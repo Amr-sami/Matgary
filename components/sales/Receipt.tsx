@@ -1,10 +1,9 @@
 "use client";
 
-import { formatPrice, formatDate } from "@/lib/utils";
+import { formatPrice, formatDate, formatDateTime } from "@/lib/utils";
 import type { DiscountType } from "@/lib/types";
 
 interface ReceiptSaleData {
-  saleId?: string;
   productName: string;
   brand?: string;
   quantity: number;

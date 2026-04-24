@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ProductSearchSelect } from "./ProductSearchSelect";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
@@ -8,9 +8,14 @@ import { recordSale } from "@/lib/firestore";
 import type { Product, DiscountType } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
 import { Printer, Percent, DollarSign } from "lucide-react";
+import { Receipt } from "./Receipt";
 
-export interface ReceiptSaleData {
-  saleId?: string;
+interface SaleFormProps {
+  onSuccess: () => void;
+  preselectedProduct?: Product | null;
+}
+
+interface LastSaleData {
   productName: string;
   brand?: string;
   quantity: number;
@@ -23,13 +28,7 @@ export interface ReceiptSaleData {
   saleDate: Date;
 }
 
-interface SaleFormProps {
-  onSuccess: () => void;
-  onPrintLastSale?: (data: ReceiptSaleData) => void;
-  preselectedProduct?: Product | null;
-}
-
-export function SaleForm({ onSuccess, onPrintLastSale, preselectedProduct }: SaleFormProps) {
+export function SaleForm({ onSuccess, preselectedProduct }: SaleFormProps) {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(preselectedProduct || null);
   const [quantity, setQuantity] = useState(1);
   const [pricePerUnit, setPricePerUnit] = useState(0);
@@ -40,8 +39,9 @@ export function SaleForm({ onSuccess, onPrintLastSale, preselectedProduct }: Sal
   const [discountType, setDiscountType] = useState<DiscountType>("percentage");
   const [discountValue, setDiscountValue] = useState(0);
 
-  // Last sale for receipt (kept locally only so the print button can appear)
-  const [lastSale, setLastSale] = useState<ReceiptSaleData | null>(null);
+  // Last sale for receipt
+  const [lastSale, setLastSale] = useState<LastSaleData | null>(null);
+  const receiptRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (selectedProduct) {
@@ -61,7 +61,7 @@ export function SaleForm({ onSuccess, onPrintLastSale, preselectedProduct }: Sal
     if (!selectedProduct || quantity < 1 || pricePerUnit < 1) return;
     setLoading(true);
     try {
-      const saleId = await recordSale(
+      await recordSale(
         selectedProduct.id,
         quantity,
         pricePerUnit,
@@ -72,7 +72,6 @@ export function SaleForm({ onSuccess, onPrintLastSale, preselectedProduct }: Sal
 
       // Save last sale data for receipt
       setLastSale({
-        saleId,
         productName: selectedProduct.name,
         brand: selectedProduct.brand,
         quantity,
@@ -99,11 +98,7 @@ export function SaleForm({ onSuccess, onPrintLastSale, preselectedProduct }: Sal
   };
 
   const handlePrint = () => {
-    if (lastSale && onPrintLastSale) {
-      onPrintLastSale(lastSale);
-    } else if (lastSale) {
-      window.print();
-    }
+    window.print();
   };
 
   const isValid = selectedProduct && quantity >= 1 && pricePerUnit > 0 && quantity <= selectedProduct.quantity;
@@ -241,6 +236,12 @@ export function SaleForm({ onSuccess, onPrintLastSale, preselectedProduct }: Sal
         )}
       </div>
 
+      {/* Hidden Receipt for Printing */}
+      {lastSale && (
+        <div ref={receiptRef} className="print-receipt-container">
+          <Receipt sale={lastSale} />
+        </div>
+      )}
     </>
   );
 }
