@@ -5,13 +5,13 @@ import { AppShell } from "@/components/layout/AppShell";
 import { useSales } from "@/hooks/useSales";
 import { useReturns } from "@/hooks/useReturns";
 import { useProducts } from "@/hooks/useProducts";
-import { SaleForm } from "@/components/sales/SaleForm";
+import { SaleForm, type ReceiptSaleData } from "@/components/sales/SaleForm";
+import { PrintOptionsModal } from "@/components/sales/PrintOptionsModal";
 import { SaleSummaryCard } from "@/components/sales/SaleSummaryCard";
 import { SalesFilters } from "@/components/sales/SalesFilters";
 import { SalesTable } from "@/components/sales/SalesTable";
 import { SaleCard } from "@/components/sales/SaleCard";
 import { ReturnModal } from "@/components/returns/ReturnModal";
-import { Receipt } from "@/components/sales/Receipt";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Toast } from "@/components/ui/Toast";
@@ -26,7 +26,7 @@ export default function SalesPage() {
   const [selectedStatus, setSelectedStatus] = useState<"all" | "sold" | "returned">("all");
 
   const [returnSale, setReturnSale] = useState<Sale | null>(null);
-  const [printSale, setPrintSale] = useState<Sale | null>(null);
+  const [receiptData, setReceiptData] = useState<ReceiptSaleData | null>(null);
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const filteredSales = useMemo(() => {
@@ -43,11 +43,19 @@ export default function SalesPage() {
   };
 
   const handlePrint = (sale: Sale) => {
-    setPrintSale(sale);
-    // Use a small timeout to ensure the Receipt component is rendered before printing
-    setTimeout(() => {
-      window.print();
-    }, 100);
+    setReceiptData({
+      saleId: sale.id,
+      productName: sale.productName,
+      brand: sale.brand,
+      quantity: sale.quantitySold,
+      pricePerUnit: sale.pricePerUnit,
+      subtotal: sale.subtotal,
+      discountType: sale.discountType,
+      discountValue: sale.discountValue,
+      discountAmount: sale.discountAmount || 0,
+      totalPrice: sale.totalPrice,
+      saleDate: sale.saleDate,
+    });
   };
 
   const handleReturnSuccess = () => {
@@ -72,6 +80,7 @@ export default function SalesPage() {
         {/* Sale Form */}
         <SaleForm
           onSuccess={() => setToast({ type: "success", message: "تم تسجيل البيع بنجاح" })}
+          onPrintLastSale={setReceiptData}
         />
 
         {/* Filters */}
@@ -107,25 +116,13 @@ export default function SalesPage() {
         onSuccess={handleReturnSuccess}
       />
 
-      {/* Hidden Receipt for Printing */}
-      {printSale && (
-        <div className="print-receipt-container">
-          <Receipt 
-            sale={{
-              productName: printSale.productName,
-              brand: printSale.brand,
-              quantity: printSale.quantitySold,
-              pricePerUnit: printSale.pricePerUnit,
-              subtotal: printSale.subtotal,
-              discountType: printSale.discountType,
-              discountValue: printSale.discountValue,
-              discountAmount: printSale.discountAmount || 0,
-              totalPrice: printSale.totalPrice,
-              saleDate: printSale.saleDate,
-            }} 
-          />
-        </div>
-      )}
+      {/* Print Options Modal — owns the printable container */}
+      <PrintOptionsModal
+        isOpen={!!receiptData}
+        onClose={() => setReceiptData(null)}
+        receiptData={receiptData}
+        onConfirm={() => setReceiptData(null)}
+      />
 
       {toast && (
         <Toast type={toast.type} message={toast.message} onClose={() => setToast(null)} />
