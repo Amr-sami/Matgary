@@ -50,14 +50,13 @@ export function getTodayRange() {
 export function getYesterdayRange() {
   const start = startOfDay(new Date());
   start.setDate(start.getDate() - 1);
-  const end = endOfDay(new Date(start));
+  const end = endOfDay(start);
   return { start, end };
 }
 
 export function getThisMonthRange() {
-  const start = new Date();
-  start.setDate(1);
-  startOfDay(start);
-  const end = endOfDay(new Date());
+  const now = new Date();
+  const start = startOfDay(new Date(now.getFullYear(), now.getMonth(), 1));
+  const end = endOfDay(now);
   return { start, end };
 }

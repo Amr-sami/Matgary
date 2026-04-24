@@ -42,10 +42,11 @@ export function useInsights() {
     const revenueGrowth = lastRevenue === 0 ? 100 : ((currentRevenue - lastRevenue) / lastRevenue) * 100;
 
     // 2. Revenue Trend (Last 30 days)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
-    
-    const days = eachDayOfInterval({ start: thirtyDaysAgo, end: now });
+    const trendStart = startOfDay(new Date());
+    trendStart.setDate(trendStart.getDate() - 29);
+    const trendEnd = endOfDay(now);
+
+    const days = eachDayOfInterval({ start: trendStart, end: trendEnd });
     const trendData = days.map(day => {
       const daySales = sales.filter(s => isSameDay(new Date(s.saleDate), day));
       return {

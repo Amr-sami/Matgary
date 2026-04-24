@@ -80,7 +80,7 @@ export function LowStockAlert() {
           ))}
           {lowStockProducts.length > 6 && (
             <p className="text-xs text-text-secondary text-center">
-              +{lowStockProducts.length - 6} weitere
+              +{lowStockProducts.length - 6} منتج آخر
             </p>
           )}
         </div>

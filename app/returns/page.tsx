@@ -19,8 +19,8 @@ export default function ReturnsPage() {
     );
   }
 
-  const thisMonth = new Date();
-  thisMonth.setDate(1);
+  const now = new Date();
+  const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
   const monthReturns = returns.filter(
     (r) => new Date(r.returnDate) >= thisMonth

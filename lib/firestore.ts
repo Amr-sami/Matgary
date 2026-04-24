@@ -211,7 +211,7 @@ export function subscribeToSales(callback: (sales: Sale[]) => void): () => void 
         brand: data.brand,
         quantitySold: data.quantitySold,
         pricePerUnit: data.pricePerUnit,
-        subtotal: data.subtotal || data.totalPrice,
+        subtotal: data.subtotal ?? (data.totalPrice + (data.discountAmount || 0)),
         discountType: data.discountType as DiscountType | undefined,
         discountValue: data.discountValue,
         discountAmount: data.discountAmount,

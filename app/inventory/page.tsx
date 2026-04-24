@@ -87,7 +87,7 @@ export default function InventoryPage() {
 
         {/* Product Count */}
         <p className="text-sm text-text-secondary">
-          {filteredProducts.length}产品在 المخزن
+          {filteredProducts.length} منتج في المخزن
         </p>
 
         {/* Empty State */}
