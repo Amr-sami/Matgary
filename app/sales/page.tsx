@@ -1,17 +1,17 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { AppShell } from "@/components/layout/AppShell";
 import { useSales } from "@/hooks/useSales";
 import { useReturns } from "@/hooks/useReturns";
 import { useProducts } from "@/hooks/useProducts";
 import { SaleForm, type ReceiptSaleData } from "@/components/sales/SaleForm";
-import { PrintOptionsModal } from "@/components/sales/PrintOptionsModal";
 import { SaleSummaryCard } from "@/components/sales/SaleSummaryCard";
 import { SalesFilters } from "@/components/sales/SalesFilters";
 import { SalesTable } from "@/components/sales/SalesTable";
 import { SaleCard } from "@/components/sales/SaleCard";
 import { ReturnModal } from "@/components/returns/ReturnModal";
+import { Receipt } from "@/components/sales/Receipt";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Toast } from "@/components/ui/Toast";
@@ -57,6 +57,15 @@ export default function SalesPage() {
       saleDate: sale.saleDate,
     });
   };
+
+  useEffect(() => {
+    if (!receiptData) return;
+    const id = requestAnimationFrame(() => {
+      window.print();
+      setReceiptData(null);
+    });
+    return () => cancelAnimationFrame(id);
+  }, [receiptData]);
 
   const handleReturnSuccess = () => {
     setToast({ type: "success", message: "تم تسجيل المرتجع وتحديث المخزن" });
@@ -116,13 +125,12 @@ export default function SalesPage() {
         onSuccess={handleReturnSuccess}
       />
 
-      {/* Print Options Modal — renders the hidden printable container itself */}
-      <PrintOptionsModal
-        isOpen={!!receiptData}
-        onClose={() => setReceiptData(null)}
-        receiptData={receiptData}
-        onConfirm={() => setReceiptData(null)}
-      />
+      {/* Hidden Receipt for Printing */}
+      {receiptData && (
+        <div className="print-receipt-container">
+          <Receipt sale={receiptData} />
+        </div>
+      )}
 
       {toast && (
         <Toast type={toast.type} message={toast.message} onClose={() => setToast(null)} />

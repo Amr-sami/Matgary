@@ -93,132 +93,19 @@ body {
   background: var(--text-secondary);
 }
 
-/* ─── Receipt Styles (shared between on-screen preview and print) ─── */
-.receipt {
-  font-family: 'Consolas', 'Courier New', 'Menlo', monospace;
-  font-size: 11px;
-  line-height: 1.45;
-  color: #000;
-  background: #fff;
-  direction: ltr;
-  padding: 4mm 3mm;
-}
-
-.receipt-slogan {
-  text-align: center;
-  font-size: 10px;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  margin: 2px 0 4px;
-}
-
-.receipt-title {
-  text-align: center;
-  font-size: 18px;
-  font-weight: 900;
-  letter-spacing: 2px;
-  margin: 4px 0 6px;
-  text-transform: uppercase;
-}
-
-.receipt-divider {
-  text-align: center;
-  font-size: 10px;
-  color: #000;
-  margin: 3px 0;
-  overflow: hidden;
-  white-space: nowrap;
-}
-
-.receipt-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  padding: 1px 0;
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-}
-
-.receipt-items {
-  margin: 2px 0;
-}
-
-.receipt-item-main {
-  font-weight: 700;
-}
-
-.receipt-item-name {
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.receipt-item-price {
-  font-variant-numeric: tabular-nums;
-}
-
-.receipt-item-sub {
-  font-size: 10px;
-  padding-left: 6px;
-  color: #000;
-}
-
-.receipt-total-row {
-  font-size: 13px;
-  font-weight: 900;
-  letter-spacing: 0.5px;
-  padding: 2px 0;
-}
-
-.receipt-thankyou {
-  text-align: center;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  margin: 4px 0 2px;
-  text-transform: uppercase;
-}
-
-.receipt-thankyou-ar {
-  text-align: center;
-  font-size: 10px;
-  font-family: var(--font-cairo), 'Arial', sans-serif;
-  margin-bottom: 4px;
-  direction: rtl;
-}
-
-.receipt-barcode {
-  display: flex;
-  justify-content: center;
-  align-items: stretch;
-  gap: 1px;
-  height: 40px;
-  margin: 6px auto 2px;
-  width: 90%;
-}
-
-.receipt-bar {
-  display: inline-block;
-  height: 100%;
-}
-
-.receipt-barcode-text {
-  text-align: center;
-  font-size: 10px;
-  letter-spacing: 2px;
-  margin-top: 2px;
-}
-
-/* Screen-only: hide the print container. Revealed inside @media print. */
+/* ─── Receipt Styles (hidden on screen) ─── */
 .print-receipt-container {
   display: none;
 }
 
 /* ─── Print Styles ─── */
 @media print {
+  /* Use visibility to hide everything but the receipt */
   body * {
     visibility: hidden;
   }
 
+  /* Show only the receipt and its content */
   .print-receipt-container,
   .print-receipt-container * {
     visibility: visible;
@@ -242,11 +129,94 @@ body {
   .receipt {
     width: 72mm;
     margin: 0 auto;
+    padding: 4mm 2mm;
+    font-family: var(--font-cairo), 'Arial', sans-serif;
+    font-size: 11px;
+    line-height: 1.5;
+    color: #000;
+    background: #fff;
+    direction: rtl;
     visibility: visible !important;
   }
 
-  .receipt-page-break {
-    break-before: page;
-    page-break-before: always;
+  .receipt-header {
+    text-align: center;
+    margin-bottom: 4px;
+  }
+
+  .receipt-store-name {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 2px 0;
+    letter-spacing: 2px;
+  }
+
+  .receipt-subtitle {
+    font-size: 10px;
+    color: #333;
+    margin: 0;
+  }
+
+  .receipt-divider-double {
+    text-align: center;
+    font-size: 9px;
+    letter-spacing: -0.5px;
+    color: #000;
+    margin: 3px 0;
+  }
+
+  .receipt-divider {
+    text-align: center;
+    font-size: 9px;
+    letter-spacing: -0.5px;
+    color: #555;
+    margin: 4px 0;
+  }
+
+  .receipt-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1px 0;
+    font-size: 11px;
+  }
+
+  .receipt-section {
+    margin: 2px 0;
+  }
+
+  .receipt-discount {
+    color: #666;
+  }
+
+  .receipt-total {
+    margin: 4px 0;
+  }
+
+  .receipt-total-row {
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .receipt-footer {
+    text-align: center;
+    margin-top: 8px;
+    font-size: 10px;
+    color: #333;
+  }
+
+  .receipt-footer p {
+    margin: 2px 0;
+  }
+
+  .receipt-spacer {
+    height: 4px;
+  }
+
+  .receipt-thankyou {
+    font-size: 12px;
+    font-weight: 600;
+    color: #000;
+    margin-top: 6px !important;
   }
 }
