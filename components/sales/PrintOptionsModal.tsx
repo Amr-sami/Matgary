@@ -279,22 +279,19 @@ export function PrintOptionsModal({ isOpen, onClose, receiptData, onConfirm }: P
         {/* Preview Column */}
         <div className="space-y-2">
           <label className="block text-sm font-medium">معاينة</label>
-          <div className="border border-border rounded-lg bg-gray-50 p-4 max-h-[60vh] overflow-auto">
+          <div className="border border-border rounded-lg bg-gray-100 p-4 max-h-[60vh] overflow-auto flex justify-center">
             <div
+              className="receipt-preview shadow-md"
               style={{
-                width: `${Math.min(opts.widthMm, 80) * 3}px`,
-                margin: "0 auto",
+                width: `${Math.min(opts.widthMm, 80) * 3.4}px`,
                 background: "#fff",
-                padding: "8px",
                 border: "1px solid #e5e7eb",
-                fontSize: "11px",
-                direction: "rtl",
               }}
             >
               {receiptData ? (
                 <Receipt sale={receiptData} />
               ) : (
-                <p className="text-center text-text-secondary text-sm">لا توجد بيانات</p>
+                <p className="text-center text-text-secondary text-sm p-8">لا توجد بيانات</p>
               )}
             </div>
           </div>

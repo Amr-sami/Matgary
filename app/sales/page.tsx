@@ -44,6 +44,7 @@ export default function SalesPage() {
 
   const handlePrint = (sale: Sale) => {
     setReceiptData({
+      saleId: sale.id,
       productName: sale.productName,
       brand: sale.brand,
       quantity: sale.quantitySold,

@@ -10,6 +10,7 @@ import { formatPrice } from "@/lib/utils";
 import { Printer, Percent, DollarSign } from "lucide-react";
 
 export interface ReceiptSaleData {
+  saleId?: string;
   productName: string;
   brand?: string;
   quantity: number;
@@ -60,7 +61,7 @@ export function SaleForm({ onSuccess, onPrintLastSale, preselectedProduct }: Sal
     if (!selectedProduct || quantity < 1 || pricePerUnit < 1) return;
     setLoading(true);
     try {
-      await recordSale(
+      const saleId = await recordSale(
         selectedProduct.id,
         quantity,
         pricePerUnit,
@@ -71,6 +72,7 @@ export function SaleForm({ onSuccess, onPrintLastSale, preselectedProduct }: Sal
 
       // Save last sale data for receipt
       setLastSale({
+        saleId,
         productName: selectedProduct.name,
         brand: selectedProduct.brand,
         quantity,

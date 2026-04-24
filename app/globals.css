@@ -1,43 +1,36 @@
 @import "tailwindcss";
 
 :root {
-  --bg-main: #F5F3EF;
-  --bg-card: #FFFFFF;
-  --bg-sidebar: #1C1C1E;
-  --text-primary: #1A1A1A;
-  --text-secondary: #6B6B6B;
-  --text-sidebar: #E8E8E8;
-  --accent: #C9A84C;
-  --accent-hover: #B8962E;
-  --accent-light: #F5EDD6;
-  --danger: #C0392B;
-  --danger-light: #FDEAEA;
-  --success: #27AE60;
-  --success-light: #EAFAF1;
-  --border: #E8E4DC;
-  --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04);
+  --background: #F5F6F8;
+  --accent: #3E6FD9;
+  --accent-hover: #2B55B0;
+  --accent-light: #E8EEFC;
+  --text-primary: #1A2233;
+  --text-secondary: #6B7280;
+  --border: #E5E7EB;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --danger: #EF4444;
+  --surface: #FFFFFF;
+  --sidebar-bg: #0F1116;
+  --sidebar-text: #E5E7EB;
 }
 
 @theme inline {
-  --color-bg-main: var(--bg-main);
-  --color-bg-card: var(--bg-card);
-  --color-bg-sidebar: var(--bg-sidebar);
-  --color-text-primary: var(--text-primary);
-  --color-text-secondary: var(--text-secondary);
-  --color-text-sidebar: var(--text-sidebar);
+  --color-background: var(--background);
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
   --color-accent-light: var(--accent-light);
-  --color-danger: var(--danger);
-  --color-danger-light: var(--danger-light);
-  --color-success: var(--success);
-  --color-success-light: var(--success-light);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
   --color-border: var(--border);
-  --font-arabic: var(--font-cairo), sans-serif;
-}
-
-* {
-  box-sizing: border-box;
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-surface: var(--surface);
+  --color-sidebar-bg: var(--sidebar-bg);
+  --color-sidebar-text: var(--sidebar-text);
+  --font-sans: var(--font-cairo), 'Arial', sans-serif;
 }
 
 html {
@@ -45,42 +38,50 @@ html {
 }
 
 body {
-  font-family: var(--font-cairo), sans-serif;
-  font-size: 15px;
-  line-height: 1.6;
+  background: var(--background);
   color: var(--text-primary);
-  background: var(--bg-main);
+  font-family: var(--font-cairo), 'Arial', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-h1 {
-  font-size: 1.75rem;
-  font-weight: 700;
+/* Hide scrollbar on filter chips */
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
-h2 {
-  font-size: 1.375rem;
-  font-weight: 600;
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
 
-h3 {
-  font-size: 1.125rem;
-  font-weight: 600;
+/* Animations */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
-input,
-select,
-textarea {
-  font-family: var(--font-cairo), sans-serif;
-  text-align: right;
+@keyframes zoom-in-95 {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
 }
 
+.animate-in {
+  animation-duration: 200ms;
+  animation-fill-mode: both;
+}
+
+.fade-in { animation-name: fade-in; }
+.zoom-in-95 { animation-name: zoom-in-95; }
+
+/* Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--bg-main);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
@@ -92,19 +93,132 @@ textarea {
   background: var(--text-secondary);
 }
 
-/* ─── Receipt Styles (hidden on screen) ─── */
+/* ─── Receipt Styles (shared between on-screen preview and print) ─── */
+.receipt {
+  font-family: 'Consolas', 'Courier New', 'Menlo', monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #000;
+  background: #fff;
+  direction: ltr;
+  padding: 4mm 3mm;
+}
+
+.receipt-slogan {
+  text-align: center;
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin: 2px 0 4px;
+}
+
+.receipt-title {
+  text-align: center;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  margin: 4px 0 6px;
+  text-transform: uppercase;
+}
+
+.receipt-divider {
+  text-align: center;
+  font-size: 10px;
+  color: #000;
+  margin: 3px 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.receipt-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 1px 0;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.receipt-items {
+  margin: 2px 0;
+}
+
+.receipt-item-main {
+  font-weight: 700;
+}
+
+.receipt-item-name {
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.receipt-item-price {
+  font-variant-numeric: tabular-nums;
+}
+
+.receipt-item-sub {
+  font-size: 10px;
+  padding-left: 6px;
+  color: #000;
+}
+
+.receipt-total-row {
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  padding: 2px 0;
+}
+
+.receipt-thankyou {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  margin: 4px 0 2px;
+  text-transform: uppercase;
+}
+
+.receipt-thankyou-ar {
+  text-align: center;
+  font-size: 10px;
+  font-family: var(--font-cairo), 'Arial', sans-serif;
+  margin-bottom: 4px;
+  direction: rtl;
+}
+
+.receipt-barcode {
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  gap: 1px;
+  height: 40px;
+  margin: 6px auto 2px;
+  width: 90%;
+}
+
+.receipt-bar {
+  display: inline-block;
+  height: 100%;
+}
+
+.receipt-barcode-text {
+  text-align: center;
+  font-size: 10px;
+  letter-spacing: 2px;
+  margin-top: 2px;
+}
+
+/* Screen-only: hide the print container. Revealed inside @media print. */
 .print-receipt-container {
   display: none;
 }
 
 /* ─── Print Styles ─── */
 @media print {
-  /* Use visibility to hide everything but the receipt */
   body * {
     visibility: hidden;
   }
 
-  /* Show only the receipt and its content */
   .print-receipt-container,
   .print-receipt-container * {
     visibility: visible;
@@ -128,95 +242,7 @@ textarea {
   .receipt {
     width: 72mm;
     margin: 0 auto;
-    padding: 4mm 2mm;
-    font-family: var(--font-cairo), 'Arial', sans-serif;
-    font-size: 11px;
-    line-height: 1.5;
-    color: #000;
-    background: #fff;
-    direction: rtl;
     visibility: visible !important;
-  }
-
-  .receipt-header {
-    text-align: center;
-    margin-bottom: 4px;
-  }
-
-  .receipt-store-name {
-    font-size: 18px;
-    font-weight: 700;
-    margin: 2px 0;
-    letter-spacing: 2px;
-  }
-
-  .receipt-subtitle {
-    font-size: 10px;
-    color: #333;
-    margin: 0;
-  }
-
-  .receipt-divider-double {
-    text-align: center;
-    font-size: 9px;
-    letter-spacing: -0.5px;
-    color: #000;
-    margin: 3px 0;
-  }
-
-  .receipt-divider {
-    text-align: center;
-    font-size: 9px;
-    letter-spacing: -0.5px;
-    color: #555;
-    margin: 4px 0;
-  }
-
-  .receipt-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1px 0;
-    font-size: 11px;
-  }
-
-  .receipt-section {
-    margin: 2px 0;
-  }
-
-  .receipt-discount {
-    color: #666;
-  }
-
-  .receipt-total {
-    margin: 4px 0;
-  }
-
-  .receipt-total-row {
-    font-size: 14px;
-    font-weight: 700;
-  }
-
-  .receipt-footer {
-    text-align: center;
-    margin-top: 8px;
-    font-size: 10px;
-    color: #333;
-  }
-
-  .receipt-footer p {
-    margin: 2px 0;
-  }
-
-  .receipt-spacer {
-    height: 4px;
-  }
-
-  .receipt-thankyou {
-    font-size: 12px;
-    font-weight: 600;
-    color: #000;
-    margin-top: 6px !important;
   }
 
   .receipt-page-break {
