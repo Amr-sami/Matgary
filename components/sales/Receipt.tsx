@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import type { DiscountType } from "@/lib/types";
 
 interface ReceiptSaleData {
@@ -45,11 +44,7 @@ const STORE_PHONE = "01500228266";
 const STORE_LOCATION_AR = "العاشر من رمضان · الأردنية، خلف فودافون";
 const STORE_LOCATION_EN = "10th of Ramadan City - El Ordnia, behind Vodafone";
 
-function publicReceiptUrl(saleId: string | undefined, origin: string): string {
-  const base = origin || "";
-  if (!saleId) return `${base}/`;
-  return `${base}/r/${saleId}`;
-}
+const STORE_WEBSITE = "https://cornerwatcesstore.com";
 
 function qrImageUrl(payload: string): string {
   const data = encodeURIComponent(payload);
@@ -58,12 +53,7 @@ function qrImageUrl(payload: string): string {
 
 export function Receipt({ sale }: ReceiptProps) {
   const code = shortCode(sale);
-  const [origin] = useState(() =>
-    typeof window !== "undefined" ? window.location.origin : ""
-  );
-
-  const receiptUrl = publicReceiptUrl(sale.saleId, origin);
-  const qrUrl = qrImageUrl(receiptUrl);
+  const qrUrl = qrImageUrl(STORE_WEBSITE);
 
   return (
     <div className="receipt" dir="ltr">
@@ -146,7 +136,7 @@ export function Receipt({ sale }: ReceiptProps) {
           className="receipt-qr-img"
         />
       </div>
-      <div className="receipt-qr-hint">SCAN FOR PDF · امسح للفاتورة</div>
+      <div className="receipt-qr-hint">SCAN TO VISIT · {STORE_WEBSITE.replace("https://", "")}</div>
       <div className="receipt-barcode-text">#{code}</div>
     </div>
   );
