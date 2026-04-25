@@ -143,6 +143,17 @@ textarea {
     break-after: page;
   }
 
+  .receipt-logo {
+    display: block;
+    width: 18mm;
+    height: auto;
+    max-height: 18mm;
+    object-fit: contain;
+    margin: 0 auto 2px;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
   .receipt-slogan {
     text-align: center;
     font-size: 10px;
@@ -151,6 +162,16 @@ textarea {
     margin: 2px 0 2px;
     font-weight: 700;
   }
+
+  .receipt-qr-hint {
+    text-align: center;
+    font-size: 9px;
+    letter-spacing: 0.5px;
+    margin: 2px 0;
+    font-weight: 600;
+  }
+
+  .no-print { display: none !important; }
 
   .receipt-contact {
     text-align: center;
@@ -278,6 +299,23 @@ textarea {
   background: #fff;
   direction: ltr;
   padding: 4mm 3mm;
+}
+
+.receipt-preview .receipt-logo {
+  display: block;
+  width: 60px;
+  height: auto;
+  max-height: 60px;
+  object-fit: contain;
+  margin: 0 auto 4px;
+}
+
+.receipt-preview .receipt-qr-hint {
+  text-align: center;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  margin: 2px 0;
+  font-weight: 600;
 }
 
 .receipt-preview .receipt-slogan {

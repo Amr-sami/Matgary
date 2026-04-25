@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { DiscountType } from "@/lib/types";
 
 interface ReceiptSaleData {
@@ -44,15 +45,10 @@ const STORE_PHONE = "01500228266";
 const STORE_LOCATION_AR = "العاشر من رمضان · الأردنية، خلف فودافون";
 const STORE_LOCATION_EN = "10th of Ramadan City - El Ordnia, behind Vodafone";
 
-function buildQrPayload(sale: ReceiptSaleData, code: string): string {
-  return [
-    "CORNER STORE",
-    `TEL: ${STORE_PHONE}`,
-    STORE_LOCATION_EN,
-    `RECEIPT: #${code}`,
-    `TOTAL: ${sale.totalPrice.toFixed(2)} EGP`,
-    `DATE: ${formatReceiptDate(sale.saleDate)}`,
-  ].join("\n");
+function publicReceiptUrl(saleId: string | undefined, origin: string): string {
+  const base = origin || "";
+  if (!saleId) return `${base}/`;
+  return `${base}/r/${saleId}`;
 }
 
 function qrImageUrl(payload: string): string {
@@ -62,10 +58,17 @@ function qrImageUrl(payload: string): string {
 
 export function Receipt({ sale }: ReceiptProps) {
   const code = shortCode(sale);
-  const qrUrl = qrImageUrl(buildQrPayload(sale, code));
+  const [origin] = useState(() =>
+    typeof window !== "undefined" ? window.location.origin : ""
+  );
+
+  const receiptUrl = publicReceiptUrl(sale.saleId, origin);
+  const qrUrl = qrImageUrl(receiptUrl);
 
   return (
     <div className="receipt" dir="ltr">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/logo.png" alt="Corner Store" className="receipt-logo" />
       <div className="receipt-slogan">CORNER STORE · العاشر من رمضان</div>
       <div className="receipt-contact">TEL: {STORE_PHONE}</div>
       <div className="receipt-contact">{STORE_LOCATION_EN}</div>
@@ -143,6 +146,7 @@ export function Receipt({ sale }: ReceiptProps) {
           className="receipt-qr-img"
         />
       </div>
+      <div className="receipt-qr-hint">SCAN FOR PDF · امسح للفاتورة</div>
       <div className="receipt-barcode-text">#{code}</div>
     </div>
   );

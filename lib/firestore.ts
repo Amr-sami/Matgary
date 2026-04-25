@@ -195,6 +195,33 @@ export async function recordSale(
   });
 }
 
+export async function getSaleById(saleId: string): Promise<Sale | null> {
+  const saleRef = doc(db, "sales", saleId);
+  const snap = await getDoc(saleRef);
+  if (!snap.exists()) return null;
+  const data = snap.data();
+  return {
+    id: snap.id,
+    productId: data.productId,
+    productName: data.productName,
+    category: data.category as Category,
+    gender: data.gender as Gender,
+    brand: data.brand,
+    quantitySold: data.quantitySold,
+    pricePerUnit: data.pricePerUnit,
+    subtotal: data.subtotal ?? (data.totalPrice + (data.discountAmount || 0)),
+    discountType: data.discountType as DiscountType | undefined,
+    discountValue: data.discountValue,
+    discountAmount: data.discountAmount,
+    totalPrice: data.totalPrice,
+    saleDate: convertTimestamp(data.saleDate as Timestamp),
+    isReturned: data.isReturned || false,
+    returnedAt: data.returnedAt ? convertTimestamp(data.returnedAt as Timestamp) : undefined,
+    returnedQuantity: data.returnedQuantity,
+    note: data.note,
+  };
+}
+
 export function subscribeToSales(callback: (sales: Sale[]) => void): () => void {
   const salesRef = collection(db, "sales");
   const q = query(salesRef, orderBy("saleDate", "desc"));
