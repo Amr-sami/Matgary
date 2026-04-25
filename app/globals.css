@@ -108,6 +108,8 @@ textarea {
   .print-receipt-container,
   .print-receipt-container * {
     visibility: visible;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   .print-receipt-container {
@@ -116,12 +118,13 @@ textarea {
     left: 0;
     top: 0;
     width: 72mm;
-    margin: 0;
+    margin: 0 auto;
     padding: 0;
+    page-break-after: always;
+    break-after: page;
   }
 
   @page {
-    size: 80mm auto;
     margin: 0;
   }
 
@@ -136,6 +139,8 @@ textarea {
     background: #fff;
     direction: ltr;
     visibility: visible !important;
+    page-break-after: always;
+    break-after: page;
   }
 
   .receipt-slogan {
@@ -143,7 +148,23 @@ textarea {
     font-size: 10px;
     letter-spacing: 1px;
     text-transform: uppercase;
-    margin: 2px 0 4px;
+    margin: 2px 0 2px;
+    font-weight: 700;
+  }
+
+  .receipt-contact {
+    text-align: center;
+    font-size: 9.5px;
+    margin: 1px 0;
+    letter-spacing: 0.3px;
+  }
+
+  .receipt-contact-ar {
+    text-align: center;
+    font-size: 9.5px;
+    margin: 1px 0 4px;
+    font-family: var(--font-cairo), 'Arial', sans-serif;
+    direction: rtl;
   }
 
   .receipt-title {
@@ -220,19 +241,19 @@ textarea {
     direction: rtl;
   }
 
-  .receipt-barcode {
+  .receipt-qr {
     display: flex;
     justify-content: center;
-    align-items: stretch;
-    gap: 1px;
-    height: 40px;
+    align-items: center;
     margin: 6px auto 2px;
-    width: 90%;
   }
 
-  .receipt-bar {
-    display: inline-block;
-    height: 100%;
+  .receipt-qr-img {
+    width: 30mm;
+    height: 30mm;
+    image-rendering: pixelated;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   .receipt-barcode-text {
@@ -264,7 +285,23 @@ textarea {
   font-size: 10px;
   letter-spacing: 1px;
   text-transform: uppercase;
-  margin: 2px 0 4px;
+  margin: 2px 0 2px;
+  font-weight: 700;
+}
+
+.receipt-preview .receipt-contact {
+  text-align: center;
+  font-size: 9.5px;
+  margin: 1px 0;
+  letter-spacing: 0.3px;
+}
+
+.receipt-preview .receipt-contact-ar {
+  text-align: center;
+  font-size: 9.5px;
+  margin: 1px 0 4px;
+  font-family: var(--font-cairo), 'Arial', sans-serif;
+  direction: rtl;
 }
 
 .receipt-preview .receipt-title {
@@ -332,19 +369,17 @@ textarea {
   direction: rtl;
 }
 
-.receipt-preview .receipt-barcode {
+.receipt-preview .receipt-qr {
   display: flex;
   justify-content: center;
-  align-items: stretch;
-  gap: 1px;
-  height: 40px;
+  align-items: center;
   margin: 6px auto 2px;
-  width: 90%;
 }
 
-.receipt-preview .receipt-bar {
-  display: inline-block;
-  height: 100%;
+.receipt-preview .receipt-qr-img {
+  width: 110px;
+  height: 110px;
+  image-rendering: pixelated;
 }
 
 .receipt-preview .receipt-barcode-text {

@@ -58,30 +58,41 @@ interface PrintOptionsModalProps {
   onConfirm: () => void;
 }
 
-function buildPrintStyle(opts: PrintOptions): string {
+function buildPrintStyle(opts: PrintOptions, isThermalPrinter: boolean): string {
   const { widthMm, heightMm, orientation, margin, scale, pagesPerSheet } = opts;
   const mm = MARGIN_MM[margin];
-  const size = heightMm === "auto" ? `${widthMm}mm auto` : `${widthMm}mm ${heightMm}mm`;
   const contentWidth = Math.max(widthMm - mm * 2, 20);
+
+  // For thermal printers we constrain @page to the roll width so the printer
+  // cuts at the right spot. For regular paper printers we leave @page size to
+  // the printer's actual paper (set in the browser dialog) and just center the
+  // narrow receipt — otherwise drivers tile multiple small pages on one sheet.
+  const pageRule = isThermalPrinter
+    ? `@page { size: ${widthMm}mm ${heightMm === "auto" ? "auto" : `${heightMm}mm`} ${orientation}; margin: ${mm}mm; }`
+    : `@page { margin: ${mm}mm; }`;
 
   const gridCols = pagesPerSheet >= 2 ? 2 : 1;
   const gridRows = pagesPerSheet === 4 ? 2 : 1;
 
   return `
     @media print {
-      @page {
-        size: ${size} ${orientation};
-        margin: ${mm}mm;
-      }
+      ${pageRule}
       .print-receipt-container {
         display: ${pagesPerSheet > 1 ? "grid" : "block"} !important;
         ${pagesPerSheet > 1 ? `grid-template-columns: repeat(${gridCols}, 1fr); grid-template-rows: repeat(${gridRows}, auto); gap: 4mm;` : ""}
         width: ${contentWidth}mm !important;
+        margin: 0 auto !important;
         transform: scale(${scale / 100});
-        transform-origin: top ${orientation === "portrait" ? "right" : "left"};
+        transform-origin: top center;
       }
       .receipt {
         width: 100% !important;
+        page-break-after: always;
+        break-after: page;
+      }
+      .receipt:last-child {
+        page-break-after: auto;
+        break-after: auto;
       }
     }
   `;
@@ -121,7 +132,7 @@ export function PrintOptionsModal({ isOpen, onClose, receiptData, onConfirm }: P
 
     const style = document.createElement("style");
     style.id = "print-options-dynamic";
-    style.textContent = buildPrintStyle(opts);
+    style.textContent = buildPrintStyle(opts, selectedPaper.thermal);
     document.head.appendChild(style);
 
     const cleanup = () => {

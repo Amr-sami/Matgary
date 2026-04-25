@@ -40,23 +40,36 @@ function shortCode(sale: ReceiptSaleData): string {
   return sale.saleDate.getTime().toString().slice(-10);
 }
 
-function barcodeBars(code: string): { width: number; filled: boolean }[] {
-  const bars: { width: number; filled: boolean }[] = [];
-  const seed = code.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-  for (let i = 0; i < 48; i++) {
-    const v = (seed * (i + 7)) % 11;
-    bars.push({ width: 1 + (v % 3), filled: v % 2 === 0 });
-  }
-  return bars;
+const STORE_PHONE = "01500228266";
+const STORE_LOCATION_AR = "العاشر من رمضان · الأردنية، خلف فودافون";
+const STORE_LOCATION_EN = "10th of Ramadan City - El Ordnia, behind Vodafone";
+
+function buildQrPayload(sale: ReceiptSaleData, code: string): string {
+  return [
+    "CORNER STORE",
+    `TEL: ${STORE_PHONE}`,
+    STORE_LOCATION_EN,
+    `RECEIPT: #${code}`,
+    `TOTAL: ${sale.totalPrice.toFixed(2)} EGP`,
+    `DATE: ${formatReceiptDate(sale.saleDate)}`,
+  ].join("\n");
+}
+
+function qrImageUrl(payload: string): string {
+  const data = encodeURIComponent(payload);
+  return `https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=0&ecc=M&data=${data}`;
 }
 
 export function Receipt({ sale }: ReceiptProps) {
   const code = shortCode(sale);
-  const bars = barcodeBars(code);
+  const qrUrl = qrImageUrl(buildQrPayload(sale, code));
 
   return (
     <div className="receipt" dir="ltr">
       <div className="receipt-slogan">CORNER STORE · العاشر من رمضان</div>
+      <div className="receipt-contact">TEL: {STORE_PHONE}</div>
+      <div className="receipt-contact">{STORE_LOCATION_EN}</div>
+      <div className="receipt-contact-ar">{STORE_LOCATION_AR}</div>
 
       <div className="receipt-divider">- - - - - - - - - - - - - - - - - - - - - - - - -</div>
 
@@ -120,17 +133,15 @@ export function Receipt({ sale }: ReceiptProps) {
 
       <div className="receipt-divider">- - - - - - - - - - - - - - - - - - - - - - - - -</div>
 
-      <div className="receipt-barcode">
-        {bars.map((b, i) => (
-          <span
-            key={i}
-            className="receipt-bar"
-            style={{
-              width: `${b.width}px`,
-              background: b.filled ? "#000" : "transparent",
-            }}
-          />
-        ))}
+      <div className="receipt-qr">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={qrUrl}
+          alt={`QR ${code}`}
+          width={120}
+          height={120}
+          className="receipt-qr-img"
+        />
       </div>
       <div className="receipt-barcode-text">#{code}</div>
     </div>
