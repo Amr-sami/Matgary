@@ -21,6 +21,7 @@ interface PrintOptions {
   scale: number;
   copies: number;
   pagesPerSheet: 1 | 2 | 4;
+  fitToPage: boolean;
 }
 
 const PAPER_SIZES: Record<
@@ -68,6 +69,7 @@ const DEFAULT_OPTS: PrintOptions = {
   scale: 100,
   copies: 1,
   pagesPerSheet: 1,
+  fitToPage: true,
 };
 
 interface PrintOptionsModalProps {
@@ -78,16 +80,16 @@ interface PrintOptionsModalProps {
 }
 
 function buildPrintStyle(opts: PrintOptions, preset: typeof PAPER_SIZES[PaperPreset]): string {
-  const { widthMm, heightMm, orientation, margin, scale, pagesPerSheet } = opts;
+  const { widthMm, heightMm, orientation, margin, scale, pagesPerSheet, fitToPage } = opts;
   const mm = MARGIN_MM[margin];
   const contentWidth = Math.max(widthMm - mm * 2, 20);
 
-  // Three @page modes:
-  // 1. useDriverPaper (auto_one, default): no size — printer uses its own paper
-  //    (A4/Letter). The receipt is just centered on whatever paper is loaded.
-  //    This is the only mode that prevents driver-side 4-up tiling.
-  // 2. thermal: @page locked to roll width; height auto so receipt fits exactly.
-  // 3. fixed paper (A4/Letter/custom): explicit @page size.
+  // Three modes:
+  // 1. useDriverPaper (auto_one): no @page size — printer uses its own paper
+  //    (A4/Letter/whatever the user picks in the browser dialog). One receipt
+  //    centered per sheet. This is the only mode that *guarantees* no 4-up tiling.
+  // 2. thermal: @page is locked to the roll width so the printer cuts correctly.
+  // 3. fixed paper (A4/Letter/custom): @page matches the chosen size.
   let pageRule: string;
   if (preset.useDriverPaper) {
     pageRule = `@page { margin: ${mm}mm; }`;
@@ -101,24 +103,32 @@ function buildPrintStyle(opts: PrintOptions, preset: typeof PAPER_SIZES[PaperPre
   const gridCols = pagesPerSheet >= 2 ? 2 : 1;
   const gridRows = pagesPerSheet === 4 ? 2 : 1;
 
-  // Skip transform entirely when scale is 100 — even an identity scale creates
-  // a stacking context that has been observed to cause Chrome's print pipeline
-  // to paginate the same content into multiple pages.
-  const transformRule = scale === 100
-    ? ""
-    : `transform: scale(${scale / 100}); transform-origin: top center;`;
+  // fitToPage stretches the receipt vertically to fill the page so there is no
+  // blank space between the bottom of the receipt and the bottom of the paper.
+  // Implemented via flex column on the wrapper + flex-grow on a spacer-less
+  // receipt container. We use min-height: 100vh on the container.
+  const fitRules = fitToPage && pagesPerSheet === 1
+    ? `
+      .print-receipt-container > * {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+    `
+    : "";
 
   return `
     @media print {
-      html, body { background: #fff !important; margin: 0 !important; padding: 0 !important; }
+      html, body { background: #fff !important; }
       ${pageRule}
       .print-receipt-container {
-        position: static !important;
         display: ${pagesPerSheet > 1 ? "grid" : "block"} !important;
         ${pagesPerSheet > 1 ? `grid-template-columns: repeat(${gridCols}, 1fr); grid-template-rows: repeat(${gridRows}, auto); gap: 4mm;` : ""}
         width: ${contentWidth}mm !important;
         margin: 0 auto !important;
-        ${transformRule}
+        transform: scale(${scale / 100});
+        transform-origin: top center;
       }
       .receipt {
         width: 100% !important;
@@ -129,11 +139,7 @@ function buildPrintStyle(opts: PrintOptions, preset: typeof PAPER_SIZES[PaperPre
         page-break-after: auto;
         break-after: auto;
       }
-      /* Prevent QR/logo image load timing from pushing content onto a new page */
-      .receipt-qr, .receipt-qr-img, .receipt-logo {
-        page-break-inside: avoid;
-        break-inside: avoid;
-      }
+      ${fitRules}
     }
   `;
 }
@@ -165,7 +171,7 @@ export function PrintOptionsModal({ isOpen, onClose, receiptData, onConfirm }: P
     [opts.copies]
   );
 
-  const handlePrint = async () => {
+  const handlePrint = () => {
     if (!receiptData) return;
     const existing = document.getElementById("print-options-dynamic");
     if (existing) existing.remove();
@@ -182,27 +188,10 @@ export function PrintOptionsModal({ isOpen, onClose, receiptData, onConfirm }: P
     };
     window.addEventListener("afterprint", cleanup);
 
-    // Wait for every image inside the print container (logo + QR) to finish
-    // loading. If we don't wait, Chrome paginates an empty layout, then the
-    // images load mid-preview and the layout reflows — which has been observed
-    // to duplicate the receipt across multiple pages.
-    const container = document.querySelector(".print-receipt-container");
-    if (container) {
-      const imgs = Array.from(container.querySelectorAll("img"));
-      await Promise.all(
-        imgs.map(
-          (img) =>
-            new Promise<void>((resolve) => {
-              if (img.complete && img.naturalWidth > 0) return resolve();
-              img.addEventListener("load", () => resolve(), { once: true });
-              img.addEventListener("error", () => resolve(), { once: true });
-            })
-        )
-      );
-    }
-
-    window.print();
-    onConfirm();
+    requestAnimationFrame(() => {
+      window.print();
+      onConfirm();
+    });
   };
 
   return (
@@ -337,10 +326,27 @@ export function PrintOptionsModal({ isOpen, onClose, receiptData, onConfirm }: P
             </div>
           )}
 
+          {opts.pagesPerSheet === 1 && (
+            <label className="flex items-center justify-between gap-3 p-3 rounded-lg border border-border bg-white cursor-pointer">
+              <div>
+                <p className="text-sm font-medium">ملء الصفحة (بدون فراغ أسفل الفاتورة)</p>
+                <p className="text-xs text-text-secondary mt-0.5">
+                  يمد الفاتورة لتغطي ارتفاع الورقة كاملاً.
+                </p>
+              </div>
+              <input
+                type="checkbox"
+                checked={opts.fitToPage}
+                onChange={(e) => setOpts((o) => ({ ...o, fitToPage: e.target.checked }))}
+                className="w-5 h-5 accent-accent"
+              />
+            </label>
+          )}
+
           <p className="text-xs text-text-secondary bg-accent-light p-2 rounded leading-relaxed">
-            <strong>منع تكرار الفاتورة:</strong> اختر &quot;تلقائي · نسخة واحدة لكل ورقة&quot; (الافتراضي).
-            في نافذة الطباعة بالمتصفح: اختر &quot;Pages per sheet: 1&quot; وأطفئ &quot;Fit to page&quot;
-            إن وجدت. استخدم XP-330B فقط مع الطابعة الحرارية الحقيقية.
+            <strong>منع تكرار الفاتورة 4 مرات:</strong> اختر &quot;تلقائي · نسخة واحدة لكل ورقة&quot;
+            (الافتراضي). هذا الخيار يستخدم مقاس الورق الفعلي للطابعة فيطبع نسخة واحدة فقط في الورقة.
+            استخدم XP-330B فقط مع الطابعة الحرارية.
           </p>
         </div>
 
