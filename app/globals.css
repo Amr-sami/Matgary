@@ -114,14 +114,10 @@ textarea {
 
   .print-receipt-container {
     display: block !important;
-    position: absolute;
-    left: 0;
-    top: 0;
+    position: static !important;
     width: 72mm;
     margin: 0 auto;
     padding: 0;
-    page-break-after: always;
-    break-after: page;
   }
 
   @page {
@@ -145,11 +141,11 @@ textarea {
 
   .receipt-logo {
     display: block;
-    width: 18mm;
+    width: 38mm;
     height: auto;
-    max-height: 18mm;
+    max-height: 38mm;
     object-fit: contain;
-    margin: 0 auto 2px;
+    margin: 0 auto 4px;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
@@ -303,11 +299,11 @@ textarea {
 
 .receipt-preview .receipt-logo {
   display: block;
-  width: 60px;
+  width: 130px;
   height: auto;
-  max-height: 60px;
+  max-height: 130px;
   object-fit: contain;
-  margin: 0 auto 4px;
+  margin: 0 auto 6px;
 }
 
 .receipt-preview .receipt-qr-hint {
