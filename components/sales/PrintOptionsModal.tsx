@@ -196,9 +196,9 @@ export function PrintOptionsModal({ isOpen, onClose, receiptData, onConfirm }: P
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="خيارات الطباعة" className="max-w-3xl">
-      <div className="grid md:grid-cols-2 gap-6">
+      <div className="grid lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Options Column */}
-        <div className="space-y-4">
+        <div className="space-y-4 order-2 lg:order-1">
           <div>
             <label className="block text-sm font-medium mb-2">مقاس الورق</label>
             <div className="grid grid-cols-1 gap-2">
@@ -351,13 +351,12 @@ export function PrintOptionsModal({ isOpen, onClose, receiptData, onConfirm }: P
         </div>
 
         {/* Preview Column */}
-        <div className="space-y-2">
+        <div className="space-y-2 order-1 lg:order-2">
           <label className="block text-sm font-medium">معاينة</label>
-          <div className="border border-border rounded-lg bg-bg-main p-4 max-h-[60vh] overflow-auto flex justify-center">
+          <div className="border border-border rounded-lg bg-bg-main p-2 sm:p-4 max-h-[40vh] lg:max-h-[60vh] overflow-auto flex justify-center">
             <div
-              className="receipt-preview"
+              className="receipt-preview w-full max-w-[272px]"
               style={{
-                width: `${Math.min(opts.widthMm, 80) * 3.4}px`,
                 background: "#fff",
                 border: "1px solid var(--border)",
               }}
@@ -373,11 +372,11 @@ export function PrintOptionsModal({ isOpen, onClose, receiptData, onConfirm }: P
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-border">
-        <Button variant="ghost" onClick={onClose}>
+      <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 sm:gap-3 mt-6 pt-4 border-t border-border">
+        <Button variant="ghost" onClick={onClose} className="w-full sm:w-auto">
           إلغاء
         </Button>
-        <Button onClick={handlePrint} disabled={!receiptData} className="flex items-center gap-2">
+        <Button onClick={handlePrint} disabled={!receiptData} className="flex items-center justify-center gap-2 w-full sm:w-auto">
           <Printer className="w-4 h-4" />
           طباعة ({opts.copies}× نسخة)
         </Button>
