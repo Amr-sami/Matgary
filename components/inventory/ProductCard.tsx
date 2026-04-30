@@ -80,8 +80,7 @@ export function ProductCard({ product, onEdit, onDelete, onSell }: ProductCardPr
         </button>
         <button
           onClick={() => onDelete(product)}
-          disabled={!isOutOfStock}
-          className="p-2 bg-danger-light text-danger rounded-lg disabled:opacity-50"
+          className="p-2 bg-danger-light text-danger rounded-lg"
         >
           <Trash2 className="w-4 h-4" />
         </button>

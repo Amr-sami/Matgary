@@ -92,14 +92,6 @@ export async function updateProduct(
 
 export async function deleteProduct(productId: string): Promise<void> {
   const productRef = doc(db, "products", productId);
-  const productSnap = await getDoc(productRef);
-  if (!productSnap.exists()) {
-    throw new Error("المنتج غير موجود");
-  }
-  const currentQty = productSnap.data().quantity;
-  if (currentQty > 0) {
-    throw new Error("لا يمكن حذف منتج له مخزون");
-  }
   await deleteDoc(productRef);
 }
 
