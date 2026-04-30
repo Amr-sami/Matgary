@@ -21,6 +21,7 @@ export function EditProductModal({
   onSuccess,
 }: EditProductModalProps) {
   const [loading, setLoading] = useState(false);
+  const [name, setName] = useState("");
   const [quantity, setQuantity] = useState(0);
   const [price, setPrice] = useState(0);
   const [costPrice, setCostPrice] = useState(0);
@@ -29,6 +30,7 @@ export function EditProductModal({
   // Update state when product prop changes or modal opens
   useEffect(() => {
     if (product && isOpen) {
+      setName(product.name);
       setQuantity(product.quantity);
       setPrice(product.price);
       setCostPrice(product.costPrice || 0);
@@ -38,9 +40,15 @@ export function EditProductModal({
 
   const handleSave = async () => {
     if (!product) return;
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      alert("اسم المنتج مطلوب");
+      return;
+    }
     setLoading(true);
     try {
       await updateProduct(product.id, {
+        name: trimmedName,
         quantity: Number(quantity),
         price: Number(price),
         costPrice: Number(costPrice),
@@ -61,10 +69,18 @@ export function EditProductModal({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="تعديل المنتج">
       <div className="space-y-4">
-        <div className="p-4 bg-gray-50 rounded-lg">
-          <p className="font-medium">{product.name}</p>
-          <p className="text-sm text-text-secondary">{product.brand}</p>
-        </div>
+        {product.brand && (
+          <div className="p-4 bg-gray-50 rounded-lg">
+            <p className="text-sm text-text-secondary">{product.brand}</p>
+          </div>
+        )}
+
+        <Input
+          label="اسم المنتج"
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
 
         <Input
           label="الكمية"

@@ -72,9 +72,8 @@ export function ProductTableRow({ product, onEdit, onDelete, onSell, ...props }:
           </button>
           <button
             onClick={() => onDelete(product)}
-            disabled={!isOutOfStock}
-            className="p-2 hover:bg-danger-light rounded-lg text-danger disabled:opacity-50 disabled:cursor-not-allowed"
-            title={isOutOfStock ? "حذف" : "لا يمكن حذف منتج له مخزون"}
+            className="p-2 hover:bg-danger-light rounded-lg text-danger"
+            title="حذف"
           >
             <Trash2 className="w-4 h-4" />
           </button>
