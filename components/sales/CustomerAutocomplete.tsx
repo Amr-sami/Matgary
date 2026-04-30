@@ -35,14 +35,20 @@ export function CustomerAutocomplete({
 
   const filtered = useMemo(() => {
     const q = value.trim().toLowerCase();
+    const digits = q.replace(/\D/g, "");
     const list = suggestions.filter((s) => {
       if (field === "name" && !s.name) return false;
       if (field === "phone" && !s.phone) return false;
       if (!q) return true;
-      const hay = `${s.name} ${s.phone}`.toLowerCase();
-      return hay.includes(q);
+      const nameHay = (s.name || "").toLowerCase();
+      const phoneHay = (s.phone || "").toLowerCase();
+      // Match either field by either name or digits typed
+      if (nameHay.includes(q)) return true;
+      if (phoneHay.includes(q)) return true;
+      if (digits && phoneHay.replace(/\D/g, "").includes(digits)) return true;
+      return false;
     });
-    return list.slice(0, 8);
+    return list.slice(0, 10);
   }, [suggestions, value, field]);
 
   useEffect(() => {

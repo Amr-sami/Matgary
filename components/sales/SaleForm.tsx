@@ -8,6 +8,7 @@ import { Input } from "../ui/Input";
 import { recordCartSale } from "@/lib/firestore";
 import { useSales } from "@/hooks/useSales";
 import { useProducts } from "@/hooks/useProducts";
+import { useCustomersData } from "@/hooks/useCustomersData";
 import type { Product, DiscountType, PaymentMethod } from "@/lib/types";
 import { PAYMENT_METHOD_LABELS } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
@@ -79,6 +80,7 @@ export function SaleForm({
   preselectedProduct,
 }: SaleFormProps) {
   const { sales } = useSales();
+  const { records: customerRecords } = useCustomersData();
   const { products } = useProducts();
   const searchParams = useSearchParams();
 
@@ -145,7 +147,9 @@ export function SaleForm({
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  // Build a list of past customers (phone-keyed) for autocomplete
+  // Build a list of past customers (phone-keyed) for autocomplete.
+  // Uses useCustomersData (direct Firestore read) so it always sees
+  // customerName/customerPhone fields, regardless of any chunk caching.
   const pastCustomers: CustomerSuggestion[] = (() => {
     const map = new Map<
       string,
@@ -157,7 +161,7 @@ export function SaleForm({
         lifetimeValue: number;
       }
     >();
-    for (const s of sales) {
+    for (const s of customerRecords) {
       if (s.isReturned) continue;
       const name = (s.customerName || "").trim();
       const phone = (s.customerPhone || "").trim();
