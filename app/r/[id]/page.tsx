@@ -1,8 +1,7 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
-import Link from "next/link";
-import { Printer, Download, ArrowLeft } from "lucide-react";
+import { Printer, Download } from "lucide-react";
 import { Receipt } from "@/components/sales/Receipt";
 import { getSaleById } from "@/lib/firestore";
 import type { Sale } from "@/lib/types";
@@ -10,6 +9,12 @@ import type { Sale } from "@/lib/types";
 interface PageProps {
   params: Promise<{ id: string }>;
 }
+
+const PUBLIC_STORE = {
+  name: "Corner Store",
+  website: "https://cornerwatcesstore.com",
+  phone: "01500228266",
+};
 
 export default function PublicReceiptPage({ params }: PageProps) {
   const { id } = use(params);
@@ -24,7 +29,11 @@ export default function PublicReceiptPage({ params }: PageProps) {
         const s = await getSaleById(id);
         if (cancelled) return;
         if (!s) setError("الفاتورة غير موجودة");
-        else setSale(s);
+        else {
+          setSale(s);
+          // Update tab title to the receipt # so customers don't see admin branding
+          document.title = `فاتورة #${s.id.slice(-8).toUpperCase()} — ${PUBLIC_STORE.name}`;
+        }
       } catch {
         if (!cancelled) setError("تعذر تحميل الفاتورة");
       } finally {
@@ -48,9 +57,11 @@ export default function PublicReceiptPage({ params }: PageProps) {
 
   if (error || !sale) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-6">
-        <p className="text-danger">{error || "غير موجود"}</p>
-        <Link href="/" className="text-accent underline">العودة للرئيسية</Link>
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-6 text-center">
+        <p className="text-danger font-bold">{error || "غير موجود"}</p>
+        <p className="text-sm text-text-secondary">
+          من فضلك اطلب الرابط الصحيح من بائع {PUBLIC_STORE.name}.
+        </p>
       </div>
     );
   }
@@ -72,30 +83,22 @@ export default function PublicReceiptPage({ params }: PageProps) {
   return (
     <div className="public-receipt-page min-h-screen bg-bg-main py-6 px-4">
       <div className="max-w-md mx-auto">
-        <div className="flex items-center justify-between mb-4 no-print">
-          <Link
-            href="/"
-            className="text-text-secondary text-sm flex items-center gap-1 hover:text-accent"
+        {/* Customer-facing toolbar — no link back to the admin app */}
+        <div className="flex items-center justify-end gap-2 mb-4 no-print">
+          <button
+            onClick={handlePrint}
+            className="flex items-center gap-2 bg-accent text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90"
           >
-            <ArrowLeft className="w-4 h-4" />
-            الرئيسية
-          </Link>
-          <div className="flex gap-2">
-            <button
-              onClick={handlePrint}
-              className="flex items-center gap-2 bg-accent text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90"
-            >
-              <Download className="w-4 h-4" />
-              حفظ PDF
-            </button>
-            <button
-              onClick={handlePrint}
-              className="flex items-center gap-2 bg-white border border-border px-4 py-2 rounded-lg text-sm font-medium hover:bg-bg-main"
-            >
-              <Printer className="w-4 h-4" />
-              طباعة
-            </button>
-          </div>
+            <Download className="w-4 h-4" />
+            حفظ PDF
+          </button>
+          <button
+            onClick={handlePrint}
+            className="flex items-center gap-2 bg-white border border-border px-4 py-2 rounded-lg text-sm font-medium hover:bg-bg-main"
+          >
+            <Printer className="w-4 h-4" />
+            طباعة
+          </button>
         </div>
 
         <div className="bg-white border border-border rounded-xl shadow-sm p-4">
@@ -107,6 +110,29 @@ export default function PublicReceiptPage({ params }: PageProps) {
         <p className="text-center text-xs text-text-secondary mt-4 no-print">
           اضغط &quot;حفظ PDF&quot; ثم اختر &quot;Save as PDF&quot; من نافذة الطباعة
         </p>
+
+        <div className="mt-6 text-center text-xs text-text-secondary no-print space-y-1">
+          <p className="font-bold text-text-primary">{PUBLIC_STORE.name}</p>
+          <p>
+            للتواصل:{" "}
+            <a
+              href={`tel:${PUBLIC_STORE.phone}`}
+              className="text-accent hover:underline"
+            >
+              {PUBLIC_STORE.phone}
+            </a>
+          </p>
+          <p>
+            <a
+              href={PUBLIC_STORE.website}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="text-accent hover:underline"
+            >
+              {PUBLIC_STORE.website.replace("https://", "")}
+            </a>
+          </p>
+        </div>
       </div>
 
       {/* Hidden print container the global @media print rules target */}
