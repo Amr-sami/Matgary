@@ -26,6 +26,10 @@ export default function AddProductPage() {
     price: 0,
     costPrice: 0,
     lowStockThreshold: 3,
+    sku: "",
+    tags: "",
+    supplier: "",
+    location: "",
   });
 
   const handleFormChange = (field: string, value: string | number) => {
@@ -45,11 +49,16 @@ export default function AddProductPage() {
 
     setLoading(true);
     try {
-      const productBrand = category === "watches" 
+      const productBrand = category === "watches"
         ? (form.brand === "Other" ? form.customBrand : form.brand)
         : undefined;
 
-      await addProduct({
+      const tags = form.tags
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
+
+      const payload: any = {
         name: form.name,
         category,
         gender,
@@ -58,7 +67,13 @@ export default function AddProductPage() {
         price: form.price,
         costPrice: form.costPrice || undefined,
         lowStockThreshold: form.lowStockThreshold,
-      });
+      };
+      if (form.sku.trim()) payload.sku = form.sku.trim();
+      if (form.supplier.trim()) payload.supplier = form.supplier.trim();
+      if (form.location.trim()) payload.location = form.location.trim();
+      if (tags.length > 0) payload.tags = tags;
+
+      await addProduct(payload);
 
       setToast({ type: "success", message: "تم إضافة المنتج بنجاح" });
 
@@ -73,6 +88,10 @@ export default function AddProductPage() {
         price: 0,
         costPrice: 0,
         lowStockThreshold: 3,
+        sku: "",
+        tags: "",
+        supplier: "",
+        location: "",
       });
     } catch (error: any) {
       setToast({ type: "error", message: error.message || "حدث خطأ" });

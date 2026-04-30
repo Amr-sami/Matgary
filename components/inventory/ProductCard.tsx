@@ -40,6 +40,18 @@ export function ProductCard({
           {product.brand && (
             <p className="text-xs text-text-secondary">{product.brand}</p>
           )}
+          <div className="flex flex-wrap gap-1 mt-1">
+            {product.sku && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-text-secondary font-mono">
+                {product.sku}
+              </span>
+            )}
+            {product.location && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-text-secondary">
+                📍 {product.location}
+              </span>
+            )}
+          </div>
         </div>
         <Badge variant={product.category}>
           {CATEGORY_LABELS[product.category]}
@@ -50,6 +62,14 @@ export function ProductCard({
         <Badge variant={product.gender}>
           {GENDER_LABELS[product.gender]}
         </Badge>
+        {(product.tags || []).slice(0, 3).map((t) => (
+          <span
+            key={t}
+            className="text-[10px] px-2 py-0.5 rounded-full bg-accent-light text-accent font-medium"
+          >
+            #{t}
+          </span>
+        ))}
         {cost > 0 && (
           <span
             className={cn(

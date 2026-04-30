@@ -127,6 +127,10 @@ export function subscribeToProducts(callback: (products: Product[]) => void): ()
         price: data.price,
         costPrice: data.costPrice,
         lowStockThreshold: data.lowStockThreshold || 3,
+        sku: data.sku,
+        tags: Array.isArray(data.tags) ? (data.tags as string[]) : undefined,
+        supplier: data.supplier,
+        location: data.location,
         createdAt: convertTimestamp(data.createdAt as Timestamp),
         updatedAt: convertTimestamp(data.updatedAt as Timestamp),
       };

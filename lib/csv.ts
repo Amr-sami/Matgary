@@ -22,6 +22,10 @@ export function productsToCsv(products: Product[]): string {
     "الربح للقطعة",
     "هامش الربح %",
     "حد التنبيه",
+    "الكود/الباركود",
+    "التاجات",
+    "المورد",
+    "مكان التخزين",
     "تاريخ الإضافة",
     "آخر تحديث",
   ];
@@ -40,6 +44,10 @@ export function productsToCsv(products: Product[]): string {
       profit,
       margin.toFixed(1),
       p.lowStockThreshold,
+      p.sku || "",
+      (p.tags || []).join("|"),
+      p.supplier || "",
+      p.location || "",
       p.createdAt.toISOString(),
       p.updatedAt.toISOString(),
     ].map(escapeCsv).join(",");

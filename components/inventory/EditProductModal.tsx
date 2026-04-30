@@ -27,8 +27,11 @@ export function EditProductModal({
   const [price, setPrice] = useState(0);
   const [costPrice, setCostPrice] = useState(0);
   const [lowStockThreshold, setLowStockThreshold] = useState(3);
+  const [sku, setSku] = useState("");
+  const [tags, setTags] = useState("");
+  const [supplier, setSupplier] = useState("");
+  const [location, setLocation] = useState("");
 
-  // Update state when product prop changes or modal opens
   useEffect(() => {
     if (product && isOpen) {
       setName(product.name);
@@ -37,6 +40,10 @@ export function EditProductModal({
       setPrice(product.price);
       setCostPrice(product.costPrice || 0);
       setLowStockThreshold(product.lowStockThreshold || 3);
+      setSku(product.sku || "");
+      setTags((product.tags || []).join(", "));
+      setSupplier(product.supplier || "");
+      setLocation(product.location || "");
     }
   }, [product, isOpen]);
 
@@ -49,6 +56,10 @@ export function EditProductModal({
     }
     setLoading(true);
     try {
+      const tagList = tags
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
       await updateProduct(product.id, {
         name: trimmedName,
         brand: brand.trim(),
@@ -56,6 +67,10 @@ export function EditProductModal({
         price: Number(price),
         costPrice: Number(costPrice),
         lowStockThreshold: Number(lowStockThreshold),
+        sku: sku.trim(),
+        supplier: supplier.trim(),
+        location: location.trim(),
+        tags: tagList,
       });
       onSuccess();
       onClose();
@@ -116,6 +131,35 @@ export function EditProductModal({
           value={lowStockThreshold}
           onChange={(e) => setLowStockThreshold(Number(e.target.value))}
           min={1}
+        />
+
+        <Input
+          label="كود المنتج / الباركود"
+          type="text"
+          value={sku}
+          onChange={(e) => setSku(e.target.value)}
+        />
+
+        <Input
+          label="المورد"
+          type="text"
+          value={supplier}
+          onChange={(e) => setSupplier(e.target.value)}
+        />
+
+        <Input
+          label="مكان التخزين"
+          type="text"
+          value={location}
+          onChange={(e) => setLocation(e.target.value)}
+        />
+
+        <Input
+          label="تاجات (افصل بفاصلة)"
+          type="text"
+          value={tags}
+          onChange={(e) => setTags(e.target.value)}
+          placeholder="عرض، جديد، تصفية"
         />
 
         <div className="flex gap-3 pt-4">

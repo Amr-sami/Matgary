@@ -18,6 +18,10 @@ interface Step3DetailsProps {
     price: number;
     costPrice: number;
     lowStockThreshold: number;
+    sku: string;
+    tags: string;
+    supplier: string;
+    location: string;
   };
   onChange: (field: string, value: string | number) => void;
   onSubmit: () => void;
@@ -120,6 +124,34 @@ export function Step3Details({
         value={form.lowStockThreshold}
         onChange={(e) => onChange("lowStockThreshold", Number(e.target.value))}
         min={1}
+      />
+
+      <Input
+        label="كود المنتج / الباركود (اختياري)"
+        value={form.sku}
+        onChange={(e) => onChange("sku", e.target.value)}
+        placeholder="SKU أو باركود"
+      />
+
+      <Input
+        label="الموردون (اختياري)"
+        value={form.supplier}
+        onChange={(e) => onChange("supplier", e.target.value)}
+        placeholder="اسم المورد"
+      />
+
+      <Input
+        label="مكان التخزين (اختياري)"
+        value={form.location}
+        onChange={(e) => onChange("location", e.target.value)}
+        placeholder="مثال: رف 3، فاترينة B"
+      />
+
+      <Input
+        label="تاجات (افصل بفاصلة)"
+        value={form.tags}
+        onChange={(e) => onChange("tags", e.target.value)}
+        placeholder="مثلاً: عرض، جديد، تصفية"
       />
 
       <div className="pt-4">

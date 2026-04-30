@@ -40,7 +40,15 @@ function InventoryPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { products, loading } = useProducts();
-  const { query, setQuery, filtered } = useSearch(products, ["name", "brand", "category"]);
+  const { query, setQuery, filtered } = useSearch(products, [
+    "name",
+    "brand",
+    "category",
+    "sku",
+    "tags",
+    "supplier",
+    "location",
+  ]);
 
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(
     (searchParams.get("cat") as Category | null) || null
@@ -53,6 +61,12 @@ function InventoryPageInner() {
   );
   const [selectedStockStatus, setSelectedStockStatus] = useState<StockStatus | null>(
     (searchParams.get("stock") as StockStatus | null) || null
+  );
+  const [selectedTag, setSelectedTag] = useState<string | null>(
+    searchParams.get("tag") || null
+  );
+  const [selectedSupplier, setSelectedSupplier] = useState<string | null>(
+    searchParams.get("sup") || null
   );
   const [minPrice, setMinPrice] = useState(searchParams.get("min") || "");
   const [maxPrice, setMaxPrice] = useState(searchParams.get("max") || "");
@@ -76,6 +90,8 @@ function InventoryPageInner() {
     if (selectedGender) params.set("gen", selectedGender);
     if (selectedBrand) params.set("brand", selectedBrand);
     if (selectedStockStatus) params.set("stock", selectedStockStatus);
+    if (selectedTag) params.set("tag", selectedTag);
+    if (selectedSupplier) params.set("sup", selectedSupplier);
     if (minPrice) params.set("min", minPrice);
     if (maxPrice) params.set("max", maxPrice);
     if (sortKey !== "newest") params.set("sort", sortKey);
@@ -87,6 +103,8 @@ function InventoryPageInner() {
     selectedGender,
     selectedBrand,
     selectedStockStatus,
+    selectedTag,
+    selectedSupplier,
     minPrice,
     maxPrice,
     sortKey,
@@ -103,6 +121,24 @@ function InventoryPageInner() {
     return Array.from(set).sort((a, b) => a.localeCompare(b, "ar"));
   }, [products]);
 
+  const tags = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of products) {
+      for (const t of p.tags || []) {
+        if (t && t.trim()) set.add(t.trim());
+      }
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "ar"));
+  }, [products]);
+
+  const suppliers = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of products) {
+      if (p.supplier && p.supplier.trim()) set.add(p.supplier.trim());
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "ar"));
+  }, [products]);
+
   const filteredProducts = useMemo(() => {
     const min = minPrice ? Number(minPrice) : null;
     const max = maxPrice ? Number(maxPrice) : null;
@@ -110,6 +146,8 @@ function InventoryPageInner() {
       if (selectedCategory && p.category !== selectedCategory) return false;
       if (selectedGender && p.gender !== selectedGender) return false;
       if (selectedBrand && p.brand !== selectedBrand) return false;
+      if (selectedTag && !(p.tags || []).includes(selectedTag)) return false;
+      if (selectedSupplier && p.supplier !== selectedSupplier) return false;
       if (selectedStockStatus) {
         if (selectedStockStatus === "out" && p.quantity !== 0) return false;
         if (
@@ -156,6 +194,8 @@ function InventoryPageInner() {
     selectedCategory,
     selectedGender,
     selectedBrand,
+    selectedTag,
+    selectedSupplier,
     selectedStockStatus,
     minPrice,
     maxPrice,
@@ -201,6 +241,8 @@ function InventoryPageInner() {
     !!selectedCategory ||
     !!selectedGender ||
     !!selectedBrand ||
+    !!selectedTag ||
+    !!selectedSupplier ||
     !!selectedStockStatus ||
     !!minPrice ||
     !!maxPrice ||
@@ -210,6 +252,8 @@ function InventoryPageInner() {
     setSelectedCategory(null);
     setSelectedGender(null);
     setSelectedBrand(null);
+    setSelectedTag(null);
+    setSelectedSupplier(null);
     setSelectedStockStatus(null);
     setMinPrice("");
     setMaxPrice("");
@@ -239,7 +283,7 @@ function InventoryPageInner() {
         {/* Search */}
         <input
           type="text"
-          placeholder="ابحث عن منتج، براند، أو صنف..."
+          placeholder="ابحث بالاسم، الباركود، التاج، البراند، أو المورد..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           dir="rtl"
@@ -261,6 +305,12 @@ function InventoryPageInner() {
           maxPrice={maxPrice}
           onMinPriceChange={setMinPrice}
           onMaxPriceChange={setMaxPrice}
+          tags={tags}
+          selectedTag={selectedTag}
+          onTagChange={setSelectedTag}
+          suppliers={suppliers}
+          selectedSupplier={selectedSupplier}
+          onSupplierChange={setSelectedSupplier}
         />
 
         {/* Sort + tools */}

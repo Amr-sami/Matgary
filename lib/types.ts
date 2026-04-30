@@ -24,6 +24,10 @@ export interface Product {
   price: number;
   costPrice?: number;
   lowStockThreshold: number;
+  sku?: string;
+  tags?: string[];
+  supplier?: string;
+  location?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -72,6 +76,10 @@ export interface ProductFormData {
   price: number;
   costPrice: number;
   lowStockThreshold: number;
+  sku: string;
+  tags: string;
+  supplier: string;
+  location: string;
 }
 
 export type ExpenseCategory = "rent" | "salaries" | "electricity" | "water" | "internet" | "other";

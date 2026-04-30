@@ -45,9 +45,26 @@ export function ProductTableRow({
       <td className={cellPad}>
         <div>
           <p className="font-medium">{product.name}</p>
-          {product.brand && (
-            <p className="text-xs text-text-secondary">{product.brand}</p>
-          )}
+          <div className="flex flex-wrap gap-1 mt-0.5">
+            {product.sku && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-text-secondary font-mono">
+                {product.sku}
+              </span>
+            )}
+            {product.location && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-text-secondary">
+                📍 {product.location}
+              </span>
+            )}
+            {(product.tags || []).slice(0, 3).map((t) => (
+              <span
+                key={t}
+                className="text-[10px] px-1.5 py-0.5 rounded bg-accent-light text-accent"
+              >
+                #{t}
+              </span>
+            ))}
+          </div>
         </div>
       </td>
       <td className={cellPad}>

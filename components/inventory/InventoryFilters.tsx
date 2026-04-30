@@ -25,6 +25,12 @@ interface InventoryFiltersProps {
   maxPrice: string;
   onMinPriceChange: (value: string) => void;
   onMaxPriceChange: (value: string) => void;
+  tags: string[];
+  selectedTag: string | null;
+  onTagChange: (tag: string | null) => void;
+  suppliers: string[];
+  selectedSupplier: string | null;
+  onSupplierChange: (supplier: string | null) => void;
 }
 
 export function InventoryFilters({
@@ -41,6 +47,12 @@ export function InventoryFilters({
   maxPrice,
   onMinPriceChange,
   onMaxPriceChange,
+  tags,
+  selectedTag,
+  onTagChange,
+  suppliers,
+  selectedSupplier,
+  onSupplierChange,
 }: InventoryFiltersProps) {
   const categories: (Category | null)[] = [null, "watches", "perfumes", "sunglasses"];
   const genders: (Gender | null)[] = [null, "male", "female"];
@@ -102,7 +114,7 @@ export function InventoryFilters({
         ))}
       </div>
 
-      {/* Brand + Price filters */}
+      {/* Brand + Supplier + Price filters */}
       <div className="flex flex-wrap gap-2">
         {brands.length > 0 && (
           <select
@@ -115,6 +127,21 @@ export function InventoryFilters({
             {brands.map((brand) => (
               <option key={brand} value={brand}>
                 {brand}
+              </option>
+            ))}
+          </select>
+        )}
+        {suppliers.length > 0 && (
+          <select
+            value={selectedSupplier || ""}
+            onChange={(e) => onSupplierChange(e.target.value || null)}
+            className="px-3 py-2 rounded-lg border border-border bg-white text-sm"
+            dir="rtl"
+          >
+            <option value="">كل الموردين</option>
+            {suppliers.map((s) => (
+              <option key={s} value={s}>
+                {s}
               </option>
             ))}
           </select>
@@ -140,6 +167,37 @@ export function InventoryFilters({
           className="px-3 py-2 rounded-lg border border-border bg-white text-sm w-28"
         />
       </div>
+
+      {/* Tags */}
+      {tags.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => onTagChange(null)}
+            className={cn(
+              "px-3 py-1.5 rounded-full text-xs font-medium transition-colors",
+              selectedTag === null
+                ? "bg-accent text-white"
+                : "bg-white border border-border text-text-secondary hover:border-accent"
+            )}
+          >
+            كل التاجات
+          </button>
+          {tags.map((t) => (
+            <button
+              key={t}
+              onClick={() => onTagChange(selectedTag === t ? null : t)}
+              className={cn(
+                "px-3 py-1.5 rounded-full text-xs font-medium transition-colors",
+                selectedTag === t
+                  ? "bg-accent text-white"
+                  : "bg-white border border-border text-text-secondary hover:border-accent"
+              )}
+            >
+              #{t}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
