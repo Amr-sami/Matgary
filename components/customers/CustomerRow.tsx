@@ -1,20 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import {
   ChevronDown,
   ChevronUp,
   Phone,
-  ShoppingBag,
-  Wallet,
   Star,
   MessageCircle,
   Bell,
   Megaphone,
-  Eye,
 } from "lucide-react";
-import type { Sale } from "@/lib/types";
 import { CATEGORY_LABELS } from "@/lib/types";
 import { formatPrice, formatDate } from "@/lib/utils";
 import {
@@ -22,10 +17,11 @@ import {
   daysSince,
   topCategoryLabel,
 } from "@/lib/customers";
+import type { CustomerSaleRecord } from "@/hooks/useCustomersData";
 
 interface CustomerRowProps {
   customer: CustomerAggregate;
-  allSales: Sale[];
+  records: CustomerSaleRecord[];
 }
 
 function waLink(phone: string | undefined, message: string): string {
@@ -35,21 +31,22 @@ function waLink(phone: string | undefined, message: string): string {
     : `https://wa.me/?text=${encodeURIComponent(message)}`;
 }
 
-export function CustomerRow({ customer, allSales }: CustomerRowProps) {
+export function CustomerRow({ customer, records }: CustomerRowProps) {
   const [expanded, setExpanded] = useState(false);
   const isRepeat = customer.invoiceCount >= 3;
   const inactive = daysSince(customer.lastVisit) >= 60;
 
   const invoices = useMemo(() => {
     if (!expanded) return [];
-    const filtered = allSales.filter((s) => {
+    const filtered = records.filter((s) => {
+      if (s.isReturned) return false;
       const name = (s.customerName || "").trim();
       const phone = (s.customerPhone || "").trim();
       const key = phone || `name:${name.toLowerCase()}`;
-      return key === customer.key && !s.isReturned;
+      return key === customer.key;
     });
-    // Group by invoiceId
-    const map = new Map<string, Sale[]>();
+    // Group by invoiceId (fallback to sale id)
+    const map = new Map<string, CustomerSaleRecord[]>();
     for (const s of filtered) {
       const id = s.invoiceId || s.id;
       const arr = map.get(id) || [];
@@ -64,14 +61,7 @@ export function CustomerRow({ customer, allSales }: CustomerRowProps) {
         total: lines.reduce((s, l) => s + l.totalPrice, 0),
       }))
       .sort((a, b) => b.date.getTime() - a.date.getTime());
-  }, [expanded, allSales, customer.key]);
-
-  const filterLink = `/sales?${new URLSearchParams({
-    range: "all",
-    // The sales page reads the search via local state, so we encode the
-    // phone/name into a hint param. Sales page falls back to URL on hydrate.
-    q: customer.phone || customer.name,
-  } as any).toString()}`;
+  }, [expanded, records, customer.key]);
 
   return (
     <div className="bg-white rounded-xl border border-border overflow-hidden">
@@ -134,13 +124,6 @@ export function CustomerRow({ customer, allSales }: CustomerRowProps) {
           {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           {expanded ? "إخفاء" : "عرض الفواتير"}
         </button>
-        <Link
-          href={filterLink}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white border border-border text-xs hover:border-accent"
-        >
-          <Eye className="w-3.5 h-3.5" />
-          فواتير العميل
-        </Link>
 
         <div className="flex-1" />
 
