@@ -141,6 +141,7 @@ textarea {
     visibility: visible !important;
     page-break-after: always;
     break-after: page;
+    font-weight: 700;
   }
 
   .receipt-logo {
@@ -198,12 +199,14 @@ textarea {
   }
 
   .receipt-divider {
-    text-align: center;
-    font-size: 10px;
-    color: #000;
-    margin: 3px 0;
+    /* Hide the dash text content and render as a solid horizontal line */
+    font-size: 0;
+    color: transparent;
+    line-height: 0;
+    margin: 4px 0;
+    border-top: 1px solid #000;
+    height: 0;
     overflow: hidden;
-    white-space: nowrap;
   }
 
   .receipt-row {
@@ -299,6 +302,7 @@ textarea {
   background: #fff;
   direction: ltr;
   padding: 4mm 3mm;
+  font-weight: 700;
 }
 
 .receipt-preview .receipt-logo {
@@ -352,12 +356,13 @@ textarea {
 }
 
 .receipt-preview .receipt-divider {
-  text-align: center;
-  font-size: 10px;
-  color: #000;
-  margin: 3px 0;
+  font-size: 0;
+  color: transparent;
+  line-height: 0;
+  margin: 4px 0;
+  border-top: 1px solid #000;
+  height: 0;
   overflow: hidden;
-  white-space: nowrap;
 }
 
 .receipt-preview .receipt-row {
