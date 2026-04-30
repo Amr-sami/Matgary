@@ -3,20 +3,21 @@
 import { useMemo, useState } from "react";
 import { Download, Users, Star, Wallet, Bell, Megaphone } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
+import { useCustomersData } from "@/hooks/useCustomersData";
 import { useSales } from "@/hooks/useSales";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { CustomerRow } from "@/components/customers/CustomerRow";
 import { downloadCsv } from "@/lib/csv";
 import {
-  buildCustomerAggregates,
+  buildCustomerAggregatesGeneric,
   customersToCsv,
   daysSince,
   type CustomerAggregate,
 } from "@/lib/customers";
 import { formatPrice } from "@/lib/utils";
 
-const BUILD_STAMP = "2026-04-30-customer-fields-v2";
+const BUILD_STAMP = "2026-04-30-customer-direct-read-v3";
 
 type SortKey = "ltv" | "recent" | "invoices" | "outstanding" | "name";
 type Filter = "all" | "repeat" | "inactive" | "outstanding";
@@ -30,33 +31,39 @@ const SORT_LABELS: Record<SortKey, string> = {
 };
 
 export default function CustomersPage() {
-  const { sales, loading } = useSales();
+  // Read sales directly from Firestore (independent of subscribeToSales)
+  const { records, loading } = useCustomersData();
+  // Keep useSales call to allow CustomerRow's invoice listing to use the same data shape
+  const { sales: legacySales } = useSales();
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("ltv");
   const [filter, setFilter] = useState<Filter>("all");
 
-  const customers = useMemo(() => buildCustomerAggregates(sales), [sales]);
+  const customers = useMemo(
+    () => buildCustomerAggregatesGeneric(records),
+    [records]
+  );
 
   // Diagnostic: how many sales had any customer info attached
   const salesWithCustomer = useMemo(
     () =>
-      sales.filter(
+      records.filter(
         (s) =>
           !s.isReturned &&
           ((s.customerName || "").trim() || (s.customerPhone || "").trim())
       ).length,
-    [sales]
+    [records]
   );
   const totalActiveSales = useMemo(
-    () => sales.filter((s) => !s.isReturned).length,
-    [sales]
+    () => records.filter((s) => !s.isReturned).length,
+    [records]
   );
   const latestSale = useMemo(
     () =>
-      [...sales]
+      [...records]
         .filter((s) => !s.isReturned)
         .sort((a, b) => b.saleDate.getTime() - a.saleDate.getTime())[0],
-    [sales]
+    [records]
   );
 
   const filtered = useMemo(() => {
@@ -345,7 +352,7 @@ export default function CustomersPage() {
 
         <div className="space-y-3">
           {filtered.map((c) => (
-            <CustomerRow key={c.key} customer={c} allSales={sales} />
+            <CustomerRow key={c.key} customer={c} allSales={legacySales} />
           ))}
         </div>
       </div>
