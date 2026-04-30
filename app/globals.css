@@ -133,8 +133,8 @@ textarea {
     margin: 0 auto;
     padding: 4mm 3mm;
     font-family: 'Consolas', 'Courier New', 'Menlo', monospace;
-    font-size: 11px;
-    line-height: 1.45;
+    font-size: 13px;
+    line-height: 1.5;
     color: #000;
     background: #fff;
     direction: ltr;
@@ -157,7 +157,7 @@ textarea {
 
   .receipt-slogan {
     text-align: center;
-    font-size: 10px;
+    font-size: 12px;
     letter-spacing: 1px;
     text-transform: uppercase;
     margin: 2px 0 2px;
@@ -166,24 +166,24 @@ textarea {
 
   .receipt-qr-hint {
     text-align: center;
-    font-size: 9px;
+    font-size: 11px;
     letter-spacing: 0.5px;
     margin: 2px 0;
-    font-weight: 600;
+    font-weight: 700;
   }
 
   .no-print { display: none !important; }
 
   .receipt-contact {
     text-align: center;
-    font-size: 9.5px;
+    font-size: 11px;
     margin: 1px 0;
     letter-spacing: 0.3px;
   }
 
   .receipt-contact-ar {
     text-align: center;
-    font-size: 9.5px;
+    font-size: 11px;
     margin: 1px 0 4px;
     font-family: var(--font-cairo), 'Arial', sans-serif;
     direction: rtl;
@@ -191,7 +191,7 @@ textarea {
 
   .receipt-title {
     text-align: center;
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 900;
     letter-spacing: 2px;
     margin: 4px 0 6px;
@@ -214,7 +214,7 @@ textarea {
     justify-content: space-between;
     align-items: baseline;
     padding: 1px 0;
-    font-size: 11px;
+    font-size: 13px;
     font-variant-numeric: tabular-nums;
   }
 
@@ -236,13 +236,13 @@ textarea {
   }
 
   .receipt-item-sub {
-    font-size: 10px;
+    font-size: 12px;
     padding-left: 6px;
     color: #000;
   }
 
   .receipt-total-row {
-    font-size: 13px;
+    font-size: 15px;
     font-weight: 900;
     letter-spacing: 0.5px;
     padding: 2px 0;
@@ -250,7 +250,7 @@ textarea {
 
   .receipt-thankyou {
     text-align: center;
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 700;
     letter-spacing: 1px;
     margin: 4px 0 2px;
@@ -259,7 +259,7 @@ textarea {
 
   .receipt-thankyou-ar {
     text-align: center;
-    font-size: 10px;
+    font-size: 12px;
     font-family: var(--font-cairo), 'Arial', sans-serif;
     margin-bottom: 4px;
     direction: rtl;
@@ -282,7 +282,7 @@ textarea {
 
   .receipt-barcode-text {
     text-align: center;
-    font-size: 10px;
+    font-size: 12px;
     letter-spacing: 2px;
     margin-top: 2px;
   }
@@ -296,8 +296,8 @@ textarea {
 /* ─── Receipt preview (on-screen inside Print Options modal) ─── */
 .receipt-preview .receipt {
   font-family: 'Consolas', 'Courier New', 'Menlo', monospace;
-  font-size: 11px;
-  line-height: 1.45;
+  font-size: 13px;
+  line-height: 1.5;
   color: #000;
   background: #fff;
   direction: ltr;
@@ -316,15 +316,15 @@ textarea {
 
 .receipt-preview .receipt-qr-hint {
   text-align: center;
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.5px;
   margin: 2px 0;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .receipt-preview .receipt-slogan {
   text-align: center;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 1px;
   text-transform: uppercase;
   margin: 2px 0 2px;
@@ -333,14 +333,14 @@ textarea {
 
 .receipt-preview .receipt-contact {
   text-align: center;
-  font-size: 9.5px;
+  font-size: 11px;
   margin: 1px 0;
   letter-spacing: 0.3px;
 }
 
 .receipt-preview .receipt-contact-ar {
   text-align: center;
-  font-size: 9.5px;
+  font-size: 11px;
   margin: 1px 0 4px;
   font-family: var(--font-cairo), 'Arial', sans-serif;
   direction: rtl;
@@ -348,7 +348,7 @@ textarea {
 
 .receipt-preview .receipt-title {
   text-align: center;
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 900;
   letter-spacing: 2px;
   margin: 4px 0 6px;
@@ -370,7 +370,7 @@ textarea {
   justify-content: space-between;
   align-items: baseline;
   padding: 1px 0;
-  font-size: 11px;
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -384,12 +384,12 @@ textarea {
 }
 
 .receipt-preview .receipt-item-sub {
-  font-size: 10px;
+  font-size: 12px;
   padding-left: 6px;
 }
 
 .receipt-preview .receipt-total-row {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 900;
   letter-spacing: 0.5px;
   padding: 2px 0;
@@ -397,7 +397,7 @@ textarea {
 
 .receipt-preview .receipt-thankyou {
   text-align: center;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: 1px;
   margin: 4px 0 2px;
@@ -406,7 +406,7 @@ textarea {
 
 .receipt-preview .receipt-thankyou-ar {
   text-align: center;
-  font-size: 10px;
+  font-size: 12px;
   font-family: var(--font-cairo), 'Arial', sans-serif;
   margin-bottom: 4px;
   direction: rtl;
@@ -427,7 +427,7 @@ textarea {
 
 .receipt-preview .receipt-barcode-text {
   text-align: center;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 2px;
   margin-top: 2px;
 }
