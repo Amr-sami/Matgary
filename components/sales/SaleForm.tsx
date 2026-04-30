@@ -144,6 +144,28 @@ export function SaleForm({
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
+  // Build a list of past customers (phone-keyed) for autocomplete
+  const pastCustomers = (() => {
+    const map = new Map<string, { name: string; phone: string; lastVisit: number }>();
+    for (const s of sales) {
+      const name = (s.customerName || "").trim();
+      const phone = (s.customerPhone || "").trim();
+      if (!name && !phone) continue;
+      const key = phone || `name:${name.toLowerCase()}`;
+      const cur = map.get(key);
+      const ts = s.saleDate.getTime();
+      if (!cur || ts > cur.lastVisit) {
+        map.set(key, { name, phone, lastVisit: ts });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.lastVisit - a.lastVisit);
+  })();
+
+  const handleCustomerPick = (entry: { name: string; phone: string }) => {
+    if (entry.name) setCustomerName(entry.name);
+    if (entry.phone) setCustomerPhone(entry.phone);
+  };
+
   const recentProducts = (() => {
     const seen = new Set<string>();
     const out: Product[] = [];
@@ -586,18 +608,69 @@ export function SaleForm({
             </div>
 
             <div className="grid grid-cols-2 gap-2">
-              <Input
-                label="اسم العميل (اختياري)"
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                placeholder="..."
-              />
-              <Input
-                label="رقم الموبايل"
-                value={customerPhone}
-                onChange={(e) => setCustomerPhone(e.target.value)}
-                placeholder="..."
-              />
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                  اسم العميل (اختياري)
+                </label>
+                <input
+                  type="text"
+                  list="past-customer-names"
+                  value={customerName}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setCustomerName(v);
+                    const match = pastCustomers.find((c) => c.name === v);
+                    if (match) handleCustomerPick(match);
+                  }}
+                  placeholder="..."
+                  dir="rtl"
+                  className="w-full px-4 py-2.5 rounded-lg border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+                <datalist id="past-customer-names">
+                  {pastCustomers
+                    .filter((c) => c.name)
+                    .slice(0, 50)
+                    .map((c, i) => (
+                      <option
+                        key={`${c.name}-${i}`}
+                        value={c.name}
+                        label={c.phone}
+                      />
+                    ))}
+                </datalist>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                  رقم الموبايل
+                </label>
+                <input
+                  type="text"
+                  list="past-customer-phones"
+                  value={customerPhone}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setCustomerPhone(v);
+                    const match = pastCustomers.find((c) => c.phone === v);
+                    if (match) handleCustomerPick(match);
+                  }}
+                  placeholder="..."
+                  dir="rtl"
+                  inputMode="tel"
+                  className="w-full px-4 py-2.5 rounded-lg border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+                <datalist id="past-customer-phones">
+                  {pastCustomers
+                    .filter((c) => c.phone)
+                    .slice(0, 50)
+                    .map((c, i) => (
+                      <option
+                        key={`${c.phone}-${i}`}
+                        value={c.phone}
+                        label={c.name}
+                      />
+                    ))}
+                </datalist>
+              </div>
             </div>
 
             <div>

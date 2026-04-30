@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Package, ShoppingCart, PlusSquare, RotateCcw, BarChart3, Wallet } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingCart, PlusSquare, RotateCcw, BarChart3, Wallet, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/", label: "لوحة", icon: LayoutDashboard },
   { href: "/inventory", label: "المخزن", icon: Package },
   { href: "/sales", label: "المبيعات", icon: ShoppingCart },
+  { href: "/customers", label: "العملاء", icon: Users },
   { href: "/add-product", label: "إضافة", icon: PlusSquare },
   { href: "/returns", label: "مرتجعات", icon: RotateCcw },
   { href: "/expenses", label: "المصاريف", icon: Wallet },

@@ -9,6 +9,7 @@ interface SalesTableProps {
   onPrint: (sale: Sale) => void;
   onEdit: (sale: Sale) => void;
   onVoid: (sale: Sale) => void;
+  onCustomerClick?: (sale: Sale) => void;
   selectedIds: Set<string>;
   onToggleSelect: (sale: Sale) => void;
   onToggleSelectAll: () => void;
@@ -20,6 +21,7 @@ export function SalesTable({
   onPrint,
   onEdit,
   onVoid,
+  onCustomerClick,
   selectedIds,
   onToggleSelect,
   onToggleSelectAll,
@@ -63,6 +65,7 @@ export function SalesTable({
               onPrint={onPrint}
               onEdit={onEdit}
               onVoid={onVoid}
+              onCustomerClick={onCustomerClick}
               selected={selectedIds.has(sale.id)}
               onToggleSelect={onToggleSelect}
             />

@@ -18,6 +18,7 @@ import { DeferredPanel } from "@/components/sales/DeferredPanel";
 import { DayCompareCard } from "@/components/sales/DayCompareCard";
 import { SalesChart } from "@/components/sales/SalesChart";
 import { TopProductsCard } from "@/components/sales/TopProductsCard";
+import { TopCustomersCard } from "@/components/sales/TopCustomersCard";
 import { HourHeatmap } from "@/components/sales/HourHeatmap";
 import { SalesTable } from "@/components/sales/SalesTable";
 import { SaleCard } from "@/components/sales/SaleCard";
@@ -275,6 +276,13 @@ function SalesPageInner() {
     });
   }, [pagedSales]);
 
+  const handleCustomerClick = (sale: Sale) => {
+    const value = sale.customerPhone || sale.customerName || "";
+    if (!value) return;
+    setQuery(value);
+    setDateRange("all");
+    setSelectedStatus("all");
+  };
   const handleReturn = (sale: Sale) => setReturnSale(sale);
   const handlePrint = (sale: Sale) => {
     // If the sale belongs to a multi-line invoice, print the whole invoice
@@ -442,6 +450,7 @@ function SalesPageInner() {
           </div>
           <TopProductsCard sales={dateRangedSales} />
         </div>
+        <TopCustomersCard sales={dateRangedSales} />
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
           <div className="lg:col-span-2">
             <HourHeatmap sales={dateRangedSales} />
@@ -506,6 +515,7 @@ function SalesPageInner() {
               onPrint={handlePrint}
               onEdit={setEditSale}
               onVoid={setVoidSaleData}
+              onCustomerClick={handleCustomerClick}
               selectedIds={selectedIds}
               onToggleSelect={toggleSelect}
               onToggleSelectAll={toggleSelectAll}
@@ -524,6 +534,7 @@ function SalesPageInner() {
                 onPrint={handlePrint}
                 onEdit={setEditSale}
                 onVoid={setVoidSaleData}
+                onCustomerClick={handleCustomerClick}
                 selected={selectedIds.has(sale.id)}
                 onToggleSelect={toggleSelect}
               />

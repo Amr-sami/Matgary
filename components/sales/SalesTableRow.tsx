@@ -13,6 +13,7 @@ interface SalesTableRowProps {
   onPrint: (sale: Sale) => void;
   onEdit: (sale: Sale) => void;
   onVoid: (sale: Sale) => void;
+  onCustomerClick?: (sale: Sale) => void;
   selected: boolean;
   onToggleSelect: (sale: Sale) => void;
 }
@@ -23,6 +24,7 @@ export function SalesTableRow({
   onPrint,
   onEdit,
   onVoid,
+  onCustomerClick,
   selected,
   onToggleSelect,
 }: SalesTableRowProps) {
@@ -60,9 +62,14 @@ export function SalesTableRow({
           {sale.productName}
           <div className="flex flex-wrap gap-1 mt-0.5">
             {sale.customerName && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-text-secondary">
+              <button
+                type="button"
+                onClick={() => onCustomerClick?.(sale)}
+                className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-text-secondary hover:bg-accent hover:text-white transition-colors"
+                title="عرض كل فواتير هذا العميل"
+              >
                 {sale.customerName}
-              </span>
+              </button>
             )}
             {sale.paymentMethod && (
               <span
