@@ -16,6 +16,8 @@ import {
 } from "@/lib/customers";
 import { formatPrice } from "@/lib/utils";
 
+const BUILD_STAMP = "2026-04-30-customer-fields-v2";
+
 type SortKey = "ltv" | "recent" | "invoices" | "outstanding" | "name";
 type Filter = "all" | "repeat" | "inactive" | "outstanding";
 
@@ -188,9 +190,12 @@ export default function CustomersPage() {
               </div>
             )}
             <p className="text-xs italic">
-              لو ظهر "غير موجود" بعد تسجيل بيع جديد ببيانات عميل، اعمل
-              hard refresh (Ctrl+Shift+R أو Cmd+Shift+R) للتأكد من تحميل آخر
-              نسخة من النظام.
+              لو ظهر "غير موجود" مع إنك سجلت اسم/رقم: المتصفح بيحمّل نسخة قديمة
+              من البرنامج. اعمل hard refresh: Ctrl+Shift+R (ويندوز) أو
+              Cmd+Shift+R (ماك)، أو افتح الصفحة في incognito.
+            </p>
+            <p className="text-[10px] text-text-secondary">
+              build: {BUILD_STAMP}
             </p>
           </div>
         )}

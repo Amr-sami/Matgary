@@ -321,21 +321,6 @@ export function SaleForm({
 
     setLoading(true);
     try {
-      const cartOptions = {
-        note: note || undefined,
-        orderDiscountType: orderDiscountValue > 0 ? orderDiscountType : undefined,
-        orderDiscountValue: orderDiscountValue > 0 ? orderDiscountValue : undefined,
-        customDate: useCustomDate ? saleDate : undefined,
-        customerName: customerName.trim() || undefined,
-        customerPhone: customerPhone.trim() || undefined,
-        paymentMethod,
-      };
-      console.log("[SaleForm] submitting cart sale", {
-        lineCount: lines.length,
-        customerName: cartOptions.customerName || "(empty)",
-        customerPhone: cartOptions.customerPhone || "(empty)",
-        paymentMethod: cartOptions.paymentMethod,
-      });
       const result = await recordCartSale(
         lines.map((l) => ({
           productId: l.product.id,
@@ -344,7 +329,15 @@ export function SaleForm({
           lineDiscountType: l.lineDiscountValue > 0 ? l.lineDiscountType : undefined,
           lineDiscountValue: l.lineDiscountValue > 0 ? l.lineDiscountValue : undefined,
         })),
-        cartOptions
+        {
+          note: note || undefined,
+          orderDiscountType: orderDiscountValue > 0 ? orderDiscountType : undefined,
+          orderDiscountValue: orderDiscountValue > 0 ? orderDiscountValue : undefined,
+          customDate: useCustomDate ? saleDate : undefined,
+          customerName: customerName.trim() || undefined,
+          customerPhone: customerPhone.trim() || undefined,
+          paymentMethod,
+        }
       );
 
       const linesGross = lines.reduce(

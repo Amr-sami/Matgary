@@ -621,13 +621,6 @@ export async function recordCartSale(
         isPaid: paymentMethod !== "deferred",
         paidAt: paymentMethod !== "deferred" ? serverTimestamp() : null,
       };
-      if (i === 0) {
-        console.log("[recordCartSale] writing first sale doc", {
-          customerName: payload.customerName,
-          customerPhone: payload.customerPhone,
-          paymentMethod: payload.paymentMethod,
-        });
-      }
       tx.set(p.saleRef, payload);
       saleIds.push(p.saleRef.id);
     }
