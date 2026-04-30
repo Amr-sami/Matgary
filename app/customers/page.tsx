@@ -49,6 +49,13 @@ export default function CustomersPage() {
     () => sales.filter((s) => !s.isReturned).length,
     [sales]
   );
+  const latestSale = useMemo(
+    () =>
+      [...sales]
+        .filter((s) => !s.isReturned)
+        .sort((a, b) => b.saleDate.getTime() - a.saleDate.getTime())[0],
+    [sales]
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -136,7 +143,7 @@ export default function CustomersPage() {
       <div className="space-y-4">
         {/* Diagnostic: explain when nothing is showing */}
         {customers.length === 0 && totalActiveSales > 0 && (
-          <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 text-sm text-orange-900 space-y-1">
+          <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 text-sm text-orange-900 space-y-2">
             <p className="font-bold">لا يوجد عملاء بعد</p>
             <p>
               عندك {totalActiveSales} فاتورة في النظام، لكن لم يتم إدخال اسم
@@ -145,6 +152,45 @@ export default function CustomersPage() {
             <p className="text-xs">
               الحل: عند تسجيل البيع، اكتب اسم العميل أو رقم الموبايل في حقول
               "العميل" قبل الضغط على "تسجيل الفاتورة".
+            </p>
+            {latestSale && (
+              <div className="mt-2 p-2 rounded bg-white border border-orange-100 text-xs font-mono space-y-0.5 text-text-primary">
+                <p className="font-sans text-text-secondary">
+                  أحدث فاتورة (للتشخيص):
+                </p>
+                <p>id: {latestSale.id.slice(-8)}</p>
+                <p>productName: {latestSale.productName}</p>
+                <p>
+                  customerName:{" "}
+                  <span
+                    className={
+                      latestSale.customerName
+                        ? "text-success font-bold"
+                        : "text-danger font-bold"
+                    }
+                  >
+                    {latestSale.customerName ?? "(غير موجود)"}
+                  </span>
+                </p>
+                <p>
+                  customerPhone:{" "}
+                  <span
+                    className={
+                      latestSale.customerPhone
+                        ? "text-success font-bold"
+                        : "text-danger font-bold"
+                    }
+                  >
+                    {latestSale.customerPhone ?? "(غير موجود)"}
+                  </span>
+                </p>
+                <p>paymentMethod: {latestSale.paymentMethod ?? "(غير موجود)"}</p>
+              </div>
+            )}
+            <p className="text-xs italic">
+              لو ظهر "غير موجود" بعد تسجيل بيع جديد ببيانات عميل، اعمل
+              hard refresh (Ctrl+Shift+R أو Cmd+Shift+R) للتأكد من تحميل آخر
+              نسخة من النظام.
             </p>
           </div>
         )}

@@ -587,7 +587,7 @@ export async function recordCartSale(
         updatedAt: serverTimestamp(),
       });
       const paymentMethod = options.paymentMethod || "cash";
-      tx.set(p.saleRef, {
+      const payload = {
         invoiceId,
         productId: p.line.productId,
         productName: p.productData.name,
@@ -620,7 +620,15 @@ export async function recordCartSale(
         paymentMethod,
         isPaid: paymentMethod !== "deferred",
         paidAt: paymentMethod !== "deferred" ? serverTimestamp() : null,
-      });
+      };
+      if (i === 0) {
+        console.log("[recordCartSale] writing first sale doc", {
+          customerName: payload.customerName,
+          customerPhone: payload.customerPhone,
+          paymentMethod: payload.paymentMethod,
+        });
+      }
+      tx.set(p.saleRef, payload);
       saleIds.push(p.saleRef.id);
     }
 
