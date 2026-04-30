@@ -93,6 +93,25 @@ export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
   other: "أخرى",
 };
 
+export type ProductHistoryEventType =
+  | "created"
+  | "updated"
+  | "restocked"
+  | "decreased"
+  | "sold"
+  | "returned";
+
+export interface ProductHistoryEvent {
+  id: string;
+  productId: string;
+  productName: string;
+  type: ProductHistoryEventType;
+  delta?: number;
+  quantityAfter?: number;
+  note?: string;
+  createdAt: Date;
+}
+
 export interface Expense {
   id: string;
   title: string;

@@ -2,9 +2,10 @@
 
 import { useState, useMemo, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Download, LayoutGrid, Rows3 } from "lucide-react";
+import { Download, LayoutGrid, Rows3, Upload, Skull } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { useProducts } from "@/hooks/useProducts";
+import { useSales } from "@/hooks/useSales";
 import { useSearch } from "@/hooks/useSearch";
 import { InventoryFilters, type StockStatus } from "@/components/inventory/InventoryFilters";
 import { SortMenu, type SortKey } from "@/components/inventory/SortMenu";
@@ -12,11 +13,23 @@ import { InventorySummary } from "@/components/inventory/InventorySummary";
 import { ProductTable } from "@/components/inventory/ProductTable";
 import { ProductCard } from "@/components/inventory/ProductCard";
 import { EditProductModal } from "@/components/inventory/EditProductModal";
+import { ProductHistoryModal } from "@/components/inventory/ProductHistoryModal";
+import { CsvImportModal } from "@/components/inventory/CsvImportModal";
+import {
+  BulkActionsBar,
+  type BulkAction,
+} from "@/components/inventory/BulkActionsBar";
+import { Pagination } from "@/components/ui/Pagination";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Toast } from "@/components/ui/Toast";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { deleteProduct, adjustProductQuantity } from "@/lib/firestore";
+import {
+  deleteProduct,
+  adjustProductQuantity,
+  bulkDeleteProducts,
+  bulkUpdateProducts,
+} from "@/lib/firestore";
 import { productsToCsv, downloadCsv } from "@/lib/csv";
 import type { Product, Category, Gender } from "@/lib/types";
 
@@ -40,6 +53,7 @@ function InventoryPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { products, loading } = useProducts();
+  const { sales } = useSales();
   const { query, setQuery, filtered } = useSearch(products, [
     "name",
     "brand",
@@ -77,9 +91,18 @@ function InventoryPageInner() {
     (searchParams.get("d") as "comfortable" | "compact") || "comfortable"
   );
 
+  const [deadStockOnly, setDeadStockOnly] = useState(searchParams.get("dead") === "1");
+  const [page, setPage] = useState(Number(searchParams.get("p") || "1"));
+  const [pageSize, setPageSize] = useState(Number(searchParams.get("ps") || "50"));
+
   const [editProduct, setEditProduct] = useState<Product | null>(null);
+  const [historyProduct, setHistoryProduct] = useState<Product | null>(null);
   const [deleteProductData, setDeleteProductData] = useState<Product | null>(null);
   const [_sellProduct, setSellProduct] = useState<Product | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [bulkConfirm, setBulkConfirm] = useState<null | { count: number }>(null);
+
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
@@ -96,6 +119,9 @@ function InventoryPageInner() {
     if (maxPrice) params.set("max", maxPrice);
     if (sortKey !== "newest") params.set("sort", sortKey);
     if (density !== "comfortable") params.set("d", density);
+    if (deadStockOnly) params.set("dead", "1");
+    if (page !== 1) params.set("p", String(page));
+    if (pageSize !== 50) params.set("ps", String(pageSize));
     const qs = params.toString();
     router.replace(qs ? `/inventory?${qs}` : "/inventory", { scroll: false });
   }, [
@@ -109,8 +135,23 @@ function InventoryPageInner() {
     maxPrice,
     sortKey,
     density,
+    deadStockOnly,
+    page,
+    pageSize,
     router,
   ]);
+
+  // Track which product IDs sold in the last 60 days for dead-stock detection
+  const recentlySoldIds = useMemo(() => {
+    const cutoff = Date.now() - 60 * 24 * 60 * 60 * 1000;
+    const set = new Set<string>();
+    for (const s of sales) {
+      if (!s.isReturned && s.saleDate.getTime() >= cutoff) {
+        set.add(s.productId);
+      }
+    }
+    return set;
+  }, [sales]);
 
   // Build the dynamic brand list from real data
   const brands = useMemo(() => {
@@ -160,6 +201,12 @@ function InventoryPageInner() {
       }
       if (min !== null && !Number.isNaN(min) && p.price < min) return false;
       if (max !== null && !Number.isNaN(max) && p.price > max) return false;
+      if (deadStockOnly) {
+        const ageDays = (Date.now() - p.createdAt.getTime()) / (24 * 60 * 60 * 1000);
+        if (ageDays < 60) return false;
+        if (recentlySoldIds.has(p.id)) return false;
+        if (p.quantity === 0) return false;
+      }
       return true;
     });
 
@@ -200,7 +247,47 @@ function InventoryPageInner() {
     minPrice,
     maxPrice,
     sortKey,
+    deadStockOnly,
+    recentlySoldIds,
   ]);
+
+  // Reset page when result count drops below current page
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
+    if (page > totalPages) setPage(totalPages);
+  }, [filteredProducts.length, pageSize, page]);
+
+  const pagedProducts = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredProducts.slice(start, start + pageSize);
+  }, [filteredProducts, page, pageSize]);
+
+  const selectedProducts = useMemo(
+    () => filteredProducts.filter((p) => selectedIds.has(p.id)),
+    [filteredProducts, selectedIds]
+  );
+
+  const toggleSelect = useCallback((product: Product) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(product.id)) next.delete(product.id);
+      else next.add(product.id);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    setSelectedIds((prev) => {
+      const allOnPage = pagedProducts.every((p) => prev.has(p.id));
+      const next = new Set(prev);
+      if (allOnPage) {
+        for (const p of pagedProducts) next.delete(p.id);
+      } else {
+        for (const p of pagedProducts) next.add(p.id);
+      }
+      return next;
+    });
+  }, [pagedProducts]);
 
   const handleDelete = async () => {
     if (!deleteProductData) return;
@@ -237,6 +324,71 @@ function InventoryPageInner() {
     downloadCsv(`inventory-${date}.csv`, csv);
   }, [filteredProducts]);
 
+  const handleBulkAction = useCallback(
+    async (action: BulkAction) => {
+      const ids = Array.from(selectedIds);
+      const items = filteredProducts.filter((p) => selectedIds.has(p.id));
+      if (items.length === 0) return;
+      try {
+        switch (action.type) {
+          case "delete":
+            setBulkConfirm({ count: ids.length });
+            return;
+          case "addTag":
+            await bulkUpdateProducts(items, { type: "addTag", value: action.tag });
+            setToast({ type: "success", message: `تمت إضافة التاج لـ ${items.length} منتج` });
+            break;
+          case "priceMultiplier":
+            await bulkUpdateProducts(items, {
+              type: "priceMultiplier",
+              value: action.multiplier,
+            });
+            setToast({ type: "success", message: `تم تعديل سعر ${items.length} منتج` });
+            break;
+          case "category":
+            await bulkUpdateProducts(items, { type: "category", value: action.value });
+            setToast({ type: "success", message: `تم تغيير الصنف لـ ${items.length} منتج` });
+            break;
+          case "gender":
+            await bulkUpdateProducts(items, { type: "gender", value: action.value });
+            setToast({ type: "success", message: `تم تغيير النوع لـ ${items.length} منتج` });
+            break;
+          case "supplier":
+            await bulkUpdateProducts(items, { type: "supplier", value: action.value });
+            setToast({ type: "success", message: `تم تحديد المورد لـ ${items.length} منتج` });
+            break;
+          case "location":
+            await bulkUpdateProducts(items, { type: "location", value: action.value });
+            setToast({ type: "success", message: `تم تحديد المكان لـ ${items.length} منتج` });
+            break;
+          case "exportCsv": {
+            const csv = productsToCsv(items);
+            const date = new Date().toISOString().slice(0, 10);
+            downloadCsv(`inventory-selected-${date}.csv`, csv);
+            break;
+          }
+        }
+      } catch (e: any) {
+        setToast({ type: "error", message: e.message || "تعذر تنفيذ الإجراء" });
+      }
+    },
+    [selectedIds, filteredProducts]
+  );
+
+  const handleBulkDeleteConfirm = useCallback(async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    try {
+      await bulkDeleteProducts(ids);
+      setSelectedIds(new Set());
+      setToast({ type: "success", message: `تم حذف ${ids.length} منتج` });
+    } catch (e: any) {
+      setToast({ type: "error", message: e.message || "تعذر الحذف الجماعي" });
+    } finally {
+      setBulkConfirm(null);
+    }
+  }, [selectedIds]);
+
   const hasAnyFilter =
     !!selectedCategory ||
     !!selectedGender ||
@@ -246,7 +398,8 @@ function InventoryPageInner() {
     !!selectedStockStatus ||
     !!minPrice ||
     !!maxPrice ||
-    !!query;
+    !!query ||
+    deadStockOnly;
 
   const handleResetFilters = () => {
     setSelectedCategory(null);
@@ -258,6 +411,7 @@ function InventoryPageInner() {
     setMinPrice("");
     setMaxPrice("");
     setQuery("");
+    setDeadStockOnly(false);
   };
 
   if (loading) {
@@ -317,6 +471,18 @@ function InventoryPageInner() {
         <div className="flex flex-wrap items-center gap-2 justify-between">
           <div className="flex flex-wrap items-center gap-2">
             <SortMenu value={sortKey} onChange={setSortKey} />
+            <button
+              onClick={() => setDeadStockOnly(!deadStockOnly)}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm border transition-colors ${
+                deadStockOnly
+                  ? "bg-orange-100 border-orange-300 text-orange-700"
+                  : "border-border bg-white text-text-secondary hover:border-accent"
+              }`}
+              title="منتجات لم تُبَع في 60 يوم"
+            >
+              <Skull className="w-4 h-4" />
+              مخزون راكد
+            </button>
             {hasAnyFilter && (
               <button
                 onClick={handleResetFilters}
@@ -342,6 +508,13 @@ function InventoryPageInner() {
               {density === "compact" ? "موسّع" : "مدمج"}
             </button>
             <button
+              onClick={() => setImportOpen(true)}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm border border-border bg-white text-text-secondary hover:border-accent"
+            >
+              <Upload className="w-4 h-4" />
+              استيراد
+            </button>
+            <button
               onClick={handleExportCsv}
               disabled={filteredProducts.length === 0}
               className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm border border-border bg-white text-text-secondary hover:border-accent disabled:opacity-50"
@@ -351,6 +524,13 @@ function InventoryPageInner() {
             </button>
           </div>
         </div>
+
+        {/* Bulk actions */}
+        <BulkActionsBar
+          selected={selectedProducts}
+          onClear={() => setSelectedIds(new Set())}
+          onAction={handleBulkAction}
+        />
 
         {/* Product Count */}
         <p className="text-sm text-text-secondary">
@@ -375,12 +555,16 @@ function InventoryPageInner() {
         {filteredProducts.length > 0 && (
           <div className="hidden md:block">
             <ProductTable
-              products={filteredProducts}
+              products={pagedProducts}
               onEdit={setEditProduct}
               onDelete={setDeleteProductData}
               onSell={handleSell}
               onAdjustQty={handleAdjustQty}
+              onHistory={setHistoryProduct}
               density={density}
+              selectedIds={selectedIds}
+              onToggleSelect={toggleSelect}
+              onToggleSelectAll={toggleSelectAll}
             />
           </div>
         )}
@@ -388,7 +572,7 @@ function InventoryPageInner() {
         {/* Mobile Cards */}
         {filteredProducts.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:hidden">
-            {filteredProducts.map((product) => (
+            {pagedProducts.map((product) => (
               <ProductCard
                 key={product.id}
                 product={product}
@@ -396,9 +580,25 @@ function InventoryPageInner() {
                 onDelete={setDeleteProductData}
                 onSell={handleSell}
                 onAdjustQty={handleAdjustQty}
+                onHistory={setHistoryProduct}
+                selected={selectedIds.has(product.id)}
+                onToggleSelect={toggleSelect}
               />
             ))}
           </div>
+        )}
+
+        {filteredProducts.length > 0 && (
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            total={filteredProducts.length}
+            onPageChange={setPage}
+            onPageSizeChange={(s) => {
+              setPageSize(s);
+              setPage(1);
+            }}
+          />
         )}
       </div>
 
@@ -410,6 +610,22 @@ function InventoryPageInner() {
         onSuccess={() => setToast({ type: "success", message: "تم تحديث المنتج بنجاح" })}
       />
 
+      {/* History Modal */}
+      <ProductHistoryModal
+        isOpen={!!historyProduct}
+        onClose={() => setHistoryProduct(null)}
+        product={historyProduct}
+      />
+
+      {/* CSV Import */}
+      <CsvImportModal
+        isOpen={importOpen}
+        onClose={() => setImportOpen(false)}
+        onSuccess={(count) =>
+          setToast({ type: "success", message: `تم استيراد ${count} منتج` })
+        }
+      />
+
       {/* Delete Confirmation */}
       <ConfirmDialog
         isOpen={!!deleteProductData}
@@ -418,6 +634,17 @@ function InventoryPageInner() {
         title="حذف المنتج"
         message={`هل أنت متأكد من حذف "${deleteProductData?.name}"؟`}
         confirmText="حذف"
+        variant="danger"
+      />
+
+      {/* Bulk Delete Confirmation */}
+      <ConfirmDialog
+        isOpen={!!bulkConfirm}
+        onClose={() => setBulkConfirm(null)}
+        onConfirm={handleBulkDeleteConfirm}
+        title="حذف جماعي"
+        message={`هل أنت متأكد من حذف ${bulkConfirm?.count || 0} منتج؟ لا يمكن التراجع.`}
+        confirmText="حذف الكل"
         variant="danger"
       />
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { Pencil, Trash2, ShoppingCart, Plus, Minus } from "lucide-react";
+import { Pencil, Trash2, ShoppingCart, Plus, Minus, History } from "lucide-react";
 import type { Product } from "@/lib/types";
 import { Badge } from "../ui/Badge";
 import { CATEGORY_LABELS, GENDER_LABELS } from "@/lib/types";
@@ -12,6 +12,9 @@ interface ProductCardProps {
   onDelete: (product: Product) => void;
   onSell: (product: Product) => void;
   onAdjustQty: (product: Product, delta: number) => void;
+  onHistory: (product: Product) => void;
+  selected: boolean;
+  onToggleSelect: (product: Product) => void;
 }
 
 export function ProductCard({
@@ -20,6 +23,9 @@ export function ProductCard({
   onDelete,
   onSell,
   onAdjustQty,
+  onHistory,
+  selected,
+  onToggleSelect,
 }: ProductCardProps) {
   const isOutOfStock = product.quantity === 0;
   const isLowStock = product.quantity > 0 && product.quantity <= product.lowStockThreshold;
@@ -30,12 +36,19 @@ export function ProductCard({
     <div
       className={cn(
         "bg-white rounded-xl p-4 shadow-sm border border-border",
+        selected && "ring-2 ring-accent",
         isOutOfStock && "border-s-4 border-danger",
         isLowStock && "border-s-4 border-orange-300"
       )}
     >
       <div className="flex items-start justify-between mb-2">
-        <div>
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={() => onToggleSelect(product)}
+          className="mt-1 w-4 h-4 accent-accent cursor-pointer"
+        />
+        <div className="flex-1 ms-2">
           <h3 className="font-medium">{product.name}</h3>
           {product.brand && (
             <p className="text-xs text-text-secondary">{product.brand}</p>
@@ -137,6 +150,13 @@ export function ProductCard({
         >
           <Pencil className="w-4 h-4" />
           <span className="text-sm">تعديل</span>
+        </button>
+        <button
+          onClick={() => onHistory(product)}
+          className="p-2 bg-gray-100 text-text-secondary rounded-lg"
+          title="سجل المنتج"
+        >
+          <History className="w-4 h-4" />
         </button>
         <button
           onClick={() => onDelete(product)}

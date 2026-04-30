@@ -1,6 +1,6 @@
 "use client";
 
-import { Pencil, Trash2, ShoppingCart, Plus, Minus } from "lucide-react";
+import { Pencil, Trash2, ShoppingCart, Plus, Minus, History } from "lucide-react";
 import type { Product } from "@/lib/types";
 import { Badge } from "../ui/Badge";
 import { CATEGORY_LABELS, GENDER_LABELS } from "@/lib/types";
@@ -12,7 +12,10 @@ interface ProductTableRowProps {
   onDelete: (product: Product) => void;
   onSell: (product: Product) => void;
   onAdjustQty: (product: Product, delta: number) => void;
+  onHistory: (product: Product) => void;
   density: "comfortable" | "compact";
+  selected: boolean;
+  onToggleSelect: (product: Product) => void;
 }
 
 export function ProductTableRow({
@@ -21,7 +24,10 @@ export function ProductTableRow({
   onDelete,
   onSell,
   onAdjustQty,
+  onHistory,
   density,
+  selected,
+  onToggleSelect,
   ...props
 }: ProductTableRowProps) {
   const isOutOfStock = product.quantity === 0;
@@ -37,11 +43,20 @@ export function ProductTableRow({
     <tr
       className={cn(
         "border-b border-border last:border-0",
+        selected && "bg-accent-light/40",
         isOutOfStock && "border-s-4 border-danger",
         isLowStock && "border-s-4 border-orange-300"
       )}
       {...props}
     >
+      <td className={cn(cellPad, "w-8")}>
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={() => onToggleSelect(product)}
+          className="w-4 h-4 accent-accent cursor-pointer"
+        />
+      </td>
       <td className={cellPad}>
         <div>
           <p className="font-medium">{product.name}</p>
@@ -143,6 +158,13 @@ export function ProductTableRow({
             title="تعديل"
           >
             <Pencil className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => onHistory(product)}
+            className="p-2 hover:bg-gray-100 rounded-lg text-text-secondary"
+            title="سجل المنتج"
+          >
+            <History className="w-4 h-4" />
           </button>
           <button
             onClick={() => onDelete(product)}

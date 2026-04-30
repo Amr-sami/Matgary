@@ -12,10 +12,22 @@ import {
   orderBy,
   where,
   serverTimestamp,
+  writeBatch,
   Timestamp,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import type { Product, Sale, Return, Category, Gender, DiscountType, Expense, ExpenseCategory } from "./types";
+import type {
+  Product,
+  Sale,
+  Return,
+  Category,
+  Gender,
+  DiscountType,
+  Expense,
+  ExpenseCategory,
+  ProductHistoryEvent,
+  ProductHistoryEventType,
+} from "./types";
 
 export async function addExpense(
   data: Omit<Expense, "id" | "date">
@@ -76,6 +88,12 @@ export async function addProduct(
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
+  void recordHistoryEvent({
+    productId: docRef.id,
+    productName: data.name,
+    type: "created",
+    quantityAfter: data.quantity,
+  });
   return docRef.id;
 }
 
@@ -88,6 +106,12 @@ export async function updateProduct(
     ...data,
     updatedAt: serverTimestamp(),
   });
+  void recordHistoryEvent({
+    productId,
+    productName: data.name || "",
+    type: "updated",
+    quantityAfter: typeof data.quantity === "number" ? data.quantity : undefined,
+  });
 }
 
 export async function deleteProduct(productId: string): Promise<void> {
@@ -95,19 +119,166 @@ export async function deleteProduct(productId: string): Promise<void> {
   await deleteDoc(productRef);
 }
 
+async function recordHistoryEvent(input: {
+  productId: string;
+  productName: string;
+  type: ProductHistoryEventType;
+  delta?: number;
+  quantityAfter?: number;
+  note?: string;
+}): Promise<void> {
+  try {
+    const ref = collection(db, "productHistory");
+    const data: Record<string, unknown> = {
+      productId: input.productId,
+      productName: input.productName,
+      type: input.type,
+      createdAt: serverTimestamp(),
+    };
+    if (typeof input.delta === "number") data.delta = input.delta;
+    if (typeof input.quantityAfter === "number") data.quantityAfter = input.quantityAfter;
+    if (input.note) data.note = input.note;
+    await addDoc(ref, data);
+  } catch (e) {
+    // History write must never block primary mutations
+    console.warn("history write failed", e);
+  }
+}
+
+export function subscribeToProductHistory(
+  productId: string,
+  callback: (events: ProductHistoryEvent[]) => void
+): () => void {
+  const ref = collection(db, "productHistory");
+  const q = query(
+    ref,
+    where("productId", "==", productId),
+    orderBy("createdAt", "desc")
+  );
+  return onSnapshot(q, (snap) => {
+    const events: ProductHistoryEvent[] = snap.docs.map((d) => {
+      const data = d.data();
+      return {
+        id: d.id,
+        productId: data.productId,
+        productName: data.productName,
+        type: data.type as ProductHistoryEventType,
+        delta: data.delta,
+        quantityAfter: data.quantityAfter,
+        note: data.note,
+        createdAt: convertTimestamp(data.createdAt as Timestamp),
+      };
+    });
+    callback(events);
+  });
+}
+
+export async function bulkDeleteProducts(productIds: string[]): Promise<void> {
+  if (productIds.length === 0) return;
+  const chunkSize = 400;
+  for (let i = 0; i < productIds.length; i += chunkSize) {
+    const batch = writeBatch(db);
+    for (const id of productIds.slice(i, i + chunkSize)) {
+      batch.delete(doc(db, "products", id));
+    }
+    await batch.commit();
+  }
+}
+
+type BulkUpdate =
+  | { type: "category"; value: Category }
+  | { type: "gender"; value: Gender }
+  | { type: "supplier"; value: string }
+  | { type: "location"; value: string }
+  | { type: "addTag"; value: string }
+  | { type: "priceMultiplier"; value: number };
+
+export async function bulkUpdateProducts(
+  products: Pick<Product, "id" | "price" | "tags">[],
+  update: BulkUpdate
+): Promise<void> {
+  if (products.length === 0) return;
+  const chunkSize = 400;
+  for (let i = 0; i < products.length; i += chunkSize) {
+    const batch = writeBatch(db);
+    for (const p of products.slice(i, i + chunkSize)) {
+      const ref = doc(db, "products", p.id);
+      const patch: Record<string, unknown> = { updatedAt: serverTimestamp() };
+      switch (update.type) {
+        case "category":
+          patch.category = update.value;
+          break;
+        case "gender":
+          patch.gender = update.value;
+          break;
+        case "supplier":
+          patch.supplier = update.value;
+          break;
+        case "location":
+          patch.location = update.value;
+          break;
+        case "addTag": {
+          const next = Array.from(new Set([...(p.tags || []), update.value])).filter(Boolean);
+          patch.tags = next;
+          break;
+        }
+        case "priceMultiplier":
+          patch.price = Math.max(0, Math.round(p.price * update.value));
+          break;
+      }
+      batch.update(ref, patch);
+    }
+    await batch.commit();
+  }
+}
+
+export async function bulkAddProducts(
+  rows: Omit<Product, "id" | "createdAt" | "updatedAt">[]
+): Promise<number> {
+  if (rows.length === 0) return 0;
+  const chunkSize = 400;
+  let added = 0;
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    const batch = writeBatch(db);
+    for (const row of rows.slice(i, i + chunkSize)) {
+      const ref = doc(collection(db, "products"));
+      const cleaned: Record<string, unknown> = { ...row };
+      Object.keys(cleaned).forEach((k) => {
+        if (cleaned[k] === undefined) delete cleaned[k];
+      });
+      batch.set(ref, {
+        ...cleaned,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      added++;
+    }
+    await batch.commit();
+  }
+  return added;
+}
+
 export async function adjustProductQuantity(
   productId: string,
   delta: number
 ): Promise<number> {
   const productRef = doc(db, "products", productId);
-  return runTransaction(db, async (tx) => {
+  const result = await runTransaction(db, async (tx) => {
     const snap = await tx.get(productRef);
     if (!snap.exists()) throw new Error("المنتج غير موجود");
     const current = (snap.data().quantity as number) ?? 0;
     const next = Math.max(0, current + delta);
     tx.update(productRef, { quantity: next, updatedAt: serverTimestamp() });
-    return next;
+    return { next, name: snap.data().name as string };
   });
+  void recordHistoryEvent({
+    productId,
+    productName: result.name,
+    type: delta >= 0 ? "restocked" : "decreased",
+    delta,
+    quantityAfter: result.next,
+  });
+  return result.next;
 }
 
 export function subscribeToProducts(callback: (products: Product[]) => void): () => void {
@@ -152,7 +323,7 @@ export async function recordSale(
   const productRef = doc(db, "products", productId);
   const saleRef = doc(collection(db, "sales"));
 
-  return await runTransaction(db, async (transaction) => {
+  const result = await runTransaction(db, async (transaction) => {
     const productSnap = await transaction.get(productRef);
     if (!productSnap.exists()) {
       throw new Error("المنتج غير موجود");
@@ -177,8 +348,9 @@ export async function recordSale(
     discountAmount = Math.min(discountAmount, subtotal);
     const totalPrice = subtotal - discountAmount;
 
+    const nextQty = currentQty - quantitySold;
     transaction.update(productRef, {
-      quantity: currentQty - quantitySold,
+      quantity: nextQty,
       updatedAt: serverTimestamp(),
     });
 
@@ -202,8 +374,18 @@ export async function recordSale(
       note: note || null,
     });
 
-    return saleRef.id;
+    return { saleId: saleRef.id, name: productData.name as string, nextQty };
   });
+
+  void recordHistoryEvent({
+    productId,
+    productName: result.name,
+    type: "sold",
+    delta: -quantitySold,
+    quantityAfter: result.nextQty,
+  });
+
+  return result.saleId;
 }
 
 export async function getSaleById(saleId: string): Promise<Sale | null> {
