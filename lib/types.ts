@@ -34,6 +34,15 @@ export interface Product {
 
 export type DiscountType = "percentage" | "fixed";
 
+export type PaymentMethod = "cash" | "instapay" | "card" | "deferred";
+
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  cash: "كاش",
+  instapay: "انستاباي",
+  card: "بطاقة",
+  deferred: "آجل",
+};
+
 export interface Sale {
   id: string;
   invoiceId?: string;
@@ -55,6 +64,11 @@ export interface Sale {
   returnedAt?: Date;
   returnedQuantity?: number;
   note?: string;
+  customerName?: string;
+  customerPhone?: string;
+  paymentMethod?: PaymentMethod;
+  isPaid?: boolean;
+  paidAt?: Date;
 }
 
 export interface CartLine {

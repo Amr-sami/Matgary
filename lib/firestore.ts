@@ -27,6 +27,7 @@ import type {
   ExpenseCategory,
   ProductHistoryEvent,
   ProductHistoryEventType,
+  PaymentMethod,
 } from "./types";
 
 export async function addExpense(
@@ -318,6 +319,12 @@ function makeInvoiceId(): string {
   return `INV-${ts}${rnd}`.toUpperCase();
 }
 
+export interface SaleExtras {
+  customerName?: string;
+  customerPhone?: string;
+  paymentMethod?: PaymentMethod;
+}
+
 export async function recordSale(
   productId: string,
   quantitySold: number,
@@ -326,7 +333,8 @@ export async function recordSale(
   discountType?: DiscountType,
   discountValue?: number,
   customDate?: Date,
-  invoiceId?: string
+  invoiceId?: string,
+  extras?: SaleExtras
 ): Promise<string> {
   const productRef = doc(db, "products", productId);
   const saleRef = doc(collection(db, "sales"));
@@ -362,6 +370,7 @@ export async function recordSale(
       updatedAt: serverTimestamp(),
     });
 
+    const paymentMethod = extras?.paymentMethod || "cash";
     transaction.set(saleRef, {
       invoiceId: invoiceId || makeInvoiceId(),
       productId,
@@ -382,6 +391,11 @@ export async function recordSale(
       returnedAt: null,
       returnedQuantity: null,
       note: note || null,
+      customerName: extras?.customerName?.trim() || null,
+      customerPhone: extras?.customerPhone?.trim() || null,
+      paymentMethod,
+      isPaid: paymentMethod !== "deferred",
+      paidAt: paymentMethod !== "deferred" ? serverTimestamp() : null,
     });
 
     return { saleId: saleRef.id, name: productData.name as string, nextQty };
@@ -424,6 +438,11 @@ export async function getSaleById(saleId: string): Promise<Sale | null> {
     returnedAt: data.returnedAt ? convertTimestamp(data.returnedAt as Timestamp) : undefined,
     returnedQuantity: data.returnedQuantity,
     note: data.note,
+    customerName: data.customerName || undefined,
+    customerPhone: data.customerPhone || undefined,
+    paymentMethod: (data.paymentMethod as PaymentMethod | undefined) || undefined,
+    isPaid: typeof data.isPaid === "boolean" ? data.isPaid : data.paymentMethod !== "deferred",
+    paidAt: data.paidAt ? convertTimestamp(data.paidAt as Timestamp) : undefined,
   };
 }
 
@@ -481,6 +500,9 @@ export async function recordCartSale(
     orderDiscountType?: DiscountType;
     orderDiscountValue?: number;
     customDate?: Date;
+    customerName?: string;
+    customerPhone?: string;
+    paymentMethod?: PaymentMethod;
   } = {}
 ): Promise<CartSaleResult> {
   if (lines.length === 0) throw new Error("الفاتورة فارغة");
@@ -564,6 +586,7 @@ export async function recordCartSale(
         quantity: p.currentQty - p.line.quantity,
         updatedAt: serverTimestamp(),
       });
+      const paymentMethod = options.paymentMethod || "cash";
       tx.set(p.saleRef, {
         invoiceId,
         productId: p.line.productId,
@@ -592,6 +615,11 @@ export async function recordCartSale(
         returnedAt: null,
         returnedQuantity: null,
         note: options.note || null,
+        customerName: options.customerName?.trim() || null,
+        customerPhone: options.customerPhone?.trim() || null,
+        paymentMethod,
+        isPaid: paymentMethod !== "deferred",
+        paidAt: paymentMethod !== "deferred" ? serverTimestamp() : null,
       });
       saleIds.push(p.saleRef.id);
     }
@@ -683,6 +711,27 @@ export async function updateSale(
 
     tx.update(saleRef, patch);
   });
+}
+
+export async function markSalePaid(saleId: string): Promise<void> {
+  const ref = doc(db, "sales", saleId);
+  await updateDoc(ref, { isPaid: true, paidAt: serverTimestamp() });
+}
+
+export async function markInvoicePaid(invoiceId: string): Promise<void> {
+  const ref = collection(db, "sales");
+  const q = query(ref, where("invoiceId", "==", invoiceId));
+  const snap = await getDocs(q);
+  if (snap.empty) return;
+  const chunkSize = 400;
+  const docs = snap.docs;
+  for (let i = 0; i < docs.length; i += chunkSize) {
+    const batch = writeBatch(db);
+    for (const d of docs.slice(i, i + chunkSize)) {
+      batch.update(d.ref, { isPaid: true, paidAt: serverTimestamp() });
+    }
+    await batch.commit();
+  }
 }
 
 export async function voidSale(saleId: string): Promise<void> {

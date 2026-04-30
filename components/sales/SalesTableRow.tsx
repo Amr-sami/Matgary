@@ -3,7 +3,7 @@
 import { RotateCcw, Printer, Pencil, Trash2 } from "lucide-react";
 import type { Sale } from "@/lib/types";
 import { Badge } from "../ui/Badge";
-import { CATEGORY_LABELS, GENDER_LABELS } from "@/lib/types";
+import { CATEGORY_LABELS, GENDER_LABELS, PAYMENT_METHOD_LABELS } from "@/lib/types";
 import { formatPrice, formatDate } from "@/lib/utils";
 
 interface SalesTableRowProps {
@@ -54,7 +54,32 @@ export function SalesTableRow({
           </span>
         </div>
       </td>
-      <td className="py-4 px-4 font-medium">{sale.productName}</td>
+      <td className="py-4 px-4 font-medium">
+        <div>
+          {sale.productName}
+          <div className="flex flex-wrap gap-1 mt-0.5">
+            {sale.customerName && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-text-secondary">
+                {sale.customerName}
+              </span>
+            )}
+            {sale.paymentMethod && (
+              <span
+                className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                  sale.paymentMethod === "deferred" && !sale.isPaid
+                    ? "bg-orange-100 text-orange-700"
+                    : sale.paymentMethod === "deferred" && sale.isPaid
+                      ? "bg-success-light text-success"
+                      : "bg-accent-light text-accent"
+                }`}
+              >
+                {PAYMENT_METHOD_LABELS[sale.paymentMethod]}
+                {sale.paymentMethod === "deferred" && (sale.isPaid ? " ✓" : "")}
+              </span>
+            )}
+          </div>
+        </div>
+      </td>
       <td className="py-4 px-4">
         <Badge variant={sale.category}>{CATEGORY_LABELS[sale.category]}</Badge>
       </td>

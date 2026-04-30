@@ -7,7 +7,8 @@ import { Input } from "../ui/Input";
 import { recordCartSale } from "@/lib/firestore";
 import { useSales } from "@/hooks/useSales";
 import { useProducts } from "@/hooks/useProducts";
-import type { Product, DiscountType } from "@/lib/types";
+import type { Product, DiscountType, PaymentMethod } from "@/lib/types";
+import { PAYMENT_METHOD_LABELS } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
 import { Printer, Percent, DollarSign, Calendar, Plus, Trash2, ShoppingCart } from "lucide-react";
 
@@ -95,6 +96,11 @@ export function SaleForm({
   const [useCustomDate, setUseCustomDate] = useState(false);
   const todayStr = new Date().toISOString().slice(0, 10);
   const [customDate, setCustomDate] = useState(todayStr);
+
+  // Customer + payment
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
 
   const [loading, setLoading] = useState(false);
 
@@ -242,6 +248,9 @@ export function SaleForm({
           orderDiscountType: orderDiscountValue > 0 ? orderDiscountType : undefined,
           orderDiscountValue: orderDiscountValue > 0 ? orderDiscountValue : undefined,
           customDate: useCustomDate ? saleDate : undefined,
+          customerName: customerName.trim() || undefined,
+          customerPhone: customerPhone.trim() || undefined,
+          paymentMethod,
         }
       );
 
@@ -305,6 +314,9 @@ export function SaleForm({
       setNote("");
       setUseCustomDate(false);
       setCustomDate(new Date().toISOString().slice(0, 10));
+      setCustomerName("");
+      setCustomerPhone("");
+      setPaymentMethod("cash");
       onSuccess();
     } catch (error: any) {
       alert(error.message);
@@ -535,6 +547,50 @@ export function SaleForm({
                 <span>الإجمالي</span>
                 <span className="text-2xl text-accent">{formatPrice(cartTotal)}</span>
               </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <Input
+                label="اسم العميل (اختياري)"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                placeholder="..."
+              />
+              <Input
+                label="رقم الموبايل"
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value)}
+                placeholder="..."
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                طريقة الدفع
+              </label>
+              <div className="grid grid-cols-4 gap-1 rounded-lg overflow-hidden border border-border">
+                {(Object.keys(PAYMENT_METHOD_LABELS) as PaymentMethod[]).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setPaymentMethod(m)}
+                    className={`py-2 text-xs font-medium ${
+                      paymentMethod === m
+                        ? m === "deferred"
+                          ? "bg-orange-500 text-white"
+                          : "bg-accent text-white"
+                        : "bg-white text-text-secondary"
+                    }`}
+                  >
+                    {PAYMENT_METHOD_LABELS[m]}
+                  </button>
+                ))}
+              </div>
+              {paymentMethod === "deferred" && (
+                <p className="mt-1 text-xs text-orange-600">
+                  ستُسجَّل الفاتورة كآجل غير مدفوع.
+                </p>
+              )}
             </div>
 
             <Input

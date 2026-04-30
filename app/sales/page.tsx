@@ -14,6 +14,7 @@ import {
   type SalesSortKey,
 } from "@/components/sales/SalesFilters";
 import { SalesKpiCards } from "@/components/sales/SalesKpiCards";
+import { DeferredPanel } from "@/components/sales/DeferredPanel";
 import { SalesChart } from "@/components/sales/SalesChart";
 import { TopProductsCard } from "@/components/sales/TopProductsCard";
 import { HourHeatmap } from "@/components/sales/HourHeatmap";
@@ -205,7 +206,7 @@ function SalesPageInner() {
       if (discountOnly && !(s.discountAmount && s.discountAmount > 0)) return false;
       if (q) {
         const hay =
-          `${s.productName} ${s.brand || ""} ${s.note || ""}`.toLowerCase();
+          `${s.productName} ${s.brand || ""} ${s.note || ""} ${s.customerName || ""} ${s.customerPhone || ""}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -422,6 +423,9 @@ function SalesPageInner() {
       <div className="space-y-4">
         {/* KPIs over the date-ranged sales */}
         <SalesKpiCards sales={dateRangedSales} rangeLabel={rangeLabel} />
+
+        {/* Outstanding deferred (across all time) */}
+        <DeferredPanel sales={sales} />
 
         {/* Sale Form */}
         <SaleForm
