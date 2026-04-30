@@ -1,6 +1,6 @@
 "use client";
 
-import { Pencil, Trash2, ShoppingCart } from "lucide-react";
+import { Pencil, Trash2, ShoppingCart, Plus, Minus } from "lucide-react";
 import type { Product } from "@/lib/types";
 import { Badge } from "../ui/Badge";
 import { CATEGORY_LABELS, GENDER_LABELS } from "@/lib/types";
@@ -11,11 +11,20 @@ interface ProductCardProps {
   onEdit: (product: Product) => void;
   onDelete: (product: Product) => void;
   onSell: (product: Product) => void;
+  onAdjustQty: (product: Product, delta: number) => void;
 }
 
-export function ProductCard({ product, onEdit, onDelete, onSell }: ProductCardProps) {
+export function ProductCard({
+  product,
+  onEdit,
+  onDelete,
+  onSell,
+  onAdjustQty,
+}: ProductCardProps) {
   const isOutOfStock = product.quantity === 0;
   const isLowStock = product.quantity > 0 && product.quantity <= product.lowStockThreshold;
+  const cost = product.costPrice || 0;
+  const margin = product.price > 0 ? ((product.price - cost) / product.price) * 100 : 0;
 
   return (
     <div
@@ -37,24 +46,55 @@ export function ProductCard({ product, onEdit, onDelete, onSell }: ProductCardPr
         </Badge>
       </div>
 
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
         <Badge variant={product.gender}>
           {GENDER_LABELS[product.gender]}
         </Badge>
+        {cost > 0 && (
+          <span
+            className={cn(
+              "text-xs font-medium px-2 py-0.5 rounded-md",
+              margin < 15
+                ? "bg-danger-light text-danger"
+                : margin < 30
+                  ? "bg-orange-50 text-orange-600"
+                  : "bg-success-light text-success"
+            )}
+          >
+            هامش {margin.toFixed(0)}%
+          </span>
+        )}
       </div>
 
       <div className="flex items-center justify-between mb-4">
         <div>
-          <p className="text-sm text-text-secondary">الكمية</p>
-          <p
-            className={cn(
-              "text-xl font-bold",
-              isOutOfStock && "text-danger",
-              isLowStock && "text-orange-600"
-            )}
-          >
-            {product.quantity}
-          </p>
+          <p className="text-sm text-text-secondary mb-1">الكمية</p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onAdjustQty(product, -1)}
+              disabled={isOutOfStock}
+              className="p-1 rounded-md border border-border disabled:opacity-30"
+            >
+              <Minus className="w-3.5 h-3.5" />
+            </button>
+            <span
+              className={cn(
+                "text-xl font-bold min-w-[2ch] text-center",
+                isOutOfStock && "text-danger",
+                isLowStock && "text-orange-600"
+              )}
+            >
+              {product.quantity}
+            </span>
+            <button
+              type="button"
+              onClick={() => onAdjustQty(product, 1)}
+              className="p-1 rounded-md border border-border"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
         <div className="text-end">
           <p className="text-sm text-text-secondary">السعر</p>

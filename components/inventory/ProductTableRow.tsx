@@ -1,6 +1,6 @@
 "use client";
 
-import { Pencil, Trash2, ShoppingCart } from "lucide-react";
+import { Pencil, Trash2, ShoppingCart, Plus, Minus } from "lucide-react";
 import type { Product } from "@/lib/types";
 import { Badge } from "../ui/Badge";
 import { CATEGORY_LABELS, GENDER_LABELS } from "@/lib/types";
@@ -11,11 +11,27 @@ interface ProductTableRowProps {
   onEdit: (product: Product) => void;
   onDelete: (product: Product) => void;
   onSell: (product: Product) => void;
+  onAdjustQty: (product: Product, delta: number) => void;
+  density: "comfortable" | "compact";
 }
 
-export function ProductTableRow({ product, onEdit, onDelete, onSell, ...props }: ProductTableRowProps) {
+export function ProductTableRow({
+  product,
+  onEdit,
+  onDelete,
+  onSell,
+  onAdjustQty,
+  density,
+  ...props
+}: ProductTableRowProps) {
   const isOutOfStock = product.quantity === 0;
   const isLowStock = product.quantity > 0 && product.quantity <= product.lowStockThreshold;
+  const cost = product.costPrice || 0;
+  const profit = product.price - cost;
+  const margin = product.price > 0 ? (profit / product.price) * 100 : 0;
+  const stockValue = product.quantity * cost;
+
+  const cellPad = density === "compact" ? "py-1.5 px-2" : "py-3 px-2";
 
   return (
     <tr
@@ -26,7 +42,7 @@ export function ProductTableRow({ product, onEdit, onDelete, onSell, ...props }:
       )}
       {...props}
     >
-      <td className="py-3 px-2">
+      <td className={cellPad}>
         <div>
           <p className="font-medium">{product.name}</p>
           {product.brand && (
@@ -34,27 +50,68 @@ export function ProductTableRow({ product, onEdit, onDelete, onSell, ...props }:
           )}
         </div>
       </td>
-      <td className="py-3 px-2">
+      <td className={cellPad}>
         <Badge variant={product.category}>{CATEGORY_LABELS[product.category]}</Badge>
       </td>
-      <td className="py-3 px-2">
+      <td className={cellPad}>
         <Badge variant={product.gender}>{GENDER_LABELS[product.gender]}</Badge>
       </td>
-      <td className="py-3 px-2 text-sm">{product.brand || "-"}</td>
-      <td className="py-3 px-2">
-        <span
-          className={cn(
-            "font-medium",
-            isOutOfStock && "text-danger",
-            isLowStock && "text-orange-600"
-          )}
-        >
-          {product.quantity}
-        </span>
+      <td className={cn(cellPad, "text-sm")}>{product.brand || "-"}</td>
+      <td className={cellPad}>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => onAdjustQty(product, -1)}
+            disabled={isOutOfStock}
+            className="p-1 rounded-md hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed text-text-secondary"
+            title="إنقاص"
+          >
+            <Minus className="w-3.5 h-3.5" />
+          </button>
+          <span
+            className={cn(
+              "font-medium min-w-[2ch] text-center",
+              isOutOfStock && "text-danger",
+              isLowStock && "text-orange-600"
+            )}
+          >
+            {product.quantity}
+          </span>
+          <button
+            type="button"
+            onClick={() => onAdjustQty(product, 1)}
+            className="p-1 rounded-md hover:bg-gray-100 text-text-secondary"
+            title="زيادة"
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </td>
-      <td className="py-3 px-2 font-medium">{formatPrice(product.price)}</td>
-      <td className="py-3 px-2">
-        <div className="flex items-center gap-2">
+      <td className={cn(cellPad, "font-medium")}>{formatPrice(product.price)}</td>
+      <td className={cn(cellPad, "text-sm")}>
+        {cost > 0 ? (
+          <span
+            className={cn(
+              "font-medium",
+              margin < 15 ? "text-danger" : margin < 30 ? "text-orange-600" : "text-success"
+            )}
+          >
+            {margin.toFixed(0)}%
+          </span>
+        ) : (
+          <span className="text-text-secondary">-</span>
+        )}
+      </td>
+      <td className={cn(cellPad, "text-sm")}>{formatPrice(stockValue)}</td>
+      <td className={cn(cellPad, "text-xs text-text-secondary whitespace-nowrap")}>
+        {product.updatedAt.toLocaleDateString("ar-EG", {
+          year: "2-digit",
+          month: "short",
+          day: "numeric",
+        })}
+      </td>
+      <td className={cellPad}>
+        <div className="flex items-center gap-1">
           <button
             onClick={() => onSell(product)}
             disabled={isOutOfStock}

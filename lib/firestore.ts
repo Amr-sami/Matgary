@@ -95,6 +95,21 @@ export async function deleteProduct(productId: string): Promise<void> {
   await deleteDoc(productRef);
 }
 
+export async function adjustProductQuantity(
+  productId: string,
+  delta: number
+): Promise<number> {
+  const productRef = doc(db, "products", productId);
+  return runTransaction(db, async (tx) => {
+    const snap = await tx.get(productRef);
+    if (!snap.exists()) throw new Error("المنتج غير موجود");
+    const current = (snap.data().quantity as number) ?? 0;
+    const next = Math.max(0, current + delta);
+    tx.update(productRef, { quantity: next, updatedAt: serverTimestamp() });
+    return next;
+  });
+}
+
 export function subscribeToProducts(callback: (products: Product[]) => void): () => void {
   const productsRef = collection(db, "products");
   const q = query(productsRef, orderBy("createdAt", "desc"));

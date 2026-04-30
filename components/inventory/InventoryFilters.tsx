@@ -1,7 +1,15 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { CATEGORY_LABELS, GENDER_LABELS, WATCH_BRANDS, type Category, type Gender } from "@/lib/types";
+import { CATEGORY_LABELS, GENDER_LABELS, type Category, type Gender } from "@/lib/types";
+
+export type StockStatus = "in" | "low" | "out";
+
+export const STOCK_STATUS_LABELS: Record<StockStatus, string> = {
+  in: "متوفر",
+  low: "مخزون منخفض",
+  out: "نفذ",
+};
 
 interface InventoryFiltersProps {
   selectedCategory: Category | null;
@@ -10,6 +18,13 @@ interface InventoryFiltersProps {
   onGenderChange: (gender: Gender | null) => void;
   selectedBrand: string | null;
   onBrandChange: (brand: string | null) => void;
+  brands: string[];
+  selectedStockStatus: StockStatus | null;
+  onStockStatusChange: (status: StockStatus | null) => void;
+  minPrice: string;
+  maxPrice: string;
+  onMinPriceChange: (value: string) => void;
+  onMaxPriceChange: (value: string) => void;
 }
 
 export function InventoryFilters({
@@ -19,12 +34,20 @@ export function InventoryFilters({
   onGenderChange,
   selectedBrand,
   onBrandChange,
+  brands,
+  selectedStockStatus,
+  onStockStatusChange,
+  minPrice,
+  maxPrice,
+  onMinPriceChange,
+  onMaxPriceChange,
 }: InventoryFiltersProps) {
   const categories: (Category | null)[] = [null, "watches", "perfumes", "sunglasses"];
   const genders: (Gender | null)[] = [null, "male", "female"];
+  const stockStatuses: (StockStatus | null)[] = [null, "in", "low", "out"];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Category Filter */}
       <div className="flex flex-wrap gap-2">
         {categories.map((cat) => (
@@ -38,7 +61,7 @@ export function InventoryFilters({
                 : "bg-white border border-border text-text-secondary hover:border-accent"
             )}
           >
-            {cat ? CATEGORY_LABELS[cat] : "الكل"}
+            {cat ? CATEGORY_LABELS[cat] : "كل الأصناف"}
           </button>
         ))}
       </div>
@@ -61,21 +84,62 @@ export function InventoryFilters({
         ))}
       </div>
 
-      {/* Brand Filter (only for watches) */}
-      {selectedCategory === "watches" && (
-        <select
-          value={selectedBrand || ""}
-          onChange={(e) => onBrandChange(e.target.value || null)}
-          className="px-4 py-2 rounded-lg border border-border bg-white"
-        >
-          <option value="">كل البراندات</option>
-          {WATCH_BRANDS.map((brand) => (
-            <option key={brand} value={brand}>
-              {brand}
-            </option>
-          ))}
-        </select>
-      )}
+      {/* Stock Status Filter */}
+      <div className="flex flex-wrap gap-2">
+        {stockStatuses.map((s) => (
+          <button
+            key={s ?? "all"}
+            onClick={() => onStockStatusChange(s)}
+            className={cn(
+              "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+              selectedStockStatus === s
+                ? "bg-accent text-white"
+                : "bg-white border border-border text-text-secondary hover:border-accent"
+            )}
+          >
+            {s ? STOCK_STATUS_LABELS[s] : "كل الحالات"}
+          </button>
+        ))}
+      </div>
+
+      {/* Brand + Price filters */}
+      <div className="flex flex-wrap gap-2">
+        {brands.length > 0 && (
+          <select
+            value={selectedBrand || ""}
+            onChange={(e) => onBrandChange(e.target.value || null)}
+            className="px-3 py-2 rounded-lg border border-border bg-white text-sm"
+            dir="rtl"
+          >
+            <option value="">كل البراندات</option>
+            {brands.map((brand) => (
+              <option key={brand} value={brand}>
+                {brand}
+              </option>
+            ))}
+          </select>
+        )}
+        <input
+          type="number"
+          min={0}
+          inputMode="numeric"
+          placeholder="أقل سعر"
+          value={minPrice}
+          onChange={(e) => onMinPriceChange(e.target.value)}
+          dir="rtl"
+          className="px-3 py-2 rounded-lg border border-border bg-white text-sm w-28"
+        />
+        <input
+          type="number"
+          min={0}
+          inputMode="numeric"
+          placeholder="أعلى سعر"
+          value={maxPrice}
+          onChange={(e) => onMaxPriceChange(e.target.value)}
+          dir="rtl"
+          className="px-3 py-2 rounded-lg border border-border bg-white text-sm w-28"
+        />
+      </div>
     </div>
   );
 }
