@@ -7,7 +7,7 @@ import { Input } from "../ui/Input";
 import { recordSale } from "@/lib/firestore";
 import type { Product, DiscountType } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
-import { Printer, Percent, DollarSign } from "lucide-react";
+import { Printer, Percent, DollarSign, Calendar } from "lucide-react";
 
 export interface ReceiptSaleData {
   saleId?: string;
@@ -40,6 +40,11 @@ export function SaleForm({ onSuccess, onPrintLastSale, preselectedProduct }: Sal
   const [discountType, setDiscountType] = useState<DiscountType>("percentage");
   const [discountValue, setDiscountValue] = useState(0);
 
+  // Backdated sale state
+  const [useCustomDate, setUseCustomDate] = useState(false);
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const [customDate, setCustomDate] = useState(todayStr);
+
   // Last sale for receipt (kept locally so the print button can appear)
   const [lastSale, setLastSale] = useState<ReceiptSaleData | null>(null);
 
@@ -59,6 +64,20 @@ export function SaleForm({ onSuccess, onPrintLastSale, preselectedProduct }: Sal
 
   const handleSubmit = async () => {
     if (!selectedProduct || quantity < 1 || pricePerUnit < 1) return;
+    let saleDate: Date = new Date();
+    if (useCustomDate && customDate) {
+      const parsed = new Date(`${customDate}T12:00:00`);
+      if (Number.isNaN(parsed.getTime())) {
+        alert("تاريخ غير صحيح");
+        return;
+      }
+      if (parsed.getTime() > Date.now() + 24 * 60 * 60 * 1000) {
+        alert("لا يمكن تسجيل بيع في تاريخ مستقبلي");
+        return;
+      }
+      saleDate = parsed;
+    }
+
     setLoading(true);
     try {
       const saleId = await recordSale(
@@ -67,7 +86,8 @@ export function SaleForm({ onSuccess, onPrintLastSale, preselectedProduct }: Sal
         pricePerUnit,
         note || undefined,
         discountValue > 0 ? discountType : undefined,
-        discountValue > 0 ? discountValue : undefined
+        discountValue > 0 ? discountValue : undefined,
+        useCustomDate ? saleDate : undefined
       );
 
       // Save last sale data for receipt
@@ -82,7 +102,7 @@ export function SaleForm({ onSuccess, onPrintLastSale, preselectedProduct }: Sal
         discountValue: discountValue > 0 ? discountValue : undefined,
         discountAmount,
         totalPrice,
-        saleDate: new Date(),
+        saleDate,
       });
 
       setSelectedProduct(null);
@@ -90,6 +110,8 @@ export function SaleForm({ onSuccess, onPrintLastSale, preselectedProduct }: Sal
       setPricePerUnit(0);
       setNote("");
       setDiscountValue(0);
+      setUseCustomDate(false);
+      setCustomDate(new Date().toISOString().slice(0, 10));
       onSuccess();
     } catch (error: any) {
       alert(error.message);
@@ -213,6 +235,31 @@ export function SaleForm({ onSuccess, onPrintLastSale, preselectedProduct }: Sal
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="ملاحظة..."
               />
+
+              {/* Backdated sale */}
+              <div className="space-y-2 p-4 bg-gray-50 rounded-lg border border-gray-100">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={useCustomDate}
+                    onChange={(e) => setUseCustomDate(e.target.checked)}
+                    className="w-4 h-4 accent-accent"
+                  />
+                  <Calendar className="w-4 h-4 text-text-secondary" />
+                  <span className="text-sm font-medium text-text-secondary">
+                    تسجيل بيع بتاريخ سابق
+                  </span>
+                </label>
+                {useCustomDate && (
+                  <input
+                    type="date"
+                    value={customDate}
+                    max={todayStr}
+                    onChange={(e) => setCustomDate(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-white text-sm"
+                  />
+                )}
+              </div>
 
               <Button
                 onClick={handleSubmit}

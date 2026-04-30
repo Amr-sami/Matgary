@@ -318,7 +318,8 @@ export async function recordSale(
   pricePerUnit: number,
   note?: string,
   discountType?: DiscountType,
-  discountValue?: number
+  discountValue?: number,
+  customDate?: Date
 ): Promise<string> {
   const productRef = doc(db, "products", productId);
   const saleRef = doc(collection(db, "sales"));
@@ -367,7 +368,7 @@ export async function recordSale(
       discountValue: discountValue || null,
       discountAmount: discountAmount || null,
       totalPrice,
-      saleDate: serverTimestamp(),
+      saleDate: customDate ? Timestamp.fromDate(customDate) : serverTimestamp(),
       isReturned: false,
       returnedAt: null,
       returnedQuantity: null,
