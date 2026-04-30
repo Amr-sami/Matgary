@@ -157,8 +157,27 @@ export function SaleForm({
     return out;
   })();
 
-  const cartSubtotalGross = cart.reduce((s, l) => s + l.quantity * l.pricePerUnit, 0);
-  const cartLineDiscountTotal = cart.reduce(
+  // Include the in-progress line (selected product + qty/price) in the live preview
+  // so users see totals before clicking "إضافة للفاتورة".
+  const previewLines: CartLineState[] = (() => {
+    if (!selectedProduct || quantity < 1 || pricePerUnit <= 0) return cart;
+    return [
+      ...cart,
+      {
+        product: selectedProduct,
+        quantity,
+        pricePerUnit,
+        lineDiscountType,
+        lineDiscountValue,
+      },
+    ];
+  })();
+
+  const cartSubtotalGross = previewLines.reduce(
+    (s, l) => s + l.quantity * l.pricePerUnit,
+    0
+  );
+  const cartLineDiscountTotal = previewLines.reduce(
     (s, l) =>
       s +
       calcLineDiscount(
