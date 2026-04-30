@@ -6,7 +6,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { useSales } from "@/hooks/useSales";
 import { useReturns } from "@/hooks/useReturns";
 import { useProducts } from "@/hooks/useProducts";
-import { SaleForm, type ReceiptSaleData } from "@/components/sales/SaleForm";
+import { SaleForm, type ReceiptSaleData, type ReceiptInvoiceData } from "@/components/sales/SaleForm";
 import { PrintOptionsModal } from "@/components/sales/PrintOptionsModal";
 import {
   SalesFilters,
@@ -135,6 +135,7 @@ function SalesPageInner() {
   const [editSale, setEditSale] = useState<Sale | null>(null);
   const [voidSaleData, setVoidSaleData] = useState<Sale | null>(null);
   const [receiptData, setReceiptData] = useState<ReceiptSaleData | null>(null);
+  const [invoiceReceipt, setInvoiceReceipt] = useState<ReceiptInvoiceData | null>(null);
   const [printQueue, setPrintQueue] = useState<Sale[]>([]);
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
@@ -274,6 +275,37 @@ function SalesPageInner() {
 
   const handleReturn = (sale: Sale) => setReturnSale(sale);
   const handlePrint = (sale: Sale) => {
+    // If the sale belongs to a multi-line invoice, print the whole invoice
+    if (sale.invoiceId) {
+      const lines = sales.filter(
+        (s) => s.invoiceId === sale.invoiceId && !s.isReturned
+      );
+      if (lines.length > 1) {
+        const cartSubtotal = lines.reduce((s, l) => s + l.subtotal, 0);
+        const totalPrice = lines.reduce((s, l) => s + l.totalPrice, 0);
+        const discountTotal = lines.reduce(
+          (s, l) => s + (l.discountAmount || 0),
+          0
+        );
+        setInvoiceReceipt({
+          invoiceId: sale.invoiceId,
+          saleDate: sale.saleDate,
+          lines: lines.map((l) => ({
+            productName: l.productName,
+            brand: l.brand,
+            quantity: l.quantitySold,
+            pricePerUnit: l.pricePerUnit,
+            subtotal: l.subtotal,
+            lineDiscountAmount: l.discountAmount || 0,
+          })),
+          cartSubtotal,
+          orderDiscountAmount: Math.max(0, cartSubtotal - totalPrice - discountTotal),
+          totalPrice,
+          note: sale.note,
+        });
+        return;
+      }
+    }
     setReceiptData({
       saleId: sale.id,
       productName: sale.productName,
@@ -395,6 +427,7 @@ function SalesPageInner() {
         <SaleForm
           onSuccess={() => setToast({ type: "success", message: "تم تسجيل البيع بنجاح" })}
           onPrintLastSale={setReceiptData}
+          onPrintLastInvoice={setInvoiceReceipt}
         />
 
         {/* Insights row */}
@@ -531,10 +564,17 @@ function SalesPageInner() {
       />
 
       <PrintOptionsModal
-        isOpen={!!receiptData}
-        onClose={() => setReceiptData(null)}
+        isOpen={!!receiptData || !!invoiceReceipt}
+        onClose={() => {
+          setReceiptData(null);
+          setInvoiceReceipt(null);
+        }}
         receiptData={receiptData}
-        onConfirm={() => setReceiptData(null)}
+        invoiceData={invoiceReceipt}
+        onConfirm={() => {
+          setReceiptData(null);
+          setInvoiceReceipt(null);
+        }}
       />
 
       {toast && (

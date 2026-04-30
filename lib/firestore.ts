@@ -312,6 +312,12 @@ export function subscribeToProducts(callback: (products: Product[]) => void): ()
   return unsubscribe;
 }
 
+function makeInvoiceId(): string {
+  const ts = Date.now().toString(36);
+  const rnd = Math.random().toString(36).slice(2, 8);
+  return `INV-${ts}${rnd}`.toUpperCase();
+}
+
 export async function recordSale(
   productId: string,
   quantitySold: number,
@@ -319,7 +325,8 @@ export async function recordSale(
   note?: string,
   discountType?: DiscountType,
   discountValue?: number,
-  customDate?: Date
+  customDate?: Date,
+  invoiceId?: string
 ): Promise<string> {
   const productRef = doc(db, "products", productId);
   const saleRef = doc(collection(db, "sales"));
@@ -356,6 +363,7 @@ export async function recordSale(
     });
 
     transaction.set(saleRef, {
+      invoiceId: invoiceId || makeInvoiceId(),
       productId,
       productName: productData.name,
       category: productData.category,
@@ -402,6 +410,7 @@ export async function getSaleById(saleId: string): Promise<Sale | null> {
     category: data.category as Category,
     gender: data.gender as Gender,
     brand: data.brand,
+    invoiceId: data.invoiceId,
     quantitySold: data.quantitySold,
     pricePerUnit: data.pricePerUnit,
     costPriceAtSale: typeof data.costPriceAtSale === "number" ? data.costPriceAtSale : undefined,
@@ -450,6 +459,160 @@ export function subscribeToSales(callback: (sales: Sale[]) => void): () => void 
   });
   
   return unsubscribe;
+}
+
+export interface CartSaleLineInput {
+  productId: string;
+  quantity: number;
+  pricePerUnit: number;
+  lineDiscountType?: DiscountType;
+  lineDiscountValue?: number;
+}
+
+export interface CartSaleResult {
+  invoiceId: string;
+  saleIds: string[];
+}
+
+export async function recordCartSale(
+  lines: CartSaleLineInput[],
+  options: {
+    note?: string;
+    orderDiscountType?: DiscountType;
+    orderDiscountValue?: number;
+    customDate?: Date;
+  } = {}
+): Promise<CartSaleResult> {
+  if (lines.length === 0) throw new Error("الفاتورة فارغة");
+  const invoiceId = makeInvoiceId();
+
+  const result = await runTransaction(db, async (tx) => {
+    // Read all referenced products inside the transaction
+    type Pre = {
+      line: CartSaleLineInput;
+      productData: any;
+      currentQty: number;
+      ref: ReturnType<typeof doc>;
+      saleRef: ReturnType<typeof doc>;
+      lineSubtotal: number;
+      lineDiscount: number;
+    };
+    const pre: Pre[] = [];
+    let cartGross = 0;
+    for (const line of lines) {
+      const ref = doc(db, "products", line.productId);
+      const snap = await tx.get(ref);
+      if (!snap.exists()) throw new Error(`المنتج غير موجود (${line.productId})`);
+      const data = snap.data();
+      const currentQty = (data.quantity as number) ?? 0;
+      if (currentQty < line.quantity) {
+        throw new Error(
+          `الكمية المطلوبة من "${data.name}" غير متوفرة (المتاح ${currentQty})`
+        );
+      }
+      const lineSubtotal = line.quantity * line.pricePerUnit;
+      let lineDiscount = 0;
+      if (line.lineDiscountType && line.lineDiscountValue && line.lineDiscountValue > 0) {
+        lineDiscount =
+          line.lineDiscountType === "percentage"
+            ? Math.round((lineSubtotal * line.lineDiscountValue) / 100)
+            : line.lineDiscountValue;
+      }
+      lineDiscount = Math.min(lineDiscount, lineSubtotal);
+      cartGross += lineSubtotal - lineDiscount;
+      pre.push({
+        line,
+        productData: data,
+        currentQty,
+        ref,
+        saleRef: doc(collection(db, "sales")),
+        lineSubtotal,
+        lineDiscount,
+      });
+    }
+
+    // Apportion order-level discount across lines proportionally
+    let orderDiscountTotal = 0;
+    if (
+      options.orderDiscountType &&
+      typeof options.orderDiscountValue === "number" &&
+      options.orderDiscountValue > 0 &&
+      cartGross > 0
+    ) {
+      orderDiscountTotal =
+        options.orderDiscountType === "percentage"
+          ? Math.round((cartGross * options.orderDiscountValue) / 100)
+          : options.orderDiscountValue;
+      orderDiscountTotal = Math.min(orderDiscountTotal, cartGross);
+    }
+
+    const saleIds: string[] = [];
+    let allocated = 0;
+    for (let i = 0; i < pre.length; i++) {
+      const p = pre[i];
+      const afterLine = p.lineSubtotal - p.lineDiscount;
+      const sharePct = cartGross > 0 ? afterLine / cartGross : 0;
+      let allocation = i === pre.length - 1
+        ? orderDiscountTotal - allocated
+        : Math.round(orderDiscountTotal * sharePct);
+      allocation = Math.max(0, Math.min(allocation, afterLine));
+      allocated += allocation;
+      const totalLineDiscount = p.lineDiscount + allocation;
+      const totalPrice = p.lineSubtotal - totalLineDiscount;
+
+      tx.update(p.ref, {
+        quantity: p.currentQty - p.line.quantity,
+        updatedAt: serverTimestamp(),
+      });
+      tx.set(p.saleRef, {
+        invoiceId,
+        productId: p.line.productId,
+        productName: p.productData.name,
+        category: p.productData.category,
+        gender: p.productData.gender,
+        brand: p.productData.brand || null,
+        quantitySold: p.line.quantity,
+        pricePerUnit: p.line.pricePerUnit,
+        costPriceAtSale:
+          typeof p.productData.costPrice === "number" ? p.productData.costPrice : null,
+        subtotal: p.lineSubtotal,
+        discountType:
+          totalLineDiscount > 0
+            ? p.line.lineDiscountType ||
+              (options.orderDiscountType === "percentage" ? "percentage" : "fixed")
+            : null,
+        discountValue:
+          totalLineDiscount > 0 && p.line.lineDiscountValue
+            ? p.line.lineDiscountValue
+            : null,
+        discountAmount: totalLineDiscount || null,
+        totalPrice,
+        saleDate: options.customDate ? Timestamp.fromDate(options.customDate) : serverTimestamp(),
+        isReturned: false,
+        returnedAt: null,
+        returnedQuantity: null,
+        note: options.note || null,
+      });
+      saleIds.push(p.saleRef.id);
+    }
+
+    return { invoiceId, saleIds, snapshots: pre };
+  });
+
+  // Fire history events outside the transaction
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const snap = (result as any).snapshots[i];
+    void recordHistoryEvent({
+      productId: line.productId,
+      productName: snap.productData.name,
+      type: "sold",
+      delta: -line.quantity,
+      quantityAfter: snap.currentQty - line.quantity,
+    });
+  }
+
+  return { invoiceId: result.invoiceId, saleIds: result.saleIds };
 }
 
 export async function updateSale(

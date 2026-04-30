@@ -36,6 +36,7 @@ export type DiscountType = "percentage" | "fixed";
 
 export interface Sale {
   id: string;
+  invoiceId?: string;
   productId: string;
   productName: string;
   category: Category;
@@ -54,6 +55,14 @@ export interface Sale {
   returnedAt?: Date;
   returnedQuantity?: number;
   note?: string;
+}
+
+export interface CartLine {
+  productId: string;
+  quantity: number;
+  pricePerUnit: number;
+  lineDiscountType?: DiscountType;
+  lineDiscountValue?: number;
 }
 
 export interface Return {

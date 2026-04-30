@@ -4,12 +4,12 @@ import { useState, useEffect } from "react";
 import { ProductSearchSelect } from "./ProductSearchSelect";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
-import { recordSale } from "@/lib/firestore";
+import { recordCartSale } from "@/lib/firestore";
 import { useSales } from "@/hooks/useSales";
 import { useProducts } from "@/hooks/useProducts";
 import type { Product, DiscountType } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
-import { Printer, Percent, DollarSign, Calendar } from "lucide-react";
+import { Printer, Percent, DollarSign, Calendar, Plus, Trash2, ShoppingCart } from "lucide-react";
 
 export interface ReceiptSaleData {
   saleId?: string;
@@ -25,32 +25,81 @@ export interface ReceiptSaleData {
   saleDate: Date;
 }
 
+export interface ReceiptInvoiceData {
+  invoiceId?: string;
+  saleDate: Date;
+  lines: {
+    productName: string;
+    brand?: string;
+    quantity: number;
+    pricePerUnit: number;
+    subtotal: number;
+    lineDiscountAmount: number;
+  }[];
+  cartSubtotal: number;
+  orderDiscountAmount: number;
+  totalPrice: number;
+  note?: string;
+}
+
+interface CartLineState {
+  product: Product;
+  quantity: number;
+  pricePerUnit: number;
+  lineDiscountType: DiscountType;
+  lineDiscountValue: number;
+}
+
 interface SaleFormProps {
   onSuccess: () => void;
   onPrintLastSale?: (data: ReceiptSaleData) => void;
+  onPrintLastInvoice?: (data: ReceiptInvoiceData) => void;
   preselectedProduct?: Product | null;
 }
 
-export function SaleForm({ onSuccess, onPrintLastSale, preselectedProduct }: SaleFormProps) {
+function calcLineDiscount(
+  qty: number,
+  price: number,
+  type: DiscountType,
+  value: number
+): number {
+  const subtotal = qty * price;
+  if (value <= 0) return 0;
+  const raw = type === "percentage" ? Math.round((subtotal * value) / 100) : value;
+  return Math.min(raw, subtotal);
+}
+
+export function SaleForm({
+  onSuccess,
+  onPrintLastSale: _onPrintLastSale,
+  onPrintLastInvoice,
+  preselectedProduct,
+}: SaleFormProps) {
   const { sales } = useSales();
   const { products } = useProducts();
+
+  // Current line being composed
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(preselectedProduct || null);
   const [quantity, setQuantity] = useState(1);
   const [pricePerUnit, setPricePerUnit] = useState(0);
+  const [lineDiscountType, setLineDiscountType] = useState<DiscountType>("percentage");
+  const [lineDiscountValue, setLineDiscountValue] = useState(0);
+
+  // Cart of accumulated lines (multi-product invoice)
+  const [cart, setCart] = useState<CartLineState[]>([]);
+
+  // Order-level fields (apply to whole invoice)
   const [note, setNote] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  // Discount state
-  const [discountType, setDiscountType] = useState<DiscountType>("percentage");
-  const [discountValue, setDiscountValue] = useState(0);
-
-  // Backdated sale state
+  const [orderDiscountType, setOrderDiscountType] = useState<DiscountType>("percentage");
+  const [orderDiscountValue, setOrderDiscountValue] = useState(0);
   const [useCustomDate, setUseCustomDate] = useState(false);
   const todayStr = new Date().toISOString().slice(0, 10);
   const [customDate, setCustomDate] = useState(todayStr);
 
-  // Last sale for receipt (kept locally so the print button can appear)
-  const [lastSale, setLastSale] = useState<ReceiptSaleData | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  // Last invoice for receipt
+  const [lastInvoice, setLastInvoice] = useState<ReceiptInvoiceData | null>(null);
 
   useEffect(() => {
     if (selectedProduct) {
@@ -58,7 +107,6 @@ export function SaleForm({ onSuccess, onPrintLastSale, preselectedProduct }: Sal
     }
   }, [selectedProduct]);
 
-  // Keyboard shortcut: "/" focuses search
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
@@ -73,7 +121,6 @@ export function SaleForm({ onSuccess, onPrintLastSale, preselectedProduct }: Sal
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  // Last 5 distinct products sold (in stock only)
   const recentProducts = (() => {
     const seen = new Set<string>();
     const out: Product[] = [];
@@ -87,16 +134,85 @@ export function SaleForm({ onSuccess, onPrintLastSale, preselectedProduct }: Sal
     return out;
   })();
 
-  const subtotal = quantity * pricePerUnit;
-  const discountAmount = discountValue > 0
-    ? discountType === "percentage"
-      ? Math.round((subtotal * discountValue) / 100)
-      : Math.min(discountValue, subtotal)
+  const cartSubtotalGross = cart.reduce((s, l) => s + l.quantity * l.pricePerUnit, 0);
+  const cartLineDiscountTotal = cart.reduce(
+    (s, l) =>
+      s +
+      calcLineDiscount(
+        l.quantity,
+        l.pricePerUnit,
+        l.lineDiscountType,
+        l.lineDiscountValue
+      ),
+    0
+  );
+  const cartAfterLines = cartSubtotalGross - cartLineDiscountTotal;
+  const orderDiscountAmount =
+    orderDiscountValue > 0 && cartAfterLines > 0
+      ? Math.min(
+          orderDiscountType === "percentage"
+            ? Math.round((cartAfterLines * orderDiscountValue) / 100)
+            : orderDiscountValue,
+          cartAfterLines
+        )
+      : 0;
+  const cartTotal = cartAfterLines - orderDiscountAmount;
+
+  // Inventory check: account for the cart already holding some quantity of this product
+  const stockReservedFor = (productId: string) =>
+    cart
+      .filter((l) => l.product.id === productId)
+      .reduce((s, l) => s + l.quantity, 0);
+
+  const remainingStockForCurrent = selectedProduct
+    ? selectedProduct.quantity - stockReservedFor(selectedProduct.id)
     : 0;
-  const totalPrice = subtotal - discountAmount;
+
+  const canAddCurrentLine =
+    !!selectedProduct &&
+    quantity >= 1 &&
+    pricePerUnit >= 1 &&
+    quantity <= remainingStockForCurrent;
+
+  const handleAddToCart = () => {
+    if (!canAddCurrentLine || !selectedProduct) return;
+    setCart((prev) => [
+      ...prev,
+      {
+        product: selectedProduct,
+        quantity,
+        pricePerUnit,
+        lineDiscountType,
+        lineDiscountValue,
+      },
+    ]);
+    setSelectedProduct(null);
+    setQuantity(1);
+    setPricePerUnit(0);
+    setLineDiscountValue(0);
+  };
+
+  const handleRemoveLine = (idx: number) => {
+    setCart((prev) => prev.filter((_, i) => i !== idx));
+  };
 
   const handleSubmit = async () => {
-    if (!selectedProduct || quantity < 1 || pricePerUnit < 1) return;
+    // Auto-add the current in-progress line to the cart if any
+    let lines: CartLineState[] = cart;
+    if (selectedProduct && quantity >= 1 && pricePerUnit >= 1 && canAddCurrentLine) {
+      lines = [
+        ...cart,
+        {
+          product: selectedProduct,
+          quantity,
+          pricePerUnit,
+          lineDiscountType,
+          lineDiscountValue,
+        },
+      ];
+    }
+    if (lines.length === 0) return;
+
     let saleDate: Date = new Date();
     if (useCustomDate && customDate) {
       const parsed = new Date(`${customDate}T12:00:00`);
@@ -113,36 +229,80 @@ export function SaleForm({ onSuccess, onPrintLastSale, preselectedProduct }: Sal
 
     setLoading(true);
     try {
-      const saleId = await recordSale(
-        selectedProduct.id,
-        quantity,
-        pricePerUnit,
-        note || undefined,
-        discountValue > 0 ? discountType : undefined,
-        discountValue > 0 ? discountValue : undefined,
-        useCustomDate ? saleDate : undefined
+      const result = await recordCartSale(
+        lines.map((l) => ({
+          productId: l.product.id,
+          quantity: l.quantity,
+          pricePerUnit: l.pricePerUnit,
+          lineDiscountType: l.lineDiscountValue > 0 ? l.lineDiscountType : undefined,
+          lineDiscountValue: l.lineDiscountValue > 0 ? l.lineDiscountValue : undefined,
+        })),
+        {
+          note: note || undefined,
+          orderDiscountType: orderDiscountValue > 0 ? orderDiscountType : undefined,
+          orderDiscountValue: orderDiscountValue > 0 ? orderDiscountValue : undefined,
+          customDate: useCustomDate ? saleDate : undefined,
+        }
       );
 
-      // Save last sale data for receipt
-      setLastSale({
-        saleId,
-        productName: selectedProduct.name,
-        brand: selectedProduct.brand,
-        quantity,
-        pricePerUnit,
-        subtotal,
-        discountType: discountValue > 0 ? discountType : undefined,
-        discountValue: discountValue > 0 ? discountValue : undefined,
-        discountAmount,
-        totalPrice,
-        saleDate,
-      });
+      const linesGross = lines.reduce(
+        (s, l) => s + l.quantity * l.pricePerUnit,
+        0
+      );
+      const lineDiscTotal = lines.reduce(
+        (s, l) =>
+          s +
+          calcLineDiscount(
+            l.quantity,
+            l.pricePerUnit,
+            l.lineDiscountType,
+            l.lineDiscountValue
+          ),
+        0
+      );
+      const after = linesGross - lineDiscTotal;
+      const orderDisc =
+        orderDiscountValue > 0 && after > 0
+          ? Math.min(
+              orderDiscountType === "percentage"
+                ? Math.round((after * orderDiscountValue) / 100)
+                : orderDiscountValue,
+              after
+            )
+          : 0;
+      const total = after - orderDisc;
 
+      const invoiceForReceipt: ReceiptInvoiceData = {
+        invoiceId: result.invoiceId,
+        saleDate,
+        lines: lines.map((l) => ({
+          productName: l.product.name,
+          brand: l.product.brand,
+          quantity: l.quantity,
+          pricePerUnit: l.pricePerUnit,
+          subtotal: l.quantity * l.pricePerUnit,
+          lineDiscountAmount: calcLineDiscount(
+            l.quantity,
+            l.pricePerUnit,
+            l.lineDiscountType,
+            l.lineDiscountValue
+          ),
+        })),
+        cartSubtotal: linesGross,
+        orderDiscountAmount: orderDisc,
+        totalPrice: total,
+        note: note || undefined,
+      };
+      setLastInvoice(invoiceForReceipt);
+
+      // Reset form
+      setCart([]);
       setSelectedProduct(null);
       setQuantity(1);
       setPricePerUnit(0);
+      setLineDiscountValue(0);
+      setOrderDiscountValue(0);
       setNote("");
-      setDiscountValue(0);
       setUseCustomDate(false);
       setCustomDate(new Date().toISOString().slice(0, 10));
       onSuccess();
@@ -154,191 +314,285 @@ export function SaleForm({ onSuccess, onPrintLastSale, preselectedProduct }: Sal
   };
 
   const handlePrint = () => {
-    if (lastSale && onPrintLastSale) {
-      onPrintLastSale(lastSale);
-    } else if (lastSale) {
-      window.print();
+    if (lastInvoice && onPrintLastInvoice) {
+      onPrintLastInvoice(lastInvoice);
     }
   };
 
-  const isValid = selectedProduct && quantity >= 1 && pricePerUnit > 0 && quantity <= selectedProduct.quantity;
-
   return (
-    <>
-      <div className="bg-white rounded-xl p-5 shadow-sm border border-border">
-        <h3 className="font-semibold mb-4">تسجيل بيع جديد</h3>
-
-        <div className="space-y-4">
-          <ProductSearchSelect value={selectedProduct} onChange={setSelectedProduct} />
-
-          {!selectedProduct && recentProducts.length > 0 && (
-            <div>
-              <p className="text-xs text-text-secondary mb-2">منتجات حديثة:</p>
-              <div className="flex flex-wrap gap-2">
-                {recentProducts.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => setSelectedProduct(p)}
-                    className="px-3 py-1.5 rounded-full text-xs bg-accent-light text-accent hover:bg-accent hover:text-white transition-colors"
-                  >
-                    {p.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {selectedProduct && (
-            <>
-              <p className="text-sm text-text-secondary">
-                المتوفر في المخزن: {selectedProduct.quantity} قطعة
-              </p>
-
-              <Input
-                label="الكمية"
-                type="number"
-                value={quantity}
-                onChange={(e) => setQuantity(Number(e.target.value))}
-                min={1}
-                max={selectedProduct.quantity}
-                error={
-                  quantity > selectedProduct.quantity
-                    ? `الحد الأقصى: ${selectedProduct.quantity}`
-                    : undefined
-                }
-              />
-
-              <Input
-                label="سعر الوحدة (جنيه)"
-                type="number"
-                value={pricePerUnit}
-                onChange={(e) => setPricePerUnit(Number(e.target.value))}
-                min={1}
-              />
-
-              {/* Discount Section */}
-              <div className="space-y-3 p-4 bg-gray-50 rounded-lg border border-gray-100">
-                <p className="text-sm font-medium text-text-secondary">خصم (اختياري)</p>
-                
-                {/* Discount Type Toggle */}
-                <div className="flex rounded-lg overflow-hidden border border-border">
-                  <button
-                    type="button"
-                    onClick={() => setDiscountType("percentage")}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium transition-colors ${
-                      discountType === "percentage"
-                        ? "bg-accent text-white"
-                        : "bg-white text-text-secondary hover:bg-gray-50"
-                    }`}
-                  >
-                    <Percent className="w-4 h-4" />
-                    نسبة مئوية
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDiscountType("fixed")}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium transition-colors ${
-                      discountType === "fixed"
-                        ? "bg-accent text-white"
-                        : "bg-white text-text-secondary hover:bg-gray-50"
-                    }`}
-                  >
-                    <DollarSign className="w-4 h-4" />
-                    مبلغ ثابت
-                  </button>
-                </div>
-
-                {/* Discount Value Input */}
-                <Input
-                  label={discountType === "percentage" ? "نسبة الخصم (%)" : "مبلغ الخصم (جنيه)"}
-                  type="number"
-                  value={discountValue}
-                  onChange={(e) => setDiscountValue(Number(e.target.value))}
-                  min={0}
-                  max={discountType === "percentage" ? 100 : subtotal}
-                />
-              </div>
-
-              {/* Price Breakdown */}
-              <div className="p-4 bg-accent-light rounded-lg space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-text-secondary">المجموع الفرعي</span>
-                  <span className="font-medium">{formatPrice(subtotal)}</span>
-                </div>
-                {discountAmount > 0 && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-danger">
-                      الخصم {discountType === "percentage" ? `(${discountValue}%)` : ""}
-                    </span>
-                    <span className="font-medium text-danger">- {formatPrice(discountAmount)}</span>
-                  </div>
-                )}
-                <div className="border-t border-accent/20 pt-2 flex items-center justify-between">
-                  <span className="text-sm font-semibold">الإجمالي</span>
-                  <span className="text-2xl font-bold text-accent">{formatPrice(totalPrice)}</span>
-                </div>
-              </div>
-
-              <Input
-                label="ملاحظة (اختياري)"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="ملاحظة..."
-              />
-
-              {/* Backdated sale */}
-              <div className="space-y-2 p-4 bg-gray-50 rounded-lg border border-gray-100">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={useCustomDate}
-                    onChange={(e) => setUseCustomDate(e.target.checked)}
-                    className="w-4 h-4 accent-accent"
-                  />
-                  <Calendar className="w-4 h-4 text-text-secondary" />
-                  <span className="text-sm font-medium text-text-secondary">
-                    تسجيل بيع بتاريخ سابق
-                  </span>
-                </label>
-                {useCustomDate && (
-                  <input
-                    type="date"
-                    value={customDate}
-                    max={todayStr}
-                    onChange={(e) => setCustomDate(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-white text-sm"
-                  />
-                )}
-              </div>
-
-              <Button
-                onClick={handleSubmit}
-                disabled={!isValid}
-                loading={loading}
-                className="w-full"
-              >
-                تسجيل البيع
-              </Button>
-            </>
-          )}
-        </div>
-
-        {/* Print Receipt Button — shows after successful sale */}
-        {lastSale && (
-          <div className="mt-4 pt-4 border-t border-border">
-            <Button
-              variant="secondary"
-              onClick={handlePrint}
-              className="w-full flex items-center justify-center gap-2"
-            >
-              <Printer className="w-5 h-5" />
-              طباعة الفاتورة
-            </Button>
-          </div>
+    <div className="bg-white rounded-xl p-5 shadow-sm border border-border">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-semibold">تسجيل بيع جديد</h3>
+        {cart.length > 0 && (
+          <span className="text-xs px-2 py-1 rounded-full bg-accent-light text-accent font-medium">
+            {cart.length} منتج في الفاتورة
+          </span>
         )}
       </div>
 
-    </>
+      <div className="space-y-4">
+        <ProductSearchSelect value={selectedProduct} onChange={setSelectedProduct} />
+
+        {!selectedProduct && cart.length === 0 && recentProducts.length > 0 && (
+          <div>
+            <p className="text-xs text-text-secondary mb-2">منتجات حديثة:</p>
+            <div className="flex flex-wrap gap-2">
+              {recentProducts.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setSelectedProduct(p)}
+                  className="px-3 py-1.5 rounded-full text-xs bg-accent-light text-accent hover:bg-accent hover:text-white transition-colors"
+                >
+                  {p.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {selectedProduct && (
+          <div className="space-y-3 p-3 rounded-lg border border-border">
+            <p className="text-sm text-text-secondary">
+              المتاح: {remainingStockForCurrent} قطعة
+            </p>
+
+            <Input
+              label="الكمية"
+              type="number"
+              value={quantity}
+              onChange={(e) => setQuantity(Number(e.target.value))}
+              min={1}
+              max={remainingStockForCurrent}
+              error={
+                quantity > remainingStockForCurrent
+                  ? `الحد الأقصى: ${remainingStockForCurrent}`
+                  : undefined
+              }
+            />
+
+            <Input
+              label="سعر الوحدة (جنيه)"
+              type="number"
+              value={pricePerUnit}
+              onChange={(e) => setPricePerUnit(Number(e.target.value))}
+              min={1}
+            />
+
+            <div className="space-y-2 p-3 bg-gray-50 rounded-lg border border-gray-100">
+              <p className="text-xs font-medium text-text-secondary">خصم على هذا المنتج (اختياري)</p>
+              <div className="flex rounded-lg overflow-hidden border border-border">
+                <button
+                  type="button"
+                  onClick={() => setLineDiscountType("percentage")}
+                  className={`flex-1 flex items-center justify-center gap-1 py-1.5 text-xs ${
+                    lineDiscountType === "percentage"
+                      ? "bg-accent text-white"
+                      : "bg-white text-text-secondary"
+                  }`}
+                >
+                  <Percent className="w-3 h-3" />
+                  نسبة
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLineDiscountType("fixed")}
+                  className={`flex-1 flex items-center justify-center gap-1 py-1.5 text-xs ${
+                    lineDiscountType === "fixed"
+                      ? "bg-accent text-white"
+                      : "bg-white text-text-secondary"
+                  }`}
+                >
+                  <DollarSign className="w-3 h-3" />
+                  مبلغ
+                </button>
+              </div>
+              <Input
+                label={lineDiscountType === "percentage" ? "نسبة %" : "مبلغ ج.م"}
+                type="number"
+                value={lineDiscountValue}
+                onChange={(e) => setLineDiscountValue(Number(e.target.value))}
+                min={0}
+                max={lineDiscountType === "percentage" ? 100 : quantity * pricePerUnit}
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={handleAddToCart}
+              disabled={!canAddCurrentLine}
+              className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-accent-light text-accent hover:bg-accent hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+            >
+              <Plus className="w-4 h-4" />
+              إضافة للفاتورة
+            </button>
+          </div>
+        )}
+
+        {/* Cart lines */}
+        {cart.length > 0 && (
+          <div className="border border-border rounded-lg divide-y divide-border">
+            {cart.map((line, idx) => {
+              const lineSubtotal = line.quantity * line.pricePerUnit;
+              const ld = calcLineDiscount(
+                line.quantity,
+                line.pricePerUnit,
+                line.lineDiscountType,
+                line.lineDiscountValue
+              );
+              return (
+                <div key={idx} className="flex items-center gap-2 p-3 text-sm">
+                  <ShoppingCart className="w-4 h-4 text-text-secondary shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{line.product.name}</p>
+                    <p className="text-xs text-text-secondary">
+                      {line.quantity} × {formatPrice(line.pricePerUnit)}
+                      {ld > 0 && (
+                        <span className="text-danger ms-1">
+                          (خصم - {formatPrice(ld)})
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  <span className="font-bold whitespace-nowrap">
+                    {formatPrice(lineSubtotal - ld)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveLine(idx)}
+                    className="p-1 text-danger hover:bg-danger-light rounded"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Order-level fields shown once any line exists */}
+        {(cart.length > 0 || selectedProduct) && (
+          <>
+            <div className="space-y-2 p-3 bg-gray-50 rounded-lg border border-gray-100">
+              <p className="text-sm font-medium text-text-secondary">
+                خصم على إجمالي الفاتورة (اختياري)
+              </p>
+              <div className="flex rounded-lg overflow-hidden border border-border">
+                <button
+                  type="button"
+                  onClick={() => setOrderDiscountType("percentage")}
+                  className={`flex-1 flex items-center justify-center gap-1 py-1.5 text-xs ${
+                    orderDiscountType === "percentage"
+                      ? "bg-accent text-white"
+                      : "bg-white text-text-secondary"
+                  }`}
+                >
+                  <Percent className="w-3 h-3" />
+                  نسبة
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOrderDiscountType("fixed")}
+                  className={`flex-1 flex items-center justify-center gap-1 py-1.5 text-xs ${
+                    orderDiscountType === "fixed"
+                      ? "bg-accent text-white"
+                      : "bg-white text-text-secondary"
+                  }`}
+                >
+                  <DollarSign className="w-3 h-3" />
+                  مبلغ
+                </button>
+              </div>
+              <Input
+                label={orderDiscountType === "percentage" ? "نسبة %" : "مبلغ ج.م"}
+                type="number"
+                value={orderDiscountValue}
+                onChange={(e) => setOrderDiscountValue(Number(e.target.value))}
+                min={0}
+                max={orderDiscountType === "percentage" ? 100 : cartAfterLines}
+              />
+            </div>
+
+            {/* Totals preview */}
+            <div className="p-4 bg-accent-light rounded-lg space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span className="text-text-secondary">المجموع الفرعي</span>
+                <span>{formatPrice(cartSubtotalGross)}</span>
+              </div>
+              {cartLineDiscountTotal > 0 && (
+                <div className="flex justify-between text-danger">
+                  <span>خصومات بنود</span>
+                  <span>- {formatPrice(cartLineDiscountTotal)}</span>
+                </div>
+              )}
+              {orderDiscountAmount > 0 && (
+                <div className="flex justify-between text-danger">
+                  <span>خصم الفاتورة</span>
+                  <span>- {formatPrice(orderDiscountAmount)}</span>
+                </div>
+              )}
+              <div className="border-t border-accent/20 pt-1 flex justify-between font-bold">
+                <span>الإجمالي</span>
+                <span className="text-2xl text-accent">{formatPrice(cartTotal)}</span>
+              </div>
+            </div>
+
+            <Input
+              label="ملاحظة (اختياري)"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="ملاحظة..."
+            />
+
+            <div className="space-y-2 p-3 bg-gray-50 rounded-lg border border-gray-100">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={useCustomDate}
+                  onChange={(e) => setUseCustomDate(e.target.checked)}
+                  className="w-4 h-4 accent-accent"
+                />
+                <Calendar className="w-4 h-4 text-text-secondary" />
+                <span className="text-sm font-medium text-text-secondary">
+                  تسجيل الفاتورة بتاريخ سابق
+                </span>
+              </label>
+              {useCustomDate && (
+                <input
+                  type="date"
+                  value={customDate}
+                  max={todayStr}
+                  onChange={(e) => setCustomDate(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-white text-sm"
+                />
+              )}
+            </div>
+
+            <Button
+              onClick={handleSubmit}
+              disabled={loading || (cart.length === 0 && !canAddCurrentLine)}
+              loading={loading}
+              className="w-full"
+            >
+              تسجيل الفاتورة
+            </Button>
+          </>
+        )}
+      </div>
+
+      {/* Print last invoice */}
+      {lastInvoice && (
+        <div className="mt-4 pt-4 border-t border-border">
+          <Button
+            variant="secondary"
+            onClick={handlePrint}
+            className="w-full flex items-center justify-center gap-2"
+          >
+            <Printer className="w-5 h-5" />
+            طباعة الفاتورة
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }

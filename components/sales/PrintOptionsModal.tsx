@@ -6,7 +6,8 @@ import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { Receipt } from "./Receipt";
-import type { ReceiptSaleData } from "./SaleForm";
+import { InvoiceReceipt } from "./InvoiceReceipt";
+import type { ReceiptSaleData, ReceiptInvoiceData } from "./SaleForm";
 
 type PaperPreset = "auto_one" | "xp330b_80" | "thermal_58" | "a4" | "letter" | "custom";
 type Orientation = "portrait" | "landscape";
@@ -76,6 +77,7 @@ interface PrintOptionsModalProps {
   isOpen: boolean;
   onClose: () => void;
   receiptData: ReceiptSaleData | null;
+  invoiceData?: ReceiptInvoiceData | null;
   onConfirm: () => void;
 }
 
@@ -144,7 +146,8 @@ function buildPrintStyle(opts: PrintOptions, preset: typeof PAPER_SIZES[PaperPre
   `;
 }
 
-export function PrintOptionsModal({ isOpen, onClose, receiptData, onConfirm }: PrintOptionsModalProps) {
+export function PrintOptionsModal({ isOpen, onClose, receiptData, invoiceData, onConfirm }: PrintOptionsModalProps) {
+  const useInvoice = !!invoiceData;
   const [opts, setOpts] = useState<PrintOptions>(DEFAULT_OPTS);
 
   const selectedPaper = PAPER_SIZES[opts.paper];
@@ -172,7 +175,7 @@ export function PrintOptionsModal({ isOpen, onClose, receiptData, onConfirm }: P
   );
 
   const handlePrint = () => {
-    if (!receiptData) return;
+    if (!receiptData && !invoiceData) return;
     const existing = document.getElementById("print-options-dynamic");
     if (existing) existing.remove();
 
@@ -361,7 +364,9 @@ export function PrintOptionsModal({ isOpen, onClose, receiptData, onConfirm }: P
                 border: "1px solid var(--border)",
               }}
             >
-              {receiptData ? (
+              {useInvoice && invoiceData ? (
+                <InvoiceReceipt invoice={invoiceData} />
+              ) : receiptData ? (
                 <Receipt sale={receiptData} />
               ) : (
                 <p className="text-center text-text-secondary text-sm p-8">لا توجد بيانات</p>
@@ -376,18 +381,22 @@ export function PrintOptionsModal({ isOpen, onClose, receiptData, onConfirm }: P
         <Button variant="ghost" onClick={onClose} className="w-full sm:w-auto">
           إلغاء
         </Button>
-        <Button onClick={handlePrint} disabled={!receiptData} className="flex items-center justify-center gap-2 w-full sm:w-auto">
+        <Button onClick={handlePrint} disabled={!receiptData && !invoiceData} className="flex items-center justify-center gap-2 w-full sm:w-auto">
           <Printer className="w-4 h-4" />
           طباعة ({opts.copies}× نسخة)
         </Button>
       </div>
 
       {/* Printable container — hidden on screen, revealed for print */}
-      {receiptData && (
+      {(receiptData || invoiceData) && (
         <div className="print-receipt-container" aria-hidden="true">
           {renderCopiesCount.map((i) => (
             <div key={i} className={i > 0 ? "receipt-page-break" : undefined}>
-              <Receipt sale={receiptData} />
+              {useInvoice && invoiceData ? (
+                <InvoiceReceipt invoice={invoiceData} />
+              ) : receiptData ? (
+                <Receipt sale={receiptData} />
+              ) : null}
             </div>
           ))}
         </div>
