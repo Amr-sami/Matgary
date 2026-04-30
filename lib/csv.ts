@@ -1,4 +1,4 @@
-import type { Product } from "./types";
+import type { Product, Sale } from "./types";
 import { CATEGORY_LABELS, GENDER_LABELS } from "./types";
 
 function escapeCsv(value: unknown): string {
@@ -50,6 +50,52 @@ export function productsToCsv(products: Product[]): string {
       p.location || "",
       p.createdAt.toISOString(),
       p.updatedAt.toISOString(),
+    ].map(escapeCsv).join(",");
+  });
+  return "﻿" + [headers.join(","), ...rows].join("\n");
+}
+
+export function salesToCsv(sales: Sale[]): string {
+  const headers = [
+    "التاريخ",
+    "المنتج",
+    "الصنف",
+    "الجنس",
+    "البراند",
+    "الكمية",
+    "سعر الوحدة",
+    "سعر التكلفة",
+    "المجموع الفرعي",
+    "نوع الخصم",
+    "قيمة الخصم",
+    "مبلغ الخصم",
+    "الإجمالي",
+    "الربح",
+    "الحالة",
+    "ملاحظة",
+  ];
+  const rows = sales.map((s) => {
+    const profit =
+      typeof s.costPriceAtSale === "number"
+        ? s.totalPrice - s.costPriceAtSale * s.quantitySold
+        : "";
+    return [
+      s.saleDate.toISOString(),
+      s.productName,
+      CATEGORY_LABELS[s.category],
+      GENDER_LABELS[s.gender],
+      s.brand || "",
+      s.quantitySold,
+      s.pricePerUnit,
+      s.costPriceAtSale ?? "",
+      s.subtotal,
+      s.discountType || "",
+      s.discountValue ?? "",
+      s.discountAmount ?? 0,
+      s.totalPrice,
+      profit,
+      s.isReturned ? "مرتجع" : "مباع",
+      s.note || "",
     ].map(escapeCsv).join(",");
   });
   return "﻿" + [headers.join(","), ...rows].join("\n");

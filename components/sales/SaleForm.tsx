@@ -5,6 +5,8 @@ import { ProductSearchSelect } from "./ProductSearchSelect";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { recordSale } from "@/lib/firestore";
+import { useSales } from "@/hooks/useSales";
+import { useProducts } from "@/hooks/useProducts";
 import type { Product, DiscountType } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
 import { Printer, Percent, DollarSign, Calendar } from "lucide-react";
@@ -30,6 +32,8 @@ interface SaleFormProps {
 }
 
 export function SaleForm({ onSuccess, onPrintLastSale, preselectedProduct }: SaleFormProps) {
+  const { sales } = useSales();
+  const { products } = useProducts();
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(preselectedProduct || null);
   const [quantity, setQuantity] = useState(1);
   const [pricePerUnit, setPricePerUnit] = useState(0);
@@ -53,6 +57,35 @@ export function SaleForm({ onSuccess, onPrintLastSale, preselectedProduct }: Sal
       setPricePerUnit(selectedProduct.price);
     }
   }, [selectedProduct]);
+
+  // Keyboard shortcut: "/" focuses search
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const isTyping =
+        target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA");
+      if (e.key === "/" && !isTyping) {
+        e.preventDefault();
+        document.getElementById("sale-product-search")?.focus();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  // Last 5 distinct products sold (in stock only)
+  const recentProducts = (() => {
+    const seen = new Set<string>();
+    const out: Product[] = [];
+    for (const s of sales) {
+      if (out.length >= 5) break;
+      if (seen.has(s.productId)) continue;
+      seen.add(s.productId);
+      const p = products.find((x) => x.id === s.productId);
+      if (p && p.quantity > 0) out.push(p);
+    }
+    return out;
+  })();
 
   const subtotal = quantity * pricePerUnit;
   const discountAmount = discountValue > 0
@@ -137,6 +170,24 @@ export function SaleForm({ onSuccess, onPrintLastSale, preselectedProduct }: Sal
 
         <div className="space-y-4">
           <ProductSearchSelect value={selectedProduct} onChange={setSelectedProduct} />
+
+          {!selectedProduct && recentProducts.length > 0 && (
+            <div>
+              <p className="text-xs text-text-secondary mb-2">منتجات حديثة:</p>
+              <div className="flex flex-wrap gap-2">
+                {recentProducts.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setSelectedProduct(p)}
+                    className="px-3 py-1.5 rounded-full text-xs bg-accent-light text-accent hover:bg-accent hover:text-white transition-colors"
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {selectedProduct && (
             <>

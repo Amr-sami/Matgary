@@ -122,21 +122,30 @@ function ReportsContent() {
             <>
               {/* Desktop Table */}
               <div className="hidden md:block">
-                <SalesTable 
-                  sales={filteredData.sales} 
-                  onReturn={() => {}} 
+                <SalesTable
+                  sales={filteredData.sales}
+                  onReturn={() => {}}
                   onPrint={handlePrint}
+                  onEdit={() => {}}
+                  onVoid={() => {}}
+                  selectedIds={new Set()}
+                  onToggleSelect={() => {}}
+                  onToggleSelectAll={() => {}}
                 />
               </div>
 
               {/* Mobile Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:hidden">
                 {filteredData.sales.map((sale) => (
-                  <SaleCard 
-                    key={sale.id} 
-                    sale={sale} 
-                    onReturn={() => {}} 
+                  <SaleCard
+                    key={sale.id}
+                    sale={sale}
+                    onReturn={() => {}}
                     onPrint={handlePrint}
+                    onEdit={() => {}}
+                    onVoid={() => {}}
+                    selected={false}
+                    onToggleSelect={() => {}}
                   />
                 ))}
               </div>

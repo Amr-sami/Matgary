@@ -1,6 +1,6 @@
 "use client";
 
-import { RotateCcw, Printer, Calendar, Tag } from "lucide-react";
+import { RotateCcw, Printer, Calendar, Tag, Pencil, Trash2 } from "lucide-react";
 import type { Sale } from "@/lib/types";
 import { Badge } from "../ui/Badge";
 import { CATEGORY_LABELS, GENDER_LABELS } from "@/lib/types";
@@ -10,20 +10,39 @@ interface SaleCardProps {
   sale: Sale;
   onReturn: (sale: Sale) => void;
   onPrint: (sale: Sale) => void;
+  onEdit: (sale: Sale) => void;
+  onVoid: (sale: Sale) => void;
+  selected: boolean;
+  onToggleSelect: (sale: Sale) => void;
 }
 
-export function SaleCard({ sale, onReturn, onPrint }: SaleCardProps) {
+export function SaleCard({
+  sale,
+  onReturn,
+  onPrint,
+  onEdit,
+  onVoid,
+  selected,
+  onToggleSelect,
+}: SaleCardProps) {
   const saleDate = new Date(sale.saleDate);
 
   return (
     <div
       className={cn(
         "bg-white rounded-xl p-4 shadow-sm border border-border transition-all font-cairo",
+        selected && "ring-2 ring-accent",
         sale.isReturned && "opacity-75 bg-gray-50/50"
       )}
     >
       <div className="flex items-start justify-between mb-3">
-        <div className="space-y-1">
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={() => onToggleSelect(sale)}
+          className="mt-1 w-4 h-4 accent-accent cursor-pointer"
+        />
+        <div className="flex-1 ms-2 space-y-1">
           <div className="flex flex-col gap-0.5 text-xs text-text-secondary">
             <div className="flex items-center gap-1.5 font-bold text-text-primary">
               <Calendar className="w-3.5 h-3.5 text-accent" />
@@ -87,24 +106,42 @@ export function SaleCard({ sale, onReturn, onPrint }: SaleCardProps) {
           {!sale.isReturned && (
             <button
               onClick={() => onPrint(sale)}
-              className="flex items-center justify-center gap-2 px-5 py-2.5 bg-accent text-white rounded-xl hover:bg-accent/90 transition-all font-bold shadow-lg shadow-accent/20 border border-accent/20"
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-accent text-white rounded-xl hover:bg-accent/90 font-bold shadow-lg shadow-accent/20 border border-accent/20 text-sm"
             >
               <Printer className="w-4 h-4" />
               طباعة
             </button>
           )}
+          <div className="flex gap-2">
+            <button
+              onClick={() => onEdit(sale)}
+              disabled={sale.isReturned}
+              className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-gray-100 text-text-secondary rounded-xl hover:bg-gray-200 disabled:opacity-40 text-sm"
+            >
+              <Pencil className="w-4 h-4" />
+              تعديل
+            </button>
+            <button
+              onClick={() => onReturn(sale)}
+              disabled={sale.isReturned}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-sm",
+                sale.isReturned
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  : "bg-danger-light text-danger hover:bg-danger hover:text-white border border-danger/10"
+              )}
+            >
+              <RotateCcw className="w-4 h-4" />
+              مرتجع
+            </button>
+          </div>
           <button
-            onClick={() => onReturn(sale)}
-            disabled={sale.isReturned}
-            className={cn(
-              "flex items-center justify-center gap-2 px-5 py-2 rounded-xl transition-all font-bold text-sm",
-              sale.isReturned 
-                ? "bg-gray-100 text-gray-400 cursor-not-allowed" 
-                : "bg-danger-light text-danger hover:bg-danger hover:text-white border border-danger/10"
-            )}
+            onClick={() => onVoid(sale)}
+            className="flex items-center justify-center gap-1 px-3 py-1.5 text-xs text-text-secondary hover:text-danger"
+            title="حذف الفاتورة وإرجاع المخزون"
           >
-            <RotateCcw className="w-4 h-4" />
-            مرتجع
+            <Trash2 className="w-3.5 h-3.5" />
+            حذف الفاتورة
           </button>
         </div>
       </div>

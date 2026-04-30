@@ -43,6 +43,7 @@ export interface Sale {
   brand?: string;
   quantitySold: number;
   pricePerUnit: number;
+  costPriceAtSale?: number;
   subtotal: number;
   discountType?: DiscountType;
   discountValue?: number;

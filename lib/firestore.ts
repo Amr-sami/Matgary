@@ -363,6 +363,7 @@ export async function recordSale(
       brand: productData.brand || null,
       quantitySold,
       pricePerUnit,
+      costPriceAtSale: typeof productData.costPrice === "number" ? productData.costPrice : null,
       subtotal,
       discountType: discountType || null,
       discountValue: discountValue || null,
@@ -403,6 +404,7 @@ export async function getSaleById(saleId: string): Promise<Sale | null> {
     brand: data.brand,
     quantitySold: data.quantitySold,
     pricePerUnit: data.pricePerUnit,
+    costPriceAtSale: typeof data.costPriceAtSale === "number" ? data.costPriceAtSale : undefined,
     subtotal: data.subtotal ?? (data.totalPrice + (data.discountAmount || 0)),
     discountType: data.discountType as DiscountType | undefined,
     discountValue: data.discountValue,
@@ -448,6 +450,99 @@ export function subscribeToSales(callback: (sales: Sale[]) => void): () => void 
   });
   
   return unsubscribe;
+}
+
+export async function updateSale(
+  saleId: string,
+  updates: {
+    quantitySold?: number;
+    pricePerUnit?: number;
+    discountType?: DiscountType | null;
+    discountValue?: number | null;
+    note?: string;
+    saleDate?: Date;
+  }
+): Promise<void> {
+  const saleRef = doc(db, "sales", saleId);
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(saleRef);
+    if (!snap.exists()) throw new Error("البيع غير موجود");
+    const data = snap.data();
+
+    const productRef = doc(db, "products", data.productId);
+    const productSnap = await tx.get(productRef);
+
+    const oldQty = data.quantitySold as number;
+    const newQty = updates.quantitySold ?? oldQty;
+    const newPrice = updates.pricePerUnit ?? (data.pricePerUnit as number);
+    const newDiscType =
+      updates.discountType === undefined
+        ? (data.discountType as DiscountType | null | undefined)
+        : updates.discountType;
+    const newDiscVal =
+      updates.discountValue === undefined
+        ? (data.discountValue as number | null | undefined)
+        : updates.discountValue;
+
+    const subtotal = newQty * newPrice;
+    let discountAmount = 0;
+    if (newDiscType && typeof newDiscVal === "number" && newDiscVal > 0) {
+      discountAmount =
+        newDiscType === "percentage"
+          ? Math.round((subtotal * newDiscVal) / 100)
+          : newDiscVal;
+    }
+    discountAmount = Math.min(discountAmount, subtotal);
+    const totalPrice = subtotal - discountAmount;
+
+    // Quantity diff -> stock change
+    if (productSnap.exists() && newQty !== oldQty) {
+      const currentStock = (productSnap.data().quantity as number) ?? 0;
+      const stockDelta = oldQty - newQty;
+      const nextStock = Math.max(0, currentStock + stockDelta);
+      tx.update(productRef, {
+        quantity: nextStock,
+        updatedAt: serverTimestamp(),
+      });
+    }
+
+    const patch: Record<string, unknown> = {
+      quantitySold: newQty,
+      pricePerUnit: newPrice,
+      subtotal,
+      discountType: newDiscType ?? null,
+      discountValue: newDiscVal ?? null,
+      discountAmount: discountAmount || null,
+      totalPrice,
+    };
+    if (updates.note !== undefined) patch.note = updates.note || null;
+    if (updates.saleDate) patch.saleDate = Timestamp.fromDate(updates.saleDate);
+
+    tx.update(saleRef, patch);
+  });
+}
+
+export async function voidSale(saleId: string): Promise<void> {
+  const saleRef = doc(db, "sales", saleId);
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(saleRef);
+    if (!snap.exists()) throw new Error("البيع غير موجود");
+    const data = snap.data();
+    if (data.isReturned) {
+      tx.delete(saleRef);
+      return;
+    }
+    const productRef = doc(db, "products", data.productId);
+    const productSnap = await tx.get(productRef);
+    if (productSnap.exists()) {
+      const currentQty = (productSnap.data().quantity as number) ?? 0;
+      tx.update(productRef, {
+        quantity: currentQty + (data.quantitySold as number),
+        updatedAt: serverTimestamp(),
+      });
+    }
+    tx.delete(saleRef);
+  });
 }
 
 export async function recordReturn(

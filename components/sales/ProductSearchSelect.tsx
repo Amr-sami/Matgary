@@ -49,6 +49,7 @@ export function ProductSearchSelect({ value, onChange }: ProductSearchSelectProp
       <div className="relative">
         <Search className="absolute start-4 top-1/2 -translate-y-1/2 w-5 h-5 text-text-secondary" />
         <input
+          id="sale-product-search"
           type="text"
           value={search}
           onChange={(e) => {
