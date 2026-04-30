@@ -35,6 +35,21 @@ export default function CustomersPage() {
 
   const customers = useMemo(() => buildCustomerAggregates(sales), [sales]);
 
+  // Diagnostic: how many sales had any customer info attached
+  const salesWithCustomer = useMemo(
+    () =>
+      sales.filter(
+        (s) =>
+          !s.isReturned &&
+          ((s.customerName || "").trim() || (s.customerPhone || "").trim())
+      ).length,
+    [sales]
+  );
+  const totalActiveSales = useMemo(
+    () => sales.filter((s) => !s.isReturned).length,
+    [sales]
+  );
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     let list = customers.filter((c) => {
@@ -119,6 +134,27 @@ export default function CustomersPage() {
   return (
     <AppShell title="العملاء">
       <div className="space-y-4">
+        {/* Diagnostic: explain when nothing is showing */}
+        {customers.length === 0 && totalActiveSales > 0 && (
+          <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 text-sm text-orange-900 space-y-1">
+            <p className="font-bold">لا يوجد عملاء بعد</p>
+            <p>
+              عندك {totalActiveSales} فاتورة في النظام، لكن لم يتم إدخال اسم
+              أو رقم العميل في أي منها.
+            </p>
+            <p className="text-xs">
+              الحل: عند تسجيل البيع، اكتب اسم العميل أو رقم الموبايل في حقول
+              "العميل" قبل الضغط على "تسجيل الفاتورة".
+            </p>
+          </div>
+        )}
+        {customers.length > 0 && salesWithCustomer < totalActiveSales && (
+          <div className="rounded-xl border border-accent-light bg-accent-light/30 p-3 text-xs text-text-secondary">
+            تم ربط بيانات العملاء بـ {salesWithCustomer} من أصل {totalActiveSales} فاتورة.
+            باقي الفواتير لم يتم تسجيل اسم/رقم لها.
+          </div>
+        )}
+
         {/* Summary cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <SummaryCard
