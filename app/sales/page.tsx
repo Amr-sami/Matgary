@@ -15,6 +15,7 @@ import {
 } from "@/components/sales/SalesFilters";
 import { SalesKpiCards } from "@/components/sales/SalesKpiCards";
 import { DeferredPanel } from "@/components/sales/DeferredPanel";
+import { DayCompareCard } from "@/components/sales/DayCompareCard";
 import { SalesChart } from "@/components/sales/SalesChart";
 import { TopProductsCard } from "@/components/sales/TopProductsCard";
 import { HourHeatmap } from "@/components/sales/HourHeatmap";
@@ -441,7 +442,12 @@ function SalesPageInner() {
           </div>
           <TopProductsCard sales={dateRangedSales} />
         </div>
-        <HourHeatmap sales={dateRangedSales} />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+          <div className="lg:col-span-2">
+            <HourHeatmap sales={dateRangedSales} />
+          </div>
+          <DayCompareCard sales={sales} />
+        </div>
 
         {/* Filters */}
         <SalesFilters

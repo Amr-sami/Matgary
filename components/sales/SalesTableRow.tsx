@@ -1,6 +1,7 @@
 "use client";
 
 import { RotateCcw, Printer, Pencil, Trash2 } from "lucide-react";
+import { ShareReceiptButton } from "./ShareReceiptButton";
 import type { Sale } from "@/lib/types";
 import { Badge } from "../ui/Badge";
 import { CATEGORY_LABELS, GENDER_LABELS, PAYMENT_METHOD_LABELS } from "@/lib/types";
@@ -119,6 +120,7 @@ export function SalesTableRow({
               <Printer className="w-4 h-4" />
             </button>
           )}
+          {!sale.isReturned && <ShareReceiptButton sale={sale} />}
           <button
             onClick={() => onEdit(sale)}
             disabled={sale.isReturned}

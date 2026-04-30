@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { ProductSearchSelect } from "./ProductSearchSelect";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
@@ -78,6 +79,7 @@ export function SaleForm({
 }: SaleFormProps) {
   const { sales } = useSales();
   const { products } = useProducts();
+  const searchParams = useSearchParams();
 
   // Current line being composed
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(preselectedProduct || null);
@@ -112,6 +114,21 @@ export function SaleForm({
       setPricePerUnit(selectedProduct.price);
     }
   }, [selectedProduct]);
+
+  // Pre-select a product via ?preselect=<id> (used by inventory's quick-sell)
+  useEffect(() => {
+    const id = searchParams.get("preselect");
+    if (!id) return;
+    const p = products.find((x) => x.id === id);
+    if (p) {
+      setSelectedProduct(p);
+    }
+    // Strip the query from the URL so refresh doesn't re-trigger
+    const url = new URL(window.location.href);
+    url.searchParams.delete("preselect");
+    window.history.replaceState({}, "", url.toString());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

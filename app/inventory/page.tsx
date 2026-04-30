@@ -301,6 +301,8 @@ function InventoryPageInner() {
 
   const handleSell = (product: Product) => {
     setSellProduct(product);
+    // Quick-sell: jump to sales page with the product pre-selected via query
+    router.push(`/sales?preselect=${encodeURIComponent(product.id)}`);
   };
 
   const handleAdjustQty = useCallback(
