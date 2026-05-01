@@ -428,6 +428,54 @@ export function SaleForm({
             console.warn(
               "[whatsapp] Green API enabled but credentials missing — skipping send (no tab opened)"
             );
+          } else if (settings.sendAsPdf) {
+            // Send as PDF attachment via Green API sendFileByUpload
+            const invoicePayload = {
+              invoiceId: result.invoiceId,
+              saleDate: saleDate.toISOString(),
+              customerName: customerName.trim() || undefined,
+              customerPhone: trimmedPhone,
+              lines: lines.map((l) => ({
+                productName: l.product.name,
+                brand: l.product.brand,
+                quantity: l.quantity,
+                pricePerUnit: l.pricePerUnit,
+                subtotal: l.quantity * l.pricePerUnit,
+                lineDiscountAmount: calcLineDiscount(
+                  l.quantity,
+                  l.pricePerUnit,
+                  l.lineDiscountType,
+                  l.lineDiscountValue
+                ),
+              })),
+              cartSubtotal: cartSubtotalGross,
+              orderDiscountAmount,
+              totalPrice: total,
+              note: note || undefined,
+              shopName: settings.shopName,
+              shopPhone: settings.shopPhone,
+            };
+            fetch("/api/whatsapp/send-pdf", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                phone: trimmedPhone,
+                caption: message,
+                instanceId: settings.greenApiInstanceId,
+                token: settings.greenApiToken,
+                apiUrl: settings.greenApiUrl || undefined,
+                invoice: invoicePayload,
+              }),
+            })
+              .then((r) => r.json())
+              .then((res) => {
+                if (res?.ok) {
+                  console.log("[whatsapp] PDF sent", res.idMessage);
+                } else {
+                  console.warn("[whatsapp] PDF send failed", res);
+                }
+              })
+              .catch((e) => console.warn("[whatsapp] PDF send network error", e));
           } else {
             sendViaGreenApi({
               phone: trimmedPhone,

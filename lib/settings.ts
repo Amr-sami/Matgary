@@ -36,6 +36,10 @@ export interface ShopSettings {
   // "https://7107.api.greenapi.com"). If empty we fall back to the
   // generic "https://api.green-api.com".
   greenApiUrl: string;
+  // When true (and Green API is enabled), the receipt is sent as a PDF
+  // attachment via Green API's sendFileByUpload instead of a text message
+  // with a link. The customer gets a real PDF document in WhatsApp.
+  sendAsPdf: boolean;
 }
 
 export const DEFAULT_SETTINGS: ShopSettings = {
@@ -47,6 +51,7 @@ export const DEFAULT_SETTINGS: ShopSettings = {
   greenApiInstanceId: "",
   greenApiToken: "",
   greenApiUrl: "",
+  sendAsPdf: false,
 };
 
 export interface ReceiptVars {
@@ -109,6 +114,10 @@ export function subscribeToSettings(
           typeof data.greenApiUrl === "string"
             ? data.greenApiUrl
             : DEFAULT_SETTINGS.greenApiUrl,
+        sendAsPdf:
+          typeof data.sendAsPdf === "boolean"
+            ? data.sendAsPdf
+            : DEFAULT_SETTINGS.sendAsPdf,
       });
     },
     (err) => {

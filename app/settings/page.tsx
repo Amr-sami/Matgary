@@ -229,6 +229,24 @@ export default function SettingsPage() {
             </div>
           </label>
 
+          <label className="flex items-start gap-3 p-3 rounded-lg border border-border cursor-pointer">
+            <input
+              type="checkbox"
+              checked={draft.sendAsPdf}
+              onChange={(e) => update("sendAsPdf", e.target.checked)}
+              disabled={!draft.greenApiEnabled}
+              className="mt-1 w-5 h-5 accent-accent"
+            />
+            <div className="flex-1">
+              <p className="font-medium">إرسال الفاتورة كملف PDF بدلاً من رابط</p>
+              <p className="text-xs text-text-secondary mt-0.5">
+                لو مفعّل، العميل بياخد الفاتورة كملف PDF مرفق في الواتساب
+                (مع نص الرسالة كـ caption). أنظف وأكثر احترافاً من الرابط.
+                يحتاج Green API مفعّل.
+              </p>
+            </div>
+          </label>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
               label="idInstance"
