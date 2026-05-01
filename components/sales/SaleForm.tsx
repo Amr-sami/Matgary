@@ -398,8 +398,11 @@ export function SaleForm({
       };
       setLastInvoice(invoiceForReceipt);
 
-      // After-sale WhatsApp delivery: prefers Green API if enabled+configured,
-      // otherwise falls back to opening wa.me in a new tab if autoOpenWhatsApp.
+      // After-sale WhatsApp delivery.
+      // Rule: when greenApiEnabled is true, NEVER open a wa.me tab — the
+      // toggle is a hard kill-switch. If the API call fails, log it and
+      // give up silently. wa.me only fires when greenApiEnabled is off
+      // AND autoOpenWhatsApp is on.
       const trimmedPhone = customerPhone.trim();
       if (trimmedPhone && result.saleIds.length > 0) {
         const firstSaleId = result.saleIds[0];
@@ -419,26 +422,27 @@ export function SaleForm({
           shopPhone: settings.shopPhone,
         });
 
-        if (
-          settings.greenApiEnabled &&
-          settings.greenApiInstanceId &&
-          settings.greenApiToken
-        ) {
-          // Fully background: never open a tab, just call the API and log
-          // the outcome. The user wanted no UI noise here.
-          sendViaGreenApi({
-            phone: trimmedPhone,
-            message,
-            instanceId: settings.greenApiInstanceId,
-            token: settings.greenApiToken,
-            apiUrl: settings.greenApiUrl || undefined,
-          }).then((res) => {
-            if (res.ok) {
-              console.log("[whatsapp] Green API sent", res.idMessage);
-            } else {
-              console.warn("[whatsapp] Green API send failed", res);
-            }
-          });
+        if (settings.greenApiEnabled) {
+          // Hard kill-switch: never open a tab when this toggle is on.
+          if (!settings.greenApiInstanceId || !settings.greenApiToken) {
+            console.warn(
+              "[whatsapp] Green API enabled but credentials missing — skipping send (no tab opened)"
+            );
+          } else {
+            sendViaGreenApi({
+              phone: trimmedPhone,
+              message,
+              instanceId: settings.greenApiInstanceId,
+              token: settings.greenApiToken,
+              apiUrl: settings.greenApiUrl || undefined,
+            }).then((res) => {
+              if (res.ok) {
+                console.log("[whatsapp] Green API sent", res.idMessage);
+              } else {
+                console.warn("[whatsapp] Green API send failed", res);
+              }
+            });
+          }
         } else if (settings.autoOpenWhatsApp) {
           const url = buildWhatsAppLink(trimmedPhone, message);
           if (url) window.open(url, "_blank", "noopener,noreferrer");
