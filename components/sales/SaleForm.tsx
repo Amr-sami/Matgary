@@ -430,6 +430,7 @@ export function SaleForm({
             message,
             instanceId: settings.greenApiInstanceId,
             token: settings.greenApiToken,
+            apiUrl: settings.greenApiUrl || undefined,
           }).then((res) => {
             if (!res.ok) {
               console.warn("[whatsapp] Green API send failed", res);

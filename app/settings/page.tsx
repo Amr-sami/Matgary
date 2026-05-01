@@ -94,6 +94,7 @@ export default function SettingsPage() {
         message: `🧪 رسالة اختبار من ${draft.shopName}\nالتاريخ: ${new Date().toLocaleString("ar-EG")}`,
         instanceId: draft.greenApiInstanceId.trim(),
         token: draft.greenApiToken.trim(),
+        apiUrl: draft.greenApiUrl.trim() || undefined,
       });
       if (res.ok) {
         setToast({
@@ -233,7 +234,7 @@ export default function SettingsPage() {
               label="idInstance"
               value={draft.greenApiInstanceId}
               onChange={(e) => update("greenApiInstanceId", e.target.value)}
-              placeholder="1101000000"
+              placeholder="7107606136"
             />
             <Input
               label="apiTokenInstance"
@@ -243,6 +244,12 @@ export default function SettingsPage() {
               placeholder="••••••••••••••••"
             />
           </div>
+          <Input
+            label="apiUrl (اختياري — من شاشة Green API)"
+            value={draft.greenApiUrl}
+            onChange={(e) => update("greenApiUrl", e.target.value)}
+            placeholder="https://7107.api.greenapi.com"
+          />
 
           <div className="rounded-lg border border-border p-3 space-y-2">
             <p className="text-sm font-medium flex items-center gap-2">

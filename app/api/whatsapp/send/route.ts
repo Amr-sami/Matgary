@@ -8,6 +8,7 @@ interface SendBody {
   message: string;
   instanceId: string;
   token: string;
+  apiUrl?: string;
 }
 
 export async function POST(req: Request) {
@@ -21,7 +22,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const { phone, message, instanceId, token } = body;
+  const { phone, message, instanceId, token, apiUrl } = body;
   if (!phone || !message || !instanceId || !token) {
     return NextResponse.json(
       { ok: false, error: "Missing required fields: phone, message, instanceId, token" },
@@ -37,7 +38,8 @@ export async function POST(req: Request) {
     );
   }
 
-  const url = `https://api.green-api.com/waInstance${encodeURIComponent(
+  const base = (apiUrl && apiUrl.trim()) || "https://api.green-api.com";
+  const url = `${base.replace(/\/$/, "")}/waInstance${encodeURIComponent(
     instanceId
   )}/sendMessage/${encodeURIComponent(token)}`;
   const chatId = `${normalized}@c.us`;

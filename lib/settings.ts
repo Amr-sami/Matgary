@@ -32,6 +32,10 @@ export interface ShopSettings {
   greenApiEnabled: boolean;
   greenApiInstanceId: string;
   greenApiToken: string;
+  // Optional per-instance API URL from green-api.com dashboard (e.g.
+  // "https://7107.api.greenapi.com"). If empty we fall back to the
+  // generic "https://api.green-api.com".
+  greenApiUrl: string;
 }
 
 export const DEFAULT_SETTINGS: ShopSettings = {
@@ -42,6 +46,7 @@ export const DEFAULT_SETTINGS: ShopSettings = {
   greenApiEnabled: false,
   greenApiInstanceId: "",
   greenApiToken: "",
+  greenApiUrl: "",
 };
 
 export interface ReceiptVars {
@@ -100,6 +105,10 @@ export function subscribeToSettings(
           typeof data.greenApiToken === "string"
             ? data.greenApiToken
             : DEFAULT_SETTINGS.greenApiToken,
+        greenApiUrl:
+          typeof data.greenApiUrl === "string"
+            ? data.greenApiUrl
+            : DEFAULT_SETTINGS.greenApiUrl,
       });
     },
     (err) => {

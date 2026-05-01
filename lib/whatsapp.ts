@@ -5,6 +5,7 @@ export interface SendArgs {
   message: string;
   instanceId: string;
   token: string;
+  apiUrl?: string;
 }
 
 export interface SendResult {
