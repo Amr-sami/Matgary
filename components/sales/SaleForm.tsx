@@ -9,6 +9,8 @@ import { recordCartSale } from "@/lib/firestore";
 import { useSales } from "@/hooks/useSales";
 import { useProducts } from "@/hooks/useProducts";
 import { useCustomersData } from "@/hooks/useCustomersData";
+import { useShopSettings } from "@/hooks/useShopSettings";
+import { buildWhatsAppLink, substitute } from "@/lib/settings";
 import type { Product, DiscountType, PaymentMethod } from "@/lib/types";
 import { PAYMENT_METHOD_LABELS } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
@@ -82,6 +84,7 @@ export function SaleForm({
   const { sales } = useSales();
   const { records: customerRecords } = useCustomersData();
   const { products } = useProducts();
+  const { settings } = useShopSettings();
   const searchParams = useSearchParams();
 
   // Current line being composed
@@ -393,6 +396,39 @@ export function SaleForm({
         note: note || undefined,
       };
       setLastInvoice(invoiceForReceipt);
+
+      // Auto-open WhatsApp with the templated message when:
+      // - feature is enabled in settings
+      // - customer has a phone number
+      // - we know which sale to link to (use the first sale id)
+      if (
+        settings.autoOpenWhatsApp &&
+        customerPhone.trim() &&
+        result.saleIds.length > 0
+      ) {
+        const firstSaleId = result.saleIds[0];
+        const origin =
+          typeof window !== "undefined" ? window.location.origin : "";
+        const receiptLink = `${origin}/r/${firstSaleId}`;
+        const message = substitute(settings.messageTemplate, {
+          customerName: customerName.trim() || "عميلنا الكريم",
+          customerPhone: customerPhone.trim(),
+          invoiceId: result.invoiceId,
+          invoiceCode: result.invoiceId.slice(-8).toUpperCase(),
+          totalPrice: formatPrice(total),
+          productNames: lines.map((l) => l.product.name).join("، "),
+          receiptLink,
+          date: saleDate.toLocaleDateString("ar-EG"),
+          shopName: settings.shopName,
+          shopPhone: settings.shopPhone,
+        });
+        const url = buildWhatsAppLink(customerPhone.trim(), message);
+        if (url) {
+          // Open after the success toast paints; popup blockers usually
+          // allow this since it's a direct response to a user-triggered click.
+          window.open(url, "_blank", "noopener,noreferrer");
+        }
+      }
 
       // Reset form
       setCart([]);
