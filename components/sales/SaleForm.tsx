@@ -424,7 +424,8 @@ export function SaleForm({
           settings.greenApiInstanceId &&
           settings.greenApiToken
         ) {
-          // Fire-and-forget: don't block the success toast
+          // Fully background: never open a tab, just call the API and log
+          // the outcome. The user wanted no UI noise here.
           sendViaGreenApi({
             phone: trimmedPhone,
             message,
@@ -432,11 +433,10 @@ export function SaleForm({
             token: settings.greenApiToken,
             apiUrl: settings.greenApiUrl || undefined,
           }).then((res) => {
-            if (!res.ok) {
+            if (res.ok) {
+              console.log("[whatsapp] Green API sent", res.idMessage);
+            } else {
               console.warn("[whatsapp] Green API send failed", res);
-              // Fall back to wa.me if Green API fails
-              const url = buildWhatsAppLink(trimmedPhone, message);
-              if (url) window.open(url, "_blank", "noopener,noreferrer");
             }
           });
         } else if (settings.autoOpenWhatsApp) {

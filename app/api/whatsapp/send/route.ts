@@ -44,12 +44,19 @@ export async function POST(req: Request) {
   )}/sendMessage/${encodeURIComponent(token)}`;
   const chatId = `${normalized}@c.us`;
 
+  // Encode body explicitly as UTF-8 bytes so emojis and Arabic don't get
+  // turned into "?" by any intermediate layer that defaults to Latin-1.
+  const bodyString = JSON.stringify({ chatId, message });
+  const bodyBytes = new TextEncoder().encode(bodyString);
+
   try {
     const upstream = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chatId, message }),
-      // Avoid edge cases with redirects + keep this fast
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        Accept: "application/json",
+      },
+      body: bodyBytes,
       redirect: "follow",
     });
     const text = await upstream.text();
