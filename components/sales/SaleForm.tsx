@@ -429,6 +429,31 @@ export function SaleForm({
               "[whatsapp] Green API enabled but credentials missing — skipping send (no tab opened)"
             );
           } else if (settings.sendAsPdf) {
+            // PDF mode: build a clean caption WITHOUT the receipt link
+            // (the customer is getting the PDF itself, no link needed).
+            const captionRaw = substitute(settings.messageTemplate, {
+              customerName: customerName.trim() || "عميلنا الكريم",
+              customerPhone: trimmedPhone,
+              invoiceId: result.invoiceId,
+              invoiceCode: result.invoiceId.slice(-8).toUpperCase(),
+              totalPrice: formatPrice(total),
+              productNames: lines.map((l) => l.product.name).join("، "),
+              receiptLink: "",
+              date: saleDate.toLocaleDateString("ar-EG"),
+              shopName: settings.shopName,
+              shopPhone: settings.shopPhone,
+            });
+            const pdfCaption = captionRaw
+              .split("\n")
+              .filter((line) => {
+                const t = line.trim();
+                if (/^رابط الفاتورة:\s*$/.test(t)) return false;
+                if (/^receipt link:\s*$/i.test(t)) return false;
+                return true;
+              })
+              .join("\n")
+              .replace(/\n{3,}/g, "\n\n")
+              .trim();
             // Send as PDF attachment via Green API sendFileByUpload
             const invoicePayload = {
               invoiceId: result.invoiceId,
@@ -460,7 +485,7 @@ export function SaleForm({
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 phone: trimmedPhone,
-                caption: message,
+                caption: pdfCaption,
                 instanceId: settings.greenApiInstanceId,
                 token: settings.greenApiToken,
                 apiUrl: settings.greenApiUrl || undefined,

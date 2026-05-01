@@ -35,6 +35,7 @@ await setDoc(
     greenApiInstanceId: "7107606136",
     greenApiToken: "21228ca91b714a9db84ab31e7badd14fbf6348c9b9a94190bc",
     greenApiUrl: "https://7107.api.greenapi.com",
+    sendAsPdf: true,
   },
   { merge: true }
 );
