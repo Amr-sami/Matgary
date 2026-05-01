@@ -11,6 +11,7 @@ import { useProducts } from "@/hooks/useProducts";
 import { useCustomersData } from "@/hooks/useCustomersData";
 import { useShopSettings } from "@/hooks/useShopSettings";
 import { buildWhatsAppLink, substitute } from "@/lib/settings";
+import { sendViaGreenApi } from "@/lib/whatsapp";
 import type { Product, DiscountType, PaymentMethod } from "@/lib/types";
 import { PAYMENT_METHOD_LABELS } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
@@ -397,22 +398,17 @@ export function SaleForm({
       };
       setLastInvoice(invoiceForReceipt);
 
-      // Auto-open WhatsApp with the templated message when:
-      // - feature is enabled in settings
-      // - customer has a phone number
-      // - we know which sale to link to (use the first sale id)
-      if (
-        settings.autoOpenWhatsApp &&
-        customerPhone.trim() &&
-        result.saleIds.length > 0
-      ) {
+      // After-sale WhatsApp delivery: prefers Green API if enabled+configured,
+      // otherwise falls back to opening wa.me in a new tab if autoOpenWhatsApp.
+      const trimmedPhone = customerPhone.trim();
+      if (trimmedPhone && result.saleIds.length > 0) {
         const firstSaleId = result.saleIds[0];
         const origin =
           typeof window !== "undefined" ? window.location.origin : "";
         const receiptLink = `${origin}/r/${firstSaleId}`;
         const message = substitute(settings.messageTemplate, {
           customerName: customerName.trim() || "عميلنا الكريم",
-          customerPhone: customerPhone.trim(),
+          customerPhone: trimmedPhone,
           invoiceId: result.invoiceId,
           invoiceCode: result.invoiceId.slice(-8).toUpperCase(),
           totalPrice: formatPrice(total),
@@ -422,11 +418,29 @@ export function SaleForm({
           shopName: settings.shopName,
           shopPhone: settings.shopPhone,
         });
-        const url = buildWhatsAppLink(customerPhone.trim(), message);
-        if (url) {
-          // Open after the success toast paints; popup blockers usually
-          // allow this since it's a direct response to a user-triggered click.
-          window.open(url, "_blank", "noopener,noreferrer");
+
+        if (
+          settings.greenApiEnabled &&
+          settings.greenApiInstanceId &&
+          settings.greenApiToken
+        ) {
+          // Fire-and-forget: don't block the success toast
+          sendViaGreenApi({
+            phone: trimmedPhone,
+            message,
+            instanceId: settings.greenApiInstanceId,
+            token: settings.greenApiToken,
+          }).then((res) => {
+            if (!res.ok) {
+              console.warn("[whatsapp] Green API send failed", res);
+              // Fall back to wa.me if Green API fails
+              const url = buildWhatsAppLink(trimmedPhone, message);
+              if (url) window.open(url, "_blank", "noopener,noreferrer");
+            }
+          });
+        } else if (settings.autoOpenWhatsApp) {
+          const url = buildWhatsAppLink(trimmedPhone, message);
+          if (url) window.open(url, "_blank", "noopener,noreferrer");
         }
       }
 

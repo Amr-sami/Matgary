@@ -6,9 +6,11 @@ import {
   Save,
   Phone,
   Store,
-  Cloud,
   Eye,
   Info,
+  Zap,
+  Send,
+  ExternalLink,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/Button";
@@ -21,6 +23,7 @@ import {
   substitute,
   type ShopSettings,
 } from "@/lib/settings";
+import { sendViaGreenApi } from "@/lib/whatsapp";
 import { formatPrice } from "@/lib/utils";
 
 const PLACEHOLDERS: { key: string; description: string }[] = [
@@ -40,6 +43,8 @@ export default function SettingsPage() {
   const { settings, loading } = useShopSettings();
   const [draft, setDraft] = useState<ShopSettings>(settings);
   const [busy, setBusy] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testPhone, setTestPhone] = useState("");
   const [toast, setToast] = useState<{
     type: "success" | "error";
     message: string;
@@ -71,6 +76,39 @@ export default function SettingsPage() {
 
   const handleInsertPlaceholder = (key: string) => {
     update("messageTemplate", `${draft.messageTemplate}{${key}}`);
+  };
+
+  const handleTestSend = async () => {
+    if (!testPhone.trim()) {
+      setToast({ type: "error", message: "أدخل رقم للاختبار" });
+      return;
+    }
+    if (!draft.greenApiInstanceId.trim() || !draft.greenApiToken.trim()) {
+      setToast({ type: "error", message: "أدخل instanceId و apiToken أولاً" });
+      return;
+    }
+    setTesting(true);
+    try {
+      const res = await sendViaGreenApi({
+        phone: testPhone.trim(),
+        message: `🧪 رسالة اختبار من ${draft.shopName}\nالتاريخ: ${new Date().toLocaleString("ar-EG")}`,
+        instanceId: draft.greenApiInstanceId.trim(),
+        token: draft.greenApiToken.trim(),
+      });
+      if (res.ok) {
+        setToast({
+          type: "success",
+          message: `تم الإرسال (id: ${res.idMessage || "—"})`,
+        });
+      } else {
+        setToast({
+          type: "error",
+          message: res.error || "تعذر الإرسال",
+        });
+      }
+    } finally {
+      setTesting(false);
+    }
   };
 
   // Live preview using sample data
@@ -123,29 +161,117 @@ export default function SettingsPage() {
             </div>
           </label>
 
-          <div className="rounded-lg bg-accent-light/30 border border-accent-light p-3 text-xs space-y-1">
+        </div>
+
+        {/* Green API */}
+        <div className="bg-white rounded-xl border border-border p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <Zap className="w-5 h-5 text-success" />
+            <h3 className="font-bold text-lg">Green API — إرسال تلقائي بالكامل</h3>
+          </div>
+
+          <div className="rounded-lg bg-accent-light/30 border border-accent-light p-3 text-xs space-y-1.5">
             <div className="flex items-start gap-2">
               <Info className="w-4 h-4 text-accent shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium">
-                  الإرسال التلقائي 100% (بدون ضغط زر)
-                </p>
-                <p className="text-text-secondary leading-relaxed">
-                  يحتاج تفعيل WhatsApp Cloud API من Meta Business و عمل تحقق
-                  للحساب. لما تجهز الحساب وتدّيني الـ access token + رقم
-                  الواتساب اللي اتعمله verify، نقدر نوصّل API الكامل.
+              <div className="space-y-1.5">
+                <p className="font-medium">خطوات التفعيل:</p>
+                <ol className="list-decimal list-inside space-y-0.5 text-text-secondary">
+                  <li>
+                    افتح حساب على{" "}
+                    <a
+                      href="https://green-api.com"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-accent hover:underline inline-flex items-center gap-0.5"
+                    >
+                      green-api.com <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </li>
+                  <li>
+                    أنشئ <code className="bg-white px-1 rounded">Instance</code> جديد
+                  </li>
+                  <li>
+                    من شاشة الـ Instance، انسخ{" "}
+                    <code className="bg-white px-1 rounded">idInstance</code> و{" "}
+                    <code className="bg-white px-1 rounded">apiTokenInstance</code>{" "}
+                    والصقهم في الخانات تحت
+                  </li>
+                  <li>
+                    اسكان الـ QR من واتساب موبايل المتجر مرة واحدة لربط الحساب
+                  </li>
+                  <li>
+                    فعّل الخيار وضغط "حفظ الإعدادات"، ثم جرب الإرسال من
+                    خانة الاختبار
+                  </li>
+                </ol>
+                <p className="text-orange-700 leading-relaxed">
+                  <strong>تنبيه:</strong> Green API بتستخدم بروتوكول واتساب ويب
+                  غير الرسمي. الاستخدام العادي للمتجر آمن، لكن الإرسال الكتلي
+                  أو مكرّر بسرعة ممكن يعرّض الرقم للحظر.
                 </p>
               </div>
             </div>
-            <label className="flex items-center gap-2 mt-2 opacity-50 cursor-not-allowed">
+          </div>
+
+          <label className="flex items-start gap-3 p-3 rounded-lg border border-border cursor-pointer">
+            <input
+              type="checkbox"
+              checked={draft.greenApiEnabled}
+              onChange={(e) => update("greenApiEnabled", e.target.checked)}
+              className="mt-1 w-5 h-5 accent-accent"
+            />
+            <div className="flex-1">
+              <p className="font-medium">تفعيل الإرسال التلقائي عبر Green API</p>
+              <p className="text-xs text-text-secondary mt-0.5">
+                لو مفعّل، الفاتورة تُرسل في الخلفية بدون ما يفتح أي تاب.
+              </p>
+            </div>
+          </label>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input
+              label="idInstance"
+              value={draft.greenApiInstanceId}
+              onChange={(e) => update("greenApiInstanceId", e.target.value)}
+              placeholder="1101000000"
+            />
+            <Input
+              label="apiTokenInstance"
+              value={draft.greenApiToken}
+              onChange={(e) => update("greenApiToken", e.target.value)}
+              type="password"
+              placeholder="••••••••••••••••"
+            />
+          </div>
+
+          <div className="rounded-lg border border-border p-3 space-y-2">
+            <p className="text-sm font-medium flex items-center gap-2">
+              <Send className="w-4 h-4 text-accent" />
+              اختبار الإرسال
+            </p>
+            <div className="flex gap-2">
               <input
-                type="checkbox"
-                checked={draft.cloudApiEnabled}
-                disabled
-                className="w-4 h-4 accent-accent"
+                type="tel"
+                inputMode="tel"
+                value={testPhone}
+                onChange={(e) => setTestPhone(e.target.value)}
+                placeholder="01000000000"
+                dir="ltr"
+                className="flex-1 px-3 py-2 rounded-lg border border-border bg-white text-sm"
               />
-              <span>تفعيل WhatsApp Cloud API (يحتاج إعداد لاحق)</span>
-            </label>
+              <Button
+                onClick={handleTestSend}
+                loading={testing}
+                disabled={!draft.greenApiInstanceId || !draft.greenApiToken}
+                className="whitespace-nowrap"
+              >
+                إرسال تجريبي
+              </Button>
+            </div>
+            <p className="text-[10px] text-text-secondary">
+              سيُرسل رسالة قصيرة "🧪 رسالة اختبار" للتأكد من ربط الحساب.
+              تأكد من حفظ الإعدادات بعد الاختبار الناجح.
+            </p>
           </div>
         </div>
 

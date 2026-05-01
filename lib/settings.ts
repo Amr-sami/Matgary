@@ -19,15 +19,19 @@ export const DEFAULT_TEMPLATE = `أهلاً {customerName} 👋
 export interface ShopSettings {
   // When true, after recording a sale with a customer phone the form
   // automatically opens WhatsApp Web/app with the templated message.
+  // Used as the fallback path if Green API is not enabled.
   autoOpenWhatsApp: boolean;
   // Message template — supports placeholders. See substitute() below.
   messageTemplate: string;
   // Public-facing storefront / contact info used in the template.
   shopName: string;
   shopPhone: string;
-  // Future: WhatsApp Cloud API credentials live here (NOT in client).
-  // For now we expose only a flag the future server route reads.
-  cloudApiEnabled: boolean;
+  // Green API integration — when enabled and creds are filled, sales
+  // trigger a server-side send via /api/whatsapp/send instead of
+  // opening wa.me in a tab.
+  greenApiEnabled: boolean;
+  greenApiInstanceId: string;
+  greenApiToken: string;
 }
 
 export const DEFAULT_SETTINGS: ShopSettings = {
@@ -35,7 +39,9 @@ export const DEFAULT_SETTINGS: ShopSettings = {
   messageTemplate: DEFAULT_TEMPLATE,
   shopName: "Corner Store",
   shopPhone: "01500228266",
-  cloudApiEnabled: false,
+  greenApiEnabled: false,
+  greenApiInstanceId: "",
+  greenApiToken: "",
 };
 
 export interface ReceiptVars {
@@ -82,10 +88,18 @@ export function subscribeToSettings(
             : DEFAULT_SETTINGS.messageTemplate,
         shopName: data.shopName || DEFAULT_SETTINGS.shopName,
         shopPhone: data.shopPhone || DEFAULT_SETTINGS.shopPhone,
-        cloudApiEnabled:
-          typeof data.cloudApiEnabled === "boolean"
-            ? data.cloudApiEnabled
-            : DEFAULT_SETTINGS.cloudApiEnabled,
+        greenApiEnabled:
+          typeof data.greenApiEnabled === "boolean"
+            ? data.greenApiEnabled
+            : DEFAULT_SETTINGS.greenApiEnabled,
+        greenApiInstanceId:
+          typeof data.greenApiInstanceId === "string"
+            ? data.greenApiInstanceId
+            : DEFAULT_SETTINGS.greenApiInstanceId,
+        greenApiToken:
+          typeof data.greenApiToken === "string"
+            ? data.greenApiToken
+            : DEFAULT_SETTINGS.greenApiToken,
       });
     },
     (err) => {
@@ -100,14 +114,21 @@ export async function saveSettings(s: ShopSettings): Promise<void> {
   await setDoc(ref, s, { merge: true });
 }
 
+export function normalizePhone(phone: string): string | null {
+  const cleaned = (phone || "").replace(/\D/g, "");
+  if (!cleaned) return null;
+  // Egypt: 11-digit local starting with 0 → "20" + rest
+  if (cleaned.startsWith("0") && cleaned.length === 11) {
+    return "20" + cleaned.slice(1);
+  }
+  return cleaned;
+}
+
 export function buildWhatsAppLink(
   customerPhone: string,
   message: string
 ): string | null {
-  const cleaned = (customerPhone || "").replace(/\D/g, "");
-  if (!cleaned) return null;
-  const normalized = cleaned.startsWith("0") && cleaned.length === 11
-    ? "20" + cleaned.slice(1)
-    : cleaned;
+  const normalized = normalizePhone(customerPhone);
+  if (!normalized) return null;
   return `https://wa.me/${normalized}?text=${encodeURIComponent(message)}`;
 }
