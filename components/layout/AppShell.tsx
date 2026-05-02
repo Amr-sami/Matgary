@@ -54,7 +54,7 @@ export function AppShell({ children, title }: AppShellProps) {
           collapsed ? "lg:ms-16" : "lg:ms-52"
         }`}
       >
-        <main className="flex-1 p-4 md:p-6 pb-24 lg:pb-6">{children}</main>
+        <main className="flex-1 p-4 md:p-6 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-6">{children}</main>
       </div>
 
       {/* Mobile Bottom Nav */}
