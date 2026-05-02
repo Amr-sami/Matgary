@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
@@ -83,22 +82,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         {collapsed ? <PanelRightOpen className="w-3.5 h-3.5" /> : <PanelRightClose className="w-3.5 h-3.5" />}
       </button>
 
-      {/* Logo */}
-      <div className={cn("mb-6 flex items-center gap-2", collapsed ? "justify-center px-2" : "px-4")}>
-        <Image src="/logo.png" alt="Corner Store" width={32} height={32} className="rounded-md shrink-0" />
-        <div
-          className={cn(
-            "transition-opacity duration-200 overflow-hidden",
-            collapsed ? "opacity-0 w-0" : "opacity-100"
-          )}
-        >
-          <h1 className="text-lg font-bold text-text-primary leading-tight whitespace-nowrap">Corner Store</h1>
-          <p className="text-xs text-text-secondary whitespace-nowrap">نظام إدارة المخزن</p>
-        </div>
-      </div>
-
       {/* Primary Nav Links */}
-      <div className="px-1 space-y-1">{primaryItems.map(renderItem)}</div>
+      <div className="mt-12 px-1 space-y-1">{primaryItems.map(renderItem)}</div>
 
       {/* "More" divider */}
       <div className={cn("mt-6 mb-2", collapsed ? "px-2" : "px-6")}>
