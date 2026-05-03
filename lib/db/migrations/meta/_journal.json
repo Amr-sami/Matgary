@@ -1,0 +1,55 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1777804627134,
+      "tag": "0000_chunky_living_mummy",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1777804628000,
+      "tag": "0001_shop_settings_rls",
+      "breakpoints": false
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777806181436,
+      "tag": "0002_chemical_amphibian",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1777806182000,
+      "tag": "0003_catalog_rls_and_constraints",
+      "breakpoints": false
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1777806183000,
+      "tag": "0004_rls_nullif_guard",
+      "breakpoints": false
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1777807597818,
+      "tag": "0005_flashy_lenny_balinger",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1777806184000,
+      "tag": "0006_operations_rls_and_constraints",
+      "breakpoints": false
+    }
+  ]
+}

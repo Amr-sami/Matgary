@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: matgary-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: matgary
+      POSTGRES_PASSWORD: matgary
+      POSTGRES_DB: matgary
+    ports:
+      - "5434:5432"
+    volumes:
+      - matgary_pg_data:/var/lib/postgresql/data
+      - ./infra/init-postgres.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U matgary -d matgary"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  matgary_pg_data:

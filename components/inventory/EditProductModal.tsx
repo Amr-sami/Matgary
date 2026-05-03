@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
-import { updateProduct } from "@/lib/firestore";
+import { updateProduct } from "@/lib/api/products";
 import type { Product } from "@/lib/types";
 
 interface EditProductModalProps {

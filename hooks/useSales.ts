@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { subscribeToSales } from "@/lib/firestore";
+import { useCallback, useEffect, useState } from "react";
+import { listSales } from "@/lib/api/sales";
 import type { Sale } from "@/lib/types";
 
 export function useSales() {
@@ -9,20 +9,21 @@ export function useSales() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    setLoading(true);
+  const refresh = useCallback(async () => {
     try {
-      const unsubscribe = subscribeToSales((sales) => {
-        setSales(sales);
-        setLoading(false);
-        setError(null);
-      });
-      return unsubscribe;
+      const data = await listSales();
+      setSales(data);
+      setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "حدث خطأ");
+    } finally {
       setLoading(false);
     }
   }, []);
 
-  return { sales, loading, error };
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  return { sales, loading, error, refresh };
 }

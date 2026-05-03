@@ -4,6 +4,8 @@ import { ReactNode, useEffect, useState } from "react";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { MobileBottomNav } from "./MobileBottomNav";
+import { CatalogProvider } from "@/components/catalog-context";
+import { SettingsProvider } from "@/components/settings-context";
 
 interface AppShellProps {
   children: ReactNode;
@@ -36,6 +38,8 @@ export function AppShell({ children, title }: AppShellProps) {
   const transitionClass = mounted ? "transition-[width,margin] duration-300 ease-in-out" : "";
 
   return (
+    <SettingsProvider>
+    <CatalogProvider>
     <div className="min-h-screen bg-bg-main overflow-x-hidden">
       {/* Desktop Sidebar */}
       <div
@@ -62,5 +66,7 @@ export function AppShell({ children, title }: AppShellProps) {
         <MobileBottomNav />
       </div>
     </div>
+    </CatalogProvider>
+    </SettingsProvider>
   );
 }

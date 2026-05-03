@@ -3,13 +3,10 @@
 import { Input } from "../ui/Input";
 import { Button } from "../ui/Button";
 import { Select } from "../ui/Select";
-import { WATCH_BRANDS, type Category, type Gender } from "@/lib/types";
-import { useProducts } from "@/hooks/useProducts";
-import { useMemo } from "react";
+import type { BrandDescriptor } from "@/lib/types";
 
 interface Step3DetailsProps {
-  category: Category;
-  gender: Gender;
+  brands: BrandDescriptor[]; // empty = no brand picker
   form: {
     brand: string;
     customBrand: string;
@@ -29,40 +26,38 @@ interface Step3DetailsProps {
 }
 
 export function Step3Details({
-  category,
-  gender,
+  brands,
   form,
   onChange,
   onSubmit,
   loading,
 }: Step3DetailsProps) {
-  const { products } = useProducts();
-  const isWatch = category === "watches";
+  const hasBrands = brands.length > 0;
 
-  const dynamicBrands = useMemo(() => {
-    if (!isWatch) return [];
-    const watchBrands = products
-      .filter((p) => p.category === "watches" && p.brand)
-      .map((p) => p.brand as string);
-    
-    // Get unique brands and sort them
-    const uniqueBrands = Array.from(new Set(watchBrands)).sort();
-    
-    // Return unique brands + "Other"
-    return [...uniqueBrands, "Other"];
-  }, [products, isWatch]);
+  // "Other" is always appended so a tenant can add a one-off brand without
+  // visiting Settings. Mirrors the original Corner Store flow.
+  const brandOptions = hasBrands
+    ? [
+        ...brands
+          .map((b) => b.name)
+          .filter((n) => n.toLowerCase() !== "other"),
+        "Other",
+      ]
+    : [];
+
+  const brandRequired = hasBrands;
 
   return (
     <div className="space-y-4 max-w-md mx-auto">
       <h3 className="text-center font-semibold mb-6">تفاصيل المنتج</h3>
 
-      {isWatch ? (
+      {hasBrands ? (
         <>
           <Select
             label="البراند"
-            options={dynamicBrands.map((b) => ({ 
-              value: b, 
-              label: b === "Other" ? "أخرى (إضافة براند جديد)" : b 
+            options={brandOptions.map((b) => ({
+              value: b,
+              label: b === "Other" ? "أخرى (إضافة براند جديد)" : b,
             }))}
             value={form.brand}
             onChange={(e) => onChange("brand", e.target.value)}
@@ -162,7 +157,8 @@ export function Step3Details({
             !form.name ||
             form.quantity < 1 ||
             form.price < 1 ||
-            (isWatch && !form.brand)
+            (brandRequired && !form.brand) ||
+            (form.brand === "Other" && !form.customBrand)
           }
           className="w-full"
         >

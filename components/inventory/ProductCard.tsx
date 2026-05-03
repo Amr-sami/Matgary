@@ -3,7 +3,7 @@
 import { Pencil, Trash2, ShoppingCart, Plus, Minus, History } from "lucide-react";
 import type { Product } from "@/lib/types";
 import { Badge } from "../ui/Badge";
-import { CATEGORY_LABELS, GENDER_LABELS } from "@/lib/types";
+import { useCatalog } from "@/components/catalog-context";
 import { formatPrice, cn } from "@/lib/utils";
 
 interface ProductCardProps {
@@ -31,6 +31,9 @@ export function ProductCard({
   const isLowStock = product.quantity > 0 && product.quantity <= product.lowStockThreshold;
   const cost = product.costPrice || 0;
   const margin = product.price > 0 ? ((product.price - cost) / product.price) * 100 : 0;
+  const { categoryLabel, attributeLabel, categoryById } = useCatalog();
+  const cat = categoryById[product.category];
+  const genderLabel = attributeLabel(product, "gender");
 
   return (
     <div
@@ -66,15 +69,17 @@ export function ProductCard({
             )}
           </div>
         </div>
-        <Badge variant={product.category}>
-          {CATEGORY_LABELS[product.category]}
+        <Badge variant={cat?.key as "watches" | "perfumes" | "sunglasses" | undefined}>
+          {categoryLabel(product)}
         </Badge>
       </div>
 
       <div className="flex items-center gap-2 mb-3 flex-wrap">
-        <Badge variant={product.gender}>
-          {GENDER_LABELS[product.gender]}
-        </Badge>
+        {genderLabel && genderLabel !== "—" && (
+          <Badge variant={product.attributes?.gender === "رجالي" ? "male" : "female"}>
+            {genderLabel}
+          </Badge>
+        )}
         {(product.tags || []).slice(0, 3).map((t) => (
           <span
             key={t}

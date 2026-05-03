@@ -30,7 +30,7 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Toast } from "@/components/ui/Toast";
 import { Pagination } from "@/components/ui/Pagination";
-import { voidSale } from "@/lib/firestore";
+import { voidSale } from "@/lib/api/sales";
 import { salesToCsv, downloadCsv } from "@/lib/csv";
 import type { Sale, Category, Gender } from "@/lib/types";
 

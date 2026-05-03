@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { ProductSearchSelect } from "./ProductSearchSelect";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
-import { recordCartSale } from "@/lib/firestore";
+import { recordCartSale } from "@/lib/api/sales";
 import { useSales } from "@/hooks/useSales";
 import { useProducts } from "@/hooks/useProducts";
 import { useCustomersData } from "@/hooks/useCustomersData";
@@ -405,10 +405,10 @@ export function SaleForm({
       // AND autoOpenWhatsApp is on.
       const trimmedPhone = customerPhone.trim();
       if (trimmedPhone && result.saleIds.length > 0) {
-        const firstSaleId = result.saleIds[0];
-        const origin =
-          typeof window !== "undefined" ? window.location.origin : "";
-        const receiptLink = `${origin}/r/${firstSaleId}`;
+        // Receipts are sent as PDF attachments in v1 — no public web URL.
+        // The {{receiptLink}} substitution is kept for template compatibility
+        // but always resolves to "" so the line drops out of the message.
+        const receiptLink = "";
         const message = substitute(settings.messageTemplate, {
           customerName: customerName.trim() || "عميلنا الكريم",
           customerPhone: trimmedPhone,
@@ -486,9 +486,6 @@ export function SaleForm({
               body: JSON.stringify({
                 phone: trimmedPhone,
                 caption: pdfCaption,
-                instanceId: settings.greenApiInstanceId,
-                token: settings.greenApiToken,
-                apiUrl: settings.greenApiUrl || undefined,
                 invoice: invoicePayload,
               }),
             })
@@ -505,9 +502,6 @@ export function SaleForm({
             sendViaGreenApi({
               phone: trimmedPhone,
               message,
-              instanceId: settings.greenApiInstanceId,
-              token: settings.greenApiToken,
-              apiUrl: settings.greenApiUrl || undefined,
             }).then((res) => {
               if (res.ok) {
                 console.log("[whatsapp] Green API sent", res.idMessage);

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Cairo } from "next/font/google";
+import { SessionProvider } from "next-auth/react";
 import "./globals.css";
 
 const cairo = Cairo({
@@ -21,7 +22,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ar" dir="rtl" className={cairo.variable}>
-      <body className="min-h-screen flex flex-col antialiased">{children}</body>
+      <body className="min-h-screen flex flex-col antialiased">
+        <SessionProvider>{children}</SessionProvider>
+      </body>
     </html>
   );
 }

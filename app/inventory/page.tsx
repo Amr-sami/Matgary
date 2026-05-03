@@ -29,7 +29,8 @@ import {
   adjustProductQuantity,
   bulkDeleteProducts,
   bulkUpdateProducts,
-} from "@/lib/firestore";
+} from "@/lib/api/products";
+import { useCategories } from "@/hooks/useCategories";
 import { productsToCsv, downloadCsv } from "@/lib/csv";
 import type { Product, Category, Gender } from "@/lib/types";
 
@@ -52,8 +53,9 @@ export default function InventoryPage() {
 function InventoryPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { products, loading } = useProducts();
+  const { products, loading, refresh: refreshProducts } = useProducts();
   const { sales } = useSales();
+  const { byId: categoryById, data: categoryList } = useCategories();
   const { query, setQuery, filtered } = useSearch(products, [
     "name",
     "brand",
@@ -180,12 +182,26 @@ function InventoryPageInner() {
     return Array.from(set).sort((a, b) => a.localeCompare(b, "ar"));
   }, [products]);
 
+  // Distinct gender labels from product attribute snapshots — drives the
+  // gender filter buttons. If no product carries a gender attribute, the
+  // filter row hides itself.
+  const genderOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of products) {
+      const g = p.attributes?.gender;
+      if (g && g !== "—") set.add(g);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "ar"));
+  }, [products]);
+
   const filteredProducts = useMemo(() => {
     const min = minPrice ? Number(minPrice) : null;
     const max = maxPrice ? Number(maxPrice) : null;
     const result = filtered.filter((p) => {
       if (selectedCategory && p.category !== selectedCategory) return false;
-      if (selectedGender && p.gender !== selectedGender) return false;
+      // selectedGender holds the snapshot label (e.g. "رجالي") since gender
+      // is now an attribute. Match against product.attributes.gender.
+      if (selectedGender && p.attributes?.gender !== selectedGender) return false;
       if (selectedBrand && p.brand !== selectedBrand) return false;
       if (selectedTag && !(p.tags || []).includes(selectedTag)) return false;
       if (selectedSupplier && p.supplier !== selectedSupplier) return false;
@@ -294,6 +310,7 @@ function InventoryPageInner() {
     try {
       await deleteProduct(deleteProductData.id);
       setToast({ type: "success", message: "تم حذف المنتج بنجاح" });
+      await refreshProducts();
     } catch (error: any) {
       setToast({ type: "error", message: error.message || "حدث خطأ" });
     }
@@ -313,11 +330,12 @@ function InventoryPageInner() {
           type: "success",
           message: `تم تعديل كمية "${product.name}" إلى ${next}`,
         });
+        await refreshProducts();
       } catch (error: any) {
         setToast({ type: "error", message: error.message || "تعذر تعديل الكمية" });
       }
     },
-    []
+    [refreshProducts]
   );
 
   const handleExportCsv = useCallback(() => {
@@ -370,11 +388,12 @@ function InventoryPageInner() {
             break;
           }
         }
+        await refreshProducts();
       } catch (e: any) {
         setToast({ type: "error", message: e.message || "تعذر تنفيذ الإجراء" });
       }
     },
-    [selectedIds, filteredProducts]
+    [selectedIds, filteredProducts, refreshProducts]
   );
 
   const handleBulkDeleteConfirm = useCallback(async () => {
@@ -384,6 +403,7 @@ function InventoryPageInner() {
       await bulkDeleteProducts(ids);
       setSelectedIds(new Set());
       setToast({ type: "success", message: `تم حذف ${ids.length} منتج` });
+      await refreshProducts();
     } catch (e: any) {
       setToast({ type: "error", message: e.message || "تعذر الحذف الجماعي" });
     } finally {
@@ -448,8 +468,10 @@ function InventoryPageInner() {
 
         {/* Filters */}
         <InventoryFilters
+          categoryOptions={categoryList}
           selectedCategory={selectedCategory}
           onCategoryChange={setSelectedCategory}
+          genderOptions={genderOptions}
           selectedGender={selectedGender}
           onGenderChange={setSelectedGender}
           selectedBrand={selectedBrand}

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Modal } from "../ui/Modal";
 import { LoadingSpinner } from "../ui/LoadingSpinner";
-import { subscribeToProductHistory } from "@/lib/firestore";
+import type { ProductHistoryEvent as _PHE } from "@/lib/types";
 import type { Product, ProductHistoryEvent } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
 import {
@@ -53,12 +53,27 @@ export function ProductHistoryModal({ isOpen, onClose, product }: ProductHistory
 
   useEffect(() => {
     if (!isOpen || !product) return;
+    let cancelled = false;
     setLoading(true);
-    const unsub = subscribeToProductHistory(product.id, (list) => {
-      setEvents(list);
-      setLoading(false);
-    });
-    return unsub;
+    (async () => {
+      try {
+        const res = await fetch(`/api/products/${product.id}/history`, {
+          cache: "no-store",
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json: { data: Array<Omit<ProductHistoryEvent, "createdAt"> & { createdAt: string }> } =
+          await res.json();
+        if (cancelled) return;
+        setEvents(
+          json.data.map((e) => ({ ...e, createdAt: new Date(e.createdAt) })),
+        );
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [isOpen, product]);
 
   if (!product) return null;

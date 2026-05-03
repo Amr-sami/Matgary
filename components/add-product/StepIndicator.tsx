@@ -9,7 +9,7 @@ interface StepIndicatorProps {
 
 const steps = [
   { num: 1, label: "الصنف" },
-  { num: 2, label: "الجنس" },
+  { num: 2, label: "الخصائص" },
   { num: 3, label: "التفاصيل" },
 ];
 

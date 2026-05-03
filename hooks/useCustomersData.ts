@@ -1,23 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  collection,
-  onSnapshot,
-  orderBy,
-  query,
-  Timestamp,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { listSales } from "@/lib/api/sales";
 
 /**
- * Independent data hook used ONLY by the customers page.
+ * Independent data hook used by the customers page.
  *
- * It reads the raw `sales` collection directly and explicitly extracts
- * `customerName` / `customerPhone` / `paymentMethod` / `isPaid` fields,
- * bypassing the shared subscribeToSales chunk. This guards against any
- * scenario where a cached/older bundle of subscribeToSales is dropping
- * those fields.
+ * Reads sales via the standard /api/sales endpoint and projects them down to
+ * the subset the customers page cares about. Mirrors the original interface
+ * the Firebase-backed version exposed.
  */
 
 export interface CustomerSaleRecord {
@@ -35,58 +26,41 @@ export interface CustomerSaleRecord {
   isPaid?: boolean;
 }
 
-function asDate(v: unknown): Date {
-  if (v && typeof (v as Timestamp).toDate === "function") {
-    return (v as Timestamp).toDate();
-  }
-  if (v instanceof Date) return v;
-  return new Date();
-}
-
-function asString(v: unknown): string | undefined {
-  if (typeof v === "string" && v.trim()) return v.trim();
-  return undefined;
-}
-
 export function useCustomersData() {
   const [records, setRecords] = useState<CustomerSaleRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const q = query(collection(db, "sales"), orderBy("saleDate", "desc"));
-    const unsub = onSnapshot(
-      q,
-      { includeMetadataChanges: false },
-      (snap) => {
-        const list: CustomerSaleRecord[] = snap.docs.map((d) => {
-          const raw = d.data() as Record<string, unknown>;
-          return {
-            id: d.id,
-            invoiceId: asString(raw.invoiceId),
-            productId: (raw.productId as string) || "",
-            productName: (raw.productName as string) || "",
-            category: (raw.category as string) || "",
-            totalPrice: Number(raw.totalPrice ?? 0),
-            saleDate: asDate(raw.saleDate),
-            isReturned: !!raw.isReturned,
-            customerName: asString(raw.customerName),
-            customerPhone: asString(raw.customerPhone),
-            paymentMethod: asString(raw.paymentMethod),
-            isPaid:
-              typeof raw.isPaid === "boolean"
-                ? (raw.isPaid as boolean)
-                : raw.paymentMethod !== "deferred",
-          };
-        });
-        setRecords(list);
-        setLoading(false);
-      },
-      (err) => {
-        console.error("[useCustomersData] snapshot error", err);
-        setLoading(false);
+    let cancelled = false;
+    (async () => {
+      try {
+        const sales = await listSales();
+        if (cancelled) return;
+        setRecords(
+          sales.map((s) => ({
+            id: s.id,
+            invoiceId: s.invoiceId,
+            productId: s.productId,
+            productName: s.productName,
+            category: s.category,
+            totalPrice: s.totalPrice,
+            saleDate: s.saleDate,
+            isReturned: s.isReturned,
+            customerName: s.customerName,
+            customerPhone: s.customerPhone,
+            paymentMethod: s.paymentMethod,
+            isPaid: s.isPaid,
+          })),
+        );
+      } catch (err) {
+        console.error("[useCustomersData] failed to load sales", err);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-    );
-    return unsub;
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return { records, loading };

@@ -3,7 +3,7 @@
 import { Pencil, Trash2, ShoppingCart, Plus, Minus, History } from "lucide-react";
 import type { Product } from "@/lib/types";
 import { Badge } from "../ui/Badge";
-import { CATEGORY_LABELS, GENDER_LABELS } from "@/lib/types";
+import { useCatalog } from "@/components/catalog-context";
 import { formatPrice, cn } from "@/lib/utils";
 
 interface ProductTableRowProps {
@@ -38,6 +38,9 @@ export function ProductTableRow({
   const stockValue = product.quantity * cost;
 
   const cellPad = density === "compact" ? "py-1.5 px-2" : "py-3 px-2";
+  const { categoryLabel, attributeLabel, categoryById } = useCatalog();
+  const cat = categoryById[product.category];
+  const genderLabel = attributeLabel(product, "gender");
 
   return (
     <tr
@@ -83,10 +86,18 @@ export function ProductTableRow({
         </div>
       </td>
       <td className={cellPad}>
-        <Badge variant={product.category}>{CATEGORY_LABELS[product.category]}</Badge>
+        <Badge variant={cat?.key as "watches" | "perfumes" | "sunglasses" | undefined}>
+          {categoryLabel(product)}
+        </Badge>
       </td>
       <td className={cellPad}>
-        <Badge variant={product.gender}>{GENDER_LABELS[product.gender]}</Badge>
+        {genderLabel && genderLabel !== "—" ? (
+          <Badge variant={product.attributes?.gender === "رجالي" ? "male" : "female"}>
+            {genderLabel}
+          </Badge>
+        ) : (
+          <span className="text-text-secondary text-sm">—</span>
+        )}
       </td>
       <td className={cn(cellPad, "text-sm")}>{product.brand || "-"}</td>
       <td className={cellPad}>

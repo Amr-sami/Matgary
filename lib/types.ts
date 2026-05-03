@@ -1,24 +1,63 @@
-export type Category = "watches" | "perfumes" | "sunglasses";
-export type Gender = "male" | "female";
+// Category and Gender are now per-tenant runtime data, not TS literals.
+// `category` on a Product is a category id (uuid). Display labels come from
+// useCategories().byId. The legacy `Gender` type is preserved as `string`
+// so existing component code still compiles while we migrate Phase 2 callers.
+export type Category = string;
+export type Gender = string;
 
-export const CATEGORY_LABELS: Record<Category, string> = {
-  watches: "ساعات",
-  perfumes: "برفانات",
-  sunglasses: "نظارات",
-};
+// Per-tenant category descriptor surfaced by useCategories().
+export interface CategoryDescriptor {
+  id: string;
+  key: string;
+  label: string;
+  icon: string | null;
+  position: number;
+  hasAttributes: boolean;
+}
 
-export const GENDER_LABELS: Record<Gender, string> = {
-  male: "رجالي",
-  female: "حريمي",
-};
+// One attribute defined under a category (e.g. "gender" under "watches").
+export interface CategoryAttribute {
+  id: string;
+  categoryId: string;
+  key: string;
+  label: string;
+  position: number;
+  required: boolean;
+  values: CategoryAttributeValue[];
+}
 
-export const WATCH_BRANDS = ["Other"];
+export interface CategoryAttributeValue {
+  id: string;
+  attributeId: string;
+  key: string;
+  label: string;
+  position: number;
+}
+
+export interface BrandDescriptor {
+  id: string;
+  categoryId: string | null;
+  name: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LEGACY back-compat shims — present so unmigrated components keep compiling.
+// New code MUST use useCategories().byId / product.attributes instead.
+// These will be deleted at end of Phase 2/3 once every call site is updated.
+// ─────────────────────────────────────────────────────────────────────────────
+export const CATEGORY_LABELS: Record<string, string> = {};
+export const GENDER_LABELS: Record<string, string> = {};
+export const WATCH_BRANDS: string[] = ["Other"];
 
 export interface Product {
   id: string;
   name: string;
+  /** Category id (uuid). Use useCategories().byId[product.category] for the label. */
   category: Category;
+  /** @deprecated Use `attributes.gender` (or whatever the category defines). Kept for migration compatibility. */
   gender: Gender;
+  /** Snapshot of chosen attribute values, keyed by attribute key (e.g. { gender: "رجالي" }). */
+  attributes?: Record<string, string>;
   brand?: string;
   quantity: number;
   price: number;

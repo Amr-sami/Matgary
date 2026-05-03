@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
-import { addExpense } from "@/lib/firestore";
+import { addExpense } from "@/lib/api/expenses";
 import { EXPENSE_CATEGORY_LABELS, type ExpenseCategory } from "@/lib/types";
 import { Wallet, Plus } from "lucide-react";
 

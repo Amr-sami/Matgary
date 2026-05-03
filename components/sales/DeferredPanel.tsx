@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Wallet, Phone, CheckCircle2 } from "lucide-react";
 import type { Sale } from "@/lib/types";
 import { formatPrice, formatDate } from "@/lib/utils";
-import { markInvoicePaid, markSalePaid } from "@/lib/firestore";
+import { markInvoicePaid, markSalePaid } from "@/lib/api/sales";
 
 interface DeferredPanelProps {
   sales: Sale[];

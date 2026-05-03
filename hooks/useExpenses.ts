@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { subscribeToExpenses } from "@/lib/firestore";
+import { useCallback, useEffect, useState } from "react";
+import { listExpenses } from "@/lib/api/expenses";
 import type { Expense } from "@/lib/types";
 
 export function useExpenses() {
@@ -9,20 +9,21 @@ export function useExpenses() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    setLoading(true);
-    setError(null);
+  const refresh = useCallback(async () => {
     try {
-      const unsubscribe = subscribeToExpenses((data) => {
-        setExpenses(data);
-        setLoading(false);
-      });
-      return () => unsubscribe();
+      const data = await listExpenses();
+      setExpenses(data);
+      setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "حدث خطأ أثناء تحميل المصروفات");
+    } finally {
       setLoading(false);
     }
   }, []);
 
-  return { expenses, loading, error };
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  return { expenses, loading, error, refresh };
 }

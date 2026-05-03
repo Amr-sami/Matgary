@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { subscribeToReturns } from "@/lib/firestore";
+import { useCallback, useEffect, useState } from "react";
+import { listReturns } from "@/lib/api/returns";
 import type { Return } from "@/lib/types";
 
 export function useReturns() {
@@ -9,20 +9,21 @@ export function useReturns() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    setLoading(true);
+  const refresh = useCallback(async () => {
     try {
-      const unsubscribe = subscribeToReturns((returns) => {
-        setReturns(returns);
-        setLoading(false);
-        setError(null);
-      });
-      return unsubscribe;
+      const data = await listReturns();
+      setReturns(data);
+      setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "حدث خطأ");
+    } finally {
       setLoading(false);
     }
   }, []);
 
-  return { returns, loading, error };
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  return { returns, loading, error, refresh };
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { Trash2, Calendar, Receipt } from "lucide-react";
-import { deleteExpense } from "@/lib/firestore";
+import { deleteExpense } from "@/lib/api/expenses";
 import type { Expense } from "@/lib/types";
 import { formatPrice, formatDate } from "@/lib/utils";
 import { EXPENSE_CATEGORY_LABELS } from "@/lib/types";

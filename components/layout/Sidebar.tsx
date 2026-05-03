@@ -12,10 +12,12 @@ import {
   Wallet,
   Users,
   Settings,
+  Store,
   PanelRightClose,
   PanelRightOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useSettings } from "@/components/settings-context";
 
 const primaryItems = [
   { href: "/", label: "لوحة التحكم", icon: LayoutDashboard },
@@ -39,6 +41,9 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname();
+  const { settings } = useSettings();
+  const storeName = settings.shopName?.trim() || "متجري";
+  const initial = storeName.charAt(0);
 
   const renderItem = (item: { href: string; label: string; icon: typeof LayoutDashboard }) => {
     const isActive = pathname === item.href;
@@ -82,8 +87,29 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         {collapsed ? <PanelRightOpen className="w-3.5 h-3.5" /> : <PanelRightClose className="w-3.5 h-3.5" />}
       </button>
 
+      {/* Store name header */}
+      <div
+        className={cn(
+          "flex items-center gap-2 mb-3",
+          collapsed ? "justify-center px-0" : "px-4"
+        )}
+        title={collapsed ? storeName : undefined}
+      >
+        <div className="w-8 h-8 rounded-lg bg-accent-light text-accent flex items-center justify-center shrink-0 font-bold">
+          {initial || <Store className="w-4 h-4" />}
+        </div>
+        <span
+          className={cn(
+            "font-bold text-text-primary text-sm truncate transition-opacity duration-200",
+            collapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100"
+          )}
+        >
+          {storeName}
+        </span>
+      </div>
+
       {/* Primary Nav Links */}
-      <div className="mt-12 px-1 space-y-1">{primaryItems.map(renderItem)}</div>
+      <div className="mt-2 px-1 space-y-1">{primaryItems.map(renderItem)}</div>
 
       {/* "More" divider */}
       <div className={cn("mt-6 mb-2", collapsed ? "px-2" : "px-6")}>

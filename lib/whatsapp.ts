@@ -3,9 +3,6 @@
 export interface SendArgs {
   phone: string;
   message: string;
-  instanceId: string;
-  token: string;
-  apiUrl?: string;
 }
 
 export interface SendResult {
@@ -24,7 +21,10 @@ export async function sendViaGreenApi(args: SendArgs): Promise<SendResult> {
     });
     const data = (await res.json()) as SendResult;
     return data;
-  } catch (e: any) {
-    return { ok: false, error: e?.message || "Network error" };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Network error",
+    };
   }
 }

@@ -1,52 +1,28 @@
-import { doc, onSnapshot, setDoc } from "firebase/firestore";
-import { db } from "./firebase";
+// Client-facing settings module. Fetches per-tenant settings from /api/settings
+// and exposes the same helpers components already use (substitute, normalizePhone,
+// buildWhatsAppLink). The Firestore-backed implementation has been removed.
 
-export const SETTINGS_DOC_ID = "whatsapp";
+import { DEFAULT_MESSAGE_TEMPLATE } from "./settings.defaults";
 
-export const DEFAULT_TEMPLATE = `أهلاً {customerName} 👋
-شكراً لشرائك من {shopName} ❤️
-
-تفاصيل الفاتورة:
-• {productNames}
-• الإجمالي: {totalPrice}
-• رقم الفاتورة: #{invoiceCode}
-
-رابط الفاتورة: {receiptLink}
-
-نتشرف بزيارتك مرة أخرى!
-{shopPhone}`;
+export const DEFAULT_TEMPLATE = DEFAULT_MESSAGE_TEMPLATE;
 
 export interface ShopSettings {
-  // When true, after recording a sale with a customer phone the form
-  // automatically opens WhatsApp Web/app with the templated message.
-  // Used as the fallback path if Green API is not enabled.
   autoOpenWhatsApp: boolean;
-  // Message template — supports placeholders. See substitute() below.
   messageTemplate: string;
-  // Public-facing storefront / contact info used in the template.
   shopName: string;
   shopPhone: string;
-  // Green API integration — when enabled and creds are filled, sales
-  // trigger a server-side send via /api/whatsapp/send instead of
-  // opening wa.me in a tab.
   greenApiEnabled: boolean;
   greenApiInstanceId: string;
   greenApiToken: string;
-  // Optional per-instance API URL from green-api.com dashboard (e.g.
-  // "https://7107.api.greenapi.com"). If empty we fall back to the
-  // generic "https://api.green-api.com".
   greenApiUrl: string;
-  // When true (and Green API is enabled), the receipt is sent as a PDF
-  // attachment via Green API's sendFileByUpload instead of a text message
-  // with a link. The customer gets a real PDF document in WhatsApp.
   sendAsPdf: boolean;
 }
 
 export const DEFAULT_SETTINGS: ShopSettings = {
   autoOpenWhatsApp: true,
   messageTemplate: DEFAULT_TEMPLATE,
-  shopName: "Corner Store",
-  shopPhone: "01500228266",
+  shopName: "",
+  shopPhone: "",
   greenApiEnabled: false,
   greenApiInstanceId: "",
   greenApiToken: "",
@@ -75,61 +51,23 @@ export function substitute(template: string, vars: ReceiptVars): string {
   });
 }
 
-export function subscribeToSettings(
-  callback: (s: ShopSettings) => void
-): () => void {
-  const ref = doc(db, "appSettings", SETTINGS_DOC_ID);
-  return onSnapshot(
-    ref,
-    (snap) => {
-      if (!snap.exists()) {
-        callback(DEFAULT_SETTINGS);
-        return;
-      }
-      const data = snap.data() as Partial<ShopSettings>;
-      callback({
-        autoOpenWhatsApp:
-          typeof data.autoOpenWhatsApp === "boolean"
-            ? data.autoOpenWhatsApp
-            : DEFAULT_SETTINGS.autoOpenWhatsApp,
-        messageTemplate:
-          typeof data.messageTemplate === "string" && data.messageTemplate.trim()
-            ? data.messageTemplate
-            : DEFAULT_SETTINGS.messageTemplate,
-        shopName: data.shopName || DEFAULT_SETTINGS.shopName,
-        shopPhone: data.shopPhone || DEFAULT_SETTINGS.shopPhone,
-        greenApiEnabled:
-          typeof data.greenApiEnabled === "boolean"
-            ? data.greenApiEnabled
-            : DEFAULT_SETTINGS.greenApiEnabled,
-        greenApiInstanceId:
-          typeof data.greenApiInstanceId === "string"
-            ? data.greenApiInstanceId
-            : DEFAULT_SETTINGS.greenApiInstanceId,
-        greenApiToken:
-          typeof data.greenApiToken === "string"
-            ? data.greenApiToken
-            : DEFAULT_SETTINGS.greenApiToken,
-        greenApiUrl:
-          typeof data.greenApiUrl === "string"
-            ? data.greenApiUrl
-            : DEFAULT_SETTINGS.greenApiUrl,
-        sendAsPdf:
-          typeof data.sendAsPdf === "boolean"
-            ? data.sendAsPdf
-            : DEFAULT_SETTINGS.sendAsPdf,
-      });
-    },
-    (err) => {
-      console.error("[settings] snapshot error", err);
-      callback(DEFAULT_SETTINGS);
-    }
-  );
+export async function fetchShopSettings(): Promise<ShopSettings> {
+  const res = await fetch("/api/settings", { cache: "no-store" });
+  if (!res.ok) return DEFAULT_SETTINGS;
+  const json: { data: ShopSettings } = await res.json();
+  return { ...DEFAULT_SETTINGS, ...json.data };
 }
 
-export async function saveSettings(s: ShopSettings): Promise<void> {
-  const ref = doc(db, "appSettings", SETTINGS_DOC_ID);
-  await setDoc(ref, s, { merge: true });
+export async function saveSettings(patch: Partial<ShopSettings>): Promise<void> {
+  const res = await fetch("/api/settings", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `HTTP ${res.status}`);
+  }
 }
 
 export function normalizePhone(phone: string): string | null {
@@ -144,7 +82,7 @@ export function normalizePhone(phone: string): string | null {
 
 export function buildWhatsAppLink(
   customerPhone: string,
-  message: string
+  message: string,
 ): string | null {
   const normalized = normalizePhone(customerPhone);
   if (!normalized) return null;

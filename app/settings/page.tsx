@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Toast } from "@/components/ui/Toast";
 import { useShopSettings } from "@/hooks/useShopSettings";
+import { useSettings } from "@/components/settings-context";
 import {
   DEFAULT_TEMPLATE,
   saveSettings,
@@ -25,6 +26,8 @@ import {
 } from "@/lib/settings";
 import { sendViaGreenApi } from "@/lib/whatsapp";
 import { formatPrice } from "@/lib/utils";
+import { CategoriesEditor } from "@/components/settings/CategoriesEditor";
+import { BrandsEditor } from "@/components/settings/BrandsEditor";
 
 const PLACEHOLDERS: { key: string; description: string }[] = [
   { key: "customerName", description: "اسم العميل" },
@@ -39,8 +42,25 @@ const PLACEHOLDERS: { key: string; description: string }[] = [
   { key: "shopPhone", description: "رقم المتجر" },
 ];
 
+// Cheap field-by-field equality so the Save button can flip to disabled the
+// moment the form matches the saved server state again.
+function isEqualSettings(a: ShopSettings, b: ShopSettings): boolean {
+  return (
+    a.shopName === b.shopName &&
+    a.shopPhone === b.shopPhone &&
+    a.autoOpenWhatsApp === b.autoOpenWhatsApp &&
+    a.messageTemplate === b.messageTemplate &&
+    a.greenApiEnabled === b.greenApiEnabled &&
+    a.greenApiInstanceId === b.greenApiInstanceId &&
+    a.greenApiToken === b.greenApiToken &&
+    a.greenApiUrl === b.greenApiUrl &&
+    a.sendAsPdf === b.sendAsPdf
+  );
+}
+
 export default function SettingsPage() {
-  const { settings, loading } = useShopSettings();
+  const { settings, loading, refresh: refreshLocalSettings } = useShopSettings();
+  const { refresh: refreshGlobalSettings } = useSettings();
   const [draft, setDraft] = useState<ShopSettings>(settings);
   const [busy, setBusy] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -58,10 +78,19 @@ export default function SettingsPage() {
   const update = <K extends keyof ShopSettings>(key: K, value: ShopSettings[K]) =>
     setDraft((prev) => ({ ...prev, [key]: value }));
 
+  const dirty = !isEqualSettings(draft, settings);
+
   const handleSave = async () => {
+    if (!dirty) return;
     setBusy(true);
     try {
       await saveSettings(draft);
+      // Re-fetch BOTH:
+      //  - the local hook that drives this page's `settings` baseline, so the
+      //    Save button correctly returns to its disabled "no changes" state;
+      //  - the global SettingsProvider context so the sidebar (and anything
+      //    else reading shopName) re-renders without a page reload.
+      await Promise.all([refreshLocalSettings(), refreshGlobalSettings()]);
       setToast({ type: "success", message: "تم حفظ الإعدادات" });
     } catch (e: any) {
       setToast({ type: "error", message: e.message || "تعذر الحفظ" });
@@ -89,12 +118,11 @@ export default function SettingsPage() {
     }
     setTesting(true);
     try {
+      // Server-side credential lookup — no need to pass instanceId/token from
+      // the client anymore (the operator must save first to populate them).
       const res = await sendViaGreenApi({
         phone: testPhone.trim(),
         message: `🧪 رسالة اختبار من ${draft.shopName}\nالتاريخ: ${new Date().toLocaleString("ar-EG")}`,
-        instanceId: draft.greenApiInstanceId.trim(),
-        token: draft.greenApiToken.trim(),
-        apiUrl: draft.greenApiUrl.trim() || undefined,
       });
       if (res.ok) {
         setToast({
@@ -120,7 +148,7 @@ export default function SettingsPage() {
     invoiceCode: "L6XQ7ZL8",
     totalPrice: formatPrice(2500),
     productNames: "ساعة Naviforce, نظارة Ray-Ban",
-    receiptLink: "https://cornerstore-five.vercel.app/r/abc123",
+    receiptLink: "",
     date: new Date().toLocaleDateString("ar-EG"),
     shopName: draft.shopName,
     shopPhone: draft.shopPhone,
@@ -139,6 +167,9 @@ export default function SettingsPage() {
   return (
     <AppShell title="الإعدادات">
       <div className="max-w-3xl mx-auto space-y-4">
+        <CategoriesEditor onToast={setToast} />
+        <BrandsEditor onToast={setToast} />
+
         {/* WhatsApp section */}
         <div className="bg-white rounded-xl border border-border p-5 space-y-4">
           <div className="flex items-center gap-2">
@@ -390,8 +421,18 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <div className="flex justify-end">
-          <Button onClick={handleSave} loading={busy} className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-3">
+          {dirty ? (
+            <p className="text-xs text-text-secondary">لديك تعديلات لم تُحفظ</p>
+          ) : (
+            <p className="text-xs text-text-secondary">لا توجد تعديلات</p>
+          )}
+          <Button
+            onClick={handleSave}
+            loading={busy}
+            disabled={!dirty || busy}
+            className="flex items-center gap-2"
+          >
             <Save className="w-4 h-4" />
             حفظ الإعدادات
           </Button>

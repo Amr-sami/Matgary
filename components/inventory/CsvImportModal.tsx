@@ -1,10 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
-import { parseCsv, type ParsedRow } from "@/lib/csvImport";
-import { bulkAddProducts } from "@/lib/firestore";
+import {
+  parseCsv,
+  type ParsedRow,
+  type CsvImportContext,
+} from "@/lib/csvImport";
+import { bulkAddProducts } from "@/lib/api/products";
+import { useCategories } from "@/hooks/useCategories";
+import type { CategoryAttribute } from "@/lib/types";
 import { Upload, AlertTriangle, CheckCircle2 } from "lucide-react";
 
 interface CsvImportModalProps {
@@ -17,13 +23,40 @@ export function CsvImportModal({ isOpen, onClose, onSuccess }: CsvImportModalPro
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [fileName, setFileName] = useState("");
+  const { data: categories } = useCategories();
+  const [attributesByCategoryId, setAttributesByCategoryId] = useState<
+    Record<string, CategoryAttribute[]>
+  >({});
+
+  // Pre-fetch attributes for every category so the parser can resolve
+  // gender (and future attributes) without async work mid-parse.
+  useEffect(() => {
+    let cancelled = false;
+    if (!isOpen || categories.length === 0) return;
+    (async () => {
+      const next: Record<string, CategoryAttribute[]> = {};
+      await Promise.all(
+        categories.map(async (c) => {
+          const res = await fetch(`/api/categories/${c.id}/attributes`, { cache: "no-store" });
+          if (!res.ok) return;
+          const json: { data: CategoryAttribute[] } = await res.json();
+          next[c.id] = json.data;
+        }),
+      );
+      if (!cancelled) setAttributesByCategoryId(next);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, categories]);
 
   const valid = rows.filter((r) => r.ok);
   const invalid = rows.filter((r) => !r.ok);
 
   const handleFile = async (file: File) => {
     const text = await file.text();
-    const parsed = parseCsv(text);
+    const ctx: CsvImportContext = { categories, attributesByCategoryId };
+    const parsed = parseCsv(text, ctx);
     setRows(parsed);
     setFileName(file.name);
   };

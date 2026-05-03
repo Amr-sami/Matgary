@@ -5,7 +5,7 @@ import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { Select } from "../ui/Select";
-import { recordReturn } from "@/lib/firestore";
+import { recordReturn } from "@/lib/api/returns";
 import type { Sale } from "@/lib/types";
 
 interface ReturnModalProps {

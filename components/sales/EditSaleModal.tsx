@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
-import { updateSale } from "@/lib/firestore";
+import { updateSale } from "@/lib/api/sales";
 import type { Sale, DiscountType } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
 

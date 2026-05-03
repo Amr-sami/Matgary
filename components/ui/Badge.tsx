@@ -1,9 +1,20 @@
 import { cn } from "@/lib/utils";
 
-type BadgeVariant = "watches" | "perfumes" | "sunglasses" | "male" | "female" | "sold" | "returned" | "lowstock" | "outofstock" | "other";
+// Known variants get curated colors; anything else falls back to "other".
+type BadgeVariant =
+  | "watches"
+  | "perfumes"
+  | "sunglasses"
+  | "male"
+  | "female"
+  | "sold"
+  | "returned"
+  | "lowstock"
+  | "outofstock"
+  | "other";
 
 interface BadgeProps {
-  variant: BadgeVariant;
+  variant?: BadgeVariant | string;
   children: React.ReactNode;
   className?: string;
 }
@@ -34,15 +45,20 @@ const variantLabels: Record<BadgeVariant, string> = {
   other: "أخرى",
 };
 
+function resolveVariant(v: BadgeVariant | string | undefined): BadgeVariant {
+  if (v && v in variantStyles) return v as BadgeVariant;
+  return "other";
+}
+
 export function Badge({ variant, children, className }: BadgeProps) {
-  const label = children || variantLabels[variant];
-  
+  const v = resolveVariant(variant);
+  const label = children || variantLabels[v];
   return (
     <span
       className={cn(
         "inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium",
-        variantStyles[variant],
-        className
+        variantStyles[v],
+        className,
       )}
     >
       {label}

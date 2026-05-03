@@ -1,9 +1,30 @@
-import type { Category, Gender, Product } from "./types";
+import type { CategoryDescriptor, CategoryAttribute } from "./types";
+
+export interface CsvImportContext {
+  categories: CategoryDescriptor[];
+  /** Map of categoryId -> its attributes (with values). */
+  attributesByCategoryId: Record<string, CategoryAttribute[]>;
+}
+
+export interface ParsedProductInput {
+  name: string;
+  categoryId: string;
+  brand?: string;
+  quantity: number;
+  price: number;
+  costPrice?: number;
+  lowStockThreshold?: number;
+  sku?: string;
+  tags?: string[];
+  supplier?: string;
+  location?: string;
+  attributeValueIds?: string[];
+}
 
 export interface ParsedRow {
   ok: boolean;
   errors: string[];
-  data?: Omit<Product, "id" | "createdAt" | "updatedAt">;
+  data?: ParsedProductInput;
   raw: Record<string, string>;
 }
 
@@ -40,22 +61,6 @@ const HEADER_MAP: Record<string, string> = {
   "مكان التخزين": "location",
 };
 
-const CATEGORY_FROM_AR: Record<string, Category> = {
-  ساعات: "watches",
-  watches: "watches",
-  برفانات: "perfumes",
-  perfumes: "perfumes",
-  نظارات: "sunglasses",
-  sunglasses: "sunglasses",
-};
-
-const GENDER_FROM_AR: Record<string, Gender> = {
-  رجالي: "male",
-  male: "male",
-  حريمي: "female",
-  female: "female",
-};
-
 function splitCsvLine(line: string): string[] {
   const out: string[] = [];
   let cur = "";
@@ -83,16 +88,47 @@ function splitCsvLine(line: string): string[] {
   return out;
 }
 
-export function parseCsv(text: string): ParsedRow[] {
-  // Strip BOM
+/** Match a category cell against the tenant's catalog by key or label, case-insensitive. */
+function matchCategory(
+  cell: string,
+  categories: CategoryDescriptor[],
+): CategoryDescriptor | null {
+  const norm = cell.trim().toLowerCase();
+  if (!norm) return null;
+  for (const c of categories) {
+    if (c.key.toLowerCase() === norm) return c;
+    if (c.label.toLowerCase() === cell.trim().toLowerCase()) return c;
+  }
+  return null;
+}
+
+/** Match an attribute value cell against an attribute's value list. */
+function matchAttributeValue(
+  cell: string,
+  attribute: CategoryAttribute,
+): string | null {
+  const norm = cell.trim().toLowerCase();
+  if (!norm) return null;
+  for (const v of attribute.values) {
+    if (v.key.toLowerCase() === norm) return v.id;
+    if (v.label.toLowerCase() === cell.trim().toLowerCase()) return v.id;
+  }
+  return null;
+}
+
+export function parseCsv(text: string, ctx: CsvImportContext): ParsedRow[] {
   const clean = text.replace(/^﻿/, "").trim();
   if (!clean) return [];
   const lines = clean.split(/\r?\n/).filter((l) => l.trim().length > 0);
   if (lines.length < 2) return [];
+
   const rawHeaders = splitCsvLine(lines[0]).map((h) => h.trim());
-  const fields = rawHeaders.map((h) => HEADER_MAP[h.toLowerCase()] || HEADER_MAP[h] || "");
+  const fields = rawHeaders.map(
+    (h) => HEADER_MAP[h.toLowerCase()] || HEADER_MAP[h] || "",
+  );
 
   const rows: ParsedRow[] = [];
+
   for (let i = 1; i < lines.length; i++) {
     const cells = splitCsvLine(lines[i]);
     const raw: Record<string, string> = {};
@@ -100,7 +136,9 @@ export function parseCsv(text: string): ParsedRow[] {
       raw[h] = (cells[idx] ?? "").trim();
     });
     const errors: string[] = [];
-    const obj: Record<string, unknown> = {};
+    const partial: Partial<ParsedProductInput> = {};
+    let resolvedCategory: CategoryDescriptor | null = null;
+    let genderCell: string | null = null;
 
     fields.forEach((field, idx) => {
       if (!field) return;
@@ -108,19 +146,21 @@ export function parseCsv(text: string): ParsedRow[] {
       if (!v) return;
       switch (field) {
         case "category": {
-          const c = CATEGORY_FROM_AR[v.toLowerCase()] || CATEGORY_FROM_AR[v];
+          const c = matchCategory(v, ctx.categories);
           if (!c) errors.push(`صنف غير معروف: ${v}`);
-          else obj.category = c;
+          else {
+            resolvedCategory = c;
+            partial.categoryId = c.id;
+          }
           break;
         }
         case "gender": {
-          const g = GENDER_FROM_AR[v.toLowerCase()] || GENDER_FROM_AR[v];
-          if (!g) errors.push(`جنس غير معروف: ${v}`);
-          else obj.gender = g;
+          // Defer until category is resolved so we can map against the right attribute.
+          genderCell = v;
           break;
         }
         case "tags":
-          obj.tags = v
+          partial.tags = v
             .split(/[|,]/)
             .map((t) => t.trim())
             .filter(Boolean);
@@ -131,29 +171,41 @@ export function parseCsv(text: string): ParsedRow[] {
         case "lowStockThreshold": {
           const n = Number(v);
           if (Number.isNaN(n)) errors.push(`قيمة رقمية غير صحيحة لـ ${field}: ${v}`);
-          else obj[field] = n;
+          else (partial as Record<string, number>)[field] = n;
           break;
         }
         default:
-          obj[field] = v;
+          (partial as Record<string, string>)[field] = v;
       }
     });
 
-    if (!obj.name) errors.push("الاسم مطلوب");
-    if (!obj.category) errors.push("الصنف مطلوب");
-    if (!obj.gender) errors.push("الجنس مطلوب");
-    if (typeof obj.quantity !== "number") obj.quantity = 0;
-    if (typeof obj.price !== "number") errors.push("سعر البيع مطلوب");
-    if (typeof obj.lowStockThreshold !== "number") obj.lowStockThreshold = 3;
+    // Resolve gender against the chosen category's gender attribute (if any).
+    if (resolvedCategory && genderCell) {
+      const cat = resolvedCategory as CategoryDescriptor;
+      const attrs = ctx.attributesByCategoryId[cat.id] ?? [];
+      const genderAttr = attrs.find((a) => a.key === "gender");
+      if (!genderAttr) {
+        errors.push(`القسم "${cat.label}" لا يحتوي على خاصية الجنس`);
+      } else {
+        const valueId = matchAttributeValue(genderCell, genderAttr);
+        if (!valueId) errors.push(`جنس غير معروف لهذا القسم: ${genderCell}`);
+        else partial.attributeValueIds = [...(partial.attributeValueIds ?? []), valueId];
+      }
+    }
+
+    if (!partial.name) errors.push("الاسم مطلوب");
+    if (!partial.categoryId) errors.push("الصنف مطلوب");
+    if (typeof partial.quantity !== "number") partial.quantity = 0;
+    if (typeof partial.price !== "number") errors.push("سعر البيع مطلوب");
+    if (typeof partial.lowStockThreshold !== "number") partial.lowStockThreshold = 3;
 
     rows.push({
       ok: errors.length === 0,
       errors,
-      data: errors.length === 0
-        ? (obj as Omit<Product, "id" | "createdAt" | "updatedAt">)
-        : undefined,
+      data: errors.length === 0 ? (partial as ParsedProductInput) : undefined,
       raw,
     });
   }
+
   return rows;
 }

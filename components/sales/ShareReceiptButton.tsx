@@ -13,16 +13,14 @@ export function ShareReceiptButton({ sale, variant = "icon" }: ShareReceiptButto
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const url =
-    typeof window !== "undefined"
-      ? `${window.location.origin}/r/${sale.id}`
-      : `/r/${sale.id}`;
-
-  const message = `فاتورة Corner Store\n${sale.productName}${sale.brand ? ` — ${sale.brand}` : ""}\nالإجمالي: ${sale.totalPrice} ج.م\n${url}`;
+  // Receipts are PDF-only in v1 — no public web URL to share. The button
+  // now copies a short text summary (no link) and offers to open WhatsApp
+  // with the same text. PDF attachment goes via the dedicated WhatsApp flow.
+  const message = `${sale.productName}${sale.brand ? ` — ${sale.brand}` : ""}\nالإجمالي: ${sale.totalPrice} ج.م`;
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(message);
       setCopied(true);
       setTimeout(() => {
         setCopied(false);
@@ -69,7 +67,7 @@ export function ShareReceiptButton({ sale, variant = "icon" }: ShareReceiptButto
               className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50"
             >
               {copied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
-              {copied ? "تم النسخ" : "نسخ الرابط"}
+              {copied ? "تم النسخ" : "نسخ النص"}
             </button>
             <button
               onClick={handleWhatsApp}

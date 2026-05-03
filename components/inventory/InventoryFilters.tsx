@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { CATEGORY_LABELS, GENDER_LABELS, type Category, type Gender } from "@/lib/types";
+import type { Category, Gender, CategoryDescriptor } from "@/lib/types";
 
 export type StockStatus = "in" | "low" | "out";
 
@@ -12,8 +12,12 @@ export const STOCK_STATUS_LABELS: Record<StockStatus, string> = {
 };
 
 interface InventoryFiltersProps {
+  /** Per-tenant category list — drives both the filter buttons and the labels. */
+  categoryOptions: CategoryDescriptor[];
   selectedCategory: Category | null;
   onCategoryChange: (category: Category | null) => void;
+  /** Distinct gender labels surfaced from the loaded products' attributes. */
+  genderOptions: string[];
   selectedGender: Gender | null;
   onGenderChange: (gender: Gender | null) => void;
   selectedBrand: string | null;
@@ -34,8 +38,10 @@ interface InventoryFiltersProps {
 }
 
 export function InventoryFilters({
+  categoryOptions,
   selectedCategory,
   onCategoryChange,
+  genderOptions,
   selectedGender,
   onGenderChange,
   selectedBrand,
@@ -54,47 +60,71 @@ export function InventoryFilters({
   selectedSupplier,
   onSupplierChange,
 }: InventoryFiltersProps) {
-  const categories: (Category | null)[] = [null, "watches", "perfumes", "sunglasses"];
-  const genders: (Gender | null)[] = [null, "male", "female"];
   const stockStatuses: (StockStatus | null)[] = [null, "in", "low", "out"];
 
   return (
     <div className="space-y-3">
       {/* Category Filter */}
       <div className="flex flex-wrap gap-2">
-        {categories.map((cat) => (
+        <button
+          key="cat-all"
+          onClick={() => onCategoryChange(null)}
+          className={cn(
+            "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+            selectedCategory === null
+              ? "bg-accent text-white"
+              : "bg-white border border-border text-text-secondary hover:border-accent",
+          )}
+        >
+          كل الأصناف
+        </button>
+        {categoryOptions.map((cat) => (
           <button
-            key={cat ?? "all"}
-            onClick={() => onCategoryChange(cat)}
+            key={cat.id}
+            onClick={() => onCategoryChange(cat.id)}
             className={cn(
               "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
-              selectedCategory === cat
+              selectedCategory === cat.id
                 ? "bg-accent text-white"
-                : "bg-white border border-border text-text-secondary hover:border-accent"
+                : "bg-white border border-border text-text-secondary hover:border-accent",
             )}
           >
-            {cat ? CATEGORY_LABELS[cat] : "كل الأصناف"}
+            {cat.label}
           </button>
         ))}
       </div>
 
-      {/* Gender Filter */}
-      <div className="flex flex-wrap gap-2">
-        {genders.map((g) => (
+      {/* Gender Filter — only render when at least one product surfaces a gender attribute */}
+      {genderOptions.length > 0 && (
+        <div className="flex flex-wrap gap-2">
           <button
-            key={g ?? "all"}
-            onClick={() => onGenderChange(g)}
+            key="g-all"
+            onClick={() => onGenderChange(null)}
             className={cn(
               "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
-              selectedGender === g
+              selectedGender === null
                 ? "bg-accent text-white"
-                : "bg-white border border-border text-text-secondary hover:border-accent"
+                : "bg-white border border-border text-text-secondary hover:border-accent",
             )}
           >
-            {g ? GENDER_LABELS[g] : "الكل"}
+            الكل
           </button>
-        ))}
-      </div>
+          {genderOptions.map((g) => (
+            <button
+              key={g}
+              onClick={() => onGenderChange(g)}
+              className={cn(
+                "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+                selectedGender === g
+                  ? "bg-accent text-white"
+                  : "bg-white border border-border text-text-secondary hover:border-accent",
+              )}
+            >
+              {g}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Stock Status Filter */}
       <div className="flex flex-wrap gap-2">
