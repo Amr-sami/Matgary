@@ -18,20 +18,31 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/components/settings-context";
+import { UserMenu } from "./UserMenu";
+import { useSession } from "next-auth/react";
+import { can, type Permission } from "@/lib/permissions";
 
-const primaryItems = [
-  { href: "/", label: "لوحة التحكم", icon: LayoutDashboard },
-  { href: "/inventory", label: "المخزن", icon: Package },
-  { href: "/sales", label: "المبيعات", icon: ShoppingCart },
-  { href: "/customers", label: "العملاء", icon: Users },
-  { href: "/expenses", label: "المصاريف", icon: Wallet },
+interface NavItem {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  /** Permission required to see this item. Owner sees everything regardless. */
+  requires: Permission;
+}
+
+const primaryItems: NavItem[] = [
+  { href: "/", label: "لوحة التحكم", icon: LayoutDashboard, requires: "view_dashboard" },
+  { href: "/inventory", label: "المخزن", icon: Package, requires: "view_inventory" },
+  { href: "/sales", label: "المبيعات", icon: ShoppingCart, requires: "view_sales" },
+  { href: "/customers", label: "العملاء", icon: Users, requires: "view_customers" },
+  { href: "/expenses", label: "المصاريف", icon: Wallet, requires: "view_expenses" },
 ];
 
-const secondaryItems = [
-  { href: "/add-product", label: "إضافة صنف", icon: PlusSquare },
-  { href: "/returns", label: "المرتجعات", icon: RotateCcw },
-  { href: "/insights", label: "إحصائيات", icon: BarChart3 },
-  { href: "/settings", label: "الإعدادات", icon: Settings },
+const secondaryItems: NavItem[] = [
+  { href: "/add-product", label: "إضافة صنف", icon: PlusSquare, requires: "manage_inventory" },
+  { href: "/returns", label: "المرتجعات", icon: RotateCcw, requires: "view_returns" },
+  { href: "/insights", label: "إحصائيات", icon: BarChart3, requires: "view_insights" },
+  { href: "/settings", label: "الإعدادات", icon: Settings, requires: "view_settings" },
 ];
 
 interface SidebarProps {
@@ -42,10 +53,17 @@ interface SidebarProps {
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname();
   const { settings } = useSettings();
+  const { data: session } = useSession();
+  const principal = session?.user
+    ? { role: session.user.role, permissions: session.user.permissions }
+    : null;
+  const visiblePrimary = primaryItems.filter((i) => can(principal, i.requires));
+  const visibleSecondary = secondaryItems.filter((i) => can(principal, i.requires));
+
   const storeName = settings.shopName?.trim() || "متجري";
   const initial = storeName.charAt(0);
 
-  const renderItem = (item: { href: string; label: string; icon: typeof LayoutDashboard }) => {
+  const renderItem = (item: NavItem) => {
     const isActive = pathname === item.href;
     const Icon = item.icon;
 
@@ -87,7 +105,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         {collapsed ? <PanelRightOpen className="w-3.5 h-3.5" /> : <PanelRightClose className="w-3.5 h-3.5" />}
       </button>
 
-      {/* Store name header */}
+      {/* Store name header + handle */}
       <div
         className={cn(
           "flex items-center gap-2 mb-3",
@@ -98,39 +116,59 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         <div className="w-8 h-8 rounded-lg bg-accent-light text-accent flex items-center justify-center shrink-0 font-bold">
           {initial || <Store className="w-4 h-4" />}
         </div>
-        <span
+        <div
           className={cn(
-            "font-bold text-text-primary text-sm truncate transition-opacity duration-200",
+            "min-w-0 flex-1 transition-opacity duration-200",
             collapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100"
           )}
         >
-          {storeName}
-        </span>
+          <p className="font-bold text-text-primary text-sm truncate leading-tight">
+            {storeName}
+          </p>
+          {session?.user?.tenantSlug && (
+            <p
+              dir="ltr"
+              className="text-[10px] text-text-secondary font-mono truncate leading-tight"
+            >
+              @{session.user.tenantSlug}
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Primary Nav Links */}
-      <div className="mt-2 px-1 space-y-1">{primaryItems.map(renderItem)}</div>
+      <div className="mt-2 px-1 space-y-1">{visiblePrimary.map(renderItem)}</div>
 
-      {/* "More" divider */}
-      <div className={cn("mt-6 mb-2", collapsed ? "px-2" : "px-6")}>
-        {collapsed ? (
-          <div className="h-px bg-border" />
-        ) : (
-          <p className="text-xs text-text-secondary font-medium">المزيد</p>
-        )}
-      </div>
+      {/* "More" divider — hidden when no secondary items survive permission filter */}
+      {visibleSecondary.length > 0 && (
+        <div className={cn("mt-6 mb-2", collapsed ? "px-2" : "px-6")}>
+          {collapsed ? (
+            <div className="h-px bg-border" />
+          ) : (
+            <p className="text-xs text-text-secondary font-medium">المزيد</p>
+          )}
+        </div>
+      )}
 
       {/* Secondary Nav Links */}
-      <div className="flex-1 px-1 space-y-1">{secondaryItems.map(renderItem)}</div>
+      <div className="flex-1 px-1 space-y-1">{visibleSecondary.map(renderItem)}</div>
 
-      {/* Footer */}
+      {/* Footer: user menu + version */}
       <div
         className={cn(
-          "py-3 border-t border-border transition-all duration-200",
-          collapsed ? "px-2 text-center" : "px-4"
+          "border-t border-border pt-2 mt-2 transition-all duration-200",
+          collapsed ? "px-1" : "px-2"
         )}
       >
-        <p className="text-xs text-text-secondary whitespace-nowrap">{collapsed ? "v1.0" : "نسخة 1.0.0"}</p>
+        <UserMenu collapsed={collapsed} />
+        <p
+          className={cn(
+            "text-[10px] text-text-secondary whitespace-nowrap text-center mt-1 mb-1",
+            collapsed && "opacity-0"
+          )}
+        >
+          نسخة 1.0.0
+        </p>
       </div>
     </nav>
   );

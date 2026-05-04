@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { useSession } from "next-auth/react";
 import {
   LayoutDashboard,
   Package,
@@ -14,28 +15,52 @@ import {
   Users,
   Settings,
   Menu,
+  LogOut,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { logoutAction } from "@/app/(auth)/actions";
+import { can, type Permission } from "@/lib/permissions";
 
-const primaryItems = [
-  { href: "/", label: "لوحة", icon: LayoutDashboard },
-  { href: "/inventory", label: "المخزن", icon: Package },
-  { href: "/sales", label: "المبيعات", icon: ShoppingCart },
-  { href: "/add-product", label: "إضافة", icon: PlusSquare },
-  { href: "/customers", label: "العملاء", icon: Users },
+interface NavItem {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  requires: Permission;
+}
+
+const primaryItems: NavItem[] = [
+  { href: "/", label: "لوحة", icon: LayoutDashboard, requires: "view_dashboard" },
+  { href: "/inventory", label: "المخزن", icon: Package, requires: "view_inventory" },
+  { href: "/sales", label: "المبيعات", icon: ShoppingCart, requires: "view_sales" },
+  { href: "/add-product", label: "إضافة", icon: PlusSquare, requires: "manage_inventory" },
+  { href: "/customers", label: "العملاء", icon: Users, requires: "view_customers" },
 ];
 
-const moreItems = [
-  { href: "/expenses", label: "المصاريف", icon: Wallet },
-  { href: "/returns", label: "المرتجعات", icon: RotateCcw },
-  { href: "/insights", label: "إحصائيات", icon: BarChart3 },
-  { href: "/settings", label: "الإعدادات", icon: Settings },
+const moreItems: NavItem[] = [
+  { href: "/expenses", label: "المصاريف", icon: Wallet, requires: "view_expenses" },
+  { href: "/returns", label: "المرتجعات", icon: RotateCcw, requires: "view_returns" },
+  { href: "/insights", label: "إحصائيات", icon: BarChart3, requires: "view_insights" },
+  { href: "/settings", label: "الإعدادات", icon: Settings, requires: "view_settings" },
 ];
 
 export function MobileBottomNav() {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
+  const { data: session } = useSession();
+  const principal = session?.user
+    ? { role: session.user.role, permissions: session.user.permissions }
+    : null;
+  const visiblePrimary = primaryItems.filter((i) => can(principal, i.requires));
+  const visibleMore = moreItems.filter((i) => can(principal, i.requires));
+  const [isSigningOut, startSignOut] = useTransition();
+  const email = session?.user?.email ?? "";
+
+  const handleSignOut = () => {
+    startSignOut(async () => {
+      await logoutAction();
+    });
+  };
 
   useEffect(() => {
     setMoreOpen(false);
@@ -50,7 +75,7 @@ export function MobileBottomNav() {
     };
   }, [moreOpen]);
 
-  const moreActive = moreItems.some((i) => i.href === pathname);
+  const moreActive = visibleMore.some((i) => i.href === pathname);
 
   return (
     <>
@@ -84,7 +109,7 @@ export function MobileBottomNav() {
           </button>
         </div>
         <div className="grid grid-cols-4 gap-2">
-          {moreItems.map((item) => {
+          {visibleMore.map((item) => {
             const isActive = pathname === item.href;
             const Icon = item.icon;
             return (
@@ -104,11 +129,26 @@ export function MobileBottomNav() {
             );
           })}
         </div>
+
+        {email && (
+          <div className="mt-3 pt-3 border-t border-border flex items-center justify-between gap-2">
+            <p className="text-xs text-text-secondary truncate">{email}</p>
+            <button
+              type="button"
+              onClick={handleSignOut}
+              disabled={isSigningOut}
+              className="flex items-center gap-1.5 text-xs font-medium text-danger hover:bg-danger-light rounded-lg px-3 py-1.5 disabled:opacity-50"
+            >
+              <LogOut className="w-4 h-4" />
+              {isSigningOut ? "…" : "تسجيل الخروج"}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Bottom bar */}
       <nav className="flex items-stretch justify-around bg-bg-card border-t border-border px-1 pt-1.5 pb-[calc(env(safe-area-inset-bottom)+0.375rem)]">
-        {primaryItems.map((item) => {
+        {visiblePrimary.map((item) => {
           const isActive = pathname === item.href;
           const Icon = item.icon;
           return (

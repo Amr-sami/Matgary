@@ -50,6 +50,13 @@
       "when": 1777806184000,
       "tag": "0006_operations_rls_and_constraints",
       "breakpoints": false
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1777814928093,
+      "tag": "0007_volatile_shaman",
+      "breakpoints": true
     }
   ]
 }

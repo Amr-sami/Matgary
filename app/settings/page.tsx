@@ -28,6 +28,7 @@ import { sendViaGreenApi } from "@/lib/whatsapp";
 import { formatPrice } from "@/lib/utils";
 import { CategoriesEditor } from "@/components/settings/CategoriesEditor";
 import { BrandsEditor } from "@/components/settings/BrandsEditor";
+import { TeamEditor } from "@/components/settings/TeamEditor";
 
 const PLACEHOLDERS: { key: string; description: string }[] = [
   { key: "customerName", description: "اسم العميل" },
@@ -167,6 +168,7 @@ export default function SettingsPage() {
   return (
     <AppShell title="الإعدادات">
       <div className="max-w-3xl mx-auto space-y-4">
+        <TeamEditor onToast={setToast} />
         <CategoriesEditor onToast={setToast} />
         <BrandsEditor onToast={setToast} />
 

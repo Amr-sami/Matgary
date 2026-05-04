@@ -12,7 +12,6 @@ import {
   shopSettings,
 } from "@/lib/db/schema";
 import { signIn, signOut, auth } from "@/lib/auth";
-import { slugify } from "@/lib/utils/slug";
 import { DEFAULT_MESSAGE_TEMPLATE } from "@/lib/settings.defaults";
 import { seedCornerStorePreset } from "@/lib/seeds/cornerstore";
 
@@ -20,17 +19,34 @@ const signupSchema = z.object({
   email: z.string().email().toLowerCase().trim(),
   password: z.string().min(8, "كلمة المرور 8 أحرف على الأقل").max(128),
   storeName: z.string().min(1, "اسم المتجر مطلوب").max(80),
+  // The store handle becomes the @-suffix of every staff login (ahmed@<handle>).
+  // Owner-chosen and editable so they end up with something they can actually
+  // dictate to their cashier — auto-derived slugs from Arabic names produce
+  // unusable random strings.
+  storeHandle: z
+    .string()
+    .min(2, "اسم تسجيل الدخول للمتجر مطلوب")
+    .max(40)
+    .regex(
+      /^[a-z0-9][a-z0-9-]*[a-z0-9]$/,
+      "حروف إنجليزية صغيرة وأرقام و - فقط (يبدأ وينتهي بحرف أو رقم)",
+    ),
 });
 
 export type SignupResult =
   | { ok: true }
-  | { ok: false; error: string; field?: "email" | "password" | "storeName" };
+  | {
+      ok: false;
+      error: string;
+      field?: "email" | "password" | "storeName" | "storeHandle";
+    };
 
 export async function signupAction(formData: FormData): Promise<SignupResult> {
   const parsed = signupSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
     storeName: formData.get("storeName"),
+    storeHandle: formData.get("storeHandle"),
   });
 
   if (!parsed.success) {
@@ -38,11 +54,16 @@ export async function signupAction(formData: FormData): Promise<SignupResult> {
     return {
       ok: false,
       error: first.message,
-      field: first.path[0] as "email" | "password" | "storeName" | undefined,
+      field: first.path[0] as
+        | "email"
+        | "password"
+        | "storeName"
+        | "storeHandle"
+        | undefined,
     };
   }
 
-  const { email, password, storeName } = parsed.data;
+  const { email, password, storeName, storeHandle } = parsed.data;
 
   const [existing] = await db
     .select({ id: users.id })
@@ -55,16 +76,21 @@ export async function signupAction(formData: FormData): Promise<SignupResult> {
 
   const passwordHash = await bcrypt.hash(password, 12);
 
-  // Pick a unique slug; retry a few times on collision.
-  let slug = slugify(storeName);
-  for (let i = 0; i < 5; i++) {
-    const [clash] = await db
-      .select({ id: tenants.id })
-      .from(tenants)
-      .where(eq(tenants.slug, slug))
-      .limit(1);
-    if (!clash) break;
-    slug = `${slugify(storeName)}-${Math.random().toString(36).slice(2, 6)}`;
+  // The owner-supplied handle is the slug. If it's already taken we reject
+  // outright — better than silently appending a random suffix that breaks
+  // the staff login URL the owner just promised their cashier.
+  const slug = storeHandle.toLowerCase();
+  const [slugClash] = await db
+    .select({ id: tenants.id })
+    .from(tenants)
+    .where(eq(tenants.slug, slug))
+    .limit(1);
+  if (slugClash) {
+    return {
+      ok: false,
+      error: "اسم تسجيل الدخول للمتجر مستخدم بالفعل، اختر اسماً آخر",
+      field: "storeHandle",
+    };
   }
 
   await db.transaction(async (tx) => {

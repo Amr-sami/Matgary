@@ -21,6 +21,8 @@ export const users = pgTable("users", {
   emailVerified: timestamp("email_verified", { mode: "date", withTimezone: true }),
   image: text("image"),
   passwordHash: text("password_hash"),
+  /** When true, login succeeds but every page redirects to /account/change-password. */
+  mustChangePassword: boolean("must_change_password").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .default(sql`now()`),
@@ -92,7 +94,11 @@ export const tenantMembers = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    role: text("role").notNull().default("owner"),
+    role: text("role").notNull().default("owner"), // 'owner' | 'staff'
+    /** Permission keys (see lib/permissions.ts). Owner ignores this — has all. */
+    permissions: text("permissions").array().notNull().default(sql`'{}'::text[]`),
+    /** Display name for sub-accounts (e.g. "Ahmed"). For owner this duplicates users.name. */
+    displayName: text("display_name"),
     joinedAt: timestamp("joined_at", { withTimezone: true })
       .notNull()
       .default(sql`now()`),

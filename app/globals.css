@@ -1,15 +1,15 @@
 @import "tailwindcss";
 
 :root {
-  --bg-main: #F5F3EF;
+  --bg-main: #FFFFFF;
   --bg-card: #FFFFFF;
   --bg-sidebar: #1C1C1E;
   --text-primary: #1A1A1A;
   --text-secondary: #6B6B6B;
   --text-sidebar: #E8E8E8;
-  --accent: #C9A84C;
-  --accent-hover: #B8962E;
-  --accent-light: #F5EDD6;
+  --accent: #1203E3;
+  --accent-hover: #0E02B5;
+  --accent-light: #E7E6FC;
   --danger: #C0392B;
   --danger-light: #FDEAEA;
   --success: #27AE60;
@@ -50,6 +50,15 @@ body {
   line-height: 1.6;
   color: var(--text-primary);
   background: var(--bg-main);
+}
+
+.font-display {
+  font-family: var(--font-display), var(--font-cairo), sans-serif;
+  font-feature-settings: "ss01", "kern";
+}
+
+.font-catchy {
+  font-family: var(--font-catchy), var(--font-display), var(--font-cairo), sans-serif;
 }
 
 h1 {

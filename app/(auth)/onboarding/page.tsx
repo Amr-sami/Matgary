@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { completeOnboardingAction } from "../actions";
@@ -9,7 +8,6 @@ import { completeOnboardingAction } from "../actions";
 type Preset = "cornerstore" | "blank";
 
 export default function OnboardingPage() {
-  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [shopName, setShopName] = useState("");
@@ -29,11 +27,9 @@ export default function OnboardingPage() {
         setError(res.error);
         return;
       }
-      // Middleware no longer checks onboardingComplete (JWT can be stale at the
-      // edge), so a plain push lands us on the dashboard. The DB-backed truth
-      // is whatever shop_settings.shop_name now is.
-      router.replace("/");
-      router.refresh();
+      // Full reload — the router cache otherwise lingers on this very page
+      // and the user sees onboarding again until they manually refresh.
+      window.location.href = "/";
     });
   };
 

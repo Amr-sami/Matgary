@@ -4,7 +4,12 @@ import { authConfig } from "@/lib/auth.config";
 
 const { auth } = NextAuth(authConfig);
 
-const PUBLIC_PATHS = new Set<string>(["/login", "/signup"]);
+const PUBLIC_PATHS = new Set<string>([
+  "/login",
+  "/signup",
+  // Live slug availability check is hit from the unauthed signup form.
+  "/api/account/store-handle/check",
+]);
 const PUBLIC_PREFIXES = ["/api/auth", "/_next", "/favicon", "/fonts"];
 
 // NOTE on onboarding gating: middleware runs in the Edge runtime and reads the
@@ -33,6 +38,26 @@ export default auth((req) => {
     const loginUrl = new URL("/login", nextUrl);
     if (pathname !== "/") loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);
+  }
+
+  // Force users with mustChangePassword=true through the change-password page
+  // before they can do anything else. The change-password endpoint and the
+  // signout API are explicitly allowed so they can complete the flow.
+  if (
+    session.user.mustChangePassword &&
+    pathname !== "/account/change-password" &&
+    !pathname.startsWith("/api/account/password") &&
+    !pathname.startsWith("/api/auth/")
+  ) {
+    if (pathname.startsWith("/api/")) {
+      // API consumers can't follow an HTML redirect — give them a 403 with a
+      // hint so the client can route the user to the change-password page.
+      return NextResponse.json(
+        { error: "PASSWORD_CHANGE_REQUIRED" },
+        { status: 403 },
+      );
+    }
+    return NextResponse.redirect(new URL("/account/change-password", nextUrl));
   }
 
   return NextResponse.next();
