@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { Users, Star } from "lucide-react";
+import { Users, Star } from "@/lib/icons";
 import type { Sale } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
 import { buildCustomerAggregates } from "@/lib/customers";

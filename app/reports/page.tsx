@@ -10,10 +10,10 @@ import { SaleCard } from "@/components/sales/SaleCard";
 import { Receipt } from "@/components/sales/Receipt";
 import { useSales } from "@/hooks/useSales";
 import { useReturns } from "@/hooks/useReturns";
-import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatPrice, startOfDay, endOfDay, isBetween, getTodayRange, getThisMonthRange } from "@/lib/utils";
-import { DollarSign, ShoppingCart, RotateCcw } from "lucide-react";
+import { DollarSign, ShoppingCart, RotateCcw } from "@/lib/icons";
 import type { Sale } from "@/lib/types";
 
 function ReportsContent() {
@@ -75,11 +75,7 @@ function ReportsContent() {
   };
 
   if (salesLoading || returnsLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <LoadingSpinner />
-      </div>
-    );
+    return <PageSkeleton chart rows={6} />;
   }
 
   return (
@@ -180,7 +176,7 @@ function ReportsContent() {
 export default function ReportsPage() {
   return (
     <AppShell title="التقارير والاحصائيات">
-      <Suspense fallback={<div className="flex items-center justify-center py-20"><LoadingSpinner /></div>}>
+      <Suspense fallback={<PageSkeleton chart rows={6} />}>
         <ReportsContent />
       </Suspense>
     </AppShell>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Trash2, Save, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, Trash2, Save, ChevronDown, ChevronRight } from "@/lib/icons";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { useCategories } from "@/hooks/useCategories";

@@ -1,6 +1,6 @@
 "use client";
 
-import { DollarSign, Package, ShoppingCart, RotateCcw } from "lucide-react";
+import { DollarSign, Package, ShoppingCart, RotateCcw } from "@/lib/icons";
 import { StatCard } from "./StatCard";
 import { useProducts } from "@/hooks/useProducts";
 import { useSales } from "@/hooks/useSales";

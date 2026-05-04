@@ -1,6 +1,6 @@
 "use client";
 
-import { User, UserRound } from "lucide-react";
+import { User, UserRound } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import type { CategoryAttribute } from "@/lib/types";
 

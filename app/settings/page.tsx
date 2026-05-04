@@ -11,7 +11,7 @@ import {
   Zap,
   Send,
   ExternalLink,
-} from "lucide-react";
+} from "@/lib/icons";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";

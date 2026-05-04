@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, X } from "lucide-react";
+import { Search, X } from "@/lib/icons";
 import { useSearch } from "@/hooks/useSearch";
 
 interface InventorySearchBarProps {

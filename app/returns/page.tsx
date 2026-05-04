@@ -3,7 +3,7 @@
 import { AppShell } from "@/components/layout/AppShell";
 import { useReturns } from "@/hooks/useReturns";
 import { ReturnsTable } from "@/components/returns/ReturnsTable";
-import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 
 export default function ReturnsPage() {
@@ -12,9 +12,7 @@ export default function ReturnsPage() {
   if (loading) {
     return (
       <AppShell title="المرتجعات">
-        <div className="flex items-center justify-center py-20">
-          <LoadingSpinner />
-        </div>
+        <PageSkeleton rows={6} cards={false} />
       </AppShell>
     );
   }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Search, X } from "lucide-react";
+import { Search, X } from "@/lib/icons";
 import { useProducts } from "@/hooks/useProducts";
 import type { Product } from "@/lib/types";
 import { Badge } from "../ui/Badge";

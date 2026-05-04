@@ -15,7 +15,7 @@ import { sendViaGreenApi } from "@/lib/whatsapp";
 import type { Product, DiscountType, PaymentMethod } from "@/lib/types";
 import { PAYMENT_METHOD_LABELS } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
-import { Printer, Percent, DollarSign, Calendar, Plus, Trash2, ShoppingCart } from "lucide-react";
+import { Printer, Percent, DollarSign, Calendar, Plus, Trash2, ShoppingCart } from "@/lib/icons";
 import { CustomerAutocomplete, type CustomerSuggestion } from "./CustomerAutocomplete";
 
 export interface ReceiptSaleData {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Share2, Copy, MessageCircle, Check } from "lucide-react";
+import { Share2, Copy, MessageCircle, Check } from "@/lib/icons";
 import type { Sale } from "@/lib/types";
 
 interface ShareReceiptButtonProps {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Phone, User, X } from "lucide-react";
+import { Phone, User, X } from "@/lib/icons";
 
 export interface CustomerSuggestion {
   name: string;

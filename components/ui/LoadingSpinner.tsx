@@ -1,11 +1,9 @@
-interface LoadingSpinnerProps {
-  className?: string;
-}
+import { PageSkeleton } from "./PageSkeleton";
 
-export function LoadingSpinner({ className }: LoadingSpinnerProps) {
-  return (
-    <div className={className}>
-      <div className="animate-spin w-8 h-8 border-4 border-accent-light border-t-accent rounded-full" />
-    </div>
-  );
+/**
+ * Kept as an alias for any old callsites — renders the page skeleton
+ * instead of a spinner so loading states stay consistent.
+ */
+export function LoadingSpinner({ className: _className }: { className?: string } = {}) {
+  return <PageSkeleton />;
 }

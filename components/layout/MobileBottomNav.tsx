@@ -17,7 +17,7 @@ import {
   Menu,
   LogOut,
   X,
-} from "lucide-react";
+} from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { logoutAction } from "@/app/(auth)/actions";
 import { can, type Permission } from "@/lib/permissions";
@@ -58,6 +58,9 @@ export function MobileBottomNav() {
 
   const handleSignOut = () => {
     startSignOut(async () => {
+      try {
+        window.localStorage.removeItem("shop:settings:v1");
+      } catch {}
       await logoutAction();
     });
   };
@@ -156,12 +159,19 @@ export function MobileBottomNav() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex flex-col items-center justify-center gap-0.5 px-1 py-1 rounded-lg flex-1 min-w-[48px]",
+                "relative flex flex-col items-center justify-center gap-0.5 px-1 py-1 rounded-lg flex-1 min-w-[48px]",
                 isActive ? "text-accent" : "text-text-secondary"
               )}
             >
               <Icon className="w-5 h-5" />
               <span className="text-[10px] leading-tight whitespace-nowrap">{item.label}</span>
+              <span
+                aria-hidden
+                className={cn(
+                  "absolute -bottom-1 h-[3px] w-7 rounded-full transition-all duration-200",
+                  isActive ? "bg-accent opacity-100" : "bg-transparent opacity-0"
+                )}
+              />
             </Link>
           );
         })}
@@ -171,7 +181,7 @@ export function MobileBottomNav() {
           aria-label="المزيد"
           aria-expanded={moreOpen}
           className={cn(
-            "flex flex-col items-center justify-center gap-0.5 px-1 py-1 rounded-lg flex-1 min-w-[48px] transition-colors",
+            "relative flex flex-col items-center justify-center gap-0.5 px-1 py-1 rounded-lg flex-1 min-w-[48px] transition-colors",
             moreActive || moreOpen ? "text-accent" : "text-text-secondary"
           )}
         >
@@ -190,6 +200,13 @@ export function MobileBottomNav() {
             />
           </span>
           <span className="text-[10px] leading-tight whitespace-nowrap">المزيد</span>
+          <span
+            aria-hidden
+            className={cn(
+              "absolute -bottom-1 h-[3px] w-7 rounded-full transition-all duration-200",
+              moreActive || moreOpen ? "bg-accent opacity-100" : "bg-transparent opacity-0"
+            )}
+          />
         </button>
       </nav>
     </>

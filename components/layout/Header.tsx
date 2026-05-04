@@ -1,6 +1,6 @@
 "use client";
 
-import { Menu } from "lucide-react";
+import { Menu } from "@/lib/icons";
 import { formatDate } from "@/lib/utils";
 
 interface HeaderProps {

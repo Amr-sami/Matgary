@@ -11,7 +11,7 @@ import {
 import { bulkAddProducts } from "@/lib/api/products";
 import { useCategories } from "@/hooks/useCategories";
 import type { CategoryAttribute } from "@/lib/types";
-import { Upload, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Upload, AlertTriangle, CheckCircle2 } from "@/lib/icons";
 
 interface CsvImportModalProps {
   isOpen: boolean;

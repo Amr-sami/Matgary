@@ -1,6 +1,6 @@
 "use client";
 
-import { RotateCcw, Printer, Pencil, Trash2 } from "lucide-react";
+import { RotateCcw, Printer, Pencil, Trash2 } from "@/lib/icons";
 import { ShareReceiptButton } from "./ShareReceiptButton";
 import type { Sale } from "@/lib/types";
 import { Badge } from "../ui/Badge";

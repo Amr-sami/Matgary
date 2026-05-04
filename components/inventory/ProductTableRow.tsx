@@ -1,6 +1,6 @@
 "use client";
 
-import { Pencil, Trash2, ShoppingCart, Plus, Minus, History } from "lucide-react";
+import { Pencil, Trash2, ShoppingCart, Plus, Minus, History } from "@/lib/icons";
 import type { Product } from "@/lib/types";
 import { Badge } from "../ui/Badge";
 import { useCatalog } from "@/components/catalog-context";

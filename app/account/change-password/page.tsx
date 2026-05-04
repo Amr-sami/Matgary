@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { KeyRound } from "lucide-react";
+import { KeyRound } from "@/lib/icons";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 

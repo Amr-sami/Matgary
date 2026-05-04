@@ -1,6 +1,6 @@
 "use client";
 
-import { DollarSign } from "lucide-react";
+import { DollarSign } from "@/lib/icons";
 import { useSales } from "@/hooks/useSales";
 import { formatPrice } from "@/lib/utils";
 

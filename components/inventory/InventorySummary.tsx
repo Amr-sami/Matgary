@@ -1,7 +1,7 @@
 "use client";
 
 import type { Product } from "@/lib/types";
-import { AlertTriangle, Package, PackageX, Wallet } from "lucide-react";
+import { AlertTriangle, Package, PackageX, Wallet } from "@/lib/icons";
 import { formatPrice } from "@/lib/utils";
 
 interface InventorySummaryProps {

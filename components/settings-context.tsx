@@ -18,14 +18,41 @@ interface SettingsContextValue {
 
 const SettingsContext = createContext<SettingsContextValue | null>(null);
 
+const CACHE_KEY = "shop:settings:v1";
+
+// Read the last successfully-fetched settings from localStorage. Used to
+// seed initial state so the sidebar shows the correct store name on the
+// very first paint instead of flashing DEFAULT_SETTINGS for ~50ms.
+const readCachedSettings = (): ShopSettings | null => {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(CACHE_KEY);
+    return raw ? (JSON.parse(raw) as ShopSettings) : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeCachedSettings = (next: ShopSettings) => {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(CACHE_KEY, JSON.stringify(next));
+  } catch {
+    // Quota or private mode — ignore; fetch will still hydrate the UI.
+  }
+};
+
 export function SettingsProvider({ children }: { children: ReactNode }) {
-  const [settings, setSettings] = useState<ShopSettings>(DEFAULT_SETTINGS);
-  const [loading, setLoading] = useState(true);
+  const [settings, setSettings] = useState<ShopSettings>(
+    () => readCachedSettings() ?? DEFAULT_SETTINGS,
+  );
+  const [loading, setLoading] = useState(() => readCachedSettings() === null);
 
   const refresh = useCallback(async () => {
     try {
       const next = await fetchShopSettings();
       setSettings(next);
+      writeCachedSettings(next);
     } finally {
       setLoading(false);
     }

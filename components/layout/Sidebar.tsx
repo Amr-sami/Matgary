@@ -12,10 +12,9 @@ import {
   Wallet,
   Users,
   Settings,
-  Store,
   PanelRightClose,
   PanelRightOpen,
-} from "lucide-react";
+} from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/components/settings-context";
 import { UserMenu } from "./UserMenu";
@@ -61,7 +60,6 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const visibleSecondary = secondaryItems.filter((i) => can(principal, i.requires));
 
   const storeName = settings.shopName?.trim() || "متجري";
-  const initial = storeName.charAt(0);
 
   const renderItem = (item: NavItem) => {
     const isActive = pathname === item.href;
@@ -73,13 +71,20 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         href={item.href}
         title={collapsed ? item.label : undefined}
         className={cn(
-          "flex items-center gap-3 h-11 rounded-lg transition-colors mx-2",
+          "relative flex items-center gap-3 h-11 rounded-lg transition-colors mx-2",
           collapsed ? "justify-center px-0" : "px-4",
           isActive
             ? "bg-accent-light text-accent"
             : "text-text-secondary hover:text-text-primary hover:bg-bg-main"
         )}
       >
+        <span
+          aria-hidden
+          className={cn(
+            "absolute start-0 top-2 bottom-2 w-[3px] rounded-full transition-all duration-200",
+            isActive ? "bg-accent opacity-100" : "bg-transparent opacity-0"
+          )}
+        />
         <Icon className={cn("w-5 h-5 shrink-0", isActive && "text-accent")} />
         <span
           className={cn(
@@ -105,35 +110,29 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         {collapsed ? <PanelRightOpen className="w-3.5 h-3.5" /> : <PanelRightClose className="w-3.5 h-3.5" />}
       </button>
 
-      {/* Store name header + handle */}
+      {/* Store name header */}
       <div
         className={cn(
-          "flex items-center gap-2 mb-3",
+          "mb-3 flex",
           collapsed ? "justify-center px-0" : "px-4"
         )}
         title={collapsed ? storeName : undefined}
       >
-        <div className="w-8 h-8 rounded-lg bg-accent-light text-accent flex items-center justify-center shrink-0 font-bold">
-          {initial || <Store className="w-4 h-4" />}
-        </div>
-        <div
-          className={cn(
-            "min-w-0 flex-1 transition-opacity duration-200",
-            collapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100"
-          )}
-        >
-          <p className="font-bold text-text-primary text-sm truncate leading-tight">
-            {storeName}
-          </p>
-          {session?.user?.tenantSlug && (
-            <p
-              dir="ltr"
-              className="text-[10px] text-text-secondary font-mono truncate leading-tight"
-            >
-              @{session.user.tenantSlug}
-            </p>
-          )}
-        </div>
+        {collapsed ? (
+          <span
+            aria-label="متجري"
+            className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-accent text-white font-display font-extrabold text-lg leading-none shadow-sm"
+          >
+            م
+          </span>
+        ) : (
+          <div>
+            <h2 className="font-display font-extrabold text-text-primary text-lg truncate leading-tight tracking-tight">
+              {storeName}
+            </h2>
+            <span className="mt-1.5 block h-[3px] w-8 rounded-full bg-accent" />
+          </div>
+        )}
       </div>
 
       {/* Primary Nav Links */}

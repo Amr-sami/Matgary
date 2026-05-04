@@ -5,10 +5,10 @@ import { AppShell } from "@/components/layout/AppShell";
 import { ExpenseForm } from "@/components/expenses/ExpenseForm";
 import { ExpenseTable } from "@/components/expenses/ExpenseTable";
 import { useExpenses } from "@/hooks/useExpenses";
-import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { Toast } from "@/components/ui/Toast";
 import { formatPrice } from "@/lib/utils";
-import { Wallet, TrendingDown } from "lucide-react";
+import { Wallet, TrendingDown } from "@/lib/icons";
 
 export default function ExpensesPage() {
   const { expenses, loading } = useExpenses();
@@ -19,9 +19,7 @@ export default function ExpensesPage() {
   if (loading) {
     return (
       <AppShell title="المصاريف">
-        <div className="flex items-center justify-center py-20">
-          <LoadingSpinner />
-        </div>
+        <PageSkeleton rows={6} cards={false} />
       </AppShell>
     );
   }

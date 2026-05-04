@@ -26,7 +26,7 @@ import { SalesBulkActions } from "@/components/sales/SalesBulkActions";
 import { EditSaleModal } from "@/components/sales/EditSaleModal";
 import { ReturnModal } from "@/components/returns/ReturnModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Toast } from "@/components/ui/Toast";
 import { Pagination } from "@/components/ui/Pagination";
@@ -39,9 +39,7 @@ export default function SalesPage() {
     <Suspense
       fallback={
         <AppShell title="المبيعات">
-          <div className="flex items-center justify-center py-20">
-            <LoadingSpinner />
-          </div>
+          <PageSkeleton rows={8} chart={false} />
         </AppShell>
       }
     >
@@ -405,9 +403,7 @@ function SalesPageInner() {
   if (salesLoading) {
     return (
       <AppShell title="المبيعات">
-        <div className="flex items-center justify-center py-20">
-          <LoadingSpinner />
-        </div>
+        <PageSkeleton rows={8} />
       </AppShell>
     );
   }

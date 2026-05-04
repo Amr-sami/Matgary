@@ -9,7 +9,7 @@ import {
   MessageCircle,
   Bell,
   Megaphone,
-} from "lucide-react";
+} from "@/lib/icons";
 import { CATEGORY_LABELS } from "@/lib/types";
 import { formatPrice, formatDate } from "@/lib/utils";
 import {

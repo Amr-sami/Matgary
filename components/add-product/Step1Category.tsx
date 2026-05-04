@@ -1,7 +1,7 @@
 "use client";
 
-import * as Icons from "lucide-react";
-import { Package } from "lucide-react";
+import * as Icons from "@/lib/icons";
+import { Package } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import type { CategoryDescriptor } from "@/lib/types";
 

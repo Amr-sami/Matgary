@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import type { Sale } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus } from "@/lib/icons";
 
 interface DayCompareCardProps {
   sales: Sale[]; // entire sales list (not date-filtered)

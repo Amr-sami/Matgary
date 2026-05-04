@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useRef, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { LogOut, User } from "lucide-react";
+import { LogOut, User } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { logoutAction } from "@/app/(auth)/actions";
 
@@ -30,6 +30,9 @@ export function UserMenu({ collapsed }: Props) {
 
   const signOut = () => {
     startTransition(async () => {
+      try {
+        window.localStorage.removeItem("shop:settings:v1");
+      } catch {}
       await logoutAction();
     });
   };

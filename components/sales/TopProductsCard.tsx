@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import type { Sale } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
-import { Trophy } from "lucide-react";
+import { Trophy } from "@/lib/icons";
 
 interface TopProductsCardProps {
   sales: Sale[];

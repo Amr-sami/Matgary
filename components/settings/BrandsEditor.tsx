@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "@/lib/icons";
 import { Button } from "../ui/Button";
 import { useCategories } from "@/hooks/useCategories";
 import type { BrandDescriptor } from "@/lib/types";

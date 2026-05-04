@@ -2,7 +2,7 @@
 
 import type { Sale } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
-import { Receipt, Wallet, Percent, ShoppingBasket, TrendingUp } from "lucide-react";
+import { Receipt, Wallet, Percent, ShoppingBasket, TrendingUp } from "@/lib/icons";
 
 interface SalesKpiCardsProps {
   sales: Sale[]; // already filtered by date range

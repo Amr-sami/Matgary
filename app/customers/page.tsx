@@ -1,10 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Download, Users, Star, Wallet, Bell, Megaphone } from "lucide-react";
+import { Download, Users, Star, Wallet, Bell, Megaphone } from "@/lib/icons";
 import { AppShell } from "@/components/layout/AppShell";
 import { useCustomersData } from "@/hooks/useCustomersData";
-import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { CustomerRow } from "@/components/customers/CustomerRow";
 import { downloadCsv } from "@/lib/csv";
@@ -137,9 +137,7 @@ export default function CustomersPage() {
   if (loading) {
     return (
       <AppShell title="العملاء">
-        <div className="flex items-center justify-center py-20">
-          <LoadingSpinner />
-        </div>
+        <PageSkeleton rows={7} cards={false} />
       </AppShell>
     );
   }

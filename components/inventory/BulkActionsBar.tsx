@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Trash2, Tag, Wrench, Download, X, Percent, Truck, MapPin, Package } from "lucide-react";
+import { Trash2, Tag, Wrench, Download, X, Percent, Truck, MapPin, Package } from "@/lib/icons";
 import type { Category, Gender, Product } from "@/lib/types";
 import { CATEGORY_LABELS, GENDER_LABELS } from "@/lib/types";
 

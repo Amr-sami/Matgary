@@ -1,4 +1,4 @@
-import { Package, ShoppingCart, RotateCcw } from "lucide-react";
+import { Package, ShoppingCart, RotateCcw } from "@/lib/icons";
 
 interface EmptyStateProps {
   type: "products" | "sales" | "returns";

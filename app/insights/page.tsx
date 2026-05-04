@@ -6,7 +6,7 @@ import { TrendChart } from "@/components/insights/TrendChart";
 import { CategoryPieChart } from "@/components/insights/CategoryPieChart";
 import { TopProducts } from "@/components/insights/TopProducts";
 import { StatCard } from "@/components/dashboard/StatCard";
-import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { formatPrice } from "@/lib/utils";
 import { 
   TrendingUp, 
@@ -16,7 +16,7 @@ import {
   ShoppingCart, 
   RotateCcw,
   AlertCircle
-} from "lucide-react";
+} from "@/lib/icons";
 
 export default function InsightsPage() {
   const { data, loading } = useInsights();
@@ -24,9 +24,7 @@ export default function InsightsPage() {
   if (loading) {
     return (
       <AppShell title="الإحصائيات">
-        <div className="flex items-center justify-center py-20">
-          <LoadingSpinner />
-        </div>
+        <PageSkeleton chart rows={5} />
       </AppShell>
     );
   }

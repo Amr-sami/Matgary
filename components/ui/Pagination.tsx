@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, ChevronLeft } from "lucide-react";
+import { ChevronRight, ChevronLeft } from "@/lib/icons";
 
 interface PaginationProps {
   page: number;

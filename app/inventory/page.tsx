@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Download, LayoutGrid, Rows3, Upload, Skull } from "lucide-react";
+import { Download, LayoutGrid, Rows3, Upload, Skull } from "@/lib/icons";
 import { AppShell } from "@/components/layout/AppShell";
 import { useProducts } from "@/hooks/useProducts";
 import { useSales } from "@/hooks/useSales";
@@ -22,7 +22,7 @@ import {
 import { Pagination } from "@/components/ui/Pagination";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Toast } from "@/components/ui/Toast";
-import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import {
   deleteProduct,
@@ -39,9 +39,7 @@ export default function InventoryPage() {
     <Suspense
       fallback={
         <AppShell title="المخزن">
-          <div className="flex items-center justify-center py-20">
-            <LoadingSpinner />
-          </div>
+          <PageSkeleton variant="grid" rows={8} cards={false} />
         </AppShell>
       }
     >
@@ -439,9 +437,7 @@ function InventoryPageInner() {
   if (loading) {
     return (
       <AppShell title="المخزن">
-        <div className="flex items-center justify-center py-20">
-          <LoadingSpinner />
-        </div>
+        <PageSkeleton variant="grid" rows={8} cards={false} />
       </AppShell>
     );
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Tag, TrendingUp } from "lucide-react";
+import { Tag, TrendingUp } from "@/lib/icons";
 import { formatPrice } from "@/lib/utils";
 
 interface TopProduct {

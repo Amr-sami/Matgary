@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, Printer, X } from "lucide-react";
+import { Download, Printer, X } from "@/lib/icons";
 import type { Sale } from "@/lib/types";
 
 interface SalesBulkActionsProps {

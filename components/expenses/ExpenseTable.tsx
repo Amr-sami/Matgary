@@ -1,6 +1,6 @@
 "use client";
 
-import { Trash2, Calendar, Receipt } from "lucide-react";
+import { Trash2, Calendar, Receipt } from "@/lib/icons";
 import { deleteExpense } from "@/lib/api/expenses";
 import type { Expense } from "@/lib/types";
 import { formatPrice, formatDate } from "@/lib/utils";

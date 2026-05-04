@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Modal } from "../ui/Modal";
-import { LoadingSpinner } from "../ui/LoadingSpinner";
+import { Skeleton } from "../ui/Skeleton";
 import type { ProductHistoryEvent as _PHE } from "@/lib/types";
 import type { Product, ProductHistoryEvent } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
@@ -13,7 +13,7 @@ import {
   PlusCircle,
   ShoppingCart,
   Undo2,
-} from "lucide-react";
+} from "@/lib/icons";
 
 interface ProductHistoryModalProps {
   isOpen: boolean;
@@ -82,9 +82,21 @@ export function ProductHistoryModal({ isOpen, onClose, product }: ProductHistory
     <Modal isOpen={isOpen} onClose={onClose} title={`سجل: ${product.name}`}>
       <div className="space-y-3">
         {loading ? (
-          <div className="py-8 flex justify-center">
-            <LoadingSpinner />
-          </div>
+          <ul className="space-y-2">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <li
+                key={i}
+                className="flex items-center gap-3 p-3 rounded-lg border border-border"
+              >
+                <Skeleton className="h-8 w-8 rounded-md shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-3 w-1/3" />
+                  <Skeleton className="h-3 w-1/2" />
+                </div>
+                <Skeleton className="h-4 w-12 shrink-0" />
+              </li>
+            ))}
+          </ul>
         ) : events.length === 0 ? (
           <p className="text-center text-text-secondary py-8">
             لا يوجد سجل سابق لهذا المنتج

@@ -3,7 +3,7 @@
 import { useProducts } from "@/hooks/useProducts";
 import { Badge } from "../ui/Badge";
 import { CATEGORY_LABELS, GENDER_LABELS } from "@/lib/types";
-import { AlertTriangle, CheckCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle } from "@/lib/icons";
 
 export function LowStockAlert() {
   const { products, loading } = useProducts();

@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import type { Sale } from "@/lib/types";
-import { Clock } from "lucide-react";
+import { Clock } from "@/lib/icons";
 
 interface HourHeatmapProps {
   sales: Sale[];

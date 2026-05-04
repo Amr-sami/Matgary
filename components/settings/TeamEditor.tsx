@@ -11,7 +11,7 @@ import {
   Copy,
   Check,
   AtSign,
-} from "lucide-react";
+} from "@/lib/icons";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { PasswordInput } from "../ui/PasswordInput";
