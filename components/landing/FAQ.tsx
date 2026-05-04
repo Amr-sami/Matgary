@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown } from "@/lib/icons";
+import { Plus } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { Reveal } from "./Reveal";
 
@@ -36,63 +36,85 @@ export function FAQ() {
   const [open, setOpen] = useState<number | null>(0);
 
   return (
-    <section className="py-20 md:py-28">
+    <section id="faq" className="py-20 md:py-28 scroll-mt-20">
       <div className="max-w-3xl mx-auto px-4 sm:px-6">
         <Reveal>
-          <div className="text-center mb-12">
+          <div className="max-w-2xl mx-auto text-center mb-14">
             <span className="font-catchy inline-block text-accent text-base font-bold mb-3 tracking-wide">
-              أسئلة شائعة
+              الأسئلة الشائعة
             </span>
             <h2 className="font-display font-black text-3xl md:text-4xl text-text-primary leading-tight tracking-tight">
-              ما يدور في بال الجميع
+              إجابات على أكثر ما يُسأل
             </h2>
           </div>
         </Reveal>
 
-        <div className="space-y-3">
+        <div className="border-t border-border">
           {FAQS.map((item, i) => {
             const isOpen = open === i;
             return (
-              <Reveal key={item.q} delay={i * 50}>
-                <div
-                  className={cn(
-                    "bg-white border rounded-xl transition-all duration-300",
-                    isOpen
-                      ? "border-accent shadow-md"
-                      : "border-border hover:border-accent/40",
-                  )}
-                >
+              <Reveal key={item.q} delay={i * 40}>
+                <div className="border-b border-border">
                   <button
                     type="button"
                     onClick={() => setOpen(isOpen ? null : i)}
                     aria-expanded={isOpen}
-                    className="w-full flex items-center justify-between gap-4 p-5 text-start"
+                    className="group w-full flex items-center justify-between gap-4 py-5 md:py-6 text-start"
                   >
-                    <span className="font-bold text-text-primary text-base md:text-lg">
+                    <span
+                      className={cn(
+                        "font-bold text-base md:text-lg transition-colors duration-200",
+                        isOpen
+                          ? "text-text-primary"
+                          : "text-text-primary group-hover:text-accent",
+                      )}
+                    >
                       {item.q}
                     </span>
-                    <ChevronDown
+                    <span
+                      aria-hidden
                       className={cn(
-                        "w-5 h-5 text-accent shrink-0 transition-transform duration-300",
-                        isOpen && "rotate-180",
+                        "relative shrink-0 w-7 h-7 rounded-full border flex items-center justify-center transition-all duration-300",
+                        isOpen
+                          ? "bg-accent border-accent text-white rotate-45"
+                          : "border-border text-text-secondary group-hover:border-accent group-hover:text-accent",
                       )}
-                    />
+                    >
+                      <Plus className="w-3.5 h-3.5" weight="bold" />
+                    </span>
                   </button>
                   <div
                     className={cn(
-                      "overflow-hidden transition-[max-height,opacity,padding] duration-300 ease-out",
-                      isOpen ? "max-h-60 opacity-100" : "max-h-0 opacity-0",
+                      "grid transition-all duration-300 ease-out",
+                      isOpen
+                        ? "grid-rows-[1fr] opacity-100 pb-5 md:pb-6"
+                        : "grid-rows-[0fr] opacity-0",
                     )}
                   >
-                    <p className="px-5 pb-5 text-text-secondary leading-relaxed">
-                      {item.a}
-                    </p>
+                    <div className="overflow-hidden">
+                      <p className="text-text-secondary leading-relaxed pe-10 md:pe-12">
+                        {item.a}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </Reveal>
             );
           })}
         </div>
+
+        <Reveal delay={150}>
+          <p className="text-center text-sm text-text-secondary mt-10">
+            عندك سؤال آخر؟{" "}
+            <a
+              href="#"
+              className="font-bold text-accent hover:underline underline-offset-4"
+            >
+              تواصل معنا
+            </a>
+            .
+          </p>
+        </Reveal>
       </div>
     </section>
   );

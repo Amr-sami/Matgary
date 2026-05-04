@@ -81,7 +81,7 @@ interface FeatureCardProps {
 
 function FeatureCard({ eyebrow, title, body, children }: FeatureCardProps) {
   return (
-    <article className="group relative h-full bg-white border border-border rounded-2xl p-6 md:p-7 overflow-hidden transition-colors duration-300 hover:border-accent/40 flex flex-col">
+    <article className="relative h-full bg-white border border-border rounded-2xl p-6 md:p-7 overflow-hidden flex flex-col">
       <div className="space-y-2">
         <span className="text-[11px] font-bold text-accent uppercase tracking-[0.18em]">
           {eyebrow}

@@ -5,32 +5,32 @@ const COLUMNS = [
   {
     heading: "المنتج",
     links: [
-      { href: "#features", label: "المميزات" },
-      { href: "#how", label: "كيف يعمل" },
+      { href: "/welcome#features", label: "المميزات" },
+      { href: "/welcome#how", label: "كيف يعمل" },
       { href: "/signup", label: "ابدأ مجاناً" },
     ],
   },
   {
     heading: "الشركة",
     links: [
-      { href: "#", label: "من نحن" },
-      { href: "#", label: "تواصل معنا" },
-      { href: "#", label: "المدونة" },
+      { href: "/about", label: "من نحن" },
+      { href: "/contact", label: "تواصل معنا" },
+      { href: "/blog", label: "المدونة" },
     ],
   },
   {
     heading: "الدعم",
     links: [
-      { href: "#", label: "مركز المساعدة" },
-      { href: "#", label: "الأسئلة الشائعة" },
-      { href: "#", label: "حالة الخدمة" },
+      { href: "/help", label: "مركز المساعدة" },
+      { href: "/welcome#faq", label: "الأسئلة الشائعة" },
+      { href: "/status", label: "حالة الخدمة" },
     ],
   },
   {
     heading: "قانوني",
     links: [
-      { href: "#", label: "الشروط والأحكام" },
-      { href: "#", label: "سياسة الخصوصية" },
+      { href: "/terms", label: "الشروط والأحكام" },
+      { href: "/privacy", label: "سياسة الخصوصية" },
     ],
   },
 ];

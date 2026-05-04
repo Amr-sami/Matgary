@@ -8,6 +8,14 @@ const PUBLIC_PATHS = new Set<string>([
   "/login",
   "/signup",
   "/welcome",
+  // Marketing pages — linked from the public footer, no auth needed.
+  "/about",
+  "/contact",
+  "/blog",
+  "/help",
+  "/status",
+  "/terms",
+  "/privacy",
   // Live slug availability check is hit from the unauthed signup form.
   "/api/account/store-handle/check",
   // Visual preview of error/empty screens — handy on a phone, no auth needed.
