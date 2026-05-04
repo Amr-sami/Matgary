@@ -7,8 +7,11 @@ const { auth } = NextAuth(authConfig);
 const PUBLIC_PATHS = new Set<string>([
   "/login",
   "/signup",
+  "/welcome",
   // Live slug availability check is hit from the unauthed signup form.
   "/api/account/store-handle/check",
+  // Visual preview of error/empty screens — handy on a phone, no auth needed.
+  "/preview/errors",
 ]);
 const PUBLIC_PREFIXES = ["/api/auth", "/_next", "/favicon", "/fonts"];
 
@@ -35,8 +38,12 @@ export default auth((req) => {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    // Anonymous "/" → marketing landing, not the login wall.
+    if (pathname === "/") {
+      return NextResponse.redirect(new URL("/welcome", nextUrl));
+    }
     const loginUrl = new URL("/login", nextUrl);
-    if (pathname !== "/") loginUrl.searchParams.set("next", pathname);
+    loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);
   }
 

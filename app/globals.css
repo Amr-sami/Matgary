@@ -101,6 +101,7 @@ textarea {
   background: var(--text-secondary);
 }
 
+
 /* ─── Receipt Styles (hidden on screen) ─── */
 .print-receipt-container {
   display: none;

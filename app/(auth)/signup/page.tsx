@@ -108,7 +108,7 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="w-full bg-white rounded-2xl shadow-[0_20px_50px_-12px_rgba(0,0,0,0.18)] p-8">
+    <div className="w-full bg-white p-4 lg:p-8 lg:rounded-2xl lg:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.18)]">
       <div className="text-center mb-6">
         <h1 className="text-2xl font-bold text-text-primary">إنشاء حساب جديد</h1>
         <p className="text-sm text-text-secondary mt-1">

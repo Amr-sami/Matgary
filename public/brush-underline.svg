@@ -1,0 +1,26 @@
+<svg viewBox="0 0 280 28" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" aria-hidden>
+  <!-- soft brush "stain" — slightly irregular blob behind the stroke -->
+  <path
+    d="M8,17 C 45,9 95,19 145,13 C 185,8 225,16 272,13 C 268,21 235,25 195,22 C 145,18 95,24 45,22 C 22,21 10,20 8,17 Z"
+    fill="#1203E3"
+    fill-opacity="0.28"
+  />
+  <!-- main brush stroke on top — tapered look via stroke-linecap round -->
+  <path
+    d="M14,17 C 55,11 110,18 160,14 C 200,11 235,16 266,15"
+    stroke="#1203E3"
+    stroke-width="7"
+    stroke-linecap="round"
+    fill="none"
+    opacity="0.9"
+  />
+  <!-- secondary thin highlight stroke for marker texture -->
+  <path
+    d="M22,20 C 70,16 120,21 170,17 C 210,14 245,17 260,17"
+    stroke="#1203E3"
+    stroke-width="2.5"
+    stroke-linecap="round"
+    fill="none"
+    opacity="0.55"
+  />
+</svg>

@@ -15,16 +15,19 @@ import { Logo } from "@/components/brand/Logo";
  */
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="lg:h-screen min-h-screen relative bg-white overflow-hidden">
+    <div
+      className="lg:h-screen min-h-screen relative bg-white overflow-hidden"
+      style={{
+        backgroundImage: "url(/auth-pattern.svg)",
+        backgroundRepeat: "repeat",
+      }}
+    >
       <div className="lg:flex lg:h-screen">
         {/* ── FORM COLUMN — 60% desktop, full mobile ─────────── */}
-        <div className="relative w-full lg:w-3/5 lg:bg-white min-h-screen lg:min-h-0 lg:h-screen flex-shrink-0">
-          {/* Blue rectangle ONLY on mobile */}
-          <div className="absolute inset-x-0 top-0 h-[68vh] bg-accent lg:hidden" />
-
+        <div className="relative w-full lg:w-3/5 min-h-screen lg:min-h-0 lg:h-screen flex-shrink-0">
           <main className="relative h-full min-h-screen lg:min-h-0 lg:h-screen flex flex-col items-center justify-center py-8">
             <div className="w-full max-w-md mx-auto flex flex-col items-center px-4">
-              <div className="mb-6 text-white lg:text-accent">
+              <div className="mb-6 text-accent">
                 <Logo size="lg" />
               </div>
               {children}
