@@ -11,6 +11,7 @@ import {
   BarChart3,
   Wallet,
   Users,
+  UsersGroup,
   Settings,
   PanelRightClose,
   PanelRightOpen,
@@ -41,6 +42,7 @@ const secondaryItems: NavItem[] = [
   { href: "/add-product", label: "إضافة صنف", icon: PlusSquare, requires: "manage_inventory" },
   { href: "/returns", label: "المرتجعات", icon: RotateCcw, requires: "view_returns" },
   { href: "/insights", label: "إحصائيات", icon: BarChart3, requires: "view_insights" },
+  { href: "/team", label: "الموظفون", icon: UsersGroup, requires: "manage_team" },
   { href: "/settings", label: "الإعدادات", icon: Settings, requires: "view_settings" },
 ];
 

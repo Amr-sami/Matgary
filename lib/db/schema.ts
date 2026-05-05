@@ -432,6 +432,152 @@ export const expenses = pgTable(
   (t) => [index("expenses_tenant_date_idx").on(t.tenantId, t.date)],
 );
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Attendance & payroll (scoped) — RLS applied in a separate migration step
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const attendanceSettings = pgTable("attendance_settings", {
+  tenantId: uuid("tenant_id")
+    .primaryKey()
+    .references(() => tenants.id, { onDelete: "cascade" }),
+  /** Configured working hours per day. Anything beyond this in a single day counts as overtime. */
+  workHoursPerDay: text("work_hours_per_day").notNull().default("8"),
+  /** ISO weekday numbers (1=Mon … 7=Sun). Default {5,6} = Fri+Sat. */
+  weekendDays: integer("weekend_days").array().notNull().default(sql`'{5,6}'::int[]`),
+  /** Multiplier applied to hourly rate for overtime hours (e.g. 1.5). */
+  overtimeMultiplier: text("overtime_multiplier").notNull().default("1.0"),
+  /** Minutes of grace before a check-in counts as late. */
+  graceMinutesLate: integer("grace_minutes_late").notNull().default(0),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now()`),
+});
+
+export const storeLocations = pgTable(
+  "store_locations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    latitude: text("latitude").notNull(), // numeric(9,6) via migration tune
+    longitude: text("longitude").notNull(), // numeric(9,6) via migration tune
+    geofenceRadiusM: integer("geofence_radius_m").notNull().default(50),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [index("store_locations_tenant_idx").on(t.tenantId)],
+);
+
+export const attendanceEvents = pgTable(
+  "attendance_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    employeeId: uuid("employee_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** 'check_in' | 'check_out' */
+    type: text("type").notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    /** 'manual' | 'geofence' | 'qr' | 'manager_attest' */
+    source: text("source").notNull(),
+    latitude: text("latitude"),
+    longitude: text("longitude"),
+    accuracyM: integer("accuracy_m"),
+    /** Whoever inserted the row. Same as employeeId for self-records. */
+    recordedByUserId: uuid("recorded_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    note: text("note"),
+    /** Set true when an open check_in was followed by another check_in (forgot to check out). Manager must reconcile. */
+    requiresReview: boolean("requires_review").notNull().default(false),
+  },
+  (t) => [
+    index("attendance_tenant_employee_time_idx").on(
+      t.tenantId,
+      t.employeeId,
+      t.occurredAt,
+    ),
+    index("attendance_tenant_time_idx").on(t.tenantId, t.occurredAt),
+  ],
+);
+
+export const employeeCompensation = pgTable(
+  "employee_compensation",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    employeeId: uuid("employee_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** 'fixed' | 'hourly' | 'hybrid' */
+    payType: text("pay_type").notNull(),
+    baseSalaryMonthly: text("base_salary_monthly"), // numeric(12,2) via migration tune
+    hourlyRate: text("hourly_rate"), // numeric(12,2) via migration tune
+    /** Hours included in the base monthly salary (hybrid only). Beyond this counts as overtime. */
+    standardMonthlyHours: text("standard_monthly_hours"),
+    /** Date the row becomes effective. Lookups use the row whose effective_from ≤ shift date. */
+    effectiveFrom: timestamp("effective_from", { mode: "date", withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [
+    index("emp_comp_tenant_employee_effective_idx").on(
+      t.tenantId,
+      t.employeeId,
+      t.effectiveFrom,
+    ),
+  ],
+);
+
+export const payrollPeriods = pgTable(
+  "payroll_periods",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    employeeId: uuid("employee_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    periodStart: timestamp("period_start", { mode: "date", withTimezone: true }).notNull(),
+    periodEnd: timestamp("period_end", { mode: "date", withTimezone: true }).notNull(),
+    regularHours: text("regular_hours").notNull().default("0"),
+    overtimeHours: text("overtime_hours").notNull().default("0"),
+    grossAmount: text("gross_amount").notNull().default("0"),
+    adjustmentsAmount: text("adjustments_amount").notNull().default("0"),
+    adjustmentsNote: text("adjustments_note"),
+    /** 'draft' | 'finalized' */
+    status: text("status").notNull().default("draft"),
+    finalizedAt: timestamp("finalized_at", { withTimezone: true }),
+    finalizedByUserId: uuid("finalized_by_user_id").references(() => users.id, {
+      onDelete: "restrict",
+    }),
+  },
+  (t) => [
+    index("payroll_periods_tenant_employee_period_idx").on(
+      t.tenantId,
+      t.employeeId,
+      t.periodStart,
+    ),
+  ],
+);
+
 // Convenience type exports for the rest of the app
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -448,3 +594,8 @@ export type ProductAttributeValueRow = typeof productAttributeValues.$inferSelec
 export type SaleRow = typeof sales.$inferSelect;
 export type ReturnRow = typeof returns.$inferSelect;
 export type ExpenseRow = typeof expenses.$inferSelect;
+export type AttendanceSettingsRow = typeof attendanceSettings.$inferSelect;
+export type StoreLocationRow = typeof storeLocations.$inferSelect;
+export type AttendanceEventRow = typeof attendanceEvents.$inferSelect;
+export type EmployeeCompensationRow = typeof employeeCompensation.$inferSelect;
+export type PayrollPeriodRow = typeof payrollPeriods.$inferSelect;

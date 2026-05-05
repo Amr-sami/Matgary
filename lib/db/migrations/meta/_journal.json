@@ -57,6 +57,13 @@
       "when": 1777814928093,
       "tag": "0007_volatile_shaman",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1777814929000,
+      "tag": "0008_attendance_payroll",
+      "breakpoints": false
     }
   ]
 }

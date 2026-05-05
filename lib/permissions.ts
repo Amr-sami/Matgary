@@ -19,7 +19,9 @@ export type Permission =
   | "manage_expenses"
   | "manage_catalog" // categories / attributes / brands editor
   | "manage_whatsapp" // shop settings + WhatsApp creds
-  | "manage_team"; // owner-only in practice — invite / remove employees
+  | "manage_team" // owner-only in practice — invite / remove employees
+  // Attendance & payroll
+  | "attendance_self_manual"; // staff may record own check-in/out manually
 
 export const ALL_PERMISSIONS: Permission[] = [
   "view_dashboard",
@@ -38,6 +40,7 @@ export const ALL_PERMISSIONS: Permission[] = [
   "manage_catalog",
   "manage_whatsapp",
   "manage_team",
+  "attendance_self_manual",
 ];
 
 export const PERMISSION_LABELS: Record<Permission, string> = {
@@ -57,6 +60,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   manage_catalog: "إدارة الأقسام والبراندات",
   manage_whatsapp: "إعدادات المتجر و WhatsApp",
   manage_team: "إدارة الموظفين",
+  attendance_self_manual: "تسجيل الحضور يدوياً",
 };
 
 export interface PermissionGroup {
@@ -89,6 +93,10 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       "manage_catalog",
       "manage_whatsapp",
     ],
+  },
+  {
+    title: "الحضور والانصراف",
+    permissions: ["attendance_self_manual"],
   },
 ];
 

@@ -13,6 +13,7 @@ import {
   BarChart3,
   Wallet,
   Users,
+  UsersGroup,
   Settings,
   Menu,
   LogOut,
@@ -41,6 +42,7 @@ const moreItems: NavItem[] = [
   { href: "/expenses", label: "المصاريف", icon: Wallet, requires: "view_expenses" },
   { href: "/returns", label: "المرتجعات", icon: RotateCcw, requires: "view_returns" },
   { href: "/insights", label: "إحصائيات", icon: BarChart3, requires: "view_insights" },
+  { href: "/team", label: "الموظفون", icon: UsersGroup, requires: "manage_team" },
   { href: "/settings", label: "الإعدادات", icon: Settings, requires: "view_settings" },
 ];
 
@@ -111,7 +113,7 @@ export function MobileBottomNav() {
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           {visibleMore.map((item) => {
             const isActive = pathname === item.href;
             const Icon = item.icon;

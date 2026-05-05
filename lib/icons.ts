@@ -78,6 +78,7 @@ export {
   User,
   User as UserRound,
   Users,
+  UsersThree as UsersGroup,
   Wallet,
   Wrench,
   X,
