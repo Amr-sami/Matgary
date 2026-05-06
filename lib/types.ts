@@ -201,6 +201,8 @@ export interface ProductHistoryEvent {
   createdAt: Date;
 }
 
+export type RecurrencePeriod = "monthly" | "weekly";
+
 export interface Expense {
   id: string;
   title: string;
@@ -208,6 +210,12 @@ export interface Expense {
   category: ExpenseCategory;
   /** When set, this expense is treated as a payment to that supplier (debits supplier balance). */
   supplierId?: string | null;
+  /** True for the recurring template row that spawns child instances. */
+  isRecurring?: boolean;
+  recurrencePeriod?: RecurrencePeriod | null;
+  nextOccurrenceDate?: Date | null;
+  /** Set on auto-generated children; points back at the recurring template. */
+  parentExpenseId?: string | null;
   date: Date;
   note?: string;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Trash2, Calendar, Receipt } from "@/lib/icons";
+import { Trash2, RotateCcw, Receipt } from "@/lib/icons";
 import { deleteExpense } from "@/lib/api/expenses";
 import type { Expense } from "@/lib/types";
 import { formatPrice, formatDate } from "@/lib/utils";
@@ -47,7 +47,26 @@ export function ExpenseTable({ expenses }: ExpenseTableProps) {
                 </td>
                 <td className="py-4 px-6">
                   <div>
-                    <p className="font-bold text-text-primary">{expense.title}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-bold text-text-primary">{expense.title}</p>
+                      {expense.isRecurring && (
+                        <span
+                          className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-accent-light text-accent font-medium"
+                          title="مصروف متكرر — يتولّد تلقائياً"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                          {expense.recurrencePeriod === "weekly" ? "أسبوعي" : "شهري"}
+                        </span>
+                      )}
+                      {expense.parentExpenseId && (
+                        <span
+                          className="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-text-secondary"
+                          title="نسخة من مصروف متكرر"
+                        >
+                          مولّد تلقائياً
+                        </span>
+                      )}
+                    </div>
                     {expense.note && (
                       <p className="text-xs text-text-secondary mt-0.5">{expense.note}</p>
                     )}

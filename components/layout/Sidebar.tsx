@@ -15,6 +15,8 @@ import {
   Settings,
   Truck,
   Receipt,
+  ListChecks,
+  Calendar,
   PanelRightClose,
   PanelRightOpen,
 } from "@/lib/icons";
@@ -23,6 +25,8 @@ import { useSettings } from "@/components/settings-context";
 import { UserMenu } from "./UserMenu";
 import { useSession } from "next-auth/react";
 import { can, type Permission } from "@/lib/permissions";
+import { useUnreadTaskCount } from "@/hooks/useUnreadTaskCount";
+import { useLeaveUnread } from "@/hooks/useLeaveUnread";
 
 interface NavItem {
   href: string;
@@ -36,6 +40,7 @@ const primaryItems: NavItem[] = [
   { href: "/", label: "لوحة التحكم", icon: LayoutDashboard, requires: "view_dashboard" },
   { href: "/inventory", label: "المخزن", icon: Package, requires: "view_inventory" },
   { href: "/sales", label: "المبيعات", icon: ShoppingCart, requires: "view_sales" },
+  { href: "/tasks", label: "المهام", icon: ListChecks, requires: "view_dashboard" },
   { href: "/customers", label: "العملاء", icon: Users, requires: "view_customers" },
   { href: "/expenses", label: "المصاريف", icon: Wallet, requires: "view_expenses" },
 ];
@@ -44,6 +49,7 @@ const secondaryItems: NavItem[] = [
   { href: "/add-product", label: "إضافة صنف", icon: PlusSquare, requires: "manage_inventory" },
   { href: "/suppliers", label: "الموردين", icon: Truck, requires: "view_suppliers" },
   { href: "/purchases", label: "المشتريات", icon: Receipt, requires: "view_purchases" },
+  { href: "/leave", label: "الإجازات", icon: Calendar, requires: "request_leave" },
   { href: "/returns", label: "المرتجعات", icon: RotateCcw, requires: "view_returns" },
   { href: "/insights", label: "إحصائيات", icon: BarChart3, requires: "view_insights" },
   { href: "/team", label: "الموظفون", icon: UsersGroup, requires: "manage_team" },
@@ -62,14 +68,32 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const principal = session?.user
     ? { role: session.user.role, permissions: session.user.permissions }
     : null;
-  const visiblePrimary = primaryItems.filter((i) => can(principal, i.requires));
+  const visiblePrimary = primaryItems.filter((i) => {
+    // /tasks is reachable by every logged-in member (their assigned tasks).
+    if (i.href === "/tasks") return !!principal;
+    return can(principal, i.requires);
+  });
   const visibleSecondary = secondaryItems.filter((i) => can(principal, i.requires));
 
   const storeName = settings.shopName?.trim() || "متجري";
+  const { count: unreadTasks } = useUnreadTaskCount();
+  const { counts: leaveUnread } = useLeaveUnread();
+
+  const badgeFor = (href: string): number | null => {
+    if (href === "/tasks" && unreadTasks > 0) return unreadTasks;
+    if (href === "/leave") {
+      // Manager sees pending submissions, employee sees decisions on their
+      // own requests. Each user only ever has one of the two non-zero.
+      const total = leaveUnread.submitted + leaveUnread.decided;
+      return total > 0 ? total : null;
+    }
+    return null;
+  };
 
   const renderItem = (item: NavItem) => {
     const isActive = pathname === item.href;
     const Icon = item.icon;
+    const badge = badgeFor(item.href);
 
     return (
       <Link
@@ -91,7 +115,17 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             isActive ? "bg-accent opacity-100" : "bg-transparent opacity-0"
           )}
         />
-        <Icon className={cn("w-4 h-4 shrink-0", isActive && "text-accent")} />
+        <span className="relative shrink-0">
+          <Icon className={cn("w-4 h-4", isActive && "text-accent")} />
+          {badge !== null && collapsed && (
+            <span
+              aria-label={`${badge} عناصر جديدة`}
+              className="absolute -top-1.5 -end-1.5 min-w-[14px] h-[14px] rounded-full bg-danger text-white text-[9px] font-bold flex items-center justify-center px-0.5"
+            >
+              {badge > 9 ? "9+" : badge}
+            </span>
+          )}
+        </span>
         <span
           className={cn(
             "text-sm font-medium whitespace-nowrap transition-opacity duration-200",
@@ -100,6 +134,11 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         >
           {item.label}
         </span>
+        {badge !== null && !collapsed && (
+          <span className="ms-auto min-w-[20px] h-5 rounded-full bg-danger text-white text-[10px] font-bold flex items-center justify-center px-1.5">
+            {badge > 99 ? "99+" : badge}
+          </span>
+        )}
       </Link>
     );
   };
@@ -120,7 +159,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       <div
         className={cn(
           "mb-3 flex",
-          collapsed ? "justify-center px-0" : "px-4"
+          collapsed ? "justify-center px-0" : "px-4",
         )}
         title={collapsed ? storeName : undefined}
       >

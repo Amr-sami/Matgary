@@ -84,6 +84,11 @@ function rowToExpense(r: typeof expensesTable.$inferSelect): Expense {
     amount: Number(r.amount),
     category: r.category as ExpenseCategory,
     supplierId: r.supplierId ?? null,
+    isRecurring: r.isRecurring,
+    recurrencePeriod:
+      (r.recurrencePeriod as "monthly" | "weekly" | null) ?? null,
+    nextOccurrenceDate: r.nextOccurrenceDate ?? null,
+    parentExpenseId: r.parentExpenseId ?? null,
     date: r.date,
     note: r.note ?? undefined,
   };
@@ -164,6 +169,8 @@ export interface RecordSaleInput {
   customerName?: string;
   customerPhone?: string;
   paymentMethod?: PaymentMethod;
+  /** The cashier/owner who recorded this sale. Powers staff performance reports. */
+  recordedByUserId?: string;
 }
 
 export async function recordSale(
@@ -227,6 +234,7 @@ export async function recordSale(
         paymentMethod,
         isPaid: paymentMethod !== "deferred",
         paidAt: paymentMethod !== "deferred" ? new Date() : null,
+        recordedByUserId: input.recordedByUserId ?? null,
       })
       .returning({ id: sales.id });
 
@@ -263,6 +271,8 @@ export interface CartSaleOptions {
   customerName?: string;
   customerPhone?: string;
   paymentMethod?: PaymentMethod;
+  /** The cashier/owner who recorded this sale. Powers staff performance reports. */
+  recordedByUserId?: string;
 }
 
 export interface CartSaleResult {
@@ -396,6 +406,7 @@ export async function recordCartSale(
           paymentMethod,
           isPaid: paymentMethod !== "deferred",
           paidAt: paymentMethod !== "deferred" ? new Date() : null,
+          recordedByUserId: options.recordedByUserId ?? null,
         })
         .returning({ id: sales.id });
 
@@ -631,7 +642,82 @@ export async function recordReturn(
 // Expenses
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Spawn child instances for any recurring expense template whose
+ * next_occurrence_date has passed, then bump the template's next date forward.
+ * Designed to be called lazily from listExpenses — no cron required.
+ */
+async function materializeDueRecurringExpenses(tenantId: string): Promise<void> {
+  await withTenant(tenantId, async (tx) => {
+    const due = await tx
+      .select()
+      .from(expensesTable)
+      .where(
+        and(
+          eq(expensesTable.tenantId, tenantId),
+          eq(expensesTable.isRecurring, true),
+          // next_occurrence_date IS NOT NULL AND <= now()
+          sql`${expensesTable.nextOccurrenceDate} is not null`,
+          sql`${expensesTable.nextOccurrenceDate} <= now()`,
+        ),
+      );
+
+    for (const tpl of due) {
+      let occurrence = tpl.nextOccurrenceDate ?? new Date();
+      // Catch up: spawn one child per missed period until we're back in the future.
+      // Cap at 12 iterations defensively in case the template was dormant a long time.
+      for (let i = 0; i < 12 && occurrence <= new Date(); i += 1) {
+        await tx.insert(expensesTable).values({
+          tenantId,
+          title: tpl.title,
+          amount: tpl.amount,
+          category: tpl.category,
+          supplierId: tpl.supplierId,
+          date: occurrence,
+          note: tpl.note,
+          parentExpenseId: tpl.id,
+          // Children themselves are not recurring.
+          isRecurring: false,
+        });
+
+        // Optional: debit supplier balance for the child too.
+        if (tpl.supplierId) {
+          await tx.execute(sql`
+            update suppliers
+            set balance = (balance)::numeric - ${tpl.amount}::numeric,
+                updated_at = now()
+            where tenant_id = ${tenantId} and id = ${tpl.supplierId}
+          `);
+        }
+
+        // Advance.
+        const next = new Date(occurrence);
+        if (tpl.recurrencePeriod === "weekly") {
+          next.setDate(next.getDate() + 7);
+        } else {
+          // default monthly
+          next.setMonth(next.getMonth() + 1);
+        }
+        occurrence = next;
+      }
+
+      await tx
+        .update(expensesTable)
+        .set({ nextOccurrenceDate: occurrence })
+        .where(
+          and(
+            eq(expensesTable.tenantId, tenantId),
+            eq(expensesTable.id, tpl.id),
+          ),
+        );
+    }
+  });
+}
+
 export async function listExpenses(tenantId: string): Promise<Expense[]> {
+  // Lazy: catch up any due recurring instances before listing.
+  await materializeDueRecurringExpenses(tenantId);
+
   return withTenant(tenantId, async (tx) => {
     const rows = await tx
       .select()
@@ -647,6 +733,8 @@ export interface AddExpenseInput {
   amount: number;
   category: ExpenseCategory;
   supplierId?: string | null;
+  isRecurring?: boolean;
+  recurrencePeriod?: "monthly" | "weekly" | null;
   date?: Date;
   note?: string;
 }
@@ -656,6 +744,19 @@ export async function addExpense(
   input: AddExpenseInput,
 ): Promise<{ id: string }> {
   return withTenant(tenantId, async (tx) => {
+    const startDate = input.date ?? new Date();
+    // For a recurring template, the first occurrence is "now" (recorded as the
+    // parent), and the next_occurrence_date is one period after.
+    let nextOccurrenceDate: Date | null = null;
+    if (input.isRecurring && input.recurrencePeriod) {
+      nextOccurrenceDate = new Date(startDate);
+      if (input.recurrencePeriod === "weekly") {
+        nextOccurrenceDate.setDate(nextOccurrenceDate.getDate() + 7);
+      } else {
+        nextOccurrenceDate.setMonth(nextOccurrenceDate.getMonth() + 1);
+      }
+    }
+
     const [created] = await tx
       .insert(expensesTable)
       .values({
@@ -664,7 +765,12 @@ export async function addExpense(
         amount: String(input.amount),
         category: input.category,
         supplierId: input.supplierId ?? null,
-        date: input.date ?? new Date(),
+        isRecurring: !!input.isRecurring,
+        recurrencePeriod: input.isRecurring
+          ? input.recurrencePeriod ?? "monthly"
+          : null,
+        nextOccurrenceDate,
+        date: startDate,
         note: input.note ?? null,
       })
       .returning({ id: expensesTable.id });

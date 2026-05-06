@@ -396,12 +396,15 @@ export const sales = pgTable(
     paymentMethod: text("payment_method"), // 'cash' | 'instapay' | 'card' | 'deferred'
     isPaid: boolean("is_paid").notNull().default(true),
     paidAt: timestamp("paid_at", { withTimezone: true }),
+    /** The user (cashier or owner) who recorded this sale. Null on legacy rows. */
+    recordedByUserId: uuid("recorded_by_user_id"),
   },
   (t) => [
     index("sales_tenant_date_idx").on(t.tenantId, t.saleDate),
     index("sales_tenant_invoice_idx").on(t.tenantId, t.invoiceId),
     index("sales_tenant_phone_idx").on(t.tenantId, t.customerPhone),
     index("sales_tenant_product_idx").on(t.tenantId, t.productId),
+    index("sales_tenant_recorded_by_idx").on(t.tenantId, t.recordedByUserId),
   ],
 );
 
@@ -438,6 +441,14 @@ export const expenses = pgTable(
     category: text("category").notNull(), // global enum: rent | salaries | electricity | water | internet | supplier | other
     /** Optional supplier this expense pays. When set, the supplier's running balance is debited. */
     supplierId: uuid("supplier_id"),
+    /** When true, this expense is a recurring template; child instances spawn at next_occurrence_date. */
+    isRecurring: boolean("is_recurring").notNull().default(false),
+    /** 'monthly' | 'weekly' — only meaningful when is_recurring=true. */
+    recurrencePeriod: text("recurrence_period"),
+    /** Next time this template should spawn a child instance (null when not recurring or done). */
+    nextOccurrenceDate: timestamp("next_occurrence_date", { withTimezone: true }),
+    /** Set on auto-generated child instances; points back at the recurring template. */
+    parentExpenseId: uuid("parent_expense_id"),
     date: timestamp("date", { withTimezone: true })
       .notNull()
       .default(sql`now()`),
@@ -446,6 +457,7 @@ export const expenses = pgTable(
   (t) => [
     index("expenses_tenant_date_idx").on(t.tenantId, t.date),
     index("expenses_tenant_supplier_idx").on(t.tenantId, t.supplierId),
+    index("expenses_tenant_recurring_idx").on(t.tenantId, t.isRecurring, t.nextOccurrenceDate),
   ],
 );
 
@@ -696,6 +708,106 @@ export const payrollPeriods = pgTable(
       t.employeeId,
       t.periodStart,
     ),
+  ],
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tier 3 — tasks, leave requests, notifications (scoped) — RLS in migration
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const tasks = pgTable(
+  "tasks",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    /** The doer; null = unassigned (rare). */
+    assignedToUserId: uuid("assigned_to_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    /** Manager / owner who created the task. */
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    title: text("title").notNull(),
+    description: text("description"),
+    /** 'open' | 'in_progress' | 'done' | 'cancelled' */
+    status: text("status").notNull().default("open"),
+    /** 'low' | 'normal' | 'high' */
+    priority: text("priority").notNull().default("normal"),
+    dueDate: timestamp("due_date", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    /** Set when the assignee opens the tab; null = unread. Reset on manager edits. */
+    assigneeSeenAt: timestamp("assignee_seen_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [
+    index("tasks_tenant_assignee_idx").on(t.tenantId, t.assignedToUserId),
+    index("tasks_tenant_status_idx").on(t.tenantId, t.status),
+  ],
+);
+
+export const leaveRequests = pgTable(
+  "leave_requests",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    startDate: timestamp("start_date", { withTimezone: true }).notNull(),
+    endDate: timestamp("end_date", { withTimezone: true }).notNull(),
+    reason: text("reason"),
+    /** 'pending' | 'approved' | 'rejected' */
+    status: text("status").notNull().default("pending"),
+    decidedByUserId: uuid("decided_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    decisionNote: text("decision_note"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [
+    index("leave_requests_tenant_user_idx").on(t.tenantId, t.userId),
+    index("leave_requests_tenant_status_idx").on(t.tenantId, t.status),
+  ],
+);
+
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    /** Recipient. */
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** Loose enum: 'low_stock' | 'task_assigned' | 'task_done' | 'leave_submitted' | 'leave_decided' | ... */
+    kind: text("kind").notNull(),
+    title: text("title").notNull(),
+    body: text("body"),
+    /** App-relative URL to drill into. */
+    link: text("link"),
+    isRead: boolean("is_read").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [
+    index("notifications_tenant_user_idx").on(t.tenantId, t.userId, t.createdAt),
+    index("notifications_tenant_user_unread_idx").on(t.tenantId, t.userId, t.isRead),
   ],
 );
 

@@ -15,6 +15,8 @@ const schema = z.object({
   amount: z.number().min(0),
   category: z.enum(["rent", "salaries", "electricity", "water", "internet", "supplier", "other"]),
   supplierId: z.string().uuid().nullable().optional(),
+  isRecurring: z.boolean().optional(),
+  recurrencePeriod: z.enum(["monthly", "weekly"]).nullable().optional(),
   date: z.string().datetime().optional(),
   note: z.string().max(500).optional(),
 });
@@ -30,6 +32,8 @@ export async function POST(req: NextRequest) {
   const result = await addExpense(r.ctx.tenantId, {
     ...parsed.data,
     supplierId: parsed.data.supplierId ?? null,
+    isRecurring: parsed.data.isRecurring ?? false,
+    recurrencePeriod: parsed.data.recurrencePeriod ?? null,
     date: parsed.data.date ? new Date(parsed.data.date) : undefined,
   });
   return NextResponse.json(result, { status: 201 });

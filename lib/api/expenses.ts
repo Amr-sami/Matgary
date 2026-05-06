@@ -31,6 +31,8 @@ export async function addExpense(input: {
   amount: number;
   category: ExpenseCategory;
   supplierId?: string | null;
+  isRecurring?: boolean;
+  recurrencePeriod?: "monthly" | "weekly" | null;
   date?: Date;
   note?: string;
 }): Promise<string> {

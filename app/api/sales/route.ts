@@ -36,6 +36,7 @@ export async function POST(req: NextRequest) {
     const result = await recordSale(r.ctx.tenantId, {
       ...parsed.data,
       customDate: parsed.data.customDate ? new Date(parsed.data.customDate) : undefined,
+      recordedByUserId: r.ctx.userId,
     });
     return NextResponse.json(result, { status: 201 });
   } catch (err) {

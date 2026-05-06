@@ -25,7 +25,12 @@ export type Permission =
   | "manage_whatsapp" // shop settings + WhatsApp creds
   | "manage_team" // owner-only in practice — invite / remove employees
   // Attendance & payroll
-  | "attendance_self_manual"; // staff may record own check-in/out manually
+  | "attendance_self_manual" // staff may record own check-in/out manually
+  // Tasks (every staffer can see their own; manage allows assigning to others)
+  | "manage_tasks"
+  // Leave requests
+  | "request_leave" // staff submit own
+  | "manage_leave"; // approve / reject everyone's
 
 export const ALL_PERMISSIONS: Permission[] = [
   "view_dashboard",
@@ -49,6 +54,9 @@ export const ALL_PERMISSIONS: Permission[] = [
   "manage_whatsapp",
   "manage_team",
   "attendance_self_manual",
+  "manage_tasks",
+  "request_leave",
+  "manage_leave",
 ];
 
 export const PERMISSION_LABELS: Record<Permission, string> = {
@@ -73,6 +81,9 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   manage_whatsapp: "إعدادات المتجر و WhatsApp",
   manage_team: "إدارة الموظفين",
   attendance_self_manual: "تسجيل الحضور يدوياً",
+  manage_tasks: "إنشاء وتوزيع المهام",
+  request_leave: "تقديم طلبات إجازة",
+  manage_leave: "الموافقة على طلبات الإجازة",
 };
 
 export interface PermissionGroup {
@@ -113,19 +124,25 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     permissions: ["manage_suppliers", "manage_purchases"],
   },
   {
+    title: "المهام والإجازات",
+    permissions: ["manage_tasks", "request_leave", "manage_leave"],
+  },
+  {
     title: "الحضور والانصراف",
     permissions: ["attendance_self_manual"],
   },
 ];
 
 // Sensible default for a new "cashier" employee — can use the POS, see
-// inventory, but cannot edit anything structural.
+// inventory, but cannot edit anything structural. Every employee gets the
+// ability to submit leave requests by default.
 export const DEFAULT_STAFF_PERMISSIONS: Permission[] = [
   "view_dashboard",
   "view_inventory",
   "view_sales",
   "view_customers",
   "record_sales",
+  "request_leave",
 ];
 
 export interface PermissionPrincipal {

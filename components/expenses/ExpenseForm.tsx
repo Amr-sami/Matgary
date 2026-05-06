@@ -18,6 +18,8 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
   const [category, setCategory] = useState<ExpenseCategory>("other");
   const [supplierId, setSupplierId] = useState<string | null>(null);
   const [note, setNote] = useState("");
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrencePeriod, setRecurrencePeriod] = useState<"monthly" | "weekly">("monthly");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -31,12 +33,16 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
         amount: Number(amount),
         category,
         supplierId: supplierId,
+        isRecurring,
+        recurrencePeriod: isRecurring ? recurrencePeriod : null,
         note: note || undefined,
       });
       setTitle("");
       setAmount("");
       setCategory("other");
       setSupplierId(null);
+      setIsRecurring(false);
+      setRecurrencePeriod("monthly");
       setNote("");
       onSuccess();
     } catch (error: any) {
@@ -98,6 +104,52 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
             label="المورد *"
           />
         )}
+
+        {/* Recurring toggle */}
+        <div className="rounded-lg border border-border bg-bg-main/40 p-3 space-y-2">
+          <label className="flex items-start gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              className="mt-0.5 accent-accent w-4 h-4"
+              checked={isRecurring}
+              onChange={(e) => setIsRecurring(e.target.checked)}
+            />
+            <div>
+              <span className="font-medium text-text-primary">
+                تكرار تلقائي
+              </span>
+              <p className="text-xs text-text-secondary mt-0.5">
+                ستظهر النسخة التالية تلقائياً في موعدها بدون إدخال يدوي.
+              </p>
+            </div>
+          </label>
+          {isRecurring && (
+            <div className="flex gap-2 ps-6">
+              <button
+                type="button"
+                onClick={() => setRecurrencePeriod("monthly")}
+                className={`flex-1 px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                  recurrencePeriod === "monthly"
+                    ? "bg-accent text-white border-accent"
+                    : "bg-white border-border text-text-secondary hover:border-accent"
+                }`}
+              >
+                شهري
+              </button>
+              <button
+                type="button"
+                onClick={() => setRecurrencePeriod("weekly")}
+                className={`flex-1 px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                  recurrencePeriod === "weekly"
+                    ? "bg-accent text-white border-accent"
+                    : "bg-white border-border text-text-secondary hover:border-accent"
+                }`}
+              >
+                أسبوعي
+              </button>
+            </div>
+          )}
+        </div>
 
         <Input
           label="ملاحظة (اختياري)"

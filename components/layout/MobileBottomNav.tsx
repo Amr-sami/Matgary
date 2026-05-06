@@ -17,6 +17,8 @@ import {
   Settings,
   Truck,
   Receipt,
+  ListChecks,
+  Calendar,
   Menu,
   LogOut,
   X,
@@ -24,6 +26,8 @@ import {
 import { cn } from "@/lib/utils";
 import { logoutAction } from "@/app/(auth)/actions";
 import { can, type Permission } from "@/lib/permissions";
+import { useUnreadTaskCount } from "@/hooks/useUnreadTaskCount";
+import { useLeaveUnread } from "@/hooks/useLeaveUnread";
 
 interface NavItem {
   href: string;
@@ -36,14 +40,16 @@ const primaryItems: NavItem[] = [
   { href: "/", label: "لوحة", icon: LayoutDashboard, requires: "view_dashboard" },
   { href: "/inventory", label: "المخزن", icon: Package, requires: "view_inventory" },
   { href: "/sales", label: "المبيعات", icon: ShoppingCart, requires: "view_sales" },
-  { href: "/add-product", label: "إضافة", icon: PlusSquare, requires: "manage_inventory" },
+  { href: "/tasks", label: "المهام", icon: ListChecks, requires: "view_dashboard" },
   { href: "/customers", label: "العملاء", icon: Users, requires: "view_customers" },
 ];
 
 const moreItems: NavItem[] = [
+  { href: "/add-product", label: "إضافة صنف", icon: PlusSquare, requires: "manage_inventory" },
   { href: "/expenses", label: "المصاريف", icon: Wallet, requires: "view_expenses" },
   { href: "/suppliers", label: "الموردين", icon: Truck, requires: "view_suppliers" },
   { href: "/purchases", label: "المشتريات", icon: Receipt, requires: "view_purchases" },
+  { href: "/leave", label: "الإجازات", icon: Calendar, requires: "request_leave" },
   { href: "/returns", label: "المرتجعات", icon: RotateCcw, requires: "view_returns" },
   { href: "/insights", label: "إحصائيات", icon: BarChart3, requires: "view_insights" },
   { href: "/team", label: "الموظفون", icon: UsersGroup, requires: "manage_team" },
@@ -57,10 +63,25 @@ export function MobileBottomNav() {
   const principal = session?.user
     ? { role: session.user.role, permissions: session.user.permissions }
     : null;
-  const visiblePrimary = primaryItems.filter((i) => can(principal, i.requires));
+  const visiblePrimary = primaryItems.filter((i) => {
+    // /tasks is reachable by every logged-in member.
+    if (i.href === "/tasks") return !!principal;
+    return can(principal, i.requires);
+  });
   const visibleMore = moreItems.filter((i) => can(principal, i.requires));
   const [isSigningOut, startSignOut] = useTransition();
   const email = session?.user?.email ?? "";
+  const { count: unreadTasks } = useUnreadTaskCount();
+  const { counts: leaveUnread } = useLeaveUnread();
+
+  const badgeFor = (href: string): number | null => {
+    if (href === "/tasks" && unreadTasks > 0) return unreadTasks;
+    if (href === "/leave") {
+      const total = leaveUnread.submitted + leaveUnread.decided;
+      return total > 0 ? total : null;
+    }
+    return null;
+  };
 
   const handleSignOut = () => {
     startSignOut(async () => {
@@ -121,6 +142,7 @@ export function MobileBottomNav() {
           {visibleMore.map((item) => {
             const isActive = pathname === item.href;
             const Icon = item.icon;
+            const badge = badgeFor(item.href);
             return (
               <Link
                 key={item.href}
@@ -132,7 +154,14 @@ export function MobileBottomNav() {
                     : "text-text-secondary hover:bg-bg-main"
                 )}
               >
-                <Icon className="w-5 h-5" />
+                <span className="relative">
+                  <Icon className="w-5 h-5" />
+                  {badge !== null && (
+                    <span className="absolute -top-1.5 -end-2 min-w-[16px] h-[16px] rounded-full bg-danger text-white text-[9px] font-bold flex items-center justify-center px-1">
+                      {badge > 9 ? "9+" : badge}
+                    </span>
+                  )}
+                </span>
                 <span className="text-[11px] font-medium">{item.label}</span>
               </Link>
             );
@@ -160,6 +189,7 @@ export function MobileBottomNav() {
         {visiblePrimary.map((item) => {
           const isActive = pathname === item.href;
           const Icon = item.icon;
+          const badge = badgeFor(item.href);
           return (
             <Link
               key={item.href}
@@ -169,7 +199,17 @@ export function MobileBottomNav() {
                 isActive ? "text-accent" : "text-text-secondary"
               )}
             >
-              <Icon className="w-5 h-5" />
+              <span className="relative">
+                <Icon className="w-5 h-5" />
+                {badge !== null && (
+                  <span
+                    aria-label={`${badge} عناصر جديدة`}
+                    className="absolute -top-1.5 -end-2 min-w-[16px] h-[16px] rounded-full bg-danger text-white text-[9px] font-bold flex items-center justify-center px-1"
+                  >
+                    {badge > 9 ? "9+" : badge}
+                  </span>
+                )}
+              </span>
               <span className="text-[10px] leading-tight whitespace-nowrap">{item.label}</span>
               <span
                 aria-hidden

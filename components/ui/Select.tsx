@@ -28,8 +28,8 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
           ref={ref}
           dir="rtl"
           className={cn(
-            "w-full px-4 py-2.5 rounded-lg border border-border bg-white text-text-primary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-colors appearance-none cursor-pointer",
-            error && "border-danger focus:ring-danger",
+            "w-full px-4 py-2.5 rounded-lg border border-border bg-white text-text-primary focus:outline-none focus:border-accent transition-colors appearance-none cursor-pointer",
+            error && "border-danger",
             className
           )}
           {...props}

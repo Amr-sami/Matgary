@@ -36,6 +36,7 @@ export {
   Key as KeyRound,
   GridFour as LayoutDashboard,
   SquaresFour as LayoutGrid,
+  ListChecks,
   CircleNotch as Loader2,
   SignOut as LogOut,
   MapPin,

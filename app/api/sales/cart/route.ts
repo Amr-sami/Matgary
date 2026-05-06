@@ -40,6 +40,7 @@ export async function POST(req: NextRequest) {
       customDate: parsed.data.options?.customDate
         ? new Date(parsed.data.options.customDate)
         : undefined,
+      recordedByUserId: r.ctx.userId,
     });
     return NextResponse.json(result, { status: 201 });
   } catch (err) {
