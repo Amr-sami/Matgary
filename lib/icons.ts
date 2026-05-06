@@ -31,6 +31,7 @@ export {
   Eye,
   EyeSlash as EyeOff,
   ClockCounterClockwise as History,
+  IdentificationCard,
   Info,
   Key as KeyRound,
   GridFour as LayoutDashboard,

@@ -8,6 +8,7 @@ import {
   products,
   productAttributeValues,
   productHistory,
+  suppliers,
 } from "@/lib/db/schema";
 import type {
   CategoryDescriptor,
@@ -136,6 +137,7 @@ function rowToProduct(
     sku: p.sku ?? undefined,
     tags: p.tags ?? [],
     supplier: p.supplier ?? undefined,
+    supplierId: p.supplierId ?? null,
     location: p.location ?? undefined,
     createdAt: p.createdAt,
     updatedAt: p.updatedAt,
@@ -173,7 +175,31 @@ export async function listProducts(tenantId: string): Promise<Product[]> {
       for (const a of attrs) attrKeysById.set(a.id, a.key);
     }
 
-    return ps.map((p) => rowToProduct(p, pavs, attrKeysById));
+    // Resolve linked supplier names so the legacy `supplier` text field stays
+    // populated for clients that filter/group on it.
+    const supplierIds = Array.from(
+      new Set(ps.map((p) => p.supplierId).filter((v): v is string => !!v)),
+    );
+    const supplierNamesById = new Map<string, string>();
+    if (supplierIds.length > 0) {
+      const rows = await tx
+        .select({ id: suppliers.id, name: suppliers.name })
+        .from(suppliers)
+        .where(
+          and(eq(suppliers.tenantId, tenantId), inArray(suppliers.id, supplierIds)),
+        );
+      for (const r of rows) supplierNamesById.set(r.id, r.name);
+    }
+
+    return ps.map((p) => {
+      const product = rowToProduct(p, pavs, attrKeysById);
+      // Linked supplier name takes precedence over the legacy free-text field.
+      if (p.supplierId) {
+        const linked = supplierNamesById.get(p.supplierId);
+        if (linked) product.supplier = linked;
+      }
+      return product;
+    });
   });
 }
 
@@ -188,6 +214,7 @@ export interface AddProductInput {
   sku?: string;
   tags?: string[];
   supplier?: string;
+  supplierId?: string | null;
   location?: string;
   /** attribute_value_id list — one per category attribute. */
   attributeValueIds?: string[];
@@ -242,6 +269,7 @@ export async function addProduct(
         sku: input.sku ?? null,
         tags: input.tags ?? [],
         supplier: input.supplier ?? null,
+        supplierId: input.supplierId ?? null,
         location: input.location ?? null,
       })
       .returning({ id: products.id });
@@ -289,6 +317,7 @@ export interface UpdateProductInput {
   sku?: string | null;
   tags?: string[];
   supplier?: string | null;
+  supplierId?: string | null;
   location?: string | null;
 }
 
@@ -310,6 +339,7 @@ export async function updateProduct(
     if (patch.sku !== undefined) set.sku = patch.sku;
     if (patch.tags !== undefined) set.tags = patch.tags;
     if (patch.supplier !== undefined) set.supplier = patch.supplier;
+    if (patch.supplierId !== undefined) set.supplierId = patch.supplierId;
     if (patch.location !== undefined) set.location = patch.location;
 
     const [before] = await tx

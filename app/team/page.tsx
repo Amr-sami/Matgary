@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { UsersGroup } from "@/lib/icons";
 import { AppShell } from "@/components/layout/AppShell";
 import { TeamEditor } from "@/components/settings/TeamEditor";
 import { CompensationEditor } from "@/components/team/CompensationEditor";
@@ -19,13 +20,31 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "settings", label: "إعدادات الحضور" },
 ];
 
+const TAB_DESCRIPTIONS: Record<TabKey, string> = {
+  team: "أضف موظفين، حدّد صلاحياتهم، وأدر بياناتهم وصورهم.",
+  attendance: "تابع تسجيل دخول وخروج الموظفين خلال اليوم.",
+  payroll: "إدارة الرواتب الثابتة، المعدلات الساعية، والاستحقاقات.",
+  settings: "ساعات العمل، أيام الإجازة، نسبة الأوفر، ومواقع المتجر.",
+};
+
 export default function TeamPage() {
   const [toast, setToast] = useState<ToastState>(null);
   const [tab, setTab] = useState<TabKey>("team");
 
   return (
     <AppShell title="الموظفون">
-      <div className="max-w-3xl mx-auto space-y-4">
+      <div className="max-w-5xl mx-auto space-y-6">
+        {/* Page header */}
+        <header className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-xl bg-accent-light text-accent flex items-center justify-center shrink-0">
+            <UsersGroup className="w-6 h-6" />
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold text-text-primary leading-tight">الفريق</h1>
+            <p className="text-sm text-text-secondary mt-0.5">{TAB_DESCRIPTIONS[tab]}</p>
+          </div>
+        </header>
+
         <Tabs items={TABS} active={tab} onChange={setTab} />
 
         {tab === "team" && <TeamEditor onToast={setToast} />}

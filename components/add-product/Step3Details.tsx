@@ -3,6 +3,7 @@
 import { Input } from "../ui/Input";
 import { Button } from "../ui/Button";
 import { Select } from "../ui/Select";
+import { SupplierPicker } from "../suppliers/SupplierPicker";
 import type { BrandDescriptor } from "@/lib/types";
 
 interface Step3DetailsProps {
@@ -18,9 +19,10 @@ interface Step3DetailsProps {
     sku: string;
     tags: string;
     supplier: string;
+    supplierId: string | null;
     location: string;
   };
-  onChange: (field: string, value: string | number) => void;
+  onChange: (field: string, value: string | number | null) => void;
   onSubmit: () => void;
   loading: boolean;
 }
@@ -128,11 +130,9 @@ export function Step3Details({
         placeholder="SKU أو باركود"
       />
 
-      <Input
-        label="الموردون (اختياري)"
-        value={form.supplier}
-        onChange={(e) => onChange("supplier", e.target.value)}
-        placeholder="اسم المورد"
+      <SupplierPicker
+        value={form.supplierId}
+        onChange={(id) => onChange("supplierId", id)}
       />
 
       <Input

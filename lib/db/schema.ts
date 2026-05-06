@@ -99,6 +99,15 @@ export const tenantMembers = pgTable(
     permissions: text("permissions").array().notNull().default(sql`'{}'::text[]`),
     /** Display name for sub-accounts (e.g. "Ahmed"). For owner this duplicates users.name. */
     displayName: text("display_name"),
+    /** Contact phone (free-form, normalized at the form level). */
+    phone: text("phone"),
+    /** Egyptian national ID (or other government ID). */
+    nationalId: text("national_id"),
+    /** Free-form address. */
+    address: text("address"),
+    /** Relative path under uploads/ (e.g. "<tenantId>/<uuid>.jpg") — served via /api/uploads/team. */
+    profilePhotoPath: text("profile_photo_path"),
+    idPhotoPath: text("id_photo_path"),
     joinedAt: timestamp("joined_at", { withTimezone: true })
       .notNull()
       .default(sql`now()`),
@@ -257,6 +266,8 @@ export const products = pgTable(
     sku: text("sku"),
     tags: text("tags").array().notNull().default(sql`'{}'::text[]`),
     supplier: text("supplier"),
+    /** Linked supplier record. Coexists with the legacy `supplier` text column. */
+    supplierId: uuid("supplier_id"),
     location: text("location"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -269,6 +280,7 @@ export const products = pgTable(
     index("products_tenant_created_idx").on(t.tenantId, t.createdAt),
     index("products_tenant_category_idx").on(t.tenantId, t.categoryId),
     index("products_tenant_sku_idx").on(t.tenantId, t.sku),
+    index("products_tenant_supplier_idx").on(t.tenantId, t.supplierId),
   ],
 );
 
@@ -423,14 +435,123 @@ export const expenses = pgTable(
       .references(() => tenants.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
     amount: text("amount").notNull(), // numeric via migration tune
-    category: text("category").notNull(), // global enum: rent | salaries | electricity | water | internet | other
+    category: text("category").notNull(), // global enum: rent | salaries | electricity | water | internet | supplier | other
+    /** Optional supplier this expense pays. When set, the supplier's running balance is debited. */
+    supplierId: uuid("supplier_id"),
     date: timestamp("date", { withTimezone: true })
       .notNull()
       .default(sql`now()`),
     note: text("note"),
   },
-  (t) => [index("expenses_tenant_date_idx").on(t.tenantId, t.date)],
+  (t) => [
+    index("expenses_tenant_date_idx").on(t.tenantId, t.date),
+    index("expenses_tenant_supplier_idx").on(t.tenantId, t.supplierId),
+  ],
 );
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Suppliers & Purchase Orders (scoped) — RLS applied in a separate migration step
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const suppliers = pgTable(
+  "suppliers",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    phone: text("phone"),
+    email: text("email"),
+    address: text("address"),
+    notes: text("notes"),
+    /** Running amount owed to this supplier (POs received minus payments). Stored as numeric in SQL. */
+    balance: text("balance").notNull().default("0"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [index("suppliers_tenant_idx").on(t.tenantId)],
+);
+
+export const purchaseOrders = pgTable(
+  "purchase_orders",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    supplierId: uuid("supplier_id")
+      .notNull()
+      .references(() => suppliers.id, { onDelete: "restrict" }),
+    /** 'draft' | 'received' | 'cancelled'. Receiving bumps stock and supplier balance atomically. */
+    status: text("status").notNull().default("draft"),
+    orderDate: timestamp("order_date", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    receivedDate: timestamp("received_date", { withTimezone: true }),
+    notes: text("notes"),
+    total: text("total").notNull().default("0"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [
+    index("purchase_orders_tenant_supplier_idx").on(t.tenantId, t.supplierId),
+    index("purchase_orders_tenant_date_idx").on(t.tenantId, t.orderDate),
+  ],
+);
+
+export const purchaseOrderItems = pgTable(
+  "purchase_order_items",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    purchaseOrderId: uuid("purchase_order_id")
+      .notNull()
+      .references(() => purchaseOrders.id, { onDelete: "cascade" }),
+    /** Null = ad-hoc item not tied to an existing product (won't bump stock on receive). */
+    productId: uuid("product_id").references(() => products.id, { onDelete: "set null" }),
+    productName: text("product_name").notNull(),
+    quantity: integer("quantity").notNull(),
+    unitCost: text("unit_cost").notNull(),
+    lineTotal: text("line_total").notNull(),
+  },
+  (t) => [
+    index("po_items_tenant_po_idx").on(t.tenantId, t.purchaseOrderId),
+  ],
+);
+
+export const suppliersRelations = relations(suppliers, ({ many }) => ({
+  purchaseOrders: many(purchaseOrders),
+}));
+
+export const purchaseOrdersRelations = relations(purchaseOrders, ({ many, one }) => ({
+  items: many(purchaseOrderItems),
+  supplier: one(suppliers, {
+    fields: [purchaseOrders.supplierId],
+    references: [suppliers.id],
+  }),
+}));
+
+export const purchaseOrderItemsRelations = relations(purchaseOrderItems, ({ one }) => ({
+  purchaseOrder: one(purchaseOrders, {
+    fields: [purchaseOrderItems.purchaseOrderId],
+    references: [purchaseOrders.id],
+  }),
+  product: one(products, {
+    fields: [purchaseOrderItems.productId],
+    references: [products.id],
+  }),
+}));
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Attendance & payroll (scoped) — RLS applied in a separate migration step

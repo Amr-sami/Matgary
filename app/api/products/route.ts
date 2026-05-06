@@ -21,6 +21,7 @@ const createSchema = z.object({
   sku: z.string().max(80).optional(),
   tags: z.array(z.string().max(40)).optional(),
   supplier: z.string().max(120).optional(),
+  supplierId: z.string().uuid().nullable().optional(),
   location: z.string().max(120).optional(),
   attributeValueIds: z.array(z.string().uuid()).optional(),
 });

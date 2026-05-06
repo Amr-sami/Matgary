@@ -23,6 +23,7 @@ const EMPTY_FORM = {
   sku: "",
   tags: "",
   supplier: "",
+  supplierId: null as string | null,
   location: "",
 };
 
@@ -46,7 +47,7 @@ export default function AddProductPage() {
     setAttrValues({});
   }, [categoryId]);
 
-  const handleFormChange = (field: string, value: string | number) => {
+  const handleFormChange = (field: string, value: string | number | null) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -105,6 +106,7 @@ export default function AddProductPage() {
         lowStockThreshold: form.lowStockThreshold,
         sku: form.sku.trim() || undefined,
         supplier: form.supplier.trim() || undefined,
+        supplierId: form.supplierId || undefined,
         location: form.location.trim() || undefined,
         tags: tags.length > 0 ? tags : undefined,
         attributeValueIds: Object.values(attrValues),

@@ -11,6 +11,8 @@ export type Permission =
   | "view_returns"
   | "view_insights"
   | "view_settings"
+  | "view_suppliers"
+  | "view_purchases"
   // Action capabilities
   | "manage_inventory" // add / edit / delete products + adjust stock
   | "record_sales" // create new sales (POS flow)
@@ -18,6 +20,8 @@ export type Permission =
   | "manage_returns"
   | "manage_expenses"
   | "manage_catalog" // categories / attributes / brands editor
+  | "manage_suppliers" // create/edit/delete suppliers
+  | "manage_purchases" // create/receive/cancel purchase orders
   | "manage_whatsapp" // shop settings + WhatsApp creds
   | "manage_team" // owner-only in practice — invite / remove employees
   // Attendance & payroll
@@ -32,12 +36,16 @@ export const ALL_PERMISSIONS: Permission[] = [
   "view_returns",
   "view_insights",
   "view_settings",
+  "view_suppliers",
+  "view_purchases",
   "manage_inventory",
   "record_sales",
   "modify_sales",
   "manage_returns",
   "manage_expenses",
   "manage_catalog",
+  "manage_suppliers",
+  "manage_purchases",
   "manage_whatsapp",
   "manage_team",
   "attendance_self_manual",
@@ -52,12 +60,16 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   view_returns: "المرتجعات",
   view_insights: "إحصائيات",
   view_settings: "الإعدادات",
+  view_suppliers: "الموردين",
+  view_purchases: "المشتريات",
   manage_inventory: "إدارة المنتجات (إضافة / تعديل / حذف)",
   record_sales: "تسجيل المبيعات",
   modify_sales: "تعديل / إلغاء فاتورة",
   manage_returns: "تسجيل المرتجعات",
   manage_expenses: "إدارة المصاريف",
   manage_catalog: "إدارة الأقسام والبراندات",
+  manage_suppliers: "إدارة الموردين",
+  manage_purchases: "إدارة المشتريات (إنشاء / استلام)",
   manage_whatsapp: "إعدادات المتجر و WhatsApp",
   manage_team: "إدارة الموظفين",
   attendance_self_manual: "تسجيل الحضور يدوياً",
@@ -80,6 +92,8 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       "view_returns",
       "view_insights",
       "view_settings",
+      "view_suppliers",
+      "view_purchases",
     ],
   },
   {
@@ -93,6 +107,10 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       "manage_catalog",
       "manage_whatsapp",
     ],
+  },
+  {
+    title: "الموردين والمشتريات",
+    permissions: ["manage_suppliers", "manage_purchases"],
   },
   {
     title: "الحضور والانصراف",

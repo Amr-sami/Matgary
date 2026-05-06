@@ -13,7 +13,8 @@ export async function GET() {
 const schema = z.object({
   title: z.string().min(1).max(200),
   amount: z.number().min(0),
-  category: z.enum(["rent", "salaries", "electricity", "water", "internet", "other"]),
+  category: z.enum(["rent", "salaries", "electricity", "water", "internet", "supplier", "other"]),
+  supplierId: z.string().uuid().nullable().optional(),
   date: z.string().datetime().optional(),
   note: z.string().max(500).optional(),
 });
@@ -28,6 +29,7 @@ export async function POST(req: NextRequest) {
   }
   const result = await addExpense(r.ctx.tenantId, {
     ...parsed.data,
+    supplierId: parsed.data.supplierId ?? null,
     date: parsed.data.date ? new Date(parsed.data.date) : undefined,
   });
   return NextResponse.json(result, { status: 201 });

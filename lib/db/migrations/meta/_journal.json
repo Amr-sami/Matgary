@@ -64,6 +64,20 @@
       "when": 1777814929000,
       "tag": "0008_attendance_payroll",
       "breakpoints": false
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1777814930000,
+      "tag": "0009_suppliers_and_purchases",
+      "breakpoints": false
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1777814931000,
+      "tag": "0010_employee_details",
+      "breakpoints": false
     }
   ]
 }

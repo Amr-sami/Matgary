@@ -22,6 +22,11 @@ const createSchema = z.object({
   permissions: z
     .array(z.enum(ALL_PERMISSIONS as [Permission, ...Permission[]]))
     .default([]),
+  phone: z.string().max(40).nullable().optional(),
+  nationalId: z.string().max(40).nullable().optional(),
+  address: z.string().max(255).nullable().optional(),
+  profilePhotoPath: z.string().max(255).nullable().optional(),
+  idPhotoPath: z.string().max(255).nullable().optional(),
 });
 
 export async function POST(req: NextRequest) {

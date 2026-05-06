@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { users, tenantMembers, tenants } from "@/lib/db/schema";
 import type { Permission } from "@/lib/permissions";
 import { ALL_PERMISSIONS } from "@/lib/permissions";
+import { deleteTenantUpload } from "@/lib/uploads";
 
 export class TeamConflictError extends Error {
   constructor(message: string) {
@@ -23,6 +24,12 @@ export interface TeamMemberDto {
   permissions: Permission[];
   mustChangePassword: boolean;
   joinedAt: Date;
+  phone: string | null;
+  nationalId: string | null;
+  address: string | null;
+  /** Relative path under uploads/. Display via /api/uploads/team/<path>. */
+  profilePhotoPath: string | null;
+  idPhotoPath: string | null;
 }
 
 /**
@@ -52,6 +59,11 @@ export async function listTeamMembers(tenantId: string): Promise<TeamMemberDto[]
       permissions: tenantMembers.permissions,
       displayName: tenantMembers.displayName,
       joinedAt: tenantMembers.joinedAt,
+      phone: tenantMembers.phone,
+      nationalId: tenantMembers.nationalId,
+      address: tenantMembers.address,
+      profilePhotoPath: tenantMembers.profilePhotoPath,
+      idPhotoPath: tenantMembers.idPhotoPath,
     })
     .from(tenantMembers)
     .innerJoin(users, eq(users.id, tenantMembers.userId))
@@ -68,6 +80,11 @@ export async function listTeamMembers(tenantId: string): Promise<TeamMemberDto[]
       permissions: r.permissions as Permission[],
       mustChangePassword: r.mustChangePassword,
       joinedAt: r.joinedAt,
+      phone: r.phone,
+      nationalId: r.nationalId,
+      address: r.address,
+      profilePhotoPath: r.profilePhotoPath,
+      idPhotoPath: r.idPhotoPath,
     };
   });
 }
@@ -77,6 +94,11 @@ export interface AddTeamMemberInput {
   displayName: string;
   password: string;
   permissions: Permission[];
+  phone?: string | null;
+  nationalId?: string | null;
+  address?: string | null;
+  profilePhotoPath?: string | null;
+  idPhotoPath?: string | null;
 }
 
 export async function addTeamMember(
@@ -130,6 +152,11 @@ export async function addTeamMember(
       role: "staff",
       permissions: cleanPerms,
       displayName: input.displayName.trim(),
+      phone: input.phone?.trim() || null,
+      nationalId: input.nationalId?.trim() || null,
+      address: input.address?.trim() || null,
+      profilePhotoPath: input.profilePhotoPath ?? null,
+      idPhotoPath: input.idPhotoPath ?? null,
     });
 
     return u.id;
@@ -138,14 +165,29 @@ export async function addTeamMember(
   return { userId, loginEmail };
 }
 
+export interface UpdateMemberPatch {
+  permissions?: Permission[];
+  displayName?: string;
+  phone?: string | null;
+  nationalId?: string | null;
+  address?: string | null;
+  /** Pass null to clear, undefined to leave alone, string to replace. */
+  profilePhotoPath?: string | null;
+  idPhotoPath?: string | null;
+}
+
 export async function updateMemberPermissions(
   tenantId: string,
   userId: string,
-  patch: { permissions?: Permission[]; displayName?: string },
+  patch: UpdateMemberPatch,
 ): Promise<void> {
   // Refuse to touch the tenant's owner (role-protected).
   const [member] = await db
-    .select({ role: tenantMembers.role })
+    .select({
+      role: tenantMembers.role,
+      profilePhotoPath: tenantMembers.profilePhotoPath,
+      idPhotoPath: tenantMembers.idPhotoPath,
+    })
     .from(tenantMembers)
     .where(
       and(
@@ -166,6 +208,20 @@ export async function updateMemberPermissions(
   const set: Record<string, unknown> = {};
   if (cleanPerms) set.permissions = cleanPerms;
   if (patch.displayName !== undefined) set.displayName = patch.displayName.trim();
+  if (patch.phone !== undefined) {
+    const v = patch.phone?.toString().trim();
+    set.phone = v ? v : null;
+  }
+  if (patch.nationalId !== undefined) {
+    const v = patch.nationalId?.toString().trim();
+    set.nationalId = v ? v : null;
+  }
+  if (patch.address !== undefined) {
+    const v = patch.address?.toString().trim();
+    set.address = v ? v : null;
+  }
+  if (patch.profilePhotoPath !== undefined) set.profilePhotoPath = patch.profilePhotoPath;
+  if (patch.idPhotoPath !== undefined) set.idPhotoPath = patch.idPhotoPath;
 
   if (Object.keys(set).length === 0) return;
 
@@ -182,6 +238,22 @@ export async function updateMemberPermissions(
       .set({ name: patch.displayName.trim() })
       .where(eq(users.id, userId));
   }
+
+  // Best-effort cleanup of replaced/cleared photo files.
+  if (
+    patch.profilePhotoPath !== undefined &&
+    member.profilePhotoPath &&
+    member.profilePhotoPath !== patch.profilePhotoPath
+  ) {
+    await deleteTenantUpload(tenantId, member.profilePhotoPath);
+  }
+  if (
+    patch.idPhotoPath !== undefined &&
+    member.idPhotoPath &&
+    member.idPhotoPath !== patch.idPhotoPath
+  ) {
+    await deleteTenantUpload(tenantId, member.idPhotoPath);
+  }
 }
 
 export async function removeTeamMember(
@@ -189,7 +261,11 @@ export async function removeTeamMember(
   userId: string,
 ): Promise<void> {
   const [member] = await db
-    .select({ role: tenantMembers.role })
+    .select({
+      role: tenantMembers.role,
+      profilePhotoPath: tenantMembers.profilePhotoPath,
+      idPhotoPath: tenantMembers.idPhotoPath,
+    })
     .from(tenantMembers)
     .where(
       and(eq(tenantMembers.tenantId, tenantId), eq(tenantMembers.userId, userId)),
@@ -212,6 +288,14 @@ export async function removeTeamMember(
     // Also delete the user — sub-accounts are scoped to one tenant in v1.
     await tx.delete(users).where(eq(users.id, userId));
   });
+
+  // Best-effort photo cleanup outside the transaction (filesystem is not txnal).
+  if (member.profilePhotoPath) {
+    await deleteTenantUpload(tenantId, member.profilePhotoPath);
+  }
+  if (member.idPhotoPath) {
+    await deleteTenantUpload(tenantId, member.idPhotoPath);
+  }
 }
 
 /**

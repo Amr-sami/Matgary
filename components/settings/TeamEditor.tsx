@@ -11,14 +11,15 @@ import {
   Copy,
   Check,
   AtSign,
+  Pencil,
+  Phone,
+  IdentificationCard,
 } from "@/lib/icons";
 import { Button } from "../ui/Button";
-import { Input } from "../ui/Input";
 import { PasswordInput } from "../ui/PasswordInput";
 import { Modal } from "../ui/Modal";
+import { EmployeeFormModal } from "./EmployeeFormModal";
 import {
-  ALL_PERMISSIONS,
-  DEFAULT_STAFF_PERMISSIONS,
   PERMISSION_GROUPS,
   PERMISSION_LABELS,
   type Permission,
@@ -35,6 +36,11 @@ interface Member {
   permissions: Permission[];
   mustChangePassword: boolean;
   joinedAt: string;
+  phone: string | null;
+  nationalId: string | null;
+  address: string | null;
+  profilePhotoPath: string | null;
+  idPhotoPath: string | null;
 }
 
 interface Props {
@@ -48,16 +54,11 @@ export function TeamEditor({ onToast }: Props) {
 
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
-  const [adding, setAdding] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  // Add-form state
-  const [draftUsername, setDraftUsername] = useState("");
-  const [draftDisplay, setDraftDisplay] = useState("");
-  const [draftPassword, setDraftPassword] = useState("");
-  const [draftPerms, setDraftPerms] = useState<Permission[]>(DEFAULT_STAFF_PERMISSIONS);
-
   // Modals
+  const [employeeModalOpen, setEmployeeModalOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<Member | null>(null);
   const [credModal, setCredModal] = useState<{ login: string; password: string } | null>(null);
   const [resetTarget, setResetTarget] = useState<Member | null>(null);
   const [resetPassword, setResetPasswordValue] = useState("");
@@ -97,80 +98,26 @@ export function TeamEditor({ onToast }: Props) {
 
   if (!isOwner) return null;
 
-  const togglePerm = (
-    selected: Permission[],
-    setSelected: (next: Permission[]) => void,
-    perm: Permission,
-  ) => {
-    if (selected.includes(perm)) setSelected(selected.filter((p) => p !== perm));
-    else setSelected([...selected, perm]);
+  const openAdd = () => {
+    setEditTarget(null);
+    setEmployeeModalOpen(true);
   };
 
-  const submitAdd = async () => {
-    setBusyId("__add");
-    try {
-      const res = await fetch("/api/team", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: draftUsername,
-          displayName: draftDisplay,
-          password: draftPassword,
-          permissions: draftPerms,
-        }),
-      });
+  const openEdit = (m: Member) => {
+    setEditTarget(m);
+    setEmployeeModalOpen(true);
+  };
 
-      if (res.status === 409) {
-        // Username collision — current API rejects creating a duplicate. Find
-        // the existing employee and offer to reset their password to what the
-        // owner just typed (the most likely intent).
-        await refresh();
-        const existing = members.find((m) => m.username === draftUsername.trim().toLowerCase());
-        const proceed = confirm(
-          `الموظف "${draftUsername}" موجود بالفعل.\n\nتريد تعيين كلمة سر جديدة له ("${draftPassword}")؟`,
-        );
-        if (proceed && existing) {
-          const r2 = await fetch(`/api/team/${existing.userId}/password`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ newPassword: draftPassword }),
-          });
-          if (r2.ok) {
-            setCredModal({ login: existing.loginEmail, password: draftPassword });
-            setDraftUsername("");
-            setDraftDisplay("");
-            setDraftPassword("");
-            setDraftPerms(DEFAULT_STAFF_PERMISSIONS);
-            setAdding(false);
-            await refresh();
-            return;
-          }
-          const err = await r2.json().catch(() => ({}));
-          onToast({ type: "error", message: err.error || "تعذر إعادة التعيين" });
-          return;
-        }
-        onToast({ type: "error", message: "اختر اسم مستخدم آخر أو استخدم زر إعادة تعيين كلمة السر" });
-        return;
-      }
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `HTTP ${res.status}`);
-      }
-      const created: { loginEmail: string } = await res.json();
-      // Show the exact credentials so the owner can dictate them to the cashier.
-      setCredModal({ login: created.loginEmail, password: draftPassword });
-      setDraftUsername("");
-      setDraftDisplay("");
-      setDraftPassword("");
-      setDraftPerms(DEFAULT_STAFF_PERMISSIONS);
-      setAdding(false);
-      await refresh();
-    } catch (e) {
-      onToast({ type: "error", message: e instanceof Error ? e.message : "تعذر الإضافة" });
-    } finally {
-      setBusyId(null);
+  const handleEmployeeSaved = async (
+    created?: { loginEmail: string; password: string },
+  ) => {
+    if (created) {
+      onToast({ type: "success", message: "تم إضافة الموظف" });
+      setCredModal({ login: created.loginEmail, password: created.password });
+    } else {
+      onToast({ type: "success", message: "تم حفظ التعديلات" });
     }
+    await refresh();
   };
 
   const confirmDelete = async () => {
@@ -252,146 +199,103 @@ export function TeamEditor({ onToast }: Props) {
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-border p-6 space-y-4">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
-          <ShieldCheck className="w-5 h-5 text-accent" />
-          الموظفون والصلاحيات
-        </h2>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setEditHandleOpen(true)}
-            className="text-xs text-text-secondary hover:text-accent flex items-center gap-1"
-            title="تغيير اسم تسجيل الدخول للمتجر"
-          >
-            <AtSign className="w-3.5 h-3.5" />
-            <span dir="ltr" className="font-mono">{slug}</span>
-          </button>
-          <Button
-            variant={adding ? "ghost" : "secondary"}
-            size="sm"
-            onClick={() => setAdding((v) => !v)}
-          >
-            <Plus className="w-4 h-4 me-1" />
-            {adding ? "إلغاء" : "موظف جديد"}
-          </Button>
-        </div>
+    <div className="space-y-4">
+      {/* Section toolbar — outside the card so the action button reads as page-level */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => setEditHandleOpen(true)}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-white text-text-secondary hover:text-accent hover:border-accent transition-colors"
+          title="تغيير اسم تسجيل الدخول للمتجر"
+        >
+          <AtSign className="w-3.5 h-3.5" />
+          <span dir="ltr" className="font-mono text-sm">{slug}</span>
+          <span className="text-[10px] text-text-secondary">— رابط دخول الموظفين</span>
+        </button>
+        <Button onClick={openAdd}>
+          <Plus className="w-4 h-4 me-1" />
+          موظف جديد
+        </Button>
       </div>
 
-      {adding && (
-        <div className="rounded-xl border border-border p-4 space-y-3 bg-bg-main/40">
-          <div className="grid md:grid-cols-2 gap-3">
-            <Input
-              label="الاسم الذي يظهر للزملاء"
-              placeholder="أحمد"
-              value={draftDisplay}
-              onChange={(e) => setDraftDisplay(e.target.value)}
-            />
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-1.5">
-                اسم المستخدم (يستخدمه لتسجيل الدخول)
-              </label>
-              <div className="flex items-center gap-1 bg-white border border-border rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-accent">
-                <input
-                  type="text"
-                  dir="ltr"
-                  placeholder="ahmed"
-                  value={draftUsername}
-                  onChange={(e) =>
-                    setDraftUsername(
-                      e.target.value.replace(/[^a-z0-9._-]/gi, "").toLowerCase(),
-                    )
-                  }
-                  className="flex-1 px-3 py-2.5 bg-transparent focus:outline-none text-text-primary"
-                />
-                <span dir="ltr" className="px-3 py-2.5 text-text-secondary bg-bg-main text-sm">
-                  @{slug}
-                </span>
-              </div>
-              <p className="mt-1 text-xs text-text-secondary" dir="ltr">
-                {draftUsername
-                  ? `${draftUsername}@${slug}`
-                  : `يستخدم في تسجيل الدخول كـ <username>@${slug}`}
-              </p>
-            </div>
-          </div>
-
-          <PasswordInput
-            label="كلمة السر المؤقتة (يغيّرها الموظف عند أول دخول)"
-            placeholder="٨ أحرف على الأقل"
-            value={draftPassword}
-            onChange={(e) => setDraftPassword(e.target.value)}
-          />
-
-          <div>
-            <p className="block text-sm font-medium text-text-secondary mb-2">الصلاحيات</p>
-            <div className="space-y-3">
-              {PERMISSION_GROUPS.map((group) => (
-                <div key={group.title}>
-                  <p className="text-xs text-text-secondary mb-1">{group.title}</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                    {group.permissions.map((p) => (
-                      <label
-                        key={p}
-                        className="flex items-start gap-2 text-sm rounded-md p-1.5 hover:bg-white cursor-pointer"
-                      >
-                        <input
-                          type="checkbox"
-                          className="mt-0.5 accent-accent w-4 h-4"
-                          checked={draftPerms.includes(p)}
-                          onChange={() => togglePerm(draftPerms, setDraftPerms, p)}
-                        />
-                        <span>{PERMISSION_LABELS[p]}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <Button
-            onClick={submitAdd}
-            loading={busyId === "__add"}
-            disabled={
-              !draftUsername.trim() ||
-              !draftDisplay.trim() ||
-              draftPassword.length < 8
-            }
-          >
-            <Save className="w-4 h-4 me-1" />
-            حفظ
-          </Button>
+      {/* List card */}
+      <div className="bg-white rounded-2xl border border-border overflow-hidden">
+        <div className="flex items-center justify-between gap-2 px-5 py-3 border-b border-border bg-bg-main/40">
+          <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-accent" />
+            الموظفون
+          </h2>
+          {!loading && members.length > 0 && (
+            <span className="text-xs text-text-secondary">
+              {members.length} {members.length === 1 ? "حساب" : "حسابات"}
+            </span>
+          )}
         </div>
-      )}
 
-      {loading ? (
-        <p className="text-sm text-text-secondary text-center py-3">جاري التحميل…</p>
-      ) : members.length === 0 ? (
-        <p className="text-sm text-text-secondary text-center py-3">
-          لم تضف موظفين بعد
-        </p>
-      ) : (
-        <ul className="divide-y divide-border">
-          {members.map((m) => (
-            <MemberRow
-              key={m.userId}
-              member={m}
-              busy={busyId === m.userId}
-              onChange={refresh}
-              onToast={onToast}
-              onRemove={() => setDeleteTarget(m)}
-              onResetPassword={() => {
-                setResetTarget(m);
-                setResetPasswordValue("");
-              }}
-            />
-          ))}
-        </ul>
-      )}
+        {loading ? (
+          <div className="px-5 py-8 text-center">
+            <p className="text-sm text-text-secondary">جاري التحميل…</p>
+          </div>
+        ) : members.length === 0 ? (
+          <div className="px-5 py-12 text-center">
+            <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-accent-light text-accent flex items-center justify-center">
+              <ShieldCheck className="w-7 h-7" />
+            </div>
+            <p className="text-sm font-medium text-text-primary mb-1">
+              لم تُضف موظفين بعد
+            </p>
+            <p className="text-xs text-text-secondary mb-4 max-w-xs mx-auto">
+              أنشئ حساباً لكل موظف لمنحه صلاحيات الدخول للنظام وتسجيل المبيعات والحضور.
+            </p>
+            <Button size="sm" onClick={openAdd}>
+              <Plus className="w-4 h-4 me-1" />
+              إضافة أول موظف
+            </Button>
+          </div>
+        ) : (
+          <ul className="divide-y divide-border">
+            {members.map((m) => (
+              <MemberRow
+                key={m.userId}
+                member={m}
+                busy={busyId === m.userId}
+                onChange={refresh}
+                onToast={onToast}
+                onRemove={() => setDeleteTarget(m)}
+                onResetPassword={() => {
+                  setResetTarget(m);
+                  setResetPasswordValue("");
+                }}
+                onEditDetails={() => openEdit(m)}
+              />
+            ))}
+          </ul>
+        )}
+      </div>
 
       {/* Modals */}
+      <EmployeeFormModal
+        isOpen={employeeModalOpen}
+        member={
+          editTarget
+            ? {
+                userId: editTarget.userId,
+                username: editTarget.username,
+                displayName: editTarget.displayName,
+                permissions: editTarget.permissions,
+                phone: editTarget.phone,
+                nationalId: editTarget.nationalId,
+                address: editTarget.address,
+                profilePhotoPath: editTarget.profilePhotoPath,
+                idPhotoPath: editTarget.idPhotoPath,
+              }
+            : null
+        }
+        slug={slug}
+        onClose={() => setEmployeeModalOpen(false)}
+        onSaved={handleEmployeeSaved}
+        onToast={onToast}
+      />
       <CredentialsModal
         creds={credModal}
         onClose={() => setCredModal(null)}
@@ -769,6 +673,7 @@ interface RowProps {
   onToast: (t: Toast) => void;
   onRemove: () => void;
   onResetPassword: () => void;
+  onEditDetails: () => void;
 }
 
 function MemberRow({
@@ -778,6 +683,7 @@ function MemberRow({
   onToast,
   onRemove,
   onResetPassword,
+  onEditDetails,
 }: RowProps) {
   const [editing, setEditing] = useState(false);
   const [perms, setPerms] = useState<Permission[]>(member.permissions);
@@ -806,47 +712,104 @@ function MemberRow({
   };
 
   const isOwnerRow = member.role === "owner";
+  const monogram = (member.displayName || member.username || "?").trim()[0]?.toUpperCase() ?? "?";
 
   return (
-    <li className="py-3">
+    <li className="px-5 py-3.5 hover:bg-bg-main/60 transition-colors">
       <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-medium">{member.displayName}</span>
-            <span
-              className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                isOwnerRow
-                  ? "bg-accent-light text-accent"
-                  : "bg-gray-100 text-text-secondary"
-              }`}
-            >
-              {isOwnerRow ? "المالك" : "موظف"}
-            </span>
-            {member.mustChangePassword && !isOwnerRow && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-50 text-orange-700">
-                يجب تغيير كلمة السر
-              </span>
+        <div className="min-w-0 flex-1 flex items-center gap-3">
+          {/* Avatar */}
+          <div
+            className={`w-11 h-11 rounded-full flex items-center justify-center font-semibold text-sm shrink-0 overflow-hidden ring-2 ring-white ${
+              isOwnerRow ? "bg-accent text-white" : "bg-accent-light text-accent"
+            }`}
+          >
+            {member.profilePhotoPath ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={`/api/uploads/team/${member.profilePhotoPath.replace(/^\/+/, "")}`}
+                alt=""
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span aria-hidden>{monogram}</span>
             )}
           </div>
-          <p className="text-xs text-text-secondary font-mono mt-0.5" dir="ltr">
-            {member.loginEmail}
-          </p>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-medium text-text-primary truncate">{member.displayName}</span>
+              <span
+                className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                  isOwnerRow
+                    ? "bg-accent-light text-accent"
+                    : "bg-gray-100 text-text-secondary"
+                }`}
+              >
+                {isOwnerRow ? "المالك" : "موظف"}
+              </span>
+              {member.mustChangePassword && !isOwnerRow && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-orange-50 text-orange-700">
+                  يجب تغيير كلمة السر
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-text-secondary font-mono mt-0.5 truncate" dir="ltr">
+              {member.loginEmail}
+            </p>
+            {(member.phone || member.nationalId) && (
+              <p className="text-[11px] text-text-secondary mt-1 truncate flex items-center gap-2.5">
+                {member.phone && (
+                  <span dir="ltr" className="inline-flex items-center gap-1">
+                    <Phone className="w-3 h-3" />
+                    {member.phone}
+                  </span>
+                )}
+                {member.nationalId && (
+                  <span dir="ltr" className="inline-flex items-center gap-1 font-mono">
+                    <IdentificationCard className="w-3 h-3" />
+                    {member.nationalId}
+                  </span>
+                )}
+              </p>
+            )}
+          </div>
         </div>
         {!isOwnerRow && (
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={onEditDetails}
+              disabled={busy}
+              className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-text-secondary hover:bg-white hover:text-accent border border-transparent hover:border-border disabled:opacity-50 transition-colors"
+              title="تعديل البيانات"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              تعديل
+            </button>
+            <button
+              type="button"
+              onClick={onEditDetails}
+              disabled={busy}
+              className="sm:hidden p-2 rounded-md text-text-secondary hover:bg-white hover:text-accent disabled:opacity-50"
+              title="تعديل البيانات"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
             <button
               type="button"
               onClick={() => setEditing((v) => !v)}
               disabled={busy}
-              className="px-2 py-1 rounded-md text-xs text-accent hover:bg-accent-light disabled:opacity-50"
+              className="hidden md:inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-accent hover:bg-accent-light disabled:opacity-50 transition-colors"
             >
-              {editing ? "إغلاق" : "تعديل الصلاحيات"}
+              <ShieldCheck className="w-3.5 h-3.5" />
+              {editing ? "إغلاق" : "الصلاحيات"}
             </button>
             <button
               type="button"
               onClick={onResetPassword}
               disabled={busy}
-              className="p-1.5 rounded-md text-text-secondary hover:bg-bg-main disabled:opacity-50"
+              className="p-2 rounded-md text-text-secondary hover:bg-white hover:text-accent disabled:opacity-50"
               title="إعادة تعيين كلمة السر"
             >
               <KeyRound className="w-4 h-4" />
@@ -855,7 +818,7 @@ function MemberRow({
               type="button"
               onClick={onRemove}
               disabled={busy}
-              className="p-1.5 rounded-md text-text-secondary hover:bg-danger-light hover:text-danger disabled:opacity-50"
+              className="p-2 rounded-md text-text-secondary hover:bg-danger-light hover:text-danger disabled:opacity-50"
               title="حذف"
             >
               <Trash2 className="w-4 h-4" />
@@ -865,15 +828,15 @@ function MemberRow({
       </div>
 
       {editing && !isOwnerRow && (
-        <div className="mt-3 ms-2 rounded-lg border border-border p-3 bg-bg-main/40 space-y-3">
+        <div className="mt-3 ms-14 rounded-xl border border-border p-4 bg-bg-main/60 space-y-3">
           {PERMISSION_GROUPS.map((group) => (
             <div key={group.title}>
-              <p className="text-xs text-text-secondary mb-1">{group.title}</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+              <p className="text-xs font-medium text-text-secondary mb-1.5">{group.title}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
                 {group.permissions.map((p) => (
                   <label
                     key={p}
-                    className="flex items-start gap-2 text-sm rounded-md p-1.5 hover:bg-white cursor-pointer"
+                    className="flex items-start gap-2 text-sm rounded-md p-1.5 hover:bg-white cursor-pointer transition-colors"
                   >
                     <input
                       type="checkbox"
@@ -890,10 +853,12 @@ function MemberRow({
               </div>
             </div>
           ))}
-          <Button size="sm" onClick={save}>
-            <Save className="w-4 h-4 me-1" />
-            حفظ الصلاحيات
-          </Button>
+          <div className="flex justify-end pt-1">
+            <Button size="sm" onClick={save}>
+              <Save className="w-4 h-4 me-1" />
+              حفظ الصلاحيات
+            </Button>
+          </div>
         </div>
       )}
     </li>

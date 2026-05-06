@@ -13,6 +13,8 @@ import {
   Users,
   UsersGroup,
   Settings,
+  Truck,
+  Receipt,
   PanelRightClose,
   PanelRightOpen,
 } from "@/lib/icons";
@@ -40,6 +42,8 @@ const primaryItems: NavItem[] = [
 
 const secondaryItems: NavItem[] = [
   { href: "/add-product", label: "إضافة صنف", icon: PlusSquare, requires: "manage_inventory" },
+  { href: "/suppliers", label: "الموردين", icon: Truck, requires: "view_suppliers" },
+  { href: "/purchases", label: "المشتريات", icon: Receipt, requires: "view_purchases" },
   { href: "/returns", label: "المرتجعات", icon: RotateCcw, requires: "view_returns" },
   { href: "/insights", label: "إحصائيات", icon: BarChart3, requires: "view_insights" },
   { href: "/team", label: "الموظفون", icon: UsersGroup, requires: "manage_team" },
@@ -73,8 +77,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         href={item.href}
         title={collapsed ? item.label : undefined}
         className={cn(
-          "relative flex items-center gap-3 h-11 rounded-lg transition-colors mx-2",
-          collapsed ? "justify-center px-0" : "px-4",
+          "relative flex items-center gap-2.5 h-9 rounded-lg transition-colors mx-2",
+          collapsed ? "justify-center px-0" : "px-3",
           isActive
             ? "bg-accent-light text-accent"
             : "text-text-secondary hover:text-text-primary hover:bg-bg-main"
@@ -83,14 +87,14 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         <span
           aria-hidden
           className={cn(
-            "absolute start-0 top-2 bottom-2 w-[3px] rounded-full transition-all duration-200",
+            "absolute start-0 top-1.5 bottom-1.5 w-[3px] rounded-full transition-all duration-200",
             isActive ? "bg-accent opacity-100" : "bg-transparent opacity-0"
           )}
         />
-        <Icon className={cn("w-5 h-5 shrink-0", isActive && "text-accent")} />
+        <Icon className={cn("w-4 h-4 shrink-0", isActive && "text-accent")} />
         <span
           className={cn(
-            "font-medium whitespace-nowrap transition-opacity duration-200",
+            "text-sm font-medium whitespace-nowrap transition-opacity duration-200",
             collapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100"
           )}
         >

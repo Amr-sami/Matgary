@@ -13,6 +13,7 @@ const patchSchema = z.object({
   sku: z.string().max(80).nullable().optional(),
   tags: z.array(z.string().max(40)).optional(),
   supplier: z.string().max(120).nullable().optional(),
+  supplierId: z.string().uuid().nullable().optional(),
   location: z.string().max(120).nullable().optional(),
 });
 

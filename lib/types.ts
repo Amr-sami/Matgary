@@ -40,6 +40,27 @@ export interface BrandDescriptor {
   name: string;
 }
 
+export interface SupplierDescriptor {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  notes: string | null;
+  /** Running amount owed to this supplier (positive = we owe them). */
+  balance: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface SupplierInput {
+  name: string;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  notes?: string | null;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // LEGACY back-compat shims — present so unmigrated components keep compiling.
 // New code MUST use useCategories().byId / product.attributes instead.
@@ -66,6 +87,8 @@ export interface Product {
   sku?: string;
   tags?: string[];
   supplier?: string;
+  /** Linked supplier id; coexists with the legacy free-text `supplier` field. */
+  supplierId?: string | null;
   location?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -142,10 +165,12 @@ export interface ProductFormData {
   sku: string;
   tags: string;
   supplier: string;
+  /** Linked supplier id (preferred). The free-text `supplier` is kept for legacy entries. */
+  supplierId: string | null;
   location: string;
 }
 
-export type ExpenseCategory = "rent" | "salaries" | "electricity" | "water" | "internet" | "other";
+export type ExpenseCategory = "rent" | "salaries" | "electricity" | "water" | "internet" | "supplier" | "other";
 
 export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
   rent: "إيجار",
@@ -153,6 +178,7 @@ export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
   electricity: "كهرباء",
   water: "مياه",
   internet: "إنترنت",
+  supplier: "مورد",
   other: "أخرى",
 };
 
@@ -180,6 +206,8 @@ export interface Expense {
   title: string;
   amount: number;
   category: ExpenseCategory;
+  /** When set, this expense is treated as a payment to that supplier (debits supplier balance). */
+  supplierId?: string | null;
   date: Date;
   note?: string;
 }

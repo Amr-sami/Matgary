@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
+import { SupplierPicker } from "../suppliers/SupplierPicker";
 import { addExpense } from "@/lib/api/expenses";
 import { EXPENSE_CATEGORY_LABELS, type ExpenseCategory } from "@/lib/types";
 import { Wallet, Plus } from "@/lib/icons";
@@ -15,6 +16,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState<number | "">("");
   const [category, setCategory] = useState<ExpenseCategory>("other");
+  const [supplierId, setSupplierId] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -28,11 +30,13 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
         title,
         amount: Number(amount),
         category,
+        supplierId: supplierId,
         note: note || undefined,
       });
       setTitle("");
       setAmount("");
       setCategory("other");
+      setSupplierId(null);
       setNote("");
       onSuccess();
     } catch (error: any) {
@@ -86,6 +90,14 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
             ))}
           </div>
         </div>
+
+        {category === "supplier" && (
+          <SupplierPicker
+            value={supplierId}
+            onChange={setSupplierId}
+            label="المورد *"
+          />
+        )}
 
         <Input
           label="ملاحظة (اختياري)"

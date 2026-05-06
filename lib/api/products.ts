@@ -41,6 +41,7 @@ export interface UpdateProductInput {
   sku?: string | null;
   tags?: string[];
   supplier?: string | null;
+  supplierId?: string | null;
   location?: string | null;
 }
 

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
+import { SupplierPicker } from "../suppliers/SupplierPicker";
 import { updateProduct } from "@/lib/api/products";
 import type { Product } from "@/lib/types";
 
@@ -30,6 +31,7 @@ export function EditProductModal({
   const [sku, setSku] = useState("");
   const [tags, setTags] = useState("");
   const [supplier, setSupplier] = useState("");
+  const [supplierId, setSupplierId] = useState<string | null>(null);
   const [location, setLocation] = useState("");
 
   useEffect(() => {
@@ -43,6 +45,7 @@ export function EditProductModal({
       setSku(product.sku || "");
       setTags((product.tags || []).join(", "));
       setSupplier(product.supplier || "");
+      setSupplierId(product.supplierId ?? null);
       setLocation(product.location || "");
     }
   }, [product, isOpen]);
@@ -68,7 +71,10 @@ export function EditProductModal({
         costPrice: Number(costPrice),
         lowStockThreshold: Number(lowStockThreshold),
         sku: sku.trim(),
-        supplier: supplier.trim(),
+        // When a supplier is linked, clear the legacy free-text field so it
+        // doesn't shadow the FK on next read.
+        supplier: supplierId ? "" : supplier.trim(),
+        supplierId,
         location: location.trim(),
         tags: tagList,
       });
@@ -140,12 +146,19 @@ export function EditProductModal({
           onChange={(e) => setSku(e.target.value)}
         />
 
-        <Input
+        <SupplierPicker
+          value={supplierId}
+          onChange={setSupplierId}
           label="المورد"
-          type="text"
-          value={supplier}
-          onChange={(e) => setSupplier(e.target.value)}
         />
+        {!supplierId && supplier && (
+          <Input
+            label="المورد (نص قديم)"
+            type="text"
+            value={supplier}
+            onChange={(e) => setSupplier(e.target.value)}
+          />
+        )}
 
         <Input
           label="مكان التخزين"

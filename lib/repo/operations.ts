@@ -83,6 +83,7 @@ function rowToExpense(r: typeof expensesTable.$inferSelect): Expense {
     title: r.title,
     amount: Number(r.amount),
     category: r.category as ExpenseCategory,
+    supplierId: r.supplierId ?? null,
     date: r.date,
     note: r.note ?? undefined,
   };
@@ -645,6 +646,7 @@ export interface AddExpenseInput {
   title: string;
   amount: number;
   category: ExpenseCategory;
+  supplierId?: string | null;
   date?: Date;
   note?: string;
 }
@@ -661,16 +663,46 @@ export async function addExpense(
         title: input.title,
         amount: String(input.amount),
         category: input.category,
+        supplierId: input.supplierId ?? null,
         date: input.date ?? new Date(),
         note: input.note ?? null,
       })
       .returning({ id: expensesTable.id });
+
+    // When this expense is a payment to a supplier, debit their running balance.
+    if (input.supplierId) {
+      await tx.execute(sql`
+        update suppliers
+        set balance = (balance)::numeric - ${input.amount.toFixed(2)}::numeric,
+            updated_at = now()
+        where tenant_id = ${tenantId} and id = ${input.supplierId}
+      `);
+    }
     return { id: created.id };
   });
 }
 
 export async function deleteExpense(tenantId: string, id: string): Promise<void> {
   await withTenant(tenantId, async (tx) => {
+    // Reverse any supplier balance change first so the running total stays correct.
+    const [existing] = await tx
+      .select({
+        amount: expensesTable.amount,
+        supplierId: expensesTable.supplierId,
+      })
+      .from(expensesTable)
+      .where(and(eq(expensesTable.tenantId, tenantId), eq(expensesTable.id, id)))
+      .limit(1);
+
+    if (existing?.supplierId) {
+      await tx.execute(sql`
+        update suppliers
+        set balance = (balance)::numeric + ${existing.amount}::numeric,
+            updated_at = now()
+        where tenant_id = ${tenantId} and id = ${existing.supplierId}
+      `);
+    }
+
     await tx
       .delete(expensesTable)
       .where(and(eq(expensesTable.tenantId, tenantId), eq(expensesTable.id, id)));

@@ -4,12 +4,14 @@ import { AppShell } from "@/components/layout/AppShell";
 import { StatsGrid } from "@/components/dashboard/StatsGrid";
 import { LowStockAlert } from "@/components/dashboard/LowStockAlert";
 import { RecentSalesList } from "@/components/dashboard/RecentSalesList";
+import { Greeting } from "@/components/dashboard/Greeting";
 import { SelfCheckIn } from "@/components/team/SelfCheckIn";
 
 export default function DashboardPage() {
   return (
     <AppShell title="لوحة التحكم">
       <div className="space-y-6">
+        <Greeting />
         <SelfCheckIn />
         <StatsGrid />
 

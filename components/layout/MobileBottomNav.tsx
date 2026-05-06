@@ -15,6 +15,8 @@ import {
   Users,
   UsersGroup,
   Settings,
+  Truck,
+  Receipt,
   Menu,
   LogOut,
   X,
@@ -40,6 +42,8 @@ const primaryItems: NavItem[] = [
 
 const moreItems: NavItem[] = [
   { href: "/expenses", label: "المصاريف", icon: Wallet, requires: "view_expenses" },
+  { href: "/suppliers", label: "الموردين", icon: Truck, requires: "view_suppliers" },
+  { href: "/purchases", label: "المشتريات", icon: Receipt, requires: "view_purchases" },
   { href: "/returns", label: "المرتجعات", icon: RotateCcw, requires: "view_returns" },
   { href: "/insights", label: "إحصائيات", icon: BarChart3, requires: "view_insights" },
   { href: "/team", label: "الموظفون", icon: UsersGroup, requires: "manage_team" },

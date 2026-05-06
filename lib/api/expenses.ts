@@ -30,6 +30,7 @@ export async function addExpense(input: {
   title: string;
   amount: number;
   category: ExpenseCategory;
+  supplierId?: string | null;
   date?: Date;
   note?: string;
 }): Promise<string> {

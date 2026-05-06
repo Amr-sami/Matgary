@@ -20,6 +20,9 @@
 # production
 /build
 
+# user uploads (employee photos, etc.) — served via authenticated routes only
+/uploads
+
 # misc
 .DS_Store
 *.pem
