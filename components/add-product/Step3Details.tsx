@@ -91,7 +91,8 @@ export function Step3Details({
   onSubmit,
   loading,
 }: Step3DetailsProps) {
-  void loading; // submit lives in the page footer
+  void onSubmit;
+  void loading; // submission lives in the page's sticky footer
 
   const brandOptions = [
     ...brands.map((b) => b.name).filter((n) => n.toLowerCase() !== "other"),
@@ -109,14 +110,11 @@ export function Step3Details({
     form.brand === "Other" ? form.customBrand.trim() : form.brand.trim();
   const previewName = form.name.trim() || "اسم المنتج";
 
+  // Plain <div>, not <form>: SupplierPicker can open a modal with its own
+  // <form> inline (Modal renders without a portal), and nested forms are
+  // invalid HTML. Submission is the sticky footer button on the page.
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        onSubmit();
-      }}
-      className="grid grid-cols-1 lg:grid-cols-3 gap-6"
-    >
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Form column (left, 2/3 on desktop) */}
       <div className="lg:col-span-2 space-y-6">
         <div>
@@ -319,6 +317,6 @@ export function Step3Details({
           </div>
         </div>
       </aside>
-    </form>
+    </div>
   );
 }
