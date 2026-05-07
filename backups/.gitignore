@@ -1,0 +1,5 @@
+# Backups are environment data, never source. Keep the directory but ignore
+# every dump so an "rm -rf .git" / fresh clone leaves room for the sidecar
+# without committing customer data.
+*
+!.gitignore

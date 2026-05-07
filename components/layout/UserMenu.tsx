@@ -2,7 +2,8 @@
 
 import { useState, useTransition, useRef, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { LogOut, User } from "@/lib/icons";
+import Link from "next/link";
+import { DollarSign, LogOut, User } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { logoutAction } from "@/app/(auth)/actions";
 
@@ -72,6 +73,16 @@ export function UserMenu({ collapsed }: Props) {
             <p className="text-xs text-text-secondary">مسجّل الدخول كـ</p>
             <p className="text-sm font-medium text-text-primary truncate">{email}</p>
           </div>
+          {session?.user?.role === "owner" && (
+            <Link
+              href="/billing"
+              onClick={() => setOpen(false)}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-bg-main hover:text-text-primary transition-colors"
+            >
+              <DollarSign className="w-4 h-4" />
+              الاشتراك
+            </Link>
+          )}
           <button
             type="button"
             onClick={signOut}

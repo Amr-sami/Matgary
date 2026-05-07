@@ -85,6 +85,20 @@
       "when": 1777814932000,
       "tag": "0011_tier3_features",
       "breakpoints": false
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1778166784160,
+      "tag": "0012_silly_namorita",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1778174831422,
+      "tag": "0013_absurd_warpath",
+      "breakpoints": true
     }
   ]
 }

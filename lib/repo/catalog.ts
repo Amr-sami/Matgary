@@ -16,34 +16,60 @@ import type {
   BrandDescriptor,
   Product,
 } from "@/lib/types";
+import { cacheBustPrefix, cacheRemember, tenantKey } from "@/lib/cache";
+
+// 5 min: catalog moves rarely, and every catalog-admin mutation calls
+// bustCatalogCache(tenantId) anyway, so the only stale window is when
+// someone edits the schema directly in the DB.
+const CATALOG_TTL_SEC = 300;
+const CATALOG_PREFIX = "catalog";
+
+const categoriesKey = (tenantId: string) =>
+  tenantKey(tenantId, CATALOG_PREFIX, "categories");
+const attrsKey = (tenantId: string, categoryId: string) =>
+  tenantKey(tenantId, CATALOG_PREFIX, "attrs", categoryId);
+const brandsKey = (tenantId: string, categoryId?: string) =>
+  tenantKey(tenantId, CATALOG_PREFIX, "brands", categoryId ?? "_all");
+
+/**
+ * Drop every cached catalog read for one tenant. Cheap because the prefix is
+ * narrow (`…:t:<tenantId>:catalog:`) — SCAN over <100 keys in any realistic
+ * tenant. Call from every mutation in lib/repo/catalog-admin.ts.
+ */
+export async function bustCatalogCache(tenantId: string): Promise<void> {
+  await cacheBustPrefix(tenantKey(tenantId, CATALOG_PREFIX));
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Read paths
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function listCategories(tenantId: string): Promise<CategoryDescriptor[]> {
-  return withTenant(tenantId, async (tx) => {
-    const rows = await tx
-      .select()
-      .from(categories)
-      .where(eq(categories.tenantId, tenantId))
-      .orderBy(asc(categories.position), asc(categories.label));
-    return rows.map((r) => ({
-      id: r.id,
-      key: r.key,
-      label: r.label,
-      icon: r.icon,
-      position: r.position,
-      hasAttributes: r.hasAttributes,
-    }));
-  });
+  return cacheRemember(categoriesKey(tenantId), CATALOG_TTL_SEC, () =>
+    withTenant(tenantId, async (tx) => {
+      const rows = await tx
+        .select()
+        .from(categories)
+        .where(eq(categories.tenantId, tenantId))
+        .orderBy(asc(categories.position), asc(categories.label));
+      return rows.map((r) => ({
+        id: r.id,
+        key: r.key,
+        label: r.label,
+        icon: r.icon,
+        position: r.position,
+        hasAttributes: r.hasAttributes,
+      }));
+    }),
+  );
 }
 
 export async function listAttributesForCategory(
   tenantId: string,
   categoryId: string,
 ): Promise<CategoryAttribute[]> {
-  return withTenant(tenantId, async (tx) => {
+  return cacheRemember(attrsKey(tenantId, categoryId), CATALOG_TTL_SEC, () =>
+    withTenant(tenantId, async (tx) => {
     const attrs = await tx
       .select()
       .from(categoryAttributes)
@@ -88,24 +114,27 @@ export async function listAttributesForCategory(
           position: v.position,
         })),
     }));
-  });
+    }),
+  );
 }
 
 export async function listBrands(
   tenantId: string,
   categoryId?: string,
 ): Promise<BrandDescriptor[]> {
-  return withTenant(tenantId, async (tx) => {
-    const where = categoryId
-      ? and(eq(brands.tenantId, tenantId), eq(brands.categoryId, categoryId))
-      : eq(brands.tenantId, tenantId);
-    const rows = await tx
-      .select()
-      .from(brands)
-      .where(where)
-      .orderBy(asc(brands.name));
-    return rows.map((r) => ({ id: r.id, categoryId: r.categoryId, name: r.name }));
-  });
+  return cacheRemember(brandsKey(tenantId, categoryId), CATALOG_TTL_SEC, () =>
+    withTenant(tenantId, async (tx) => {
+      const where = categoryId
+        ? and(eq(brands.tenantId, tenantId), eq(brands.categoryId, categoryId))
+        : eq(brands.tenantId, tenantId);
+      const rows = await tx
+        .select()
+        .from(brands)
+        .where(where)
+        .orderBy(asc(brands.name));
+      return rows.map((r) => ({ id: r.id, categoryId: r.categoryId, name: r.name }));
+    }),
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

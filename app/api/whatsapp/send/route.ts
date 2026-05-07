@@ -3,8 +3,14 @@ import { z } from "zod";
 import { normalizePhone } from "@/lib/settings";
 import { requireTenant } from "@/lib/api/auth-helpers";
 import { getGreenApiCredentials } from "@/lib/repo/settings";
+import { rateLimit } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
+
+// Per-tenant: 30 messages / minute. Plenty for a busy POS, far below any
+// realistic Green API rate that would hurt the quota.
+const WA_LIMIT = 30;
+const WA_WINDOW_SEC = 60;
 
 const schema = z.object({
   phone: z.string().min(1).max(40),
@@ -14,6 +20,17 @@ const schema = z.object({
 export async function POST(req: Request) {
   const auth = await requireTenant();
   if (!auth.ok) return auth.response;
+
+  const limit = await rateLimit("wa.send", auth.ctx.tenantId, {
+    limit: WA_LIMIT,
+    windowSec: WA_WINDOW_SEC,
+  });
+  if (!limit.ok) {
+    return NextResponse.json(
+      { ok: false, error: "حاول بعد دقيقة — تم تجاوز حد الإرسال." },
+      { status: 429 },
+    );
+  }
 
   let raw: unknown;
   try {

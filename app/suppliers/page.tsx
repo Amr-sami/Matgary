@@ -117,9 +117,7 @@ export default function SuppliersPage() {
           <p className="text-sm text-text-secondary">جاري التحميل…</p>
         ) : filtered.length === 0 ? (
           <div className="bg-white rounded-2xl border border-border py-12 text-center">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
-              <Truck className="w-8 h-8 text-text-secondary" />
-            </div>
+            <Truck className="w-9 h-9 mx-auto mb-4 text-text-secondary" />
             <p className="text-text-secondary">
               {query ? "لا نتائج مطابقة." : "لم تتم إضافة أي مورد بعد."}
             </p>
@@ -131,9 +129,7 @@ export default function SuppliersPage() {
                 key={s.id}
                 className="flex items-center gap-3 p-4 hover:bg-bg-main transition-colors"
               >
-                <div className="w-10 h-10 rounded-full bg-accent-light text-accent flex items-center justify-center shrink-0">
-                  <Truck className="w-5 h-5" />
-                </div>
+                <Truck className="w-6 h-6 text-accent shrink-0" />
                 <div className="flex-1 min-w-0">
                   <Link
                     href={`/suppliers/${s.id}`}

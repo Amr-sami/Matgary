@@ -129,6 +129,15 @@ function LoginInner() {
         <Button type="submit" className="w-full" loading={busy}>
           تسجيل الدخول
         </Button>
+
+        <div className="text-center">
+          <Link
+            href="/forgot-password"
+            className="text-xs text-text-secondary hover:text-accent"
+          >
+            نسيت كلمة المرور؟
+          </Link>
+        </div>
       </form>
 
       <div className="mt-6 pt-6 border-t border-border space-y-2">

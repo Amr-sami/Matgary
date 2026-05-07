@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireTenant } from "@/lib/api/auth-helpers";
 import { listSales, recordSale } from "@/lib/repo/operations";
+import { logActivity } from "@/lib/repo/activity";
 
 export async function GET() {
   const r = await requireTenant();
@@ -37,6 +38,20 @@ export async function POST(req: NextRequest) {
       ...parsed.data,
       customDate: parsed.data.customDate ? new Date(parsed.data.customDate) : undefined,
       recordedByUserId: r.ctx.userId,
+    });
+    logActivity({
+      tenantId: r.ctx.tenantId,
+      actorUserId: r.ctx.userId,
+      action: "sale.create",
+      category: "sale",
+      entityType: "sale",
+      entityId: (result as { id?: string }).id ?? null,
+      metadata: {
+        productId: parsed.data.productId,
+        quantitySold: parsed.data.quantitySold,
+        pricePerUnit: parsed.data.pricePerUnit,
+        paymentMethod: parsed.data.paymentMethod ?? null,
+      },
     });
     return NextResponse.json(result, { status: 201 });
   } catch (err) {

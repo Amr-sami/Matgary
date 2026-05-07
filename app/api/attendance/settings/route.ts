@@ -5,6 +5,7 @@ import {
   getAttendanceSettings,
   upsertAttendanceSettings,
 } from "@/lib/repo/attendance";
+import { logActivity } from "@/lib/repo/activity";
 
 export async function GET() {
   const r = await requirePermission("manage_team");
@@ -35,5 +36,12 @@ export async function PUT(req: NextRequest) {
     );
   }
   const settings = await upsertAttendanceSettings(r.ctx.tenantId, parsed.data);
+  logActivity({
+    tenantId: r.ctx.tenantId,
+    actorUserId: r.ctx.userId,
+    action: "settings.attendance_update",
+    category: "settings",
+    metadata: { changed: Object.keys(parsed.data) },
+  });
   return NextResponse.json({ settings });
 }

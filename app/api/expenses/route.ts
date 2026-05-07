@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireTenant } from "@/lib/api/auth-helpers";
 import { addExpense, listExpenses } from "@/lib/repo/operations";
+import { logActivity } from "@/lib/repo/activity";
 
 export async function GET() {
   const r = await requireTenant();
@@ -35,6 +36,16 @@ export async function POST(req: NextRequest) {
     isRecurring: parsed.data.isRecurring ?? false,
     recurrencePeriod: parsed.data.recurrencePeriod ?? null,
     date: parsed.data.date ? new Date(parsed.data.date) : undefined,
+  });
+  logActivity({
+    tenantId: r.ctx.tenantId,
+    actorUserId: r.ctx.userId,
+    action: "expense.create",
+    category: "expense",
+    entityType: "expense",
+    entityId: (result as { id?: string }).id ?? null,
+    entityLabel: parsed.data.title,
+    metadata: { amount: parsed.data.amount, category: parsed.data.category },
   });
   return NextResponse.json(result, { status: 201 });
 }

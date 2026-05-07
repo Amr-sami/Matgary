@@ -358,9 +358,7 @@ export function TasksTab({ onToast, onUnreadChange }: Props) {
         <p className="text-sm text-text-secondary text-center py-8">جاري التحميل…</p>
       ) : tasks.length === 0 ? (
         <div className="bg-white rounded-2xl border border-border py-12 text-center">
-          <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-accent-light text-accent flex items-center justify-center">
-            <ListChecks className="w-7 h-7" />
-          </div>
+          <ListChecks className="w-9 h-9 mx-auto mb-3 text-accent" />
           <p className="text-sm font-medium text-text-primary mb-1">
             {isManager ? "لا توجد مهام بعد" : "لا توجد مهام موكلة إليك"}
           </p>

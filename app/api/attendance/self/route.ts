@@ -7,6 +7,7 @@ import {
   recordAttendanceEvent,
 } from "@/lib/repo/attendance-events";
 import { listStoreLocations } from "@/lib/repo/attendance";
+import { logActivity } from "@/lib/repo/activity";
 
 const TYPES = ["check_in", "check_out"] as const;
 const SOURCES = ["manual", "geofence"] as const;
@@ -69,6 +70,20 @@ export async function POST(req: NextRequest) {
         ) <= l.geofenceRadiusM,
     );
     if (!inside) {
+      logActivity({
+        tenantId: r.ctx.tenantId,
+        actorUserId: r.ctx.userId,
+        action: "attendance.geofence_rejected",
+        category: "attendance",
+        entityType: "user",
+        entityId: r.ctx.userId,
+        metadata: {
+          type: parsed.data.type,
+          latitude: parsed.data.latitude,
+          longitude: parsed.data.longitude,
+          accuracyM: parsed.data.accuracyM ?? null,
+        },
+      });
       return NextResponse.json(
         { error: "أنت خارج نطاق المتجر" },
         { status: 403 },
@@ -86,6 +101,18 @@ export async function POST(req: NextRequest) {
       accuracyM: parsed.data.accuracyM ?? null,
       recordedByUserId: r.ctx.userId,
       note: parsed.data.note ?? null,
+    });
+    logActivity({
+      tenantId: r.ctx.tenantId,
+      actorUserId: r.ctx.userId,
+      action:
+        parsed.data.type === "check_in"
+          ? "attendance.check_in"
+          : "attendance.check_out",
+      category: "attendance",
+      entityType: "attendance_event",
+      entityId: (event as { id?: string }).id ?? null,
+      metadata: { source: parsed.data.source },
     });
     return NextResponse.json({ event }, { status: 201 });
   } catch (err) {

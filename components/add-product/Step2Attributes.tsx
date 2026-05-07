@@ -25,14 +25,26 @@ export function Step2Attributes({
   onSelect,
 }: Step2AttributesProps) {
   return (
-    <div className="space-y-8">
+    <div className="space-y-7">
+      <div>
+        <h2 className="text-lg font-bold text-text-primary">حدِّد خصائص المنتج</h2>
+        <p className="text-sm text-text-secondary mt-0.5">
+          هذه الخصائص تظهر في التقارير والفلاتر، فاحرص على دقتها.
+        </p>
+      </div>
+
       {attributes.map((attr) => (
         <div key={attr.id}>
-          <h3 className="text-center font-semibold mb-6">{attr.label}</h3>
+          <h3 className="text-sm font-semibold text-text-primary mb-3">
+            {attr.label}
+            {attr.required && <span className="text-danger ms-1">*</span>}
+          </h3>
           <div
             className={cn(
-              "grid gap-4 max-w-md mx-auto",
-              attr.values.length === 2 ? "grid-cols-2" : "grid-cols-2 md:grid-cols-3",
+              "grid gap-2.5",
+              attr.values.length === 2
+                ? "grid-cols-2"
+                : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4",
             )}
           >
             {attr.values.map((value) => {
@@ -41,20 +53,26 @@ export function Step2Attributes({
               return (
                 <button
                   key={value.id}
+                  type="button"
                   onClick={() => onSelect(attr.id, value.id)}
                   className={cn(
-                    "flex flex-col items-center justify-center p-8 rounded-xl border-2 transition-all",
+                    "flex items-center justify-center gap-2 px-4 py-3 rounded-xl border bg-white transition-all",
+                    "hover:border-accent hover:shadow-sm",
                     isSelected
-                      ? "border-accent bg-accent-light text-accent"
-                      : "border-border bg-white hover:border-accent/50",
+                      ? "border-accent bg-accent-light/40 ring-2 ring-accent/30 text-accent"
+                      : "border-border text-text-primary",
                   )}
+                  aria-pressed={isSelected}
                 >
                   {Icon && (
                     <Icon
-                      className={cn("w-16 h-16 mb-4", isSelected && "text-accent")}
+                      className={cn(
+                        "w-5 h-5",
+                        isSelected ? "text-accent" : "text-text-secondary",
+                      )}
                     />
                   )}
-                  <span className="text-xl font-semibold">{value.label}</span>
+                  <span className="text-sm font-semibold">{value.label}</span>
                 </button>
               );
             })}

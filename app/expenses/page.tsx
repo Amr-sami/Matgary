@@ -34,9 +34,7 @@ export default function ExpensesPage() {
               <p className="text-sm text-text-secondary">إجمالي المصاريف المسجلة</p>
               <p className="text-3xl font-black mt-1 text-danger">{formatPrice(totalExpenses)}</p>
             </div>
-            <div className="bg-danger-light p-4 rounded-2xl">
-              <TrendingDown className="w-8 h-8 text-danger" />
-            </div>
+            <TrendingDown className="w-8 h-8 text-danger" />
           </div>
           <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
             <Wallet className="w-24 h-24" />

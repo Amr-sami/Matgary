@@ -77,13 +77,21 @@ export function LandingFooter() {
           </div>
         </div>
 
-        <div className="mt-12 pt-6 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="text-xs text-text-secondary">
-            © {new Date().getFullYear()} متجري. جميع الحقوق محفوظة.
+        <div className="mt-12 pt-6 border-t border-border flex flex-col gap-3">
+          <p className="text-[11px] text-text-secondary leading-relaxed max-w-3xl">
+            متجري نظام تشغيلي لإدارة المتاجر. الإيصالات الصادرة عنه لأغراض
+            تشغيلية وليست بديلاً عن منظومة الفاتورة الإلكترونية المعتمدة من
+            مصلحة الضرائب المصرية (ETA). على التجار المسجَّلين ضريبياً إصدار
+            فواتيرهم الضريبية عبر بوابة ETA منفصلةً.
           </p>
-          <p className="text-xs text-text-secondary" dir="ltr">
-            Crafted with care · v1.0.0
-          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
+            <p className="text-xs text-text-secondary">
+              © {new Date().getFullYear()} متجري. جميع الحقوق محفوظة.
+            </p>
+            <p className="text-xs text-text-secondary" dir="ltr">
+              Crafted with care · v1.0.0
+            </p>
+          </div>
         </div>
       </div>
     </footer>

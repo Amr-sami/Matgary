@@ -6,6 +6,7 @@ import {
   decideLeaveRequest,
   LeaveConflictError,
 } from "@/lib/repo/leave-requests";
+import { logActivity } from "@/lib/repo/activity";
 
 const schema = z.object({
   status: z.enum(["approved", "rejected"]),
@@ -35,6 +36,15 @@ export async function POST(
       parsed.data.status,
       parsed.data.note ?? null,
     );
+    logActivity({
+      tenantId: r.ctx.tenantId,
+      actorUserId: r.ctx.userId,
+      action: parsed.data.status === "approved" ? "leave.approve" : "leave.reject",
+      category: "leave",
+      entityType: "leave_request",
+      entityId: id,
+      metadata: parsed.data.note ? { note: parsed.data.note } : null,
+    });
   } catch (err) {
     if (err instanceof LeaveConflictError) {
       return NextResponse.json({ error: err.message }, { status: 409 });

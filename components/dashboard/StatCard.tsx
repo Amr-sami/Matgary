@@ -11,10 +11,12 @@ interface StatCardProps {
   href?: string;
 }
 
+// Color → text-only token. Background "chips" were dropped per design — the
+// icon now shows in the brand colour without the filled rounded square.
 const colorStyles = {
-  accent: "bg-accent-light text-accent",
-  success: "bg-success-light text-success",
-  danger: "bg-danger-light text-danger",
+  accent: "text-accent",
+  success: "text-success",
+  danger: "text-danger",
 };
 
 export function StatCard({ title, value, subtitle, icon: Icon, color = "accent", href }: StatCardProps) {
@@ -31,13 +33,13 @@ export function StatCard({ title, value, subtitle, icon: Icon, color = "accent",
             <p className="text-xs text-text-secondary mt-1">{subtitle}</p>
           )}
         </div>
-        <div className={cn(
-          "p-3 rounded-lg transition-transform duration-200",
-          colorStyles[color],
-          href && "group-hover:scale-110"
-        )}>
-          <Icon className="w-5 h-5" />
-        </div>
+        <Icon
+          className={cn(
+            "w-6 h-6 transition-transform duration-200",
+            colorStyles[color],
+            href && "group-hover:scale-110",
+          )}
+        />
       </div>
     </div>
   );

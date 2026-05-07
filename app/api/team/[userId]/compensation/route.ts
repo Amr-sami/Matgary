@@ -5,6 +5,7 @@ import {
   createCompensation,
   listCompensationHistory,
 } from "@/lib/repo/payroll";
+import { logActivity } from "@/lib/repo/activity";
 
 export async function GET(
   _req: NextRequest,
@@ -74,6 +75,19 @@ export async function POST(
       ? new Date(parsed.data.effectiveFrom)
       : new Date(),
     createdByUserId: r.ctx.userId,
+  });
+  logActivity({
+    tenantId: r.ctx.tenantId,
+    actorUserId: r.ctx.userId,
+    action: "team.compensation_set",
+    category: "team",
+    entityType: "user",
+    entityId: userId,
+    metadata: {
+      payType: parsed.data.payType,
+      baseSalaryMonthly: parsed.data.baseSalaryMonthly ?? null,
+      hourlyRate: parsed.data.hourlyRate ?? null,
+    },
   });
   return NextResponse.json({ row }, { status: 201 });
 }

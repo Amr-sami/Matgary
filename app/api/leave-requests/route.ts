@@ -7,6 +7,7 @@ import {
   listLeaveRequests,
   submitLeaveRequest,
 } from "@/lib/repo/leave-requests";
+import { logActivity } from "@/lib/repo/activity";
 
 export async function GET() {
   const r = await requireTenant();
@@ -40,6 +41,18 @@ export async function POST(req: NextRequest) {
       startDate: new Date(parsed.data.startDate),
       endDate: new Date(parsed.data.endDate),
       reason: parsed.data.reason ?? null,
+    });
+    logActivity({
+      tenantId: r.ctx.tenantId,
+      actorUserId: r.ctx.userId,
+      action: "leave.submit",
+      category: "leave",
+      entityType: "leave_request",
+      entityId: (result as { id?: string }).id ?? null,
+      metadata: {
+        startDate: parsed.data.startDate,
+        endDate: parsed.data.endDate,
+      },
     });
     return NextResponse.json(result, { status: 201 });
   } catch (err) {

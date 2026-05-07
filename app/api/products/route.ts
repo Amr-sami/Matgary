@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireTenant } from "@/lib/api/auth-helpers";
 import { addProduct, listProducts } from "@/lib/repo/catalog";
+import { logActivity } from "@/lib/repo/activity";
 
 export async function GET() {
   const r = await requireTenant();
@@ -35,5 +36,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
   }
   const { id } = await addProduct(r.ctx.tenantId, parsed.data);
+  logActivity({
+    tenantId: r.ctx.tenantId,
+    actorUserId: r.ctx.userId,
+    action: "product.create",
+    category: "product",
+    entityType: "product",
+    entityId: id,
+    entityLabel: parsed.data.name,
+    metadata: { quantity: parsed.data.quantity, price: parsed.data.price },
+  });
   return NextResponse.json({ id }, { status: 201 });
 }

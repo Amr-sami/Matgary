@@ -124,6 +124,13 @@ export function Receipt({ sale }: ReceiptProps) {
       <div className="receipt-thankyou">THANK YOU FOR SHOPPING!</div>
       <div className="receipt-thankyou-ar">شكراً لتسوقكم معنا ❤</div>
 
+      {/* Egyptian Tax Authority disclaimer — this receipt is operational, not
+          an e-invoice. VAT-registered merchants must issue separate ETA
+          invoices. Tiny font keeps it from dominating the print. */}
+      <div className="receipt-eta-notice">
+        إيصال للأغراض التشغيلية — ليس فاتورة ضريبية إلكترونية معتمدة من ETA.
+      </div>
+
       <div className="receipt-divider">- - - - - - - - - - - - - - - - - - - - - - - - -</div>
 
       <div className="receipt-qr">

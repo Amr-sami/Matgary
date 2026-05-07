@@ -30,7 +30,9 @@ export type Permission =
   | "manage_tasks"
   // Leave requests
   | "request_leave" // staff submit own
-  | "manage_leave"; // approve / reject everyone's
+  | "manage_leave" // approve / reject everyone's
+  // Audit / activity log
+  | "view_activity_log"; // see "who did what" feed (owner-only by default)
 
 export const ALL_PERMISSIONS: Permission[] = [
   "view_dashboard",
@@ -57,6 +59,7 @@ export const ALL_PERMISSIONS: Permission[] = [
   "manage_tasks",
   "request_leave",
   "manage_leave",
+  "view_activity_log",
 ];
 
 export const PERMISSION_LABELS: Record<Permission, string> = {
@@ -84,6 +87,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   manage_tasks: "إنشاء وتوزيع المهام",
   request_leave: "تقديم طلبات إجازة",
   manage_leave: "الموافقة على طلبات الإجازة",
+  view_activity_log: "عرض سجل النشاط",
 };
 
 export interface PermissionGroup {
@@ -126,6 +130,10 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
   {
     title: "المهام والإجازات",
     permissions: ["manage_tasks", "request_leave", "manage_leave"],
+  },
+  {
+    title: "المراقبة والتدقيق",
+    permissions: ["view_activity_log"],
   },
   {
     title: "الحضور والانصراف",

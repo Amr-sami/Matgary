@@ -12,39 +12,41 @@ interface StaffStat {
   returnsCount: number;
 }
 
-type Range = "30d" | "7d" | "90d";
+interface StaffPerformanceProps {
+  /**
+   * Active date window from the parent insights page.
+   * - When `from` and `to` are both set, the leaderboard restricts to that window.
+   * - When omitted (or empty), the API falls back to its default (last 30 days).
+   */
+  window?: { from?: Date; to?: Date };
+  /** Optional Arabic label for the active range, shown under the title. */
+  rangeLabel?: string;
+}
 
-const RANGE_LABELS: Record<Range, string> = {
-  "7d": "7 أيام",
-  "30d": "30 يوم",
-  "90d": "90 يوم",
-};
-
-const RANGE_DAYS: Record<Range, number> = {
-  "7d": 7,
-  "30d": 30,
-  "90d": 90,
-};
-
-export function StaffPerformance() {
-  const [range, setRange] = useState<Range>("30d");
+export function StaffPerformance({ window, rangeLabel }: StaffPerformanceProps) {
   const [data, setData] = useState<StaffStat[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Stable dependency keys so we don't refetch on every render when the parent
+  // passes a new Date object with the same timestamp.
+  const fromKey = window?.from ? window.from.getTime() : null;
+  const toKey = window?.to ? window.to.getTime() : null;
 
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
       setLoading(true);
       try {
-        const to = new Date();
-        const from = new Date(Date.now() - RANGE_DAYS[range] * 24 * 60 * 60 * 1000);
-        const params = new URLSearchParams({
-          from: from.toISOString(),
-          to: to.toISOString(),
-        });
-        const res = await fetch(`/api/insights/staff-performance?${params}`, {
-          cache: "no-store",
-        });
+        const params = new URLSearchParams();
+        if (fromKey != null) params.set("from", new Date(fromKey).toISOString());
+        if (toKey != null) params.set("to", new Date(toKey).toISOString());
+        const qs = params.toString();
+        const res = await fetch(
+          qs
+            ? `/api/insights/staff-performance?${qs}`
+            : "/api/insights/staff-performance",
+          { cache: "no-store" },
+        );
         if (!res.ok) {
           if (!cancelled) setData([]);
           return;
@@ -59,7 +61,7 @@ export function StaffPerformance() {
     return () => {
       cancelled = true;
     };
-  }, [range]);
+  }, [fromKey, toKey]);
 
   const totalRevenue = data.reduce((s, d) => s + d.salesRevenue, 0);
   const maxRevenue = Math.max(1, ...data.map((d) => d.salesRevenue));
@@ -69,25 +71,14 @@ export function StaffPerformance() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
-          <UsersGroup className="w-5 h-5 text-accent" />
-          أداء الموظفين
-        </h2>
-        <div className="flex items-center gap-1 bg-bg-card border border-border rounded-xl p-1">
-          {(Object.keys(RANGE_LABELS) as Range[]).map((r) => (
-            <button
-              key={r}
-              type="button"
-              onClick={() => setRange(r)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                range === r
-                  ? "bg-white text-text-primary shadow-sm"
-                  : "text-text-secondary"
-              }`}
-            >
-              {RANGE_LABELS[r]}
-            </button>
-          ))}
+        <div>
+          <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
+            <UsersGroup className="w-5 h-5 text-accent" />
+            أداء الموظفين
+          </h2>
+          {rangeLabel && (
+            <p className="text-xs text-text-secondary mt-0.5">{rangeLabel}</p>
+          )}
         </div>
       </div>
 

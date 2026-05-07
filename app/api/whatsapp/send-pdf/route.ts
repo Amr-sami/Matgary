@@ -4,8 +4,14 @@ import { normalizePhone } from "@/lib/settings";
 import { generateReceiptPdf, type PdfInvoiceData } from "@/lib/pdfReceipt";
 import { requireTenant } from "@/lib/api/auth-helpers";
 import { getGreenApiCredentials } from "@/lib/repo/settings";
+import { rateLimit } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
+
+// Same per-tenant cap as /api/whatsapp/send; both share the same Green API
+// quota so they share the same scope key.
+const WA_LIMIT = 30;
+const WA_WINDOW_SEC = 60;
 
 // Loose schema for the invoice payload — pdfReceipt validates the actual shape
 // at render time. We just want to refuse missing fields up front.
@@ -18,6 +24,17 @@ const schema = z.object({
 export async function POST(req: Request) {
   const auth = await requireTenant();
   if (!auth.ok) return auth.response;
+
+  const limit = await rateLimit("wa.send", auth.ctx.tenantId, {
+    limit: WA_LIMIT,
+    windowSec: WA_WINDOW_SEC,
+  });
+  if (!limit.ok) {
+    return NextResponse.json(
+      { ok: false, error: "حاول بعد دقيقة — تم تجاوز حد الإرسال." },
+      { status: 429 },
+    );
+  }
 
   let raw: unknown;
   try {

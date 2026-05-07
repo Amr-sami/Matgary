@@ -135,6 +135,13 @@ textarea {
   }
 
   @page {
+    /* Default to a thermal-receipt-friendly page size so Chrome's print
+       dialog and the printer driver agree on dimensions. 80mm is the
+       common ESC/POS roll width; height auto so receipts of different
+       lengths print on a single continuous strip. Browsers that don't
+       respect `size` (older Safari) still inherit the zero margins and
+       the receipt's own 72mm content width keeps everything in-bounds. */
+    size: 80mm auto;
     margin: 0;
   }
 
@@ -273,6 +280,16 @@ textarea {
     font-family: var(--font-cairo), 'Arial', sans-serif;
     margin-bottom: 4px;
     direction: rtl;
+  }
+
+  .receipt-eta-notice {
+    text-align: center;
+    font-size: 8px;
+    font-family: var(--font-cairo), 'Arial', sans-serif;
+    margin: 2px 0;
+    direction: rtl;
+    color: #555;
+    line-height: 1.4;
   }
 
   .receipt-qr {

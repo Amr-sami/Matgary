@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireTenant } from "@/lib/api/auth-helpers";
 import { deleteProduct, updateProduct } from "@/lib/repo/catalog";
+import { logActivity } from "@/lib/repo/activity";
 
 const patchSchema = z.object({
   name: z.string().min(1).max(200).optional(),
@@ -30,6 +31,16 @@ export async function PATCH(
     return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
   }
   await updateProduct(r.ctx.tenantId, id, parsed.data);
+  logActivity({
+    tenantId: r.ctx.tenantId,
+    actorUserId: r.ctx.userId,
+    action: "product.update",
+    category: "product",
+    entityType: "product",
+    entityId: id,
+    entityLabel: parsed.data.name ?? null,
+    metadata: { changed: Object.keys(parsed.data) },
+  });
   return NextResponse.json({ ok: true });
 }
 
@@ -41,5 +52,13 @@ export async function DELETE(
   if (!r.ok) return r.response;
   const { id } = await params;
   await deleteProduct(r.ctx.tenantId, id);
+  logActivity({
+    tenantId: r.ctx.tenantId,
+    actorUserId: r.ctx.userId,
+    action: "product.delete",
+    category: "product",
+    entityType: "product",
+    entityId: id,
+  });
   return NextResponse.json({ ok: true });
 }

@@ -7,6 +7,8 @@ import {
   updateMemberPermissions,
 } from "@/lib/repo/team";
 import { ALL_PERMISSIONS, type Permission } from "@/lib/permissions";
+import { logActivity } from "@/lib/repo/activity";
+import { bustUserContextCache } from "@/lib/auth";
 
 const patchSchema = z.object({
   displayName: z.string().min(1).max(80).optional(),
@@ -34,6 +36,17 @@ export async function PATCH(
   }
   try {
     await updateMemberPermissions(r.ctx.tenantId, userId, parsed.data);
+    await bustUserContextCache(userId);
+    logActivity({
+      tenantId: r.ctx.tenantId,
+      actorUserId: r.ctx.userId,
+      action: "team.update",
+      category: "team",
+      entityType: "user",
+      entityId: userId,
+      entityLabel: parsed.data.displayName ?? null,
+      metadata: { changed: Object.keys(parsed.data) },
+    });
     return NextResponse.json({ ok: true });
   } catch (err) {
     if (err instanceof TeamConflictError) {
@@ -52,6 +65,15 @@ export async function DELETE(
   const { userId } = await params;
   try {
     await removeTeamMember(r.ctx.tenantId, userId);
+    await bustUserContextCache(userId);
+    logActivity({
+      tenantId: r.ctx.tenantId,
+      actorUserId: r.ctx.userId,
+      action: "team.delete",
+      category: "team",
+      entityType: "user",
+      entityId: userId,
+    });
     return NextResponse.json({ ok: true });
   } catch (err) {
     if (err instanceof TeamConflictError) {

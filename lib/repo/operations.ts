@@ -275,9 +275,24 @@ export interface CartSaleOptions {
   recordedByUserId?: string;
 }
 
+export interface CartSaleLineSummary {
+  productName: string;
+  quantity: number;
+  pricePerUnit: number;
+  lineTotal: number;
+}
+
 export interface CartSaleResult {
   invoiceId: string;
   saleIds: string[];
+  /** Per-line readable summary, useful for activity logs / receipts. */
+  lines: CartSaleLineSummary[];
+  /** Final total (after all discounts), in tenant currency. */
+  total: number;
+  paymentMethod: PaymentMethod;
+  customerName: string | null;
+  customerPhone: string | null;
+  note: string | null;
 }
 
 export async function recordCartSale(
@@ -349,6 +364,8 @@ export async function recordCartSale(
     }
 
     const saleIds: string[] = [];
+    const lineSummaries: CartSaleLineSummary[] = [];
+    let cartTotal = 0;
     let allocated = 0;
 
     for (let i = 0; i < pre.length; i++) {
@@ -411,6 +428,13 @@ export async function recordCartSale(
         .returning({ id: sales.id });
 
       saleIds.push(created.id);
+      lineSummaries.push({
+        productName: p.product.name,
+        quantity: p.line.quantity,
+        pricePerUnit: p.line.pricePerUnit,
+        lineTotal: totalPrice,
+      });
+      cartTotal += totalPrice;
 
       await tx.insert(productHistory).values({
         tenantId,
@@ -422,7 +446,16 @@ export async function recordCartSale(
       });
     }
 
-    return { invoiceId, saleIds };
+    return {
+      invoiceId,
+      saleIds,
+      lines: lineSummaries,
+      total: cartTotal,
+      paymentMethod,
+      customerName: options.customerName?.trim() || null,
+      customerPhone: options.customerPhone?.trim() || null,
+      note: options.note ?? null,
+    };
   });
 }
 

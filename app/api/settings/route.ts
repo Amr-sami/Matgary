@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireTenant } from "@/lib/api/auth-helpers";
 import { getShopSettings, saveShopSettings } from "@/lib/repo/settings";
+import { logActivity } from "@/lib/repo/activity";
 
 export async function GET() {
   const r = await requireTenant();
@@ -31,5 +32,16 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
   }
   await saveShopSettings(r.ctx.tenantId, parsed.data);
+  // Don't echo secrets (greenApiToken) into the audit metadata.
+  const safeChanged = Object.keys(parsed.data).filter(
+    (k) => k !== "greenApiToken",
+  );
+  logActivity({
+    tenantId: r.ctx.tenantId,
+    actorUserId: r.ctx.userId,
+    action: "settings.update",
+    category: "settings",
+    metadata: { changed: safeChanged },
+  });
   return NextResponse.json({ ok: true });
 }

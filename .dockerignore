@@ -1,0 +1,13 @@
+.git
+.next
+node_modules
+backups
+.env
+.env.*
+!.env.example
+infra/init-postgres.sql
+**/*.test.ts
+tests
+.DS_Store
+README.md
+*.log

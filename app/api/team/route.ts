@@ -7,6 +7,7 @@ import {
   TeamConflictError,
 } from "@/lib/repo/team";
 import { ALL_PERMISSIONS, type Permission } from "@/lib/permissions";
+import { logActivity } from "@/lib/repo/activity";
 
 export async function GET() {
   const r = await requirePermission("manage_team");
@@ -39,6 +40,19 @@ export async function POST(req: NextRequest) {
   }
   try {
     const result = await addTeamMember(r.ctx.tenantId, parsed.data);
+    logActivity({
+      tenantId: r.ctx.tenantId,
+      actorUserId: r.ctx.userId,
+      action: "team.add",
+      category: "team",
+      entityType: "user",
+      entityId: result.userId,
+      entityLabel: parsed.data.displayName,
+      metadata: {
+        username: parsed.data.username,
+        permissions: parsed.data.permissions,
+      },
+    });
     return NextResponse.json(result, { status: 201 });
   } catch (err) {
     if (err instanceof TeamConflictError) {

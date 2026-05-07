@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireTenant } from "@/lib/api/auth-helpers";
 import { recordCartSale } from "@/lib/repo/operations";
+import { logActivity } from "@/lib/repo/activity";
+import { normalizeEgyptPhone } from "@/lib/validators/egypt";
 
 const lineSchema = z.object({
   productId: z.string().uuid(),
@@ -34,13 +36,42 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
   }
+  // Customer phone normalises to canonical +20 form so the customer-history
+  // lookup matches across "0100…" and "+20100…" entries. Junk input becomes
+  // null rather than rejecting the sale (the cashier shouldn't be blocked
+  // from ringing up because of a typo).
+  const normalisedCustomerPhone = parsed.data.options?.customerPhone
+    ? normalizeEgyptPhone(parsed.data.options.customerPhone) ?? null
+    : null;
   try {
     const result = await recordCartSale(r.ctx.tenantId, parsed.data.lines, {
       ...parsed.data.options,
+      customerPhone: normalisedCustomerPhone ?? undefined,
       customDate: parsed.data.options?.customDate
         ? new Date(parsed.data.options.customDate)
         : undefined,
       recordedByUserId: r.ctx.userId,
+    });
+    const totalQty = result.lines.reduce((s, l) => s + l.quantity, 0);
+    logActivity({
+      tenantId: r.ctx.tenantId,
+      actorUserId: r.ctx.userId,
+      action: "sale.create",
+      category: "sale",
+      entityType: "sale",
+      entityId: result.saleIds[0] ?? null,
+      entityLabel: result.invoiceId,
+      metadata: {
+        invoiceId: result.invoiceId,
+        lineCount: result.lines.length,
+        totalQuantity: totalQty,
+        total: result.total,
+        paymentMethod: result.paymentMethod,
+        customerName: result.customerName,
+        customerPhone: result.customerPhone,
+        note: result.note,
+        lines: result.lines,
+      },
     });
     return NextResponse.json(result, { status: 201 });
   } catch (err) {

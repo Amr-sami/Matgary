@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useSession } from "next-auth/react";
 import {
   LayoutDashboard,
@@ -18,14 +18,14 @@ import {
   Truck,
   Receipt,
   ListChecks,
-  Calendar,
+  History,
   Menu,
   LogOut,
   X,
 } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { logoutAction } from "@/app/(auth)/actions";
-import { can, type Permission } from "@/lib/permissions";
+import { can, canAny, type Permission } from "@/lib/permissions";
 import { useUnreadTaskCount } from "@/hooks/useUnreadTaskCount";
 import { useLeaveUnread } from "@/hooks/useLeaveUnread";
 
@@ -40,19 +40,19 @@ const primaryItems: NavItem[] = [
   { href: "/", label: "لوحة", icon: LayoutDashboard, requires: "view_dashboard" },
   { href: "/inventory", label: "المخزن", icon: Package, requires: "view_inventory" },
   { href: "/sales", label: "المبيعات", icon: ShoppingCart, requires: "view_sales" },
-  { href: "/tasks", label: "المهام", icon: ListChecks, requires: "view_dashboard" },
-  { href: "/customers", label: "العملاء", icon: Users, requires: "view_customers" },
+  { href: "/add-product", label: "إضافة صنف", icon: PlusSquare, requires: "manage_inventory" },
+  { href: "/purchases", label: "المشتريات", icon: Receipt, requires: "view_purchases" },
+  { href: "/insights", label: "إحصائيات", icon: BarChart3, requires: "view_insights" },
 ];
 
 const moreItems: NavItem[] = [
-  { href: "/add-product", label: "إضافة صنف", icon: PlusSquare, requires: "manage_inventory" },
+  { href: "/tasks", label: "المهام", icon: ListChecks, requires: "view_dashboard" },
+  { href: "/customers", label: "العملاء", icon: Users, requires: "view_customers" },
   { href: "/expenses", label: "المصاريف", icon: Wallet, requires: "view_expenses" },
   { href: "/suppliers", label: "الموردين", icon: Truck, requires: "view_suppliers" },
-  { href: "/purchases", label: "المشتريات", icon: Receipt, requires: "view_purchases" },
-  { href: "/leave", label: "الإجازات", icon: Calendar, requires: "request_leave" },
   { href: "/returns", label: "المرتجعات", icon: RotateCcw, requires: "view_returns" },
-  { href: "/insights", label: "إحصائيات", icon: BarChart3, requires: "view_insights" },
   { href: "/team", label: "الموظفون", icon: UsersGroup, requires: "manage_team" },
+  { href: "/activity", label: "السجل", icon: History, requires: "view_activity_log" },
   { href: "/settings", label: "الإعدادات", icon: Settings, requires: "view_settings" },
 ];
 
@@ -63,12 +63,15 @@ export function MobileBottomNav() {
   const principal = session?.user
     ? { role: session.user.role, permissions: session.user.permissions }
     : null;
-  const visiblePrimary = primaryItems.filter((i) => {
+  const visiblePrimary = primaryItems.filter((i) => can(principal, i.requires));
+  const visibleMore = moreItems.filter((i) => {
     // /tasks is reachable by every logged-in member.
     if (i.href === "/tasks") return !!principal;
+    if (i.href === "/team") {
+      return canAny(principal, ["manage_team", "request_leave", "manage_leave"]);
+    }
     return can(principal, i.requires);
   });
-  const visibleMore = moreItems.filter((i) => can(principal, i.requires));
   const [isSigningOut, startSignOut] = useTransition();
   const email = session?.user?.email ?? "";
   const { count: unreadTasks } = useUnreadTaskCount();
@@ -76,7 +79,7 @@ export function MobileBottomNav() {
 
   const badgeFor = (href: string): number | null => {
     if (href === "/tasks" && unreadTasks > 0) return unreadTasks;
-    if (href === "/leave") {
+    if (href === "/team") {
       const total = leaveUnread.submitted + leaveUnread.decided;
       return total > 0 ? total : null;
     }
@@ -104,6 +107,38 @@ export function MobileBottomNav() {
       document.body.style.overflow = prev;
     };
   }, [moreOpen]);
+
+  // Hide-on-scroll-down / show-on-scroll-up — Facebook-style.
+  // We only hide the bar itself, not the slide-up sheet (which is fixed and
+  // siblings the nav). When the sheet is open we force the bar visible so
+  // the user can still close it.
+  const [hidden, setHidden] = useState(false);
+  const lastY = useRef(0);
+  const ticking = useRef(false);
+  useEffect(() => {
+    lastY.current = window.scrollY;
+    const onScroll = () => {
+      if (ticking.current) return;
+      ticking.current = true;
+      window.requestAnimationFrame(() => {
+        const y = window.scrollY;
+        const delta = y - lastY.current;
+        // Always show in the first 60px of the page so the bar isn't missing
+        // when the user is just casually opening a screen.
+        if (y < 60) {
+          setHidden(false);
+        } else if (delta > 8) {
+          setHidden(true);
+        } else if (delta < -8) {
+          setHidden(false);
+        }
+        lastY.current = y;
+        ticking.current = false;
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   const moreActive = visibleMore.some((i) => i.href === pathname);
 
@@ -184,8 +219,15 @@ export function MobileBottomNav() {
         )}
       </div>
 
-      {/* Bottom bar */}
-      <nav className="flex items-stretch justify-around bg-bg-card border-t border-border px-1 pt-1.5 pb-[calc(env(safe-area-inset-bottom)+0.375rem)]">
+      {/* Bottom bar — slides off-screen on scroll-down. The sheet above is a
+          sibling so it stays untouched when the bar hides. */}
+      <nav
+        className={cn(
+          "flex items-stretch justify-around bg-bg-card border-t border-border px-1 pt-1.5 pb-[calc(env(safe-area-inset-bottom)+0.375rem)]",
+          "transition-transform duration-300 ease-out will-change-transform",
+          hidden && !moreOpen ? "translate-y-full" : "translate-y-0",
+        )}
+      >
         {visiblePrimary.map((item) => {
           const isActive = pathname === item.href;
           const Icon = item.icon;

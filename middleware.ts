@@ -7,6 +7,8 @@ const { auth } = NextAuth(authConfig);
 const PUBLIC_PATHS = new Set<string>([
   "/login",
   "/signup",
+  "/forgot-password",
+  "/reset-password",
   "/welcome",
   // Marketing pages — linked from the public footer, no auth needed.
   "/about",
@@ -18,6 +20,9 @@ const PUBLIC_PATHS = new Set<string>([
   "/privacy",
   // Live slug availability check is hit from the unauthed signup form.
   "/api/account/store-handle/check",
+  // Password reset endpoints — they don't need an active session.
+  "/api/account/password/forgot",
+  "/api/account/password/reset",
   // Visual preview of error/empty screens — handy on a phone, no auth needed.
   "/preview/errors",
 ]);
@@ -73,6 +78,29 @@ export default auth((req) => {
       );
     }
     return NextResponse.redirect(new URL("/account/change-password", nextUrl));
+  }
+
+  // Subscription gate. When the trial has expired without a paid subscription
+  // (or an active subscription has lapsed past its grace period) every
+  // non-billing route redirects to /billing. Billing pages, the Paymob
+  // webhook, and the change-password flow remain reachable so the owner
+  // can recover.
+  const allowedWhenSuspended =
+    pathname === "/billing" ||
+    pathname.startsWith("/api/billing/") ||
+    pathname === "/account/change-password" ||
+    pathname.startsWith("/api/account/password");
+  if (
+    session.user.subscriptionAccessActive === false &&
+    !allowedWhenSuspended
+  ) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json(
+        { error: "SUBSCRIPTION_REQUIRED" },
+        { status: 402 },
+      );
+    }
+    return NextResponse.redirect(new URL("/billing", nextUrl));
   }
 
   return NextResponse.next();

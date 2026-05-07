@@ -18,5 +18,75 @@ services:
       timeout: 3s
       retries: 10
 
+  # Redis is used as an opportunistic cache + rate-limiter (lib/redis.ts,
+  # lib/cache.ts, lib/ratelimit.ts). The app degrades gracefully if it's down,
+  # so no AOF/RDB persistence — treat data here as ephemeral. allkeys-lru lets
+  # a runaway cache evict itself instead of OOMing the host.
+  redis:
+    image: redis:7-alpine
+    container_name: matgary-redis
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - allkeys-lru
+      - --save
+      - ""
+      - --appendonly
+      - "no"
+    ports:
+      - "6381:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Nightly database dumps with retention. The container holds nothing but a
+  # cron daemon, the pg client, and our scripts — every dump lands in the
+  # ./backups bind mount on the host so it survives container destruction
+  # and can be rsync'd to off-site by a host-level job.
+  #
+  # Default schedule: 02:30 UTC every day (~04:30 Cairo time). Override via
+  # the BACKUP_CRON env var if you want a different time.
+  backup:
+    image: postgres:16-alpine
+    container_name: matgary-backup
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: matgary
+      PGPASSWORD: matgary
+      PGDATABASE: matgary
+      BACKUP_DIR: /backups
+      BACKUP_CRON: "30 2 * * *"
+      DAILY_KEEP: "14"
+      WEEKLY_KEEP: "8"
+    volumes:
+      - ./infra/backup.sh:/usr/local/bin/backup.sh:ro
+      - ./infra/restore.sh:/usr/local/bin/restore.sh:ro
+      - ./backups:/backups
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -e
+        # Materialise crontab from $$BACKUP_CRON. Use BusyBox's crond.
+        echo "$$BACKUP_CRON /usr/local/bin/backup.sh >> /var/log/backup.log 2>&1" > /etc/crontabs/root
+        # Run one immediate backup so a fresh deploy is protected before the
+        # first scheduled tick (only if no dump exists yet).
+        if ! ls /backups/*.sql.gz >/dev/null 2>&1; then
+          /usr/local/bin/backup.sh || echo "[backup] initial run failed (non-fatal)"
+        fi
+        echo "[backup] cron schedule: $$BACKUP_CRON"
+        # crond -f keeps the container in the foreground; -d 8 = info-level.
+        exec crond -f -d 8
+
 volumes:
   matgary_pg_data:

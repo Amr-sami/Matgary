@@ -3,6 +3,12 @@ import { withTenant } from "@/lib/db";
 import { shopSettings } from "@/lib/db/schema";
 import { DEFAULT_MESSAGE_TEMPLATE } from "@/lib/settings.defaults";
 import { decryptSecret, encryptSecret } from "@/lib/crypto";
+import { cacheDel, cacheRemember, tenantKey } from "@/lib/cache";
+
+// 5 min: settings change rarely, and saveShopSettings busts the key anyway,
+// so a stale read window only opens up after a manual edit in the DB.
+const SETTINGS_TTL_SEC = 300;
+const settingsKey = (tenantId: string) => tenantKey(tenantId, "settings");
 
 // Sentinel returned to the client in place of the real Green API token. The
 // settings UI shows ••••• and only sends a new value when the operator types
@@ -37,27 +43,29 @@ export const DEFAULT_DTO: ShopSettingsDto = {
 export async function getShopSettings(
   tenantId: string,
 ): Promise<ShopSettingsDto> {
-  return withTenant(tenantId, async (tx) => {
-    const [row] = await tx
-      .select()
-      .from(shopSettings)
-      .where(eq(shopSettings.tenantId, tenantId))
-      .limit(1);
-    if (!row) return DEFAULT_DTO;
-    return {
-      shopName: row.shopName || "",
-      shopPhone: row.shopPhone || "",
-      autoOpenWhatsApp: row.autoOpenWhatsapp,
-      messageTemplate: row.messageTemplate || DEFAULT_MESSAGE_TEMPLATE,
-      greenApiEnabled: row.greenApiEnabled,
-      greenApiInstanceId: row.greenApiInstanceId || "",
-      // Never leak the encrypted blob nor the plaintext token to the client.
-      // The placeholder lets the UI show "configured" without revealing it.
-      greenApiToken: row.greenApiToken ? TOKEN_PLACEHOLDER : "",
-      greenApiUrl: row.greenApiUrl || "",
-      sendAsPdf: row.sendAsPdf,
-    };
-  });
+  return cacheRemember(settingsKey(tenantId), SETTINGS_TTL_SEC, () =>
+    withTenant(tenantId, async (tx) => {
+      const [row] = await tx
+        .select()
+        .from(shopSettings)
+        .where(eq(shopSettings.tenantId, tenantId))
+        .limit(1);
+      if (!row) return DEFAULT_DTO;
+      return {
+        shopName: row.shopName || "",
+        shopPhone: row.shopPhone || "",
+        autoOpenWhatsApp: row.autoOpenWhatsapp,
+        messageTemplate: row.messageTemplate || DEFAULT_MESSAGE_TEMPLATE,
+        greenApiEnabled: row.greenApiEnabled,
+        greenApiInstanceId: row.greenApiInstanceId || "",
+        // Never leak the encrypted blob nor the plaintext token to the client.
+        // The placeholder lets the UI show "configured" without revealing it.
+        greenApiToken: row.greenApiToken ? TOKEN_PLACEHOLDER : "",
+        greenApiUrl: row.greenApiUrl || "",
+        sendAsPdf: row.sendAsPdf,
+      };
+    }),
+  );
 }
 
 /** Server-only: decrypt and return the real Green API token for outbound API calls. */
@@ -125,4 +133,7 @@ export async function saveShopSettings(
       .set(set)
       .where(eq(shopSettings.tenantId, tenantId));
   });
+  // Co-located bust: the only place that mutates settings is also the only
+  // place that knows what to drop from cache.
+  await cacheDel(settingsKey(tenantId));
 }

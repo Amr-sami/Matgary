@@ -59,7 +59,29 @@ async function freshTenant(name: string, email: string) {
 }
 
 beforeAll(async () => {
-  // Wipe — local-only test DB. Don't run this against anything you care about.
+  // SAFETY GUARD — the wipe below truncates every meaningful table. Running it
+  // against a dev database that's also used by `npm run dev` will erase every
+  // real account, tenant, product, sale, etc. (Lesson learned the hard way.)
+  // Refuse to run unless the operator opts in via TEST_DB_WIPE=1 *and* the URL
+  // contains "test" — both conditions must hold so a forgotten env var alone
+  // can't unlock destruction.
+  const url = process.env.DATABASE_URL ?? "";
+  const optedIn = process.env.TEST_DB_WIPE === "1";
+  const looksLikeTestDb = /(?:^|[/_\-])test(?:[/_\-]|$)/i.test(url);
+  if (!optedIn || !looksLikeTestDb) {
+    throw new Error(
+      [
+        "Refusing to run the destructive isolation test wipe.",
+        "This suite TRUNCATEs users/tenants/products/sales — running it against",
+        `a non-test database would destroy real data. (DATABASE_URL=${url})`,
+        "",
+        "To run intentionally:",
+        "  1. Point DATABASE_URL at a database whose name contains 'test'",
+        "     (e.g. postgres://.../matgary_test).",
+        "  2. Export TEST_DB_WIPE=1.",
+      ].join("\n"),
+    );
+  }
   await adminDb.execute(sql`
     truncate
       returns, sales, expenses,

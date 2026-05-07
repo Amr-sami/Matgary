@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { db, withTenant } from "@/lib/db";
 import {
   users,
@@ -11,9 +12,24 @@ import {
   tenantMembers,
   shopSettings,
 } from "@/lib/db/schema";
-import { signIn, signOut, auth } from "@/lib/auth";
+import { signIn, signOut, auth, bustUserContextCache } from "@/lib/auth";
 import { DEFAULT_MESSAGE_TEMPLATE } from "@/lib/settings.defaults";
 import { seedCornerStorePreset } from "@/lib/seeds/cornerstore";
+import { logActivity } from "@/lib/repo/activity";
+import { rateLimit } from "@/lib/ratelimit";
+import { ensureSubscription } from "@/lib/repo/subscriptions";
+
+// Public signup is wide open — cap it so a script can't churn out tenants.
+// 5 / hour / IP is generous enough for legitimate retries on a flaky form.
+const SIGNUP_LIMIT = 5;
+const SIGNUP_WINDOW_SEC = 60 * 60;
+
+async function clientIp(): Promise<string> {
+  const h = await headers();
+  const xff = h.get("x-forwarded-for");
+  if (xff) return xff.split(",")[0]!.trim();
+  return h.get("x-real-ip")?.trim() ?? "unknown";
+}
 
 const signupSchema = z.object({
   email: z.string().email().toLowerCase().trim(),
@@ -42,6 +58,18 @@ export type SignupResult =
     };
 
 export async function signupAction(formData: FormData): Promise<SignupResult> {
+  const ip = await clientIp();
+  const limit = await rateLimit("signup.ip", ip, {
+    limit: SIGNUP_LIMIT,
+    windowSec: SIGNUP_WINDOW_SEC,
+  });
+  if (!limit.ok) {
+    return {
+      ok: false,
+      error: "محاولات كثيرة، حاول مرة أخرى بعد قليل",
+    };
+  }
+
   const parsed = signupSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
@@ -119,6 +147,22 @@ export async function signupAction(formData: FormData): Promise<SignupResult> {
       messageTemplate: DEFAULT_MESSAGE_TEMPLATE,
     });
   });
+
+  // Start the 14-day trial. ensureSubscription is idempotent so this is safe
+  // to call again from the middleware as a fallback for legacy tenants.
+  // Do this before sign-in so the very first authenticated request already
+  // sees an active subscription row.
+  // We need the tenant id we just created — re-fetch by slug.
+  try {
+    const [t] = await db
+      .select({ id: tenants.id })
+      .from(tenants)
+      .where(eq(tenants.slug, slug))
+      .limit(1);
+    if (t) await ensureSubscription(t.id);
+  } catch (err) {
+    console.warn("[signup] ensureSubscription failed (non-fatal):", err);
+  }
 
   // Auto sign-in after signup.
   await signIn("credentials", {
@@ -211,6 +255,9 @@ export async function completeOnboardingAction(
         await seedCornerStorePreset(tx, tenantId);
       }
     });
+    // onboardingComplete just flipped — drop the cached context so the next
+    // page render reflects it without waiting for the 60s TTL.
+    await bustUserContextCache(session.user.id!);
   } catch (err) {
     console.error("[onboarding] failed", err);
     return {
@@ -223,6 +270,19 @@ export async function completeOnboardingAction(
 }
 
 export async function logoutAction() {
+  // Capture session before signOut clears it, so the log row records who left.
+  const session = await auth();
+  if (session?.user?.tenantId && session.user.id) {
+    await logActivity({
+      tenantId: session.user.tenantId,
+      actorUserId: session.user.id,
+      actorName: session.user.name ?? session.user.email ?? null,
+      action: "auth.logout",
+      category: "auth",
+      entityType: "user",
+      entityId: session.user.id,
+    });
+  }
   await signOut({ redirect: false });
   redirect("/login");
 }

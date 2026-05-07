@@ -1,0 +1,60 @@
+# Example nginx vhost for matgary running behind nginx with a Let's Encrypt
+# cert. Place under /etc/nginx/sites-available/matgary.conf, symlink into
+# sites-enabled, and run `certbot --nginx -d your-domain.com` once before
+# applying TLS settings here. The certbot run will populate the cert paths.
+#
+# Assumes the Next.js container listens on 127.0.0.1:3000 (compose:
+# `ports: ["127.0.0.1:3000:3000"]`).
+
+# HTTPS — primary host
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name your-domain.com;
+
+    # certbot manages these.
+    ssl_certificate     /etc/letsencrypt/live/your-domain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/your-domain.com/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    # Modern HSTS — only enable after you've verified TLS works.
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy "geolocation=(self), camera=()" always;
+
+    # Egyptian receipts can be Arabic + emoji; bump body limit so PDF uploads
+    # and image uploads (team photos, logos) don't 413.
+    client_max_body_size 25m;
+
+    # Long-lived static assets — the Next build hashes them.
+    location /_next/static/ {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_cache_bypass $http_upgrade;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_read_timeout 60s;
+        proxy_send_timeout 60s;
+    }
+}
+
+# HTTP -> HTTPS redirect.
+server {
+    listen 80;
+    listen [::]:80;
+    server_name your-domain.com;
+    return 301 https://$host$request_uri;
+}

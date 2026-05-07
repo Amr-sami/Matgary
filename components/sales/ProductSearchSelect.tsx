@@ -35,6 +35,20 @@ export function ProductSearchSelect({ value, onChange }: ProductSearchSelectProp
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Sync the input with the parent-controlled selection. When the parent
+  // clears `value` (e.g. after add-to-cart), drop the search text so the
+  // user can type the next product immediately. When the parent sets a new
+  // value (e.g. quick-pick from "recent products"), reflect its name.
+  useEffect(() => {
+    if (value === null) {
+      setSearch("");
+      setIsOpen(false);
+    } else if (search !== value.name) {
+      setSearch(value.name);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
   const handleSelect = (product: Product) => {
     onChange(product);
     setSearch(product.name);

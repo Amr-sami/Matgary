@@ -13,12 +13,16 @@ import { formatPrice } from "@/lib/utils";
 
 interface TrendChartProps {
   data: { date: string; revenue: number }[];
+  /** Override the default heading. Falls back to "آخر 30 يوم". */
+  title?: string;
 }
 
-export function TrendChart({ data }: TrendChartProps) {
+export function TrendChart({ data, title }: TrendChartProps) {
   return (
     <div className="h-[300px] w-full bg-white rounded-xl p-4 shadow-sm border border-border">
-      <h3 className="text-sm font-semibold mb-4 text-text-secondary">اتجاه المبيعات (آخر 30 يوم)</h3>
+      <h3 className="text-sm font-semibold mb-4 text-text-secondary">
+        {title ?? "اتجاه المبيعات (آخر 30 يوم)"}
+      </h3>
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
           <defs>

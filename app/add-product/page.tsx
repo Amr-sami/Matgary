@@ -11,6 +11,7 @@ import { Toast } from "@/components/ui/Toast";
 import { useCategories } from "@/hooks/useCategories";
 import { useCategoryAttributes } from "@/hooks/useCategoryAttributes";
 import { useBrands } from "@/hooks/useBrands";
+import { ChevronRight, ChevronLeft } from "@/lib/icons";
 
 const EMPTY_FORM = {
   brand: "",
@@ -33,10 +34,16 @@ export default function AddProductPage() {
   // attribute_id -> attribute_value_id
   const [attrValues, setAttrValues] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
-  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [toast, setToast] = useState<
+    { type: "success" | "error"; message: string } | null
+  >(null);
   const [form, setForm] = useState(EMPTY_FORM);
 
-  const { data: categories, loading: catsLoading, refresh: refreshCategories } = useCategories();
+  const {
+    data: categories,
+    loading: catsLoading,
+    refresh: refreshCategories,
+  } = useCategories();
   const { data: attributes } = useCategoryAttributes(categoryId);
   const { data: brands, refresh: refreshBrands } = useBrands(categoryId);
 
@@ -52,38 +59,34 @@ export default function AddProductPage() {
   };
 
   const handleNext = () => {
-    if (step === 1) {
-      setStep(skipAttributes ? 3 : 2);
-    } else if (step === 2) {
-      setStep(3);
-    }
+    if (step === 1) setStep(skipAttributes ? 3 : 2);
+    else if (step === 2) setStep(3);
   };
 
   const handleBack = () => {
-    if (step === 3) {
-      setStep(skipAttributes ? 1 : 2);
-    } else if (step === 2) {
-      setStep(1);
-    }
+    if (step === 3) setStep(skipAttributes ? 1 : 2);
+    else if (step === 2) setStep(1);
   };
 
   const allRequiredAttrsAnswered = useMemo(
     () =>
-      attributes
-        .filter((a) => a.required)
-        .every((a) => !!attrValues[a.id]),
+      attributes.filter((a) => a.required).every((a) => !!attrValues[a.id]),
     [attributes, attrValues],
   );
 
   const canProceedFromStep =
-    step === 1
-      ? !!categoryId
-      : step === 2
-      ? allRequiredAttrsAnswered
-      : true;
+    step === 1 ? !!categoryId : step === 2 ? allRequiredAttrsAnswered : true;
+
+  const canSubmit =
+    step === 3 &&
+    !!categoryId &&
+    !!form.name.trim() &&
+    form.quantity >= 1 &&
+    form.price >= 1 &&
+    !(form.brand === "Other" && !form.customBrand.trim());
 
   const handleSubmit = async () => {
-    if (!categoryId || !form.name || form.quantity < 1 || form.price < 1) return;
+    if (!canSubmit || !categoryId) return;
 
     setLoading(true);
     try {
@@ -91,7 +94,10 @@ export default function AddProductPage() {
         form.brand === "Other" ? form.customBrand.trim() : form.brand.trim();
       const productBrand = typedBrand || undefined;
 
-      const tags = form.tags.split(",").map((t) => t.trim()).filter(Boolean);
+      const tags = form.tags
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
 
       const payload = {
         name: form.name,
@@ -137,7 +143,8 @@ export default function AddProductPage() {
 
       setToast({ type: "success", message: "تم إضافة المنتج بنجاح" });
 
-      // Reset
+      // Reset for the next entry. Cashiers add many products in a row, so
+      // we keep the user on the page rather than redirecting.
       setStep(1);
       setCategoryId(null);
       setAttrValues({});
@@ -152,12 +159,25 @@ export default function AddProductPage() {
     }
   };
 
+  const isFinalStep = step === 3;
+
   return (
     <AppShell title="إضافة صنف جديد">
-      <div className="max-w-2xl mx-auto space-y-8">
-        <StepIndicator currentStep={step} />
+      <div className="max-w-6xl mx-auto pb-24">
+        <header className="mb-6">
+          <h1 className="text-2xl font-bold text-text-primary leading-tight">
+            إضافة منتج جديد
+          </h1>
+          <p className="text-sm text-text-secondary mt-1">
+            ثلاث خطوات سريعة: اختر القسم، حدِّد الخصائص، ثم أكمل التفاصيل.
+          </p>
+        </header>
 
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-border">
+        <div className="mb-6">
+          <StepIndicator currentStep={step} skipStep2={skipAttributes} />
+        </div>
+
+        <div className="bg-white rounded-2xl p-5 sm:p-6 border border-border shadow-sm">
           {step === 1 && (
             <Step1Category
               categories={categories}
@@ -190,23 +210,52 @@ export default function AddProductPage() {
             />
           )}
         </div>
+      </div>
 
-        <div className="flex gap-4">
+      {/* Sticky action footer — keeps Back / Next / Save anchored at the
+          bottom regardless of scroll. Replaces the duplicate submit button
+          that lived inside Step 3 and the loose ghost-pair below the card. */}
+      <div
+        className="fixed bottom-0 inset-x-0 lg:ms-52 z-30 bg-white/95 backdrop-blur border-t border-border px-4 py-3 lg:py-3.5"
+        style={{
+          paddingBottom: "calc(env(safe-area-inset-bottom) + 0.75rem)",
+        }}
+      >
+        <div className="max-w-6xl mx-auto flex items-center justify-between gap-3">
           <Button
             variant="ghost"
             onClick={handleBack}
             disabled={step === 1}
-            className="flex-1"
+            type="button"
           >
+            <ChevronRight className="w-4 h-4 ms-1" />
             السابق
           </Button>
-          <Button
-            onClick={handleNext}
-            disabled={!canProceedFromStep || step === 3}
-            className="flex-1"
-          >
-            التالي
-          </Button>
+
+          <p className="text-xs text-text-secondary hidden sm:block">
+            {isFinalStep
+              ? "جاهز للحفظ؟ راجع المعاينة على الجانب."
+              : `الخطوة ${step} من 3`}
+          </p>
+
+          {isFinalStep ? (
+            <Button
+              onClick={handleSubmit}
+              loading={loading}
+              disabled={!canSubmit}
+            >
+              حفظ المنتج
+            </Button>
+          ) : (
+            <Button
+              onClick={handleNext}
+              disabled={!canProceedFromStep}
+              type="button"
+            >
+              التالي
+              <ChevronLeft className="w-4 h-4 me-1" />
+            </Button>
+          )}
         </div>
       </div>
 

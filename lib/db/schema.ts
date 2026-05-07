@@ -811,6 +811,130 @@ export const notifications = pgTable(
   ],
 );
 
+// ─────────────────────────────────────────────────────────────────────────────
+// SaaS billing — subscriptions + payment attempts (scoped, RLS in migration)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const subscriptions = pgTable("subscriptions", {
+  /** 1:1 with tenant — the tenant owns at most one active subscription. */
+  tenantId: uuid("tenant_id")
+    .primaryKey()
+    .references(() => tenants.id, { onDelete: "cascade" }),
+  /**
+   * Plan key. We start with two plans + the trial sentinel:
+   *  - 'trial'        — fresh signup, 14-day full access
+   *  - 'professional' — single store, full feature set, paid monthly
+   *  - 'multi_branch' — placeholder; gated behind future multi-branch work
+   */
+  plan: text("plan").notNull().default("trial"),
+  /**
+   * Lifecycle:
+   *  - 'trialing'   — inside the 14-day window
+   *  - 'active'     — paid + within current period
+   *  - 'past_due'   — payment failed; inside the 7-day grace
+   *  - 'cancelled'  — owner cancelled; access until current_period_ends_at
+   *  - 'expired'    — trial elapsed without payment, or grace exhausted
+   */
+  status: text("status").notNull().default("trialing"),
+  trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }).notNull(),
+  currentPeriodStart: timestamp("current_period_start", { withTimezone: true }),
+  currentPeriodEndsAt: timestamp("current_period_ends_at", { withTimezone: true }),
+  cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+  /** Monthly price for this plan in EGP, snapshot at subscribe time. */
+  amountEgp: text("amount_egp"),
+  /** Paymob bookkeeping. */
+  paymobCustomerId: text("paymob_customer_id"),
+  /** Last successful Paymob order id; written by the webhook on success. */
+  paymobLastOrderId: text("paymob_last_order_id"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now()`),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now()`),
+});
+
+export const paymentAttempts = pgTable(
+  "payment_attempts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    /** Paymob order id we registered before sending the user to the iframe. */
+    paymobOrderId: text("paymob_order_id"),
+    /** Paymob transaction id (callbacks). Used as the idempotency key. */
+    paymobTransactionId: text("paymob_transaction_id"),
+    amountEgp: text("amount_egp").notNull(),
+    /**
+     * 'pending' once the order is registered, then 'succeeded' / 'failed' on
+     * webhook. We never delete rows — payment history is the timeline.
+     */
+    status: text("status").notNull().default("pending"),
+    failureReason: text("failure_reason"),
+    /** Raw HMAC-verified webhook payload. Useful for support + post-mortem. */
+    rawPayload: jsonb("raw_payload").$type<Record<string, unknown>>(),
+    attemptedAt: timestamp("attempted_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    settledAt: timestamp("settled_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("payment_attempts_tenant_attempted_idx").on(t.tenantId, t.attemptedAt),
+    // Idempotency: Paymob may deliver a webhook twice. The unique txn id keeps
+    // us honest at the DB level even if the application's idempotency check fails.
+    index("payment_attempts_paymob_txn_idx").on(t.paymobTransactionId),
+  ],
+);
+
+export type SubscriptionRow = typeof subscriptions.$inferSelect;
+export type PaymentAttemptRow = typeof paymentAttempts.$inferSelect;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Audit / activity log (scoped) — RLS applied in a separate migration step.
+// One row per non-trivial mutation in the app. Insertion is fire-and-forget
+// from logActivity() — failures are swallowed so they never break the parent
+// mutation.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const activityLogs = pgTable(
+  "activity_logs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    /** Whoever performed the action. Nullable so we can keep history if the user is deleted. */
+    actorUserId: uuid("actor_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    /** Snapshot of the actor's display name at the time, so the log stays readable after deletes/renames. */
+    actorName: text("actor_name"),
+    /** Namespaced identifier, e.g. "team.add", "settings.update", "auth.login". */
+    action: text("action").notNull(),
+    /** Coarse bucket for filtering: 'team' | 'product' | 'sale' | 'expense' | 'settings' | 'auth' | ... */
+    category: text("category").notNull(),
+    /** Optional resource type, e.g. "user", "product", "sale". Used to deep-link from a row. */
+    entityType: text("entity_type"),
+    entityId: uuid("entity_id"),
+    /** Snapshot of a human label for the entity (e.g. product name, employee display name). */
+    entityLabel: text("entity_label"),
+    /** Free-form extras: { before: {...}, after: {...} } for updates, key fields for creates. */
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    ip: text("ip"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [
+    index("activity_logs_tenant_created_idx").on(t.tenantId, t.createdAt),
+    index("activity_logs_tenant_actor_idx").on(t.tenantId, t.actorUserId),
+    index("activity_logs_tenant_category_idx").on(t.tenantId, t.category),
+  ],
+);
+
+export type ActivityLogRow = typeof activityLogs.$inferSelect;
+
 // Convenience type exports for the rest of the app
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;

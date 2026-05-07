@@ -7,6 +7,7 @@ import {
   categoryAttributeValues,
   products,
 } from "@/lib/db/schema";
+import { bustCatalogCache } from "@/lib/repo/catalog";
 
 export class CatalogConflictError extends Error {
   constructor(message: string) {
@@ -31,7 +32,7 @@ export async function addCategory(
   tenantId: string,
   input: AddCategoryInput,
 ): Promise<{ id: string }> {
-  return withTenant(tenantId, async (tx) => {
+  const result = await withTenant(tenantId, async (tx) => {
     const [created] = await tx
       .insert(categories)
       .values({
@@ -45,6 +46,8 @@ export async function addCategory(
       .returning({ id: categories.id });
     return { id: created.id };
   });
+  await bustCatalogCache(tenantId);
+  return result;
 }
 
 export interface UpdateCategoryInput {
@@ -71,6 +74,7 @@ export async function updateCategory(
       .set(set)
       .where(and(eq(categories.tenantId, tenantId), eq(categories.id, id)));
   });
+  await bustCatalogCache(tenantId);
 }
 
 export async function deleteCategory(
@@ -91,6 +95,7 @@ export async function deleteCategory(
       .delete(categories)
       .where(and(eq(categories.tenantId, tenantId), eq(categories.id, id)));
   });
+  await bustCatalogCache(tenantId);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -109,7 +114,7 @@ export async function addAttribute(
   tenantId: string,
   input: AddAttributeInput,
 ): Promise<{ id: string }> {
-  return withTenant(tenantId, async (tx) => {
+  const result = await withTenant(tenantId, async (tx) => {
     const [created] = await tx
       .insert(categoryAttributes)
       .values({
@@ -130,6 +135,8 @@ export async function addAttribute(
 
     return { id: created.id };
   });
+  await bustCatalogCache(tenantId);
+  return result;
 }
 
 export async function updateAttribute(
@@ -150,6 +157,7 @@ export async function updateAttribute(
         and(eq(categoryAttributes.tenantId, tenantId), eq(categoryAttributes.id, id)),
       );
   });
+  await bustCatalogCache(tenantId);
 }
 
 export async function deleteAttribute(
@@ -192,6 +200,7 @@ export async function deleteAttribute(
         );
     }
   });
+  await bustCatalogCache(tenantId);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -203,7 +212,7 @@ export async function addAttributeValue(
   attributeId: string,
   input: { key: string; label: string; position?: number },
 ): Promise<{ id: string }> {
-  return withTenant(tenantId, async (tx) => {
+  const result = await withTenant(tenantId, async (tx) => {
     const [created] = await tx
       .insert(categoryAttributeValues)
       .values({
@@ -216,6 +225,8 @@ export async function addAttributeValue(
       .returning({ id: categoryAttributeValues.id });
     return { id: created.id };
   });
+  await bustCatalogCache(tenantId);
+  return result;
 }
 
 export async function updateAttributeValue(
@@ -238,6 +249,7 @@ export async function updateAttributeValue(
         ),
       );
   });
+  await bustCatalogCache(tenantId);
 }
 
 export async function deleteAttributeValue(
@@ -254,6 +266,7 @@ export async function deleteAttributeValue(
         ),
       );
   });
+  await bustCatalogCache(tenantId);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -269,7 +282,7 @@ export async function addBrand(
   tenantId: string,
   input: AddBrandInput,
 ): Promise<{ id: string }> {
-  return withTenant(tenantId, async (tx) => {
+  const result = await withTenant(tenantId, async (tx) => {
     const [created] = await tx
       .insert(brands)
       .values({
@@ -280,6 +293,8 @@ export async function addBrand(
       .returning({ id: brands.id });
     return { id: created.id };
   });
+  await bustCatalogCache(tenantId);
+  return result;
 }
 
 export async function deleteBrand(tenantId: string, id: string): Promise<void> {
@@ -288,6 +303,7 @@ export async function deleteBrand(tenantId: string, id: string): Promise<void> {
       .delete(brands)
       .where(and(eq(brands.tenantId, tenantId), eq(brands.id, id)));
   });
+  await bustCatalogCache(tenantId);
 }
 
 export async function updateBrand(
@@ -305,4 +321,5 @@ export async function updateBrand(
       .set(set)
       .where(and(eq(brands.tenantId, tenantId), eq(brands.id, id)));
   });
+  await bustCatalogCache(tenantId);
 }

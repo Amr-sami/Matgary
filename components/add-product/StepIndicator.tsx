@@ -5,56 +5,66 @@ import { cn } from "@/lib/utils";
 
 interface StepIndicatorProps {
   currentStep: number;
+  /** When step 2 is skipped (category has no attributes) we collapse it visually. */
+  skipStep2?: boolean;
 }
 
-const steps = [
-  { num: 1, label: "الصنف" },
-  { num: 2, label: "الخصائص" },
-  { num: 3, label: "التفاصيل" },
-];
+const STEPS = [
+  { num: 1, label: "الصنف", helper: "اختر القسم" },
+  { num: 2, label: "الخصائص", helper: "حدِّد التفاصيل" },
+  { num: 3, label: "التفاصيل", helper: "السعر والكمية" },
+] as const;
 
-export function StepIndicator({ currentStep }: StepIndicatorProps) {
+// Modern segmented progress bar. Each step gets a numbered pill (or check),
+// label + helper line, and a connector that fills as you progress. Helper
+// text drops on mobile so the row stays in one line.
+export function StepIndicator({ currentStep, skipStep2 }: StepIndicatorProps) {
   return (
-    <div className="flex items-center justify-center gap-2 md:gap-4">
-      {steps.map((step, i) => {
+    <ol
+      className="flex items-stretch gap-2 sm:gap-3 w-full"
+      aria-label="مراحل إضافة المنتج"
+    >
+      {STEPS.map((step) => {
         const isCompleted = step.num < currentStep;
         const isActive = step.num === currentStep;
+        const isMuted = step.num > currentStep || (skipStep2 && step.num === 2);
 
         return (
-          <div key={step.num} className="flex items-center">
+          <li key={step.num} className="flex-1 flex items-start gap-2 min-w-0">
             <div
               className={cn(
-                "flex items-center justify-center w-10 h-10 rounded-full font-medium text-sm transition-colors",
+                "flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold shrink-0 transition-colors",
                 isCompleted && "bg-accent text-white",
-                isActive && "bg-accent text-white",
-                !isCompleted && !isActive && "bg-gray-100 text-text-secondary"
+                isActive && "bg-accent text-white ring-4 ring-accent-light",
+                isMuted && "bg-bg-main text-text-secondary",
               )}
+              aria-current={isActive ? "step" : undefined}
             >
-              {isCompleted ? (
-                <Check className="w-5 h-5" />
-              ) : (
-                step.num
-              )}
+              {isCompleted ? <Check className="w-4 h-4" /> : step.num}
             </div>
-            <span
-              className={cn(
-                "mx-2 text-sm hidden md:block",
-                isActive ? "text-accent font-medium" : "text-text-secondary"
-              )}
-            >
-              {step.label}
-            </span>
-            {i < steps.length - 1 && (
+
+            <div className="min-w-0 flex-1">
+              <p
+                className={cn(
+                  "text-sm font-semibold leading-tight truncate",
+                  isActive ? "text-text-primary" : "text-text-secondary",
+                )}
+              >
+                {step.label}
+              </p>
+              <p className="hidden sm:block text-[11px] text-text-secondary mt-0.5 truncate">
+                {step.helper}
+              </p>
               <div
                 className={cn(
-                  "w-8 md:w-16 h-0.5",
-                  isCompleted || isActive ? "bg-accent" : "bg-gray-200"
+                  "mt-2 h-1 rounded-full transition-colors",
+                  isCompleted || isActive ? "bg-accent" : "bg-bg-main",
                 )}
               />
-            )}
-          </div>
+            </div>
+          </li>
         );
       })}
-    </div>
+    </ol>
   );
 }

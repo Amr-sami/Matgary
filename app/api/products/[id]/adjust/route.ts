@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireTenant } from "@/lib/api/auth-helpers";
 import { adjustProductQuantity } from "@/lib/repo/catalog";
+import { logActivity } from "@/lib/repo/activity";
 
 const schema = z.object({ delta: z.number().int() });
 
@@ -23,6 +24,15 @@ export async function POST(
       id,
       parsed.data.delta,
     );
+    logActivity({
+      tenantId: r.ctx.tenantId,
+      actorUserId: r.ctx.userId,
+      action: "product.adjust",
+      category: "product",
+      entityType: "product",
+      entityId: id,
+      metadata: { delta: parsed.data.delta, newQuantity },
+    });
     return NextResponse.json({ newQuantity });
   } catch (err) {
     return NextResponse.json(

@@ -16,7 +16,7 @@ import {
   Truck,
   Receipt,
   ListChecks,
-  Calendar,
+  History,
   PanelRightClose,
   PanelRightOpen,
 } from "@/lib/icons";
@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 import { useSettings } from "@/components/settings-context";
 import { UserMenu } from "./UserMenu";
 import { useSession } from "next-auth/react";
-import { can, type Permission } from "@/lib/permissions";
+import { can, canAny, type Permission } from "@/lib/permissions";
 import { useUnreadTaskCount } from "@/hooks/useUnreadTaskCount";
 import { useLeaveUnread } from "@/hooks/useLeaveUnread";
 
@@ -40,19 +40,21 @@ const primaryItems: NavItem[] = [
   { href: "/", label: "لوحة التحكم", icon: LayoutDashboard, requires: "view_dashboard" },
   { href: "/inventory", label: "المخزن", icon: Package, requires: "view_inventory" },
   { href: "/sales", label: "المبيعات", icon: ShoppingCart, requires: "view_sales" },
-  { href: "/tasks", label: "المهام", icon: ListChecks, requires: "view_dashboard" },
-  { href: "/customers", label: "العملاء", icon: Users, requires: "view_customers" },
-  { href: "/expenses", label: "المصاريف", icon: Wallet, requires: "view_expenses" },
+  { href: "/add-product", label: "إضافة صنف", icon: PlusSquare, requires: "manage_inventory" },
+  { href: "/purchases", label: "المشتريات", icon: Receipt, requires: "view_purchases" },
+  { href: "/insights", label: "إحصائيات", icon: BarChart3, requires: "view_insights" },
 ];
 
 const secondaryItems: NavItem[] = [
-  { href: "/add-product", label: "إضافة صنف", icon: PlusSquare, requires: "manage_inventory" },
+  { href: "/tasks", label: "المهام", icon: ListChecks, requires: "view_dashboard" },
+  { href: "/customers", label: "العملاء", icon: Users, requires: "view_customers" },
+  { href: "/expenses", label: "المصاريف", icon: Wallet, requires: "view_expenses" },
   { href: "/suppliers", label: "الموردين", icon: Truck, requires: "view_suppliers" },
-  { href: "/purchases", label: "المشتريات", icon: Receipt, requires: "view_purchases" },
-  { href: "/leave", label: "الإجازات", icon: Calendar, requires: "request_leave" },
   { href: "/returns", label: "المرتجعات", icon: RotateCcw, requires: "view_returns" },
-  { href: "/insights", label: "إحصائيات", icon: BarChart3, requires: "view_insights" },
+  // /team also hosts the leaves tab (merged in). Anyone with team management
+  // OR leave-request capability can open it; the page itself filters tabs.
   { href: "/team", label: "الموظفون", icon: UsersGroup, requires: "manage_team" },
+  { href: "/activity", label: "السجل", icon: History, requires: "view_activity_log" },
   { href: "/settings", label: "الإعدادات", icon: Settings, requires: "view_settings" },
 ];
 
@@ -68,12 +70,18 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const principal = session?.user
     ? { role: session.user.role, permissions: session.user.permissions }
     : null;
-  const visiblePrimary = primaryItems.filter((i) => {
-    // /tasks is reachable by every logged-in member (their assigned tasks).
+  const visiblePrimary = primaryItems.filter((i) => can(principal, i.requires));
+  const visibleSecondary = secondaryItems.filter((i) => {
+    // /tasks is reachable by every logged-in member (their assigned tasks),
+    // not gated by a real permission.
     if (i.href === "/tasks") return !!principal;
+    // /team also hosts the leaves tab — show it to anyone who has either
+    // team management or leave-request rights, since staff use it for leaves.
+    if (i.href === "/team") {
+      return canAny(principal, ["manage_team", "request_leave", "manage_leave"]);
+    }
     return can(principal, i.requires);
   });
-  const visibleSecondary = secondaryItems.filter((i) => can(principal, i.requires));
 
   const storeName = settings.shopName?.trim() || "متجري";
   const { count: unreadTasks } = useUnreadTaskCount();
@@ -81,9 +89,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
   const badgeFor = (href: string): number | null => {
     if (href === "/tasks" && unreadTasks > 0) return unreadTasks;
-    if (href === "/leave") {
-      // Manager sees pending submissions, employee sees decisions on their
-      // own requests. Each user only ever has one of the two non-zero.
+    if (href === "/team") {
+      // Team page hosts the leaves tab — surface the same combined unread
+      // count here so employees and managers don't lose the badge.
       const total = leaveUnread.submitted + leaveUnread.decided;
       return total > 0 ? total : null;
     }

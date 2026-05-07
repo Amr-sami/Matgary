@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requirePermission } from "@/lib/api/auth-helpers";
 import { addSupplier, listSuppliers } from "@/lib/repo/suppliers";
+import { logActivity } from "@/lib/repo/activity";
 
 export async function GET() {
   const r = await requirePermission("view_suppliers");
@@ -32,6 +33,15 @@ export async function POST(req: NextRequest) {
     email: parsed.data.email || null,
     address: parsed.data.address || null,
     notes: parsed.data.notes || null,
+  });
+  logActivity({
+    tenantId: r.ctx.tenantId,
+    actorUserId: r.ctx.userId,
+    action: "supplier.create",
+    category: "supplier",
+    entityType: "supplier",
+    entityId: (result as { id?: string }).id ?? null,
+    entityLabel: parsed.data.name,
   });
   return NextResponse.json(result, { status: 201 });
 }

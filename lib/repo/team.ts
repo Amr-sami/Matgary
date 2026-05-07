@@ -5,6 +5,7 @@ import { users, tenantMembers, tenants } from "@/lib/db/schema";
 import type { Permission } from "@/lib/permissions";
 import { ALL_PERMISSIONS } from "@/lib/permissions";
 import { deleteTenantUpload } from "@/lib/uploads";
+import { normalizeEgyptPhone } from "@/lib/validators/egypt";
 
 export class TeamConflictError extends Error {
   constructor(message: string) {
@@ -146,13 +147,20 @@ export async function addTeamMember(
       })
       .returning({ id: users.id });
 
+    // Phone is normalised to canonical +20 form on write so reports + lookups
+    // don't have to deal with mixed national/international shapes. We accept
+    // anything that round-trips through the normaliser; if the operator
+    // typed nonsense the field is stored as null rather than rejected — staff
+    // records routinely have missing phones.
+    const phoneNormalised = normalizeEgyptPhone(input.phone) ?? null;
+
     await tx.insert(tenantMembers).values({
       tenantId,
       userId: u.id,
       role: "staff",
       permissions: cleanPerms,
       displayName: input.displayName.trim(),
-      phone: input.phone?.trim() || null,
+      phone: phoneNormalised,
       nationalId: input.nationalId?.trim() || null,
       address: input.address?.trim() || null,
       profilePhotoPath: input.profilePhotoPath ?? null,
@@ -210,7 +218,9 @@ export async function updateMemberPermissions(
   if (patch.displayName !== undefined) set.displayName = patch.displayName.trim();
   if (patch.phone !== undefined) {
     const v = patch.phone?.toString().trim();
-    set.phone = v ? v : null;
+    // Normalise to canonical +20 form. Empty / invalid → null (we don't
+    // refuse the patch since phone is optional, just skip storing junk).
+    set.phone = v ? (normalizeEgyptPhone(v) ?? null) : null;
   }
   if (patch.nationalId !== undefined) {
     const v = patch.nationalId?.toString().trim();

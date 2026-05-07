@@ -20,6 +20,12 @@ export const authConfig = {
         session.user.role = (token.role as string | null) ?? null;
         session.user.permissions = (token.permissions as Permission[] | undefined) ?? [];
         session.user.mustChangePassword = !!token.mustChangePassword;
+        session.user.subscriptionAccessActive =
+          token.subscriptionAccessActive == null
+            ? true // tolerate older tokens — treat missing claim as "allow"
+            : !!token.subscriptionAccessActive;
+        session.user.subscriptionStatus =
+          (token.subscriptionStatus as string | null) ?? null;
       }
       return session;
     },
