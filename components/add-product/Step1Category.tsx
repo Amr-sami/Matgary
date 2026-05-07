@@ -1,14 +1,22 @@
 "use client";
 
+import { useState } from "react";
 import * as Icons from "@/lib/icons";
-import { Package } from "@/lib/icons";
+import { Package, Plus } from "@/lib/icons";
 import { cn } from "@/lib/utils";
+import { Modal } from "@/components/ui/Modal";
+import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Button";
+import { slugify } from "@/lib/utils/slug";
 import type { CategoryDescriptor } from "@/lib/types";
+
+const DEFAULT_NEW_CATEGORY_ICON = "Package";
 
 interface Step1CategoryProps {
   categories: CategoryDescriptor[];
   selectedId: string | null;
   onSelect: (categoryId: string) => void;
+  onCategoryCreated?: (newCategoryId: string | null) => Promise<void> | void;
   loading?: boolean;
 }
 
@@ -26,22 +34,55 @@ export function Step1Category({
   categories,
   selectedId,
   onSelect,
+  onCategoryCreated,
   loading,
 }: Step1CategoryProps) {
+  const [modalOpen, setModalOpen] = useState(false);
+  const [newLabel, setNewLabel] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setNewLabel("");
+    setError(null);
+  };
+
+  const submitNewCategory = async () => {
+    const label = newLabel.trim();
+    if (!label) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const key = slugify(label);
+      const res = await fetch("/api/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          key,
+          label,
+          icon: DEFAULT_NEW_CATEGORY_ICON,
+          position: categories.length,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(json?.error || `HTTP ${res.status}`);
+      }
+      const newId: string | null = json?.id ?? null;
+      await onCategoryCreated?.(newId);
+      if (newId) onSelect(newId);
+      closeModal();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "تعذر الإضافة");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="text-center py-12 text-text-secondary">جاري التحميل…</div>
-    );
-  }
-
-  if (categories.length === 0) {
-    return (
-      <div className="text-center py-8 space-y-3">
-        <h3 className="font-semibold text-text-primary">لا توجد أقسام بعد</h3>
-        <p className="text-sm text-text-secondary">
-          أضف أول قسم من <span className="text-accent">الإعدادات</span> ثم ابدأ بإضافة المنتجات.
-        </p>
-      </div>
     );
   }
 
@@ -69,7 +110,53 @@ export function Step1Category({
             </button>
           );
         })}
+
+        <button
+          type="button"
+          onClick={() => setModalOpen(true)}
+          className="flex flex-col items-center justify-center p-8 rounded-xl border-2 border-dashed border-border bg-white text-text-secondary hover:border-accent hover:text-accent transition-all"
+        >
+          <Plus className="w-16 h-16 mb-4" />
+          <span className="text-xl font-semibold">إضافة صنف</span>
+        </button>
       </div>
+
+      <Modal isOpen={modalOpen} onClose={closeModal} title="إضافة صنف جديد">
+        <div className="space-y-4">
+          <Input
+            label="اسم الصنف"
+            placeholder="مثلاً: جلود"
+            value={newLabel}
+            onChange={(e) => setNewLabel(e.target.value)}
+            autoFocus
+          />
+
+          {error && (
+            <p className="text-sm text-danger" role="alert">
+              {error}
+            </p>
+          )}
+
+          <div className="flex gap-2 pt-2">
+            <Button
+              variant="ghost"
+              onClick={closeModal}
+              disabled={saving}
+              className="flex-1"
+            >
+              إلغاء
+            </Button>
+            <Button
+              onClick={submitNewCategory}
+              loading={saving}
+              disabled={!newLabel.trim()}
+              className="flex-1"
+            >
+              حفظ الصنف
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

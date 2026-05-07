@@ -7,7 +7,7 @@ import { SupplierPicker } from "../suppliers/SupplierPicker";
 import type { BrandDescriptor } from "@/lib/types";
 
 interface Step3DetailsProps {
-  brands: BrandDescriptor[]; // empty = no brand picker
+  brands: BrandDescriptor[];
   form: {
     brand: string;
     customBrand: string;
@@ -34,62 +34,41 @@ export function Step3Details({
   onSubmit,
   loading,
 }: Step3DetailsProps) {
-  const hasBrands = brands.length > 0;
-
-  // "Other" is always appended so a tenant can add a one-off brand without
-  // visiting Settings. Mirrors the original Corner Store flow.
-  const brandOptions = hasBrands
-    ? [
-        ...brands
-          .map((b) => b.name)
-          .filter((n) => n.toLowerCase() !== "other"),
-        "Other",
-      ]
-    : [];
-
-  const brandRequired = hasBrands;
+  const brandOptions = [
+    ...brands.map((b) => b.name).filter((n) => n.toLowerCase() !== "other"),
+    "Other",
+  ];
 
   return (
     <div className="space-y-4 max-w-md mx-auto">
       <h3 className="text-center font-semibold mb-6">تفاصيل المنتج</h3>
 
-      {hasBrands ? (
-        <>
-          <Select
-            label="البراند"
-            options={brandOptions.map((b) => ({
-              value: b,
-              label: b === "Other" ? "أخرى (إضافة براند جديد)" : b,
-            }))}
-            value={form.brand}
-            onChange={(e) => onChange("brand", e.target.value)}
-            placeholder="اختر البراند..."
-          />
+      <Select
+        label="البراند (اختياري)"
+        options={brandOptions.map((b) => ({
+          value: b,
+          label: b === "Other" ? "أخرى (إضافة براند جديد)" : b,
+        }))}
+        value={form.brand}
+        onChange={(e) => onChange("brand", e.target.value)}
+        placeholder="اختر البراند..."
+      />
 
-          {form.brand === "Other" && (
-            <Input
-              label="أدخل اسم البراند"
-              value={form.customBrand}
-              onChange={(e) => onChange("customBrand", e.target.value)}
-              placeholder="اسم البراند..."
-            />
-          )}
-
-          <Input
-            label="اسم الموديل"
-            value={form.name}
-            onChange={(e) => onChange("name", e.target.value)}
-            placeholder="أدخل اسم الموديل..."
-          />
-        </>
-      ) : (
+      {form.brand === "Other" && (
         <Input
-          label="اسم المنتج"
-          value={form.name}
-          onChange={(e) => onChange("name", e.target.value)}
-          placeholder="أدخل اسم المنتج..."
+          label="أدخل اسم البراند"
+          value={form.customBrand}
+          onChange={(e) => onChange("customBrand", e.target.value)}
+          placeholder="اسم البراند..."
         />
       )}
+
+      <Input
+        label="اسم المنتج"
+        value={form.name}
+        onChange={(e) => onChange("name", e.target.value)}
+        placeholder="أدخل اسم المنتج..."
+      />
 
       <Input
         label="الكمية"
@@ -157,7 +136,6 @@ export function Step3Details({
             !form.name ||
             form.quantity < 1 ||
             form.price < 1 ||
-            (brandRequired && !form.brand) ||
             (form.brand === "Other" && !form.customBrand)
           }
           className="w-full"

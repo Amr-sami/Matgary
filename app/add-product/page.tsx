@@ -36,9 +36,9 @@ export default function AddProductPage() {
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
 
-  const { data: categories, loading: catsLoading } = useCategories();
+  const { data: categories, loading: catsLoading, refresh: refreshCategories } = useCategories();
   const { data: attributes } = useCategoryAttributes(categoryId);
-  const { data: brands } = useBrands(categoryId);
+  const { data: brands, refresh: refreshBrands } = useBrands(categoryId);
 
   // If the chosen category has no attributes, skip step 2 entirely.
   const skipAttributes = !!categoryId && attributes.length === 0;
@@ -87,12 +87,9 @@ export default function AddProductPage() {
 
     setLoading(true);
     try {
-      const productBrand =
-        brands.length > 0
-          ? form.brand === "Other"
-            ? form.customBrand
-            : form.brand
-          : undefined;
+      const typedBrand =
+        form.brand === "Other" ? form.customBrand.trim() : form.brand.trim();
+      const productBrand = typedBrand || undefined;
 
       const tags = form.tags.split(",").map((t) => t.trim()).filter(Boolean);
 
@@ -120,6 +117,22 @@ export default function AddProductPage() {
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || `HTTP ${res.status}`);
+      }
+
+      // If the user typed a brand that isn't in the dropdown yet, register it
+      // for this category so it appears in future add-product sessions.
+      if (form.brand === "Other" && typedBrand) {
+        const known = brands.some(
+          (b) => b.name.toLowerCase() === typedBrand.toLowerCase(),
+        );
+        if (!known) {
+          await fetch("/api/brands", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: typedBrand, categoryId }),
+          }).catch(() => {});
+          await refreshBrands();
+        }
       }
 
       setToast({ type: "success", message: "تم إضافة المنتج بنجاح" });
@@ -150,6 +163,9 @@ export default function AddProductPage() {
               categories={categories}
               selectedId={categoryId}
               onSelect={setCategoryId}
+              onCategoryCreated={async () => {
+                await refreshCategories();
+              }}
               loading={catsLoading}
             />
           )}
