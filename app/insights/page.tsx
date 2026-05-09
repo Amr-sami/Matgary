@@ -10,6 +10,7 @@ import { StaffPerformance } from "@/components/insights/StaffPerformance";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { Tabs } from "@/components/ui/Tabs";
+import { CATEGORY_LABELS, type Category } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
 import {
   TrendingUp,
@@ -17,7 +18,6 @@ import {
   DollarSign,
   Percent,
   ShoppingCart,
-  AlertCircle,
 } from "@/lib/icons";
 import {
   DATE_RANGE_LABELS,
@@ -114,7 +114,7 @@ export default function InsightsPage() {
   const headlineLabel =
     dateRange === "all"
       ? "مبيعات الشهر الحالي"
-      : `مبيعات الفترة المختارة (${DATE_RANGE_LABELS[dateRange]})`;
+      : `مبيعات الفترة (${DATE_RANGE_LABELS[dateRange]})`;
 
   if (loading) {
     return (
@@ -129,62 +129,64 @@ export default function InsightsPage() {
   const { metrics, trendData, topProducts, categoryChartData } = data;
   const isPositive = metrics.revenueGrowth >= 0;
 
+  const highlights = computeHighlights(trendData, topProducts, categoryChartData);
+
   return (
     <AppShell title="تحليلات العمل">
-      <div className="space-y-6">
+      <div className="space-y-5">
         <Tabs items={INSIGHTS_TABS} active={tab} onChange={setTab} />
 
         <div className="space-y-2">
-            <div className="flex flex-wrap gap-2">
-              {DATE_FILTER_ORDER.map((key) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setDateRange(key)}
-                  className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${
-                    dateRange === key
-                      ? "bg-accent text-white border-accent"
-                      : "bg-white border-border text-text-secondary hover:border-accent"
-                  }`}
-                >
-                  {DATE_RANGE_LABELS[key]}
-                </button>
-              ))}
-            </div>
-            {dateRange === "custom" && (
-              <div className="flex flex-wrap items-end gap-3 bg-white border border-border rounded-lg p-3">
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs text-text-secondary">من</label>
-                  <input
-                    type="date"
-                    value={customFrom}
-                    onChange={(e) => setCustomFrom(e.target.value)}
-                    className="px-3 py-1.5 rounded-md border border-border focus:outline-none focus:border-accent"
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs text-text-secondary">إلى</label>
-                  <input
-                    type="date"
-                    value={customTo}
-                    onChange={(e) => setCustomTo(e.target.value)}
-                    className="px-3 py-1.5 rounded-md border border-border focus:outline-none focus:border-accent"
-                  />
-                </div>
-                {(customFrom || customTo) && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCustomFrom("");
-                      setCustomTo("");
-                    }}
-                    className="text-xs text-text-secondary hover:text-danger px-2 py-1.5"
-                  >
-                    مسح
-                  </button>
-                )}
+          <div className="flex flex-wrap gap-2">
+            {DATE_FILTER_ORDER.map((key) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setDateRange(key)}
+                className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${
+                  dateRange === key
+                    ? "bg-accent text-white border-accent"
+                    : "bg-white border-border text-text-secondary hover:border-accent"
+                }`}
+              >
+                {DATE_RANGE_LABELS[key]}
+              </button>
+            ))}
+          </div>
+          {dateRange === "custom" && (
+            <div className="flex flex-wrap items-end gap-3 bg-white border border-border rounded-lg p-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-text-secondary">من</label>
+                <input
+                  type="date"
+                  value={customFrom}
+                  onChange={(e) => setCustomFrom(e.target.value)}
+                  className="px-3 py-1.5 rounded-md border border-border focus:outline-none focus:border-accent"
+                />
               </div>
-            )}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-text-secondary">إلى</label>
+                <input
+                  type="date"
+                  value={customTo}
+                  onChange={(e) => setCustomTo(e.target.value)}
+                  className="px-3 py-1.5 rounded-md border border-border focus:outline-none focus:border-accent"
+                />
+              </div>
+              {(customFrom || customTo) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomFrom("");
+                    setCustomTo("");
+                  }}
+                  className="text-xs text-text-secondary hover:text-danger px-2 py-1.5"
+                >
+                  مسح
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {tab === "staff" ? (
@@ -198,37 +200,14 @@ export default function InsightsPage() {
           />
         ) : (
           <>
-            {/* Main Stats Row */}
+            {/* KPI row */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white rounded-xl p-5 shadow-sm border border-border relative overflow-hidden group">
-                <div className="relative z-10">
-                  <p className="text-sm text-text-secondary">{headlineLabel}</p>
-                  <p className="text-2xl font-bold mt-1">{formatPrice(metrics.currentRevenue)}</p>
-                  <div
-                    className={`flex items-center gap-1 mt-2 text-xs font-bold ${
-                      isPositive ? "text-success" : "text-danger"
-                    }`}
-                  >
-                    {isPositive ? (
-                      <TrendingUp className="w-3.5 h-3.5" />
-                    ) : (
-                      <TrendingDown className="w-3.5 h-3.5" />
-                    )}
-                    {isPositive ? "+" : ""}
-                    {metrics.revenueGrowth.toFixed(1)}% {COMPARISON_LABEL[dateRange]}
-                  </div>
-                </div>
-                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                  <DollarSign className="w-12 h-12" />
-                </div>
-              </div>
-
-              <StatCard
-                title="إجمالي الخصومات"
-                value={formatPrice(metrics.totalDiscounts)}
-                subtitle={`${metrics.discountPercent.toFixed(1)}% من القيمة الإجمالية`}
-                icon={Percent}
-                color="danger"
+              <RevenueCard
+                label={headlineLabel}
+                value={metrics.currentRevenue}
+                growth={metrics.revenueGrowth}
+                isPositive={isPositive}
+                comparison={COMPARISON_LABEL[dateRange]}
               />
 
               <StatCard
@@ -240,24 +219,24 @@ export default function InsightsPage() {
               />
 
               <StatCard
-                title="إجمالي المصاريف"
-                value={formatPrice(metrics.totalExpenses)}
-                subtitle="تكاليف تشغيلية"
-                icon={DollarSign}
-                color="danger"
-              />
-
-              <StatCard
                 title="صافي الربح"
                 value={formatPrice(metrics.netProfit)}
-                subtitle="بعد خصم المصاريف والتكلفة"
+                subtitle="بعد المصاريف والتكلفة"
                 icon={TrendingUp}
                 color={metrics.netProfit >= 0 ? "success" : "danger"}
               />
+
+              <StatCard
+                title="إجمالي الخصومات"
+                value={formatPrice(metrics.totalDiscounts)}
+                subtitle={`${metrics.discountPercent.toFixed(1)}% من القيمة`}
+                icon={Percent}
+                color="danger"
+              />
             </div>
 
-            {/* Charts Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Charts: trend (2/3) + category (1/3) */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
               <div className="lg:col-span-2">
                 <TrendChart
                   data={trendData}
@@ -273,29 +252,237 @@ export default function InsightsPage() {
               </div>
             </div>
 
-            {/* Details Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-6">
+            {/* Detail grid: top products + highlights */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 pb-6">
               <TopProducts products={topProducts} />
-
-              <div className="bg-white rounded-xl p-6 shadow-sm border border-border flex flex-col justify-center items-center text-center space-y-4">
-                <AlertCircle className="w-8 h-8 text-accent" />
-                <div>
-                  <h3 className="text-lg font-bold">بصيرة الذكاء الاصطناعي</h3>
-                  <p className="text-sm text-text-secondary mt-2 max-w-sm leading-relaxed">
-                    المبيعات هذا الشهر {isPositive ? "مرتفعة" : "منخفضة"} بنسبة{" "}
-                    {Math.abs(metrics.revenueGrowth).toFixed(1)}%.
-                    {metrics.netProfit > 0
-                      ? ` صافي الربح الحالي هو ${formatPrice(metrics.netProfit)} بعد تغطية كافة المصاريف.`
-                      : " صافي الربح بالسالب حالياً، يرجى مراجعة المصاريف أو تحسين وتيرة البيع."}
-                    {metrics.discountPercent > 10 &&
-                      " نسبة الخصومات قد تؤثر على هوامش الربح على المدى الطويل."}
-                  </p>
-                </div>
-              </div>
+              <HighlightsPanel
+                items={highlights}
+                netProfit={metrics.netProfit}
+                totalExpenses={metrics.totalExpenses}
+                grossProfit={metrics.grossProfit}
+              />
             </div>
           </>
         )}
       </div>
     </AppShell>
+  );
+}
+
+function RevenueCard({
+  label,
+  value,
+  growth,
+  isPositive,
+  comparison,
+}: {
+  label: string;
+  value: number;
+  growth: number;
+  isPositive: boolean;
+  comparison: string;
+}) {
+  return (
+    <div className="bg-white rounded-xl p-5 shadow-sm border border-border h-full">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm text-text-secondary">{label}</p>
+          <p className="text-2xl font-bold mt-1 tabular-nums">
+            {formatPrice(value)}
+          </p>
+        </div>
+        <DollarSign className="w-6 h-6 text-accent shrink-0" />
+      </div>
+      <div
+        className={`mt-3 inline-flex items-center gap-1 text-xs font-semibold tabular-nums px-2 py-1 rounded-md ${
+          isPositive
+            ? "bg-success-light text-success"
+            : "bg-danger-light text-danger"
+        }`}
+      >
+        {isPositive ? (
+          <TrendingUp className="w-3.5 h-3.5" />
+        ) : (
+          <TrendingDown className="w-3.5 h-3.5" />
+        )}
+        {isPositive ? "+" : ""}
+        {growth.toFixed(1)}%
+        <span className="font-normal opacity-80 mr-1">{comparison}</span>
+      </div>
+    </div>
+  );
+}
+
+interface Highlight {
+  label: string;
+  value: string;
+  hint?: string;
+}
+
+function computeHighlights(
+  trendData: { date: string; revenue: number; count?: number }[],
+  topProducts: { name: string; revenue: number; qty: number }[],
+  categoryChartData: { name: string; value: number }[],
+): Highlight[] {
+  const result: Highlight[] = [];
+
+  if (trendData.length > 0) {
+    const total = trendData.reduce((s, d) => s + d.revenue, 0);
+    const nonZeroDays = trendData.filter((d) => d.revenue > 0).length;
+    const denom = nonZeroDays || trendData.length;
+    const avg = total / denom;
+    let peak = trendData[0];
+    for (const d of trendData) if (d.revenue > peak.revenue) peak = d;
+    if (peak.revenue > 0) {
+      result.push({
+        label: "أفضل يوم مبيعات",
+        value: formatPrice(peak.revenue),
+        hint: peak.date,
+      });
+    }
+    if (avg > 0) {
+      result.push({
+        label: "المتوسط اليومي",
+        value: formatPrice(Math.round(avg)),
+        hint: `على ${denom} يوم`,
+      });
+    }
+  }
+
+  if (topProducts.length > 0 && topProducts[0].revenue > 0) {
+    const total = topProducts.reduce((s, p) => s + p.revenue, 0);
+    const share = total === 0 ? 0 : (topProducts[0].revenue / total) * 100;
+    result.push({
+      label: "أعلى منتج",
+      value: topProducts[0].name,
+      hint: `${share.toFixed(1)}% من أعلى 5`,
+    });
+  }
+
+  if (categoryChartData.length > 0) {
+    const sorted = [...categoryChartData].sort((a, b) => b.value - a.value);
+    const total = sorted.reduce((s, d) => s + d.value, 0);
+    const top = sorted[0];
+    if (top && total > 0) {
+      const share = (top.value / total) * 100;
+      const label = CATEGORY_LABELS[top.name as Category] || top.name;
+      result.push({
+        label: "أعلى صنف",
+        value: label,
+        hint: `${share.toFixed(1)}% من الإيراد`,
+      });
+    }
+  }
+
+  return result;
+}
+
+function HighlightsPanel({
+  items,
+  netProfit,
+  totalExpenses,
+  grossProfit,
+}: {
+  items: Highlight[];
+  netProfit: number;
+  totalExpenses: number;
+  grossProfit: number;
+}) {
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-border overflow-hidden h-full flex flex-col">
+      <div className="px-5 pt-5 pb-3 border-b border-border">
+        <h3 className="text-sm font-semibold text-text-primary">
+          ملخص الفترة
+        </h3>
+        <p className="text-[11px] text-text-secondary mt-0.5">
+          نقاط رئيسية مستخرجة من بيانات الفترة المختارة
+        </p>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="flex-1 flex items-center justify-center p-8">
+          <p className="text-sm text-text-secondary">
+            لا توجد بيانات كافية لإنتاج ملخص.
+          </p>
+        </div>
+      ) : (
+        <>
+          <ul className="grid grid-cols-2 divide-x divide-y divide-border [direction:rtl]">
+            {items.map((h) => (
+              <li key={h.label} className="p-4">
+                <p className="text-[10px] uppercase tracking-wider text-text-secondary">
+                  {h.label}
+                </p>
+                <p className="text-sm font-semibold text-text-primary mt-1 truncate tabular-nums">
+                  {h.value}
+                </p>
+                {h.hint && (
+                  <p className="text-[11px] text-text-secondary mt-0.5">
+                    {h.hint}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+
+          <div className="mt-auto px-5 py-4 border-t border-border bg-bg-main/40 space-y-2">
+            <FinancialRow
+              label="إجمالي الربح"
+              value={formatPrice(grossProfit)}
+            />
+            <FinancialRow
+              label="مصاريف تشغيلية"
+              value={formatPrice(totalExpenses)}
+              negative
+            />
+            <FinancialRow
+              label="صافي الربح"
+              value={formatPrice(netProfit)}
+              emphasized
+              positive={netProfit >= 0}
+            />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function FinancialRow({
+  label,
+  value,
+  negative,
+  emphasized,
+  positive,
+}: {
+  label: string;
+  value: string;
+  negative?: boolean;
+  emphasized?: boolean;
+  positive?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between text-sm">
+      <span
+        className={
+          emphasized ? "font-semibold text-text-primary" : "text-text-secondary"
+        }
+      >
+        {label}
+      </span>
+      <span
+        className={`tabular-nums ${
+          emphasized
+            ? positive
+              ? "font-bold text-success"
+              : "font-bold text-danger"
+            : negative
+              ? "text-danger"
+              : "font-medium text-text-primary"
+        }`}
+      >
+        {value}
+      </span>
+    </div>
   );
 }
