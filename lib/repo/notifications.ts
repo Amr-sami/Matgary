@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { withTenant } from "@/lib/db";
 import { notifications } from "@/lib/db/schema";
+import { publishUserNotificationEvent } from "@/lib/notifications/events";
 
 export type NotificationKind =
   | "low_stock"
@@ -85,16 +86,23 @@ export interface CreateNotificationInput {
 export async function createNotification(
   tx: Parameters<Parameters<typeof withTenant>[1]>[0],
   tenantId: string,
+  /** Branch this notification is associated with. Pass null for tenant-wide
+   *  system notifications (billing, account, etc.). */
+  branchId: string | null,
   input: CreateNotificationInput,
 ): Promise<void> {
   await tx.insert(notifications).values({
     tenantId,
+    branchId,
     userId: input.userId,
     kind: input.kind,
     title: input.title,
     body: input.body ?? null,
     link: input.link ?? null,
   });
+  // Fire-and-forget pub/sub poke. If the surrounding tx later rolls back,
+  // the SSE consumer just refetches and finds nothing new — harmless.
+  void publishUserNotificationEvent(input.userId);
 }
 
 /**
@@ -102,10 +110,11 @@ export async function createNotification(
  */
 export async function pushNotification(
   tenantId: string,
+  branchId: string | null,
   input: CreateNotificationInput,
 ): Promise<void> {
   await withTenant(tenantId, async (tx) => {
-    await createNotification(tx, tenantId, input);
+    await createNotification(tx, tenantId, branchId, input);
   });
 }
 
@@ -126,6 +135,7 @@ export async function markNotificationRead(
         ),
       );
   });
+  void publishUserNotificationEvent(userId);
 }
 
 export async function markAllNotificationsRead(
@@ -144,6 +154,7 @@ export async function markAllNotificationsRead(
         ),
       );
   });
+  void publishUserNotificationEvent(userId);
 }
 
 export async function unreadCountByKind(
@@ -187,4 +198,5 @@ export async function markReadByKind(
         ),
       );
   });
+  void publishUserNotificationEvent(userId);
 }

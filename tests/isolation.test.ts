@@ -11,6 +11,7 @@ import {
   categories,
   brands,
   products,
+  branches,
 } from "@/lib/db/schema";
 import { addProduct, deleteProduct, listProducts, updateProduct } from "@/lib/repo/catalog";
 import {
@@ -33,9 +34,11 @@ let tenantB: string;
 let userA: string;
 let userB: string;
 let productA: string;
+let branchA: string;
+let branchB: string;
 
 async function freshTenant(name: string, email: string) {
-  const tenantId = await db.transaction(async (tx) => {
+  return db.transaction(async (tx) => {
     const [u] = await tx
       .insert(users)
       .values({ email, name, passwordHash: "x" })
@@ -45,17 +48,31 @@ async function freshTenant(name: string, email: string) {
       .insert(tenants)
       .values({ name, slug })
       .returning({ id: tenants.id });
+    // Every tenant needs a primary branch — production signup creates one,
+    // tests have to do it explicitly because they bypass signupAction.
+    const [b] = await tx
+      .insert(branches)
+      .values({
+        tenantId: t.id,
+        slug: "main",
+        name: "الفرع الرئيسي",
+        isPrimary: true,
+      })
+      .returning({ id: branches.id });
     await tx.insert(tenantMembers).values({
       tenantId: t.id,
       userId: u.id,
       role: "owner",
     });
     await tx.execute(sql`select set_config('app.tenant_id', ${t.id}, true)`);
-    await tx.insert(shopSettings).values({ tenantId: t.id, shopName: name });
-    await seedCornerStorePreset(tx, t.id);
-    return { tenantId: t.id, userId: u.id };
+    await tx.insert(shopSettings).values({
+      tenantId: t.id,
+      branchId: b.id,
+      shopName: name,
+    });
+    await seedCornerStorePreset(tx, t.id, b.id);
+    return { tenantId: t.id, userId: u.id, branchId: b.id };
   });
-  return tenantId;
 }
 
 beforeAll(async () => {
@@ -87,7 +104,8 @@ beforeAll(async () => {
       returns, sales, expenses,
       product_attribute_values, product_history, products,
       brands, category_attribute_values, category_attributes, categories,
-      shop_settings, tenant_members, sessions, accounts, users, tenants
+      shop_settings, tenant_members, branches,
+      sessions, accounts, users, tenants
     restart identity cascade
   `);
 
@@ -95,8 +113,10 @@ beforeAll(async () => {
   const b = await freshTenant("Tenant B", `b-${Date.now()}@iso.test`);
   tenantA = a.tenantId;
   userA = a.userId;
+  branchA = a.branchId;
   tenantB = b.tenantId;
   userB = b.userId;
+  branchB = b.branchId;
 
   // Seed a product into A using A's catalog (resolved via the cornerstore preset).
   const aCats = await withTenant(tenantA, (tx) =>
@@ -107,7 +127,7 @@ beforeAll(async () => {
   );
   const watches = aCats.find((c) => c.key === "watches")!;
 
-  const created = await addProduct(tenantA, {
+  const created = await addProduct(tenantA, branchA, {
     name: "Tenant-A Watch",
     categoryId: watches.id,
     quantity: 5,
@@ -183,6 +203,7 @@ describe("operations isolation", () => {
       productId: productA,
       quantitySold: 2,
       pricePerUnit: 100,
+      branchId: branchA,
     });
     saleA = sale.saleId;
 

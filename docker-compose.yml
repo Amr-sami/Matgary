@@ -88,5 +88,67 @@ services:
         # crond -f keeps the container in the foreground; -d 8 = info-level.
         exec crond -f -d 8
 
+  # Periodic application cron — pokes the app's internal cron routes on a
+  # schedule. Today: hourly recurring-expense materialisation. Container holds
+  # nothing but BusyBox (curl + crond), so no app code, no DB creds, no
+  # secrets except the bearer token below.
+  #
+  # Production wiring:
+  #   - CRON_SECRET must match the app's CRON_SECRET env var.
+  #   - CRON_TARGET_URL must point to a host the sidecar can reach. The
+  #     `extra_hosts` line maps `host.docker.internal` to the host gateway on
+  #     Linux (it already resolves on Mac/Windows); use that when the Next
+  #     server runs on the host outside compose. If you wrap the Next service
+  #     into this compose later, change CRON_TARGET_URL to `http://app:3000`
+  #     and you can drop extra_hosts.
+  cron:
+    image: alpine:3.20
+    container_name: matgary-cron
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      CRON_SECRET: "${CRON_SECRET:-}"
+      CRON_TARGET_URL: "${CRON_TARGET_URL:-http://host.docker.internal:3000}"
+      RECURRING_EXPENSES_CRON: "0 * * * *"
+      ACTIVITY_CLEANUP_CRON: "30 3 * * *"
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -e
+        apk add --no-cache curl tini >/dev/null
+        if [ -z "$$CRON_SECRET" ]; then
+          echo "[cron] CRON_SECRET not set — refusing to start."
+          exit 1
+        fi
+        # Materialise env into a root-only file the wrapper sources at run-time.
+        # Keeps the secret out of crontab listings and process args.
+        umask 077
+        printf 'CRON_SECRET=%s\nCRON_TARGET_URL=%s\n' \
+          "$$CRON_SECRET" "$$CRON_TARGET_URL" > /etc/cron-env
+        # Generic poker — endpoint passed as $1, label as $2.
+        cat > /usr/local/bin/poke-cron.sh <<'WRAPPER'
+        #!/bin/sh
+        set -e
+        . /etc/cron-env
+        endpoint="$1"
+        label="$2"
+        curl -fsS -X POST \
+          -H "Authorization: Bearer $CRON_SECRET" \
+          "$CRON_TARGET_URL$endpoint" \
+          | sed "s|^|[cron $label] |"
+        WRAPPER
+        chmod 700 /usr/local/bin/poke-cron.sh
+        {
+          echo "$$RECURRING_EXPENSES_CRON /usr/local/bin/poke-cron.sh /api/cron/recurring-expenses recurring-expenses >> /var/log/cron.log 2>&1"
+          echo "$$ACTIVITY_CLEANUP_CRON /usr/local/bin/poke-cron.sh /api/cron/activity-log-cleanup activity-cleanup >> /var/log/cron.log 2>&1"
+        } > /etc/crontabs/root
+        echo "[cron] recurring-expenses schedule: $$RECURRING_EXPENSES_CRON"
+        echo "[cron] activity-cleanup   schedule: $$ACTIVITY_CLEANUP_CRON"
+        echo "[cron] target: $$CRON_TARGET_URL"
+        # `tini` reaps zombies; crond -f keeps the container alive.
+        exec tini -- crond -f -d 8
+
 volumes:
   matgary_pg_data:

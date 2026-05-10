@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Save, Plus, ShieldCheck, IdentificationCard, MapPin, Phone } from "@/lib/icons";
+import { Save, Plus, ShieldCheck, IdentificationCard, MapPin, Phone, Store } from "@/lib/icons";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
@@ -13,6 +13,7 @@ import {
   PERMISSION_LABELS,
   type Permission,
 } from "@/lib/permissions";
+import { useBranches } from "@/hooks/useBranches";
 
 export interface EmployeeFormMember {
   userId: string;
@@ -24,6 +25,7 @@ export interface EmployeeFormMember {
   address: string | null;
   profilePhotoPath: string | null;
   idPhotoPath: string | null;
+  branchId: string | null;
 }
 
 type ToastFn = (t: { type: "success" | "error"; message: string }) => void;
@@ -57,6 +59,10 @@ export function EmployeeFormModal({ isOpen, member, slug, onClose, onSaved, onTo
   const [nationalId, setNationalId] = useState("");
   const [address, setAddress] = useState("");
   const [perms, setPerms] = useState<Permission[]>(DEFAULT_STAFF_PERMISSIONS);
+  // Multi-store: each staff member is locked to ONE branch. The picker is
+  // hidden when the tenant has only one branch (nothing to choose).
+  const [branchId, setBranchId] = useState<string>("");
+  const { branches } = useBranches();
 
   // Photo state — saved path on server vs. just-picked local file
   const [profilePath, setProfilePath] = useState<string | null>(null);
@@ -79,6 +85,7 @@ export function EmployeeFormModal({ isOpen, member, slug, onClose, onSaved, onTo
       setNationalId(member.nationalId ?? "");
       setAddress(member.address ?? "");
       setPerms(member.permissions);
+      setBranchId(member.branchId ?? "");
       setProfilePath(member.profilePhotoPath);
       setIdPath(member.idPhotoPath);
     } else {
@@ -89,12 +96,16 @@ export function EmployeeFormModal({ isOpen, member, slug, onClose, onSaved, onTo
       setNationalId("");
       setAddress("");
       setPerms(DEFAULT_STAFF_PERMISSIONS);
+      // Default a new staff member to the active branch (whichever the
+      // owner is currently on) so the most common case is one click.
+      const primary = branches.find((b) => b.isPrimary)?.id;
+      setBranchId(primary ?? branches[0]?.id ?? "");
       setProfilePath(null);
       setIdPath(null);
     }
     setProfilePending(null);
     setIdPending(null);
-  }, [isOpen, member]);
+  }, [isOpen, member, branches]);
 
   // Revoke preview blob URLs on unmount/replacement so we don't leak.
   useEffect(() => {
@@ -205,6 +216,7 @@ export function EmployeeFormModal({ isOpen, member, slug, onClose, onSaved, onTo
             address: address.trim() || null,
             profilePhotoPath: resolvedProfile,
             idPhotoPath: resolvedId,
+            branchId,
           }),
         });
         if (!res.ok) {
@@ -228,6 +240,7 @@ export function EmployeeFormModal({ isOpen, member, slug, onClose, onSaved, onTo
             address: address.trim() || null,
             profilePhotoPath: resolvedProfile,
             idPhotoPath: resolvedId,
+            branchId,
           }),
         });
         if (!res.ok) {
@@ -385,6 +398,38 @@ export function EmployeeFormModal({ isOpen, member, slug, onClose, onSaved, onTo
             />
           </div>
         </section>
+
+        {/* Section 3.5: Branch — multi-store: each staff member is locked
+            to exactly one branch (when they sign in they only see that
+            branch's data). Hidden for single-store tenants. */}
+        {branches.length > 1 && (
+          <section className="pt-4 border-t border-border">
+            <h3 className={sectionTitle}>
+              <Store className="w-3.5 h-3.5 inline-block me-1" />
+              الفرع
+            </h3>
+            <p className="text-xs text-text-secondary mb-2">
+              اختر الفرع الذي يعمل به الموظف. عند تسجيل الدخول لن يرى سوى بيانات هذا الفرع.
+            </p>
+            <select
+              value={branchId}
+              onChange={(e) => setBranchId(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-border bg-white text-sm focus:outline-none focus:border-accent"
+            >
+              <option value="" disabled>
+                اختر فرعاً…
+              </option>
+              {branches
+                .filter((b) => b.isActive)
+                .map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                    {b.isPrimary ? " (الرئيسي)" : ""}
+                  </option>
+                ))}
+            </select>
+          </section>
+        )}
 
         {/* Section 4: Permissions */}
         <section className="pt-4 border-t border-border">

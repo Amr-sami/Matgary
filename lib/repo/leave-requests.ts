@@ -31,9 +31,12 @@ const NAME_EXPR = sql<string | null>`coalesce(${tenantMembers.displayName}, ${us
 
 export async function listLeaveRequests(
   tenantId: string,
-  opts: { onlyForUserId?: string },
+  opts: { onlyForUserId?: string; branchId?: string | null },
 ): Promise<LeaveRequestDto[]> {
   return withTenant(tenantId, async (tx) => {
+    const filters = [eq(leaveRequests.tenantId, tenantId)];
+    if (opts.onlyForUserId) filters.push(eq(leaveRequests.userId, opts.onlyForUserId));
+    if (opts.branchId) filters.push(eq(leaveRequests.branchId, opts.branchId));
     const rows = await tx
       .select({
         request: leaveRequests,
@@ -48,12 +51,7 @@ export async function listLeaveRequests(
         ),
       )
       .leftJoin(users, eq(users.id, leaveRequests.userId))
-      .where(
-        and(
-          eq(leaveRequests.tenantId, tenantId),
-          opts.onlyForUserId ? eq(leaveRequests.userId, opts.onlyForUserId) : sql`true`,
-        ),
-      )
+      .where(and(...filters))
       .orderBy(desc(leaveRequests.createdAt));
 
     if (rows.length === 0) return [];
@@ -106,6 +104,7 @@ export interface CreateLeaveInput {
 
 export async function submitLeaveRequest(
   tenantId: string,
+  branchId: string,
   userId: string,
   input: CreateLeaveInput,
 ): Promise<{ id: string }> {
@@ -117,6 +116,7 @@ export async function submitLeaveRequest(
       .insert(leaveRequests)
       .values({
         tenantId,
+        branchId,
         userId,
         startDate: input.startDate,
         endDate: input.endDate,
@@ -125,7 +125,9 @@ export async function submitLeaveRequest(
       })
       .returning({ id: leaveRequests.id });
 
-    // Notify the tenant owner(s) so they can approve.
+    // Notify the tenant owner(s) so they can approve. Notification carries
+    // the branch context so multi-store owners viewing one branch don't get
+    // approval pings about the other.
     const owners = await tx
       .select({ userId: tenantMembers.userId })
       .from(tenantMembers)
@@ -149,7 +151,7 @@ export async function submitLeaveRequest(
       .limit(1);
     for (const o of owners) {
       if (o.userId === userId) continue;
-      await createNotification(tx, tenantId, {
+      await createNotification(tx, tenantId, branchId, {
         userId: o.userId,
         kind: "leave_submitted",
         title: "طلب إجازة جديد",
@@ -191,7 +193,7 @@ export async function decideLeaveRequest(
       .where(and(eq(leaveRequests.tenantId, tenantId), eq(leaveRequests.id, id)));
 
     if (existing.userId !== decidedByUserId) {
-      await createNotification(tx, tenantId, {
+      await createNotification(tx, tenantId, existing.branchId, {
         userId: existing.userId,
         kind: "leave_decided",
         title:

@@ -1,8 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useSession } from "next-auth/react";
 import { AppShell } from "@/components/layout/AppShell";
-import { useInsights } from "@/hooks/useInsights";
+import { useInsights, type InsightsBranchScope } from "@/hooks/useInsights";
+import { useBranches } from "@/hooks/useBranches";
 import { TrendChart } from "@/components/insights/TrendChart";
 import { CategoryPieChart } from "@/components/insights/CategoryPieChart";
 import { TopProducts } from "@/components/insights/TopProducts";
@@ -102,15 +104,27 @@ const COMPARISON_LABEL: Record<DateRangeKey, string> = {
 };
 
 export default function InsightsPage() {
+  const { data: session } = useSession();
+  const isOwner = session?.user?.role === "owner";
+  const { branches: accessibleBranches, current: activeBranch } = useBranches();
+
   const [tab, setTab] = useState<TabKey>("overview");
   const [dateRange, setDateRange] = useState<DateRangeKey>("all");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
+  // Branch scope: "active" follows the topbar picker; "all" merges every
+  // branch (owner only). Default for owner is "all" so they see the merged
+  // view they're used to; staff always see their active branch.
+  const [branchScope, setBranchScope] = useState<"active" | "all">("active");
+  const showBranchToggle = isOwner && accessibleBranches.length > 1;
+  const branchScopeParam: InsightsBranchScope =
+    branchScope === "all" ? "all" : undefined;
+
   const insightsWindow = useMemo(
     () => resolveInsightsWindow(dateRange, customFrom, customTo) ?? undefined,
     [dateRange, customFrom, customTo],
   );
-  const { data, loading } = useInsights(insightsWindow);
+  const { data, loading } = useInsights(insightsWindow, branchScopeParam);
   const headlineLabel =
     dateRange === "all"
       ? "مبيعات الشهر الحالي"
@@ -135,6 +149,36 @@ export default function InsightsPage() {
     <AppShell title="تحليلات العمل">
       <div className="space-y-5">
         <Tabs items={INSIGHTS_TABS} active={tab} onChange={setTab} />
+
+        {showBranchToggle && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-text-secondary">النطاق:</span>
+            <div className="inline-flex rounded-lg border border-border bg-white overflow-hidden text-xs">
+              <button
+                type="button"
+                onClick={() => setBranchScope("active")}
+                className={`px-3 py-1.5 transition-colors ${
+                  branchScope === "active"
+                    ? "bg-accent text-white"
+                    : "text-text-secondary hover:bg-bg-main"
+                }`}
+              >
+                {activeBranch?.name ?? "الفرع الحالي"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setBranchScope("all")}
+                className={`px-3 py-1.5 transition-colors border-s border-border ${
+                  branchScope === "all"
+                    ? "bg-accent text-white"
+                    : "text-text-secondary hover:bg-bg-main"
+                }`}
+              >
+                كل الفروع
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="space-y-2">
           <div className="flex flex-wrap gap-2">

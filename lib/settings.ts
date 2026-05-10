@@ -16,6 +16,12 @@ export interface ShopSettings {
   greenApiToken: string;
   greenApiUrl: string;
   sendAsPdf: boolean;
+  /** Loyalty programme — disabled by default. Per-branch in multi-store. */
+  loyaltyEnabled: boolean;
+  /** Earn rate: points per EGP spent (e.g. 0.1 = 1 pt per 10 EGP). */
+  loyaltyPointsPerEgp: number;
+  /** Redeem rate: EGP value of one point (e.g. 0.1 = 1 pt = 0.10 EGP off). */
+  loyaltyEgpPerPoint: number;
 }
 
 export const DEFAULT_SETTINGS: ShopSettings = {
@@ -28,6 +34,9 @@ export const DEFAULT_SETTINGS: ShopSettings = {
   greenApiToken: "",
   greenApiUrl: "",
   sendAsPdf: false,
+  loyaltyEnabled: false,
+  loyaltyPointsPerEgp: 0,
+  loyaltyEgpPerPoint: 0,
 };
 
 export interface ReceiptVars {

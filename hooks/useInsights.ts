@@ -1,13 +1,14 @@
 "use client";
 
-import { useMemo } from "react";
-import { useSales } from "./useSales";
-import { useReturns } from "./useReturns";
-import { useProducts } from "./useProducts";
-import { useExpenses } from "./useExpenses";
-import { startOfDay, endOfDay, getThisMonthRange, isBetween } from "@/lib/utils";
-import { startOfMonth, subMonths, format, eachDayOfInterval, isSameDay } from "date-fns";
-import type { Sale, Return, Product } from "@/lib/types";
+import { useEffect, useState } from "react";
+
+// All aggregation now lives in the server route `/api/insights/overview`. The
+// browser used to download every sale, return, expense, and product just to
+// compute six numbers — for a tenant with 50k sales that was multiple MB of
+// JSON over the wire on every page load.
+//
+// The hook here is intentionally small: it just fetches, validates the shape
+// the route promises, and re-fetches when the date window changes.
 
 export interface InsightsWindow {
   /** Start of the analysed period, inclusive. Undefined = open-ended. */
@@ -16,172 +17,110 @@ export interface InsightsWindow {
   to?: Date;
 }
 
-export function useInsights(window?: InsightsWindow) {
-  const { sales, loading: salesLoading } = useSales();
-  const { returns, loading: returnsLoading } = useReturns();
-  const { products, loading: productsLoading } = useProducts();
-  const { expenses, loading: expensesLoading } = useExpenses();
+export interface InsightsOverviewData {
+  window: { from: string; to: string } | null;
+  metrics: {
+    currentRevenue: number;
+    lastRevenue: number;
+    revenueGrowth: number;
+    totalRevenue: number;
+    totalCostOfGoods: number;
+    totalExpenses: number;
+    grossProfit: number;
+    netProfit: number;
+    totalDiscounts: number;
+    discountPercent: number;
+    totalSales: number;
+    totalReturns: number;
+  };
+  trendData: Array<{ date: string; revenue: number; count?: number }>;
+  topProducts: Array<{
+    id: string;
+    name: string;
+    brand?: string;
+    qty: number;
+    revenue: number;
+  }>;
+  categoryChartData: Array<{ name: string; value: number }>;
+}
 
-  const windowFrom = window?.from;
-  const windowTo = window?.to;
-  // Stable dependency keys so useMemo doesn't re-run on every render due to
-  // new Date instances passed in by the parent.
-  const fromKey = windowFrom ? windowFrom.getTime() : null;
-  const toKey = windowTo ? windowTo.getTime() : null;
+/** Branch scope for the overview fetch.
+ *  - undefined → server defaults to the active branch from the cookie.
+ *  - "all" → aggregate every branch (owner only on the server).
+ *  - <uuid> → restrict to that branch. */
+export type InsightsBranchScope = string | "all" | undefined;
 
-  const data = useMemo(() => {
-    if (salesLoading || returnsLoading || productsLoading || expensesLoading) return null;
+export function useInsights(
+  window?: InsightsWindow,
+  branchScope?: InsightsBranchScope,
+) {
+  const [data, setData] = useState<InsightsOverviewData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-    const now = new Date();
+  // Stable dependency keys so we don't re-fetch on every parent render.
+  const fromKey = window?.from ? window.from.getTime() : null;
+  const toKey = window?.to ? window.to.getTime() : null;
 
-    // Resolve the active analysis window. When the caller passes one we honour
-    // it; otherwise default to "this month" for revenue / "all time" for the
-    // bottom totals (preserving the original page behavior).
-    const hasWindow = !!(windowFrom || windowTo);
-    const fromDate = windowFrom ?? new Date(0);
-    const toDate = windowTo ?? endOfDay(now);
-    const inWindow = (d: Date) => d >= fromDate && d <= toDate;
+  useEffect(() => {
+    let cancelled = false;
+    const ctrl = new AbortController();
+    setError(null);
+    // Show the skeleton only when we have no data yet. Subsequent
+    // window-change refreshes keep the previous render visible until the new
+    // payload arrives — no blank-page flicker between filter clicks. Without
+    // this guard React Strict Mode's double-effect (dev only) aborts the
+    // first fetch, the `finally` still flips loading=false, and the page's
+    // `if (!data) return null` paints a blank frame.
+    setLoading((prev) => (data == null ? true : prev));
 
-    // 0. Product Cost Map for Profit Calculation
-    const productCostMap: Record<string, number> = {};
-    products.forEach(p => {
-      productCostMap[p.id] = p.costPrice || 0;
-    });
-
-    // 1. Current vs prior period revenue.
-    //    - With a window: compare the window to the immediately preceding
-    //      window of the same length.
-    //    - Without a window: compare current calendar month to last month
-    //      (preserves the original page behaviour).
-    let currentRevenue: number;
-    let lastRevenue: number;
-    if (hasWindow && windowFrom) {
-      const winSales = sales.filter((s) => inWindow(new Date(s.saleDate)));
-      currentRevenue = winSales.reduce((sum, s) => sum + s.totalPrice, 0);
-      const lengthMs = toDate.getTime() - fromDate.getTime();
-      const prevTo = new Date(fromDate.getTime() - 1);
-      const prevFrom = new Date(prevTo.getTime() - lengthMs);
-      lastRevenue = sales
-        .filter((s) => {
-          const d = new Date(s.saleDate);
-          return d >= prevFrom && d <= prevTo;
-        })
-        .reduce((sum, s) => sum + s.totalPrice, 0);
-    } else {
-      const currentMonthStart = startOfMonth(now);
-      const lastMonthStart = startOfMonth(subMonths(now, 1));
-      const lastMonthEnd = endOfDay(new Date(currentMonthStart.getTime() - 1));
-      const currentMonthSales = sales.filter(s => new Date(s.saleDate) >= currentMonthStart);
-      const lastMonthSales = sales.filter(s => {
-        const d = new Date(s.saleDate);
-        return d >= lastMonthStart && d <= lastMonthEnd;
-      });
-      currentRevenue = currentMonthSales.reduce((sum, s) => sum + s.totalPrice, 0);
-      lastRevenue = lastMonthSales.reduce((sum, s) => sum + s.totalPrice, 0);
+    const params = new URLSearchParams();
+    // Only send a window when both endpoints are present — the route rejects
+    // a half-open range. "All time" is "no params at all".
+    if (fromKey != null && toKey != null) {
+      params.set("from", new Date(fromKey).toISOString());
+      params.set("to", new Date(toKey).toISOString());
     }
-    const revenueGrowth =
-      lastRevenue === 0
-        ? currentRevenue > 0
-          ? 100
-          : 0
-        : ((currentRevenue - lastRevenue) / lastRevenue) * 100;
+    if (branchScope) params.set("branchId", branchScope);
+    const url =
+      "/api/insights/overview" +
+      (params.toString() ? `?${params.toString()}` : "");
 
-    // 2. Revenue Trend
-    //    - With a window: span the window (daily buckets, capped at 90 days for
-    //      readability).
-    //    - Without a window: last 30 days (preserves original page behaviour).
-    const TREND_MAX_DAYS = 90;
-    const trendStart = hasWindow
-      ? startOfDay(windowFrom ?? new Date(toDate.getTime() - 29 * 24 * 60 * 60 * 1000))
-      : (() => {
-          const d = startOfDay(new Date());
-          d.setDate(d.getDate() - 29);
-          return d;
-        })();
-    const trendEnd = hasWindow ? endOfDay(toDate) : endOfDay(now);
-    const totalDays =
-      Math.floor((trendEnd.getTime() - trendStart.getTime()) / (24 * 60 * 60 * 1000)) + 1;
-    const cappedStart =
-      totalDays > TREND_MAX_DAYS
-        ? new Date(trendEnd.getTime() - (TREND_MAX_DAYS - 1) * 24 * 60 * 60 * 1000)
-        : trendStart;
-    const days = eachDayOfInterval({ start: cappedStart, end: trendEnd });
-    const trendData = days.map((day) => {
-      const daySales = sales.filter((s) => isSameDay(new Date(s.saleDate), day));
-      return {
-        date: format(day, "MMM dd"),
-        revenue: daySales.reduce((sum, s) => sum + s.totalPrice, 0),
-        count: daySales.length,
-      };
-    });
-
-    // 3. Sales / returns / expenses constrained to the window for the totals
-    //    block. With no window we keep the all-time totals.
-    const winSales = hasWindow ? sales.filter((s) => inWindow(new Date(s.saleDate))) : sales;
-    const winReturns = hasWindow
-      ? returns.filter((r) => inWindow(new Date(r.returnDate)))
-      : returns;
-    const winExpenses = hasWindow
-      ? expenses.filter((e) => inWindow(new Date(e.date)))
-      : expenses;
-
-    // 4. Top Products (within window)
-    const productSales: Record<string, { id: string; name: string; brand?: string; qty: number; revenue: number }> = {};
-    winSales.forEach(s => {
-      if (!productSales[s.productId]) {
-        productSales[s.productId] = { id: s.productId, name: s.productName, brand: s.brand, qty: 0, revenue: 0 };
+    (async () => {
+      try {
+        const res = await fetch(url, {
+          signal: ctrl.signal,
+          cache: "no-store",
+        });
+        if (cancelled) return;
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || `request failed (${res.status})`);
+        }
+        const json = (await res.json()) as InsightsOverviewData;
+        if (cancelled) return;
+        setData(json);
+      } catch (err: unknown) {
+        if (cancelled) return;
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        setError(err instanceof Error ? err.message : "حدث خطأ");
+        // Deliberately don't `setData(null)` — keep the last successful
+        // render visible alongside the error so the user isn't dumped onto
+        // a blank page.
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      productSales[s.productId].qty += s.quantitySold;
-      productSales[s.productId].revenue += s.totalPrice;
-    });
+    })();
 
-    const topProducts = Object.values(productSales)
-      .sort((a, b) => b.qty - a.qty)
-      .slice(0, 5);
-
-    // 5. Category Performance (within window)
-    const categoryData: Record<string, number> = {};
-    winSales.forEach(s => {
-      categoryData[s.category] = (categoryData[s.category] || 0) + s.totalPrice;
-    });
-
-    const categoryChartData = Object.entries(categoryData).map(([name, value]) => ({ name, value }));
-
-    // 6. Financial totals (within window)
-    const totalRevenue = winSales.reduce((sum, s) => sum + s.totalPrice, 0);
-    const totalCostOfGoods = winSales.reduce((sum, s) => {
-      const costPerUnit = productCostMap[s.productId] || 0;
-      return sum + (costPerUnit * s.quantitySold);
-    }, 0);
-    const totalExpenses = winExpenses.reduce((sum, e) => sum + e.amount, 0);
-    const totalDiscounts = winSales.reduce((sum, s) => sum + (s.discountAmount || 0), 0);
-    const grossProfit = totalRevenue - totalCostOfGoods;
-    const netProfit = grossProfit - totalExpenses;
-
-    const potentialRevenue = winSales.reduce((sum, s) => sum + (s.subtotal || s.totalPrice), 0);
-    const discountPercent = potentialRevenue === 0 ? 0 : (totalDiscounts / potentialRevenue) * 100;
-
-    return {
-      window: hasWindow ? { from: fromDate, to: toDate } : null,
-      metrics: {
-        currentRevenue,
-        lastRevenue,
-        revenueGrowth,
-        totalRevenue,
-        totalCostOfGoods,
-        totalExpenses,
-        grossProfit,
-        netProfit,
-        totalDiscounts,
-        discountPercent,
-        totalSales: winSales.length,
-        totalReturns: winReturns.length,
-      },
-      trendData,
-      topProducts,
-      categoryChartData,
+    return () => {
+      cancelled = true;
+      ctrl.abort();
     };
-  }, [sales, returns, products, expenses, salesLoading, returnsLoading, productsLoading, expensesLoading, fromKey, toKey]);
+    // `data` is intentionally excluded from deps — including it would re-run
+    // the fetch every time the response lands. We only read its current value
+    // to decide whether to show the skeleton on this run.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fromKey, toKey, branchScope]);
 
-  return { data, loading: salesLoading || returnsLoading || productsLoading || expensesLoading };
+  return { data, loading, error };
 }

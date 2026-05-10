@@ -58,6 +58,7 @@ export const ACTION_LABELS: Record<string, string> = {
   "sale.mark_paid": "تأكيد دفع فاتورة",
   "expense.create": "تسجيل مصروف",
   "expense.delete": "حذف مصروف",
+  "expense.recurring_materialized": "إنشاء مصاريف دورية مستحقة",
   "supplier.create": "إضافة مورد",
   "supplier.update": "تعديل مورد",
   "supplier.delete": "حذف مورد",
@@ -71,6 +72,14 @@ export const ACTION_LABELS: Record<string, string> = {
   "billing.payment_succeeded": "تم استلام دفعة الاشتراك",
   "billing.payment_failed": "فشل دفع الاشتراك",
   "billing.cancelled": "إلغاء الاشتراك",
+  "loyalty.credit_grant": "إضافة رصيد للعميل",
+  "loyalty.credit_deduct": "خصم رصيد من العميل",
+  "branch.create": "إضافة فرع",
+  "branch.update": "تعديل فرع",
+  "branch.disable": "إيقاف فرع",
+  "branch.enable": "تفعيل فرع",
+  "branch.delete": "حذف فرع",
+  "branch.switch": "تبديل الفرع الحالي",
 };
 
 // Friendly Arabic label for a metadata field key. Falls back to the raw key

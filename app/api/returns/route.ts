@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireTenant } from "@/lib/api/auth-helpers";
+import { resolveBranchFilter } from "@/lib/api/branch-context";
 import { listReturns, recordReturn } from "@/lib/repo/operations";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const r = await requireTenant();
   if (!r.ok) return r.response;
-  const data = await listReturns(r.ctx.tenantId);
-  return NextResponse.json({ data });
+  const filter = await resolveBranchFilter(
+    r.ctx,
+    req.nextUrl.searchParams.get("branchId"),
+  );
+  if (!filter.ok) {
+    return NextResponse.json({ error: filter.error }, { status: filter.status });
+  }
+  const data = await listReturns(r.ctx.tenantId, filter.branchId);
+  return NextResponse.json({ data, branchId: filter.branchId });
 }
 
 const schema = z.object({

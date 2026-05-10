@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { normalizePhone } from "@/lib/settings";
-import { requireTenant } from "@/lib/api/auth-helpers";
+import { requireTenantWithBranch } from "@/lib/api/auth-helpers";
 import { getGreenApiCredentials } from "@/lib/repo/settings";
 import { rateLimit } from "@/lib/ratelimit";
 
@@ -18,7 +18,7 @@ const schema = z.object({
 });
 
 export async function POST(req: Request) {
-  const auth = await requireTenant();
+  const auth = await requireTenantWithBranch();
   if (!auth.ok) return auth.response;
 
   const limit = await rateLimit("wa.send", auth.ctx.tenantId, {
@@ -48,7 +48,8 @@ export async function POST(req: Request) {
   }
 
   // Server-side credential lookup — never trust the client to provide them.
-  const creds = await getGreenApiCredentials(auth.ctx.tenantId);
+  // Multi-store: each branch has its own Green API instance.
+  const creds = await getGreenApiCredentials(auth.ctx.tenantId, auth.ctx.branchId);
   if (!creds.enabled || !creds.instanceId || !creds.token) {
     return NextResponse.json(
       { ok: false, error: "Green API is not configured for this tenant" },

@@ -99,6 +99,16 @@ export const tenantMembers = pgTable(
     permissions: text("permissions").array().notNull().default(sql`'{}'::text[]`),
     /** Display name for sub-accounts (e.g. "Ahmed"). For owner this duplicates users.name. */
     displayName: text("display_name"),
+    /** Multi-store: each staff member is locked to ONE branch. NULL only for
+     *  the owner role (implicit access to every branch — they pick via the
+     *  topbar picker). The legacy uuid[] `branch_ids` column is kept for one
+     *  more deploy in case anything still reads it; will be dropped in a
+     *  follow-up. */
+    branchId: uuid("branch_id").references(() => branches.id, {
+      onDelete: "restrict",
+    }),
+    /** @deprecated read `branchId` instead. Kept only for back-compat. */
+    branchIds: uuid("branch_ids").array().notNull().default(sql`'{}'::uuid[]`),
     /** Contact phone (free-form, normalized at the form level). */
     phone: text("phone"),
     /** Egyptian national ID (or other government ID). */
@@ -119,28 +129,84 @@ export const tenantMembers = pgTable(
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Branches (scoped) — multi-location support. Every tenant has at least one
+// branch (its primary). Sales / inventory / attendance / purchases all carry
+// a branch_id so reports and stock can be sliced per location.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const branches = pgTable(
+  "branches",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    /** Stable URL-safe identifier within the tenant. "main" for the primary
+     *  branch; auto-derived from name + random suffix for additional ones. */
+    slug: text("slug").notNull(),
+    name: text("name").notNull(),
+    /** Free-form physical address line. */
+    address: text("address"),
+    /** Branch-specific contact phone (mobile or landline). */
+    phone: text("phone"),
+    /** Soft-disable flag: hides from selectors but preserves history. */
+    isActive: boolean("is_active").notNull().default(true),
+    /** Tenant's primary branch. Created automatically on signup. Protected
+     *  from deletion. Exactly one per tenant (enforced by partial unique
+     *  index in the migration). */
+    isPrimary: boolean("is_primary").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [index("branches_tenant_idx").on(t.tenantId)],
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Per-tenant settings (scoped) — RLS applied in a separate migration step
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const shopSettings = pgTable("shop_settings", {
-  tenantId: uuid("tenant_id")
-    .primaryKey()
-    .references(() => tenants.id, { onDelete: "cascade" }),
-  shopName: text("shop_name").notNull().default(""),
-  shopPhone: text("shop_phone"),
-  logoPath: text("logo_path"),
-  autoOpenWhatsapp: boolean("auto_open_whatsapp").notNull().default(true),
-  messageTemplate: text("message_template").notNull().default(""),
-  greenApiEnabled: boolean("green_api_enabled").notNull().default(false),
-  greenApiInstanceId: text("green_api_instance_id"),
-  greenApiToken: text("green_api_token"), // encrypted at rest (Phase 4)
-  greenApiUrl: text("green_api_url"),
-  sendAsPdf: boolean("send_as_pdf").notNull().default(false),
-  onboardingCompletedAt: timestamp("onboarding_completed_at", { withTimezone: true }),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .default(sql`now()`),
-});
+// shop_settings is now per-(tenant, branch). Each branch has its own shop
+// name, logo, WhatsApp credentials, and message template — full multi-store
+// isolation. The composite primary key replaces the old tenant-only PK.
+export const shopSettings = pgTable(
+  "shop_settings",
+  {
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branches.id, { onDelete: "cascade" }),
+    shopName: text("shop_name").notNull().default(""),
+    shopPhone: text("shop_phone"),
+    logoPath: text("logo_path"),
+    autoOpenWhatsapp: boolean("auto_open_whatsapp").notNull().default(true),
+    messageTemplate: text("message_template").notNull().default(""),
+    greenApiEnabled: boolean("green_api_enabled").notNull().default(false),
+    greenApiInstanceId: text("green_api_instance_id"),
+    greenApiToken: text("green_api_token"), // encrypted at rest (Phase 4)
+    greenApiUrl: text("green_api_url"),
+    sendAsPdf: boolean("send_as_pdf").notNull().default(false),
+    onboardingCompletedAt: timestamp("onboarding_completed_at", { withTimezone: true }),
+    /** Loyalty programme — disabled by default. Each branch runs its own. */
+    loyaltyEnabled: boolean("loyalty_enabled").notNull().default(false),
+    /** How many points one EGP earns. e.g. 0.1 = 1 pt per 10 EGP. Numeric;
+     *  the application floors awarded points to int. Stored as text in TS. */
+    loyaltyPointsPerEgp: text("loyalty_points_per_egp").notNull().default("0"),
+    /** EGP value of one point. e.g. 0.1 = 1 pt = 0.10 EGP off. */
+    loyaltyEgpPerPoint: text("loyalty_egp_per_point").notNull().default("0"),
+    /** Optional expiry window for earned points. Null = never expire. */
+    loyaltyExpiryDays: integer("loyalty_expiry_days"),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [primaryKey({ columns: [t.tenantId, t.branchId] })],
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Relations
@@ -182,6 +248,9 @@ export const categories = pgTable(
     tenantId: uuid("tenant_id")
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branches.id, { onDelete: "restrict" }),
     key: text("key").notNull(),
     label: text("label").notNull(),
     icon: text("icon"), // lucide icon name, falls back to "Package"
@@ -204,6 +273,9 @@ export const categoryAttributes = pgTable(
     tenantId: uuid("tenant_id")
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branches.id, { onDelete: "restrict" }),
     categoryId: uuid("category_id")
       .notNull()
       .references(() => categories.id, { onDelete: "cascade" }),
@@ -212,7 +284,10 @@ export const categoryAttributes = pgTable(
     position: integer("position").notNull().default(0),
     required: boolean("required").notNull().default(true),
   },
-  (t) => [index("category_attrs_category_idx").on(t.categoryId)],
+  (t) => [
+    index("category_attrs_category_idx").on(t.categoryId),
+    index("category_attrs_branch_idx").on(t.branchId),
+  ],
 );
 
 export const categoryAttributeValues = pgTable(
@@ -222,6 +297,9 @@ export const categoryAttributeValues = pgTable(
     tenantId: uuid("tenant_id")
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branches.id, { onDelete: "restrict" }),
     attributeId: uuid("attribute_id")
       .notNull()
       .references(() => categoryAttributes.id, { onDelete: "cascade" }),
@@ -229,7 +307,10 @@ export const categoryAttributeValues = pgTable(
     label: text("label").notNull(),
     position: integer("position").notNull().default(0),
   },
-  (t) => [index("category_attr_values_attr_idx").on(t.attributeId)],
+  (t) => [
+    index("category_attr_values_attr_idx").on(t.attributeId),
+    index("category_attr_values_branch_idx").on(t.branchId),
+  ],
 );
 
 export const brands = pgTable(
@@ -239,12 +320,18 @@ export const brands = pgTable(
     tenantId: uuid("tenant_id")
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branches.id, { onDelete: "restrict" }),
     categoryId: uuid("category_id").references(() => categories.id, {
       onDelete: "cascade",
     }), // null = applies to any category
     name: text("name").notNull(),
   },
-  (t) => [index("brands_tenant_category_idx").on(t.tenantId, t.categoryId)],
+  (t) => [
+    index("brands_tenant_category_idx").on(t.tenantId, t.categoryId),
+    index("brands_branch_idx").on(t.branchId),
+  ],
 );
 
 export const products = pgTable(
@@ -254,11 +341,18 @@ export const products = pgTable(
     tenantId: uuid("tenant_id")
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
+    /** Each product belongs to exactly one branch — the multi-store model.
+     *  Migrating between branches means duplicating the row; sales / history
+     *  references stay on the original product id. */
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branches.id, { onDelete: "restrict" }),
     categoryId: uuid("category_id")
       .notNull()
       .references(() => categories.id, { onDelete: "restrict" }),
     name: text("name").notNull(),
     brand: text("brand"),
+    /** On-hand quantity at this product's branch. */
     quantity: integer("quantity").notNull().default(0),
     price: text("price").notNull(), // stored as numeric in SQL (raw migration tunes it); kept as text in TS for precision
     costPrice: text("cost_price"),
@@ -284,6 +378,10 @@ export const products = pgTable(
   ],
 );
 
+// `product_stock` was the chain-store-era per-(product, branch) inventory
+// table. Multi-store killed it: products now belong to one branch and carry
+// their own `quantity`. Migration 0015 dropped the table + its trigger.
+
 // Snapshot of the chosen attribute value for a given product. Stores both the
 // value id (for joins) and the value label at create time so historical reports
 // stay accurate even if the tenant later renames the value.
@@ -303,6 +401,9 @@ export const productAttributeValues = pgTable(
     tenantId: uuid("tenant_id")
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branches.id, { onDelete: "restrict" }),
   },
   (t) => [primaryKey({ columns: [t.productId, t.attributeId] })],
 );
@@ -367,6 +468,14 @@ export const sales = pgTable(
     tenantId: uuid("tenant_id")
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
+    /** Branch the sale was rung up at. Nullable during the multi-branch
+     *  rollout so legacy code paths and existing writers don't break; the
+     *  migration backfills every historical row to the tenant's primary
+     *  branch. A follow-up migration will tighten to NOT NULL once every
+     *  writer plumbs the active-branch context. */
+    branchId: uuid("branch_id").references(() => branches.id, {
+      onDelete: "restrict",
+    }),
     invoiceId: text("invoice_id"),
     productId: uuid("product_id")
       .notNull()
@@ -405,6 +514,7 @@ export const sales = pgTable(
     index("sales_tenant_phone_idx").on(t.tenantId, t.customerPhone),
     index("sales_tenant_product_idx").on(t.tenantId, t.productId),
     index("sales_tenant_recorded_by_idx").on(t.tenantId, t.recordedByUserId),
+    index("sales_tenant_branch_date_idx").on(t.tenantId, t.branchId, t.saleDate),
   ],
 );
 
@@ -436,6 +546,11 @@ export const expenses = pgTable(
     tenantId: uuid("tenant_id")
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
+    /** Branch this expense was incurred at. Nullable: a tenant-wide cost
+     *  (e.g. SaaS subscription, accounting fees) leaves it null. */
+    branchId: uuid("branch_id").references(() => branches.id, {
+      onDelete: "restrict",
+    }),
     title: text("title").notNull(),
     amount: text("amount").notNull(), // numeric via migration tune
     category: text("category").notNull(), // global enum: rent | salaries | electricity | water | internet | supplier | other
@@ -458,6 +573,7 @@ export const expenses = pgTable(
     index("expenses_tenant_date_idx").on(t.tenantId, t.date),
     index("expenses_tenant_supplier_idx").on(t.tenantId, t.supplierId),
     index("expenses_tenant_recurring_idx").on(t.tenantId, t.isRecurring, t.nextOccurrenceDate),
+    index("expenses_tenant_branch_date_idx").on(t.tenantId, t.branchId, t.date),
   ],
 );
 
@@ -472,6 +588,9 @@ export const suppliers = pgTable(
     tenantId: uuid("tenant_id")
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branches.id, { onDelete: "restrict" }),
     name: text("name").notNull(),
     phone: text("phone"),
     email: text("email"),
@@ -486,7 +605,10 @@ export const suppliers = pgTable(
       .notNull()
       .default(sql`now()`),
   },
-  (t) => [index("suppliers_tenant_idx").on(t.tenantId)],
+  (t) => [
+    index("suppliers_tenant_idx").on(t.tenantId),
+    index("suppliers_branch_idx").on(t.branchId),
+  ],
 );
 
 export const purchaseOrders = pgTable(
@@ -496,6 +618,12 @@ export const purchaseOrders = pgTable(
     tenantId: uuid("tenant_id")
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
+    /** Branch the goods are received into. Nullable during the multi-branch
+     *  rollout (see sales.branchId for the same rollout pattern); migration
+     *  backfills, follow-up migration tightens to NOT NULL. */
+    branchId: uuid("branch_id").references(() => branches.id, {
+      onDelete: "restrict",
+    }),
     supplierId: uuid("supplier_id")
       .notNull()
       .references(() => suppliers.id, { onDelete: "restrict" }),
@@ -517,6 +645,7 @@ export const purchaseOrders = pgTable(
   (t) => [
     index("purchase_orders_tenant_supplier_idx").on(t.tenantId, t.supplierId),
     index("purchase_orders_tenant_date_idx").on(t.tenantId, t.orderDate),
+    index("purchase_orders_tenant_branch_date_idx").on(t.tenantId, t.branchId, t.orderDate),
   ],
 );
 
@@ -593,6 +722,13 @@ export const storeLocations = pgTable(
     tenantId: uuid("tenant_id")
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
+    /** Branch this geofence pin belongs to. A branch may have several pins
+     *  (front + back entry, etc.). Nullable for backwards compatibility with
+     *  pre-multi-branch rows; the backfill points each pin at the tenant's
+     *  primary branch. */
+    branchId: uuid("branch_id").references(() => branches.id, {
+      onDelete: "restrict",
+    }),
     name: text("name").notNull(),
     latitude: text("latitude").notNull(), // numeric(9,6) via migration tune
     longitude: text("longitude").notNull(), // numeric(9,6) via migration tune
@@ -601,7 +737,10 @@ export const storeLocations = pgTable(
       .notNull()
       .default(sql`now()`),
   },
-  (t) => [index("store_locations_tenant_idx").on(t.tenantId)],
+  (t) => [
+    index("store_locations_tenant_idx").on(t.tenantId),
+    index("store_locations_branch_idx").on(t.branchId),
+  ],
 );
 
 export const attendanceEvents = pgTable(
@@ -611,6 +750,11 @@ export const attendanceEvents = pgTable(
     tenantId: uuid("tenant_id")
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
+    /** Branch the employee clocked in/out at. Nullable during the
+     *  multi-branch rollout; migration backfills, follow-up tightens. */
+    branchId: uuid("branch_id").references(() => branches.id, {
+      onDelete: "restrict",
+    }),
     employeeId: uuid("employee_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
@@ -639,6 +783,7 @@ export const attendanceEvents = pgTable(
       t.occurredAt,
     ),
     index("attendance_tenant_time_idx").on(t.tenantId, t.occurredAt),
+    index("attendance_tenant_branch_time_idx").on(t.tenantId, t.branchId, t.occurredAt),
   ],
 );
 
@@ -722,6 +867,9 @@ export const tasks = pgTable(
     tenantId: uuid("tenant_id")
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branches.id, { onDelete: "restrict" }),
     /** The doer; null = unassigned (rare). */
     assignedToUserId: uuid("assigned_to_user_id").references(() => users.id, {
       onDelete: "set null",
@@ -750,6 +898,7 @@ export const tasks = pgTable(
   (t) => [
     index("tasks_tenant_assignee_idx").on(t.tenantId, t.assignedToUserId),
     index("tasks_tenant_status_idx").on(t.tenantId, t.status),
+    index("tasks_branch_idx").on(t.branchId),
   ],
 );
 
@@ -760,6 +909,9 @@ export const leaveRequests = pgTable(
     tenantId: uuid("tenant_id")
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branches.id, { onDelete: "restrict" }),
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
@@ -780,6 +932,7 @@ export const leaveRequests = pgTable(
   (t) => [
     index("leave_requests_tenant_user_idx").on(t.tenantId, t.userId),
     index("leave_requests_tenant_status_idx").on(t.tenantId, t.status),
+    index("leave_requests_branch_idx").on(t.branchId),
   ],
 );
 
@@ -790,6 +943,11 @@ export const notifications = pgTable(
     tenantId: uuid("tenant_id")
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
+    /** Branch context for the notification. Nullable: tenant-wide system
+     *  notifications (e.g. billing) leave it null. */
+    branchId: uuid("branch_id").references(() => branches.id, {
+      onDelete: "cascade",
+    }),
     /** Recipient. */
     userId: uuid("user_id")
       .notNull()
@@ -891,6 +1049,87 @@ export type SubscriptionRow = typeof subscriptions.$inferSelect;
 export type PaymentAttemptRow = typeof paymentAttempts.$inferSelect;
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Customer loyalty + store credit. One unified wallet per (tenant, branch,
+// customer phone). Multi-store: each branch runs its own programme — points
+// at "main" don't apply at "cairo".
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const customerWallets = pgTable(
+  "customer_wallets",
+  {
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branches.id, { onDelete: "cascade" }),
+    /** Canonical +20… form, same as `sales.customer_phone`. */
+    customerPhone: text("customer_phone").notNull(),
+    /** Snapshot of the latest seen name. UI fallback when no recent sale row. */
+    customerName: text("customer_name"),
+    /** Loyalty points balance — integer (most schemes round to whole points). */
+    points: integer("points").notNull().default(0),
+    /** EGP credit balance. Stored as numeric in SQL (precision-preserving). */
+    credit: text("credit").notNull().default("0"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [
+    primaryKey({ columns: [t.tenantId, t.branchId, t.customerPhone] }),
+    index("customer_wallets_tenant_branch_idx").on(t.tenantId, t.branchId),
+  ],
+);
+
+export const customerWalletEvents = pgTable(
+  "customer_wallet_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branches.id, { onDelete: "cascade" }),
+    customerPhone: text("customer_phone").notNull(),
+    /** 'points_earn' | 'points_redeem' | 'points_expire' |
+     *  'credit_grant' | 'credit_redeem' | 'credit_refund' | 'credit_deduct' */
+    kind: text("kind").notNull(),
+    pointsDelta: integer("points_delta").notNull().default(0),
+    /** Numeric in SQL — text in TS for precision. */
+    creditDelta: text("credit_delta").notNull().default("0"),
+    relatedSaleId: uuid("related_sale_id").references(() => sales.id, {
+      onDelete: "set null",
+    }),
+    relatedReturnId: uuid("related_return_id").references(() => returns.id, {
+      onDelete: "set null",
+    }),
+    /** Whoever initiated the change. Null for system events (e.g. expiry cron). */
+    actorUserId: uuid("actor_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    /** Free-form note for manual grants/deductions. */
+    reason: text("reason"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [
+    index("customer_wallet_events_lookup_idx").on(
+      t.tenantId,
+      t.branchId,
+      t.customerPhone,
+      t.createdAt,
+    ),
+    index("customer_wallet_events_sale_idx").on(t.relatedSaleId),
+  ],
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Audit / activity log (scoped) — RLS applied in a separate migration step.
 // One row per non-trivial mutation in the app. Insertion is fire-and-forget
 // from logActivity() — failures are swallowed so they never break the parent
@@ -922,6 +1161,12 @@ export const activityLogs = pgTable(
     /** Free-form extras: { before: {...}, after: {...} } for updates, key fields for creates. */
     metadata: jsonb("metadata").$type<Record<string, unknown>>(),
     ip: text("ip"),
+    /** Branch the action happened at, when applicable. Nullable: tenant-wide
+     *  actions (e.g. settings change) leave it null. Pure context — never a
+     *  gate. */
+    branchId: uuid("branch_id").references(() => branches.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .default(sql`now()`),

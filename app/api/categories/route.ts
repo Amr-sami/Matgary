@@ -1,14 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireTenant } from "@/lib/api/auth-helpers";
+import {
+  requireTenant,
+  requireTenantWithBranch,
+} from "@/lib/api/auth-helpers";
+import { resolveBranchFilter } from "@/lib/api/branch-context";
 import { listCategories } from "@/lib/repo/catalog";
 import { addCategory } from "@/lib/repo/catalog-admin";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const r = await requireTenant();
   if (!r.ok) return r.response;
-  const data = await listCategories(r.ctx.tenantId);
-  return NextResponse.json({ data });
+  const filter = await resolveBranchFilter(
+    r.ctx,
+    req.nextUrl.searchParams.get("branchId"),
+  );
+  if (!filter.ok) {
+    return NextResponse.json({ error: filter.error }, { status: filter.status });
+  }
+  const data = await listCategories(r.ctx.tenantId, filter.branchId);
+  return NextResponse.json({ data, branchId: filter.branchId });
 }
 
 const createSchema = z.object({
@@ -24,7 +35,7 @@ const createSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const r = await requireTenant();
+  const r = await requireTenantWithBranch();
   if (!r.ok) return r.response;
   const body = await req.json().catch(() => null);
   const parsed = createSchema.safeParse(body);
@@ -32,7 +43,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
   }
   try {
-    const result = await addCategory(r.ctx.tenantId, parsed.data);
+    const result = await addCategory(r.ctx.tenantId, r.ctx.branchId, parsed.data);
     return NextResponse.json(result, { status: 201 });
   } catch (err) {
     return NextResponse.json(

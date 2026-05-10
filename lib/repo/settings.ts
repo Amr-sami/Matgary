@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { withTenant } from "@/lib/db";
 import { shopSettings } from "@/lib/db/schema";
 import { DEFAULT_MESSAGE_TEMPLATE } from "@/lib/settings.defaults";
@@ -8,7 +8,10 @@ import { cacheDel, cacheRemember, tenantKey } from "@/lib/cache";
 // 5 min: settings change rarely, and saveShopSettings busts the key anyway,
 // so a stale read window only opens up after a manual edit in the DB.
 const SETTINGS_TTL_SEC = 300;
-const settingsKey = (tenantId: string) => tenantKey(tenantId, "settings");
+// Multi-store: settings are per (tenant, branch). Each branch has its own
+// shop name, logo, WhatsApp credentials, message template — full isolation.
+const settingsKey = (tenantId: string, branchId: string) =>
+  tenantKey(tenantId, "settings", branchId);
 
 // Sentinel returned to the client in place of the real Green API token. The
 // settings UI shows ••••• and only sends a new value when the operator types
@@ -25,6 +28,14 @@ export interface ShopSettingsDto {
   greenApiToken: string;
   greenApiUrl: string;
   sendAsPdf: boolean;
+  /** Loyalty programme — disabled by default. Each branch runs its own.
+   *  Rates are EGP-denominated:
+   *   - earn: 0.1 = 1 point per 10 EGP spent.
+   *   - redeem: 0.1 = 1 point worth 0.10 EGP discount.
+   *  Both numbers >= 0. The application floors awarded points to int.  */
+  loyaltyEnabled: boolean;
+  loyaltyPointsPerEgp: number;
+  loyaltyEgpPerPoint: number;
 }
 
 export const DEFAULT_DTO: ShopSettingsDto = {
@@ -37,18 +48,27 @@ export const DEFAULT_DTO: ShopSettingsDto = {
   greenApiToken: "",
   greenApiUrl: "",
   sendAsPdf: false,
+  loyaltyEnabled: false,
+  loyaltyPointsPerEgp: 0,
+  loyaltyEgpPerPoint: 0,
 };
 
 /** Load settings for the UI — never exposes the raw Green API token. */
 export async function getShopSettings(
   tenantId: string,
+  branchId: string,
 ): Promise<ShopSettingsDto> {
-  return cacheRemember(settingsKey(tenantId), SETTINGS_TTL_SEC, () =>
+  return cacheRemember(settingsKey(tenantId, branchId), SETTINGS_TTL_SEC, () =>
     withTenant(tenantId, async (tx) => {
       const [row] = await tx
         .select()
         .from(shopSettings)
-        .where(eq(shopSettings.tenantId, tenantId))
+        .where(
+          and(
+            eq(shopSettings.tenantId, tenantId),
+            eq(shopSettings.branchId, branchId),
+          ),
+        )
         .limit(1);
       if (!row) return DEFAULT_DTO;
       return {
@@ -63,6 +83,9 @@ export async function getShopSettings(
         greenApiToken: row.greenApiToken ? TOKEN_PLACEHOLDER : "",
         greenApiUrl: row.greenApiUrl || "",
         sendAsPdf: row.sendAsPdf,
+        loyaltyEnabled: row.loyaltyEnabled,
+        loyaltyPointsPerEgp: Number(row.loyaltyPointsPerEgp ?? 0),
+        loyaltyEgpPerPoint: Number(row.loyaltyEgpPerPoint ?? 0),
       };
     }),
   );
@@ -71,6 +94,7 @@ export async function getShopSettings(
 /** Server-only: decrypt and return the real Green API token for outbound API calls. */
 export async function getGreenApiCredentials(
   tenantId: string,
+  branchId: string,
 ): Promise<{
   enabled: boolean;
   instanceId: string;
@@ -82,7 +106,12 @@ export async function getGreenApiCredentials(
     const [row] = await tx
       .select()
       .from(shopSettings)
-      .where(eq(shopSettings.tenantId, tenantId))
+      .where(
+        and(
+          eq(shopSettings.tenantId, tenantId),
+          eq(shopSettings.branchId, branchId),
+        ),
+      )
       .limit(1);
     if (!row) {
       return { enabled: false, instanceId: "", token: "", url: "", sendAsPdf: false };
@@ -99,6 +128,7 @@ export async function getGreenApiCredentials(
 
 export async function saveShopSettings(
   tenantId: string,
+  branchId: string,
   patch: Partial<ShopSettingsDto>,
 ): Promise<void> {
   await withTenant(tenantId, async (tx) => {
@@ -127,13 +157,30 @@ export async function saveShopSettings(
     if (patch.greenApiUrl !== undefined)
       set.greenApiUrl = patch.greenApiUrl || null;
     if (patch.sendAsPdf !== undefined) set.sendAsPdf = patch.sendAsPdf;
+    if (patch.loyaltyEnabled !== undefined)
+      set.loyaltyEnabled = patch.loyaltyEnabled;
+    if (patch.loyaltyPointsPerEgp !== undefined) {
+      // Clamp to a sensible range. >100 points per EGP is almost certainly
+      // a typo; <0 is nonsensical.
+      const v = Math.max(0, Math.min(100, Number(patch.loyaltyPointsPerEgp)));
+      set.loyaltyPointsPerEgp = v.toFixed(4);
+    }
+    if (patch.loyaltyEgpPerPoint !== undefined) {
+      const v = Math.max(0, Math.min(1000, Number(patch.loyaltyEgpPerPoint)));
+      set.loyaltyEgpPerPoint = v.toFixed(4);
+    }
 
     await tx
       .update(shopSettings)
       .set(set)
-      .where(eq(shopSettings.tenantId, tenantId));
+      .where(
+        and(
+          eq(shopSettings.tenantId, tenantId),
+          eq(shopSettings.branchId, branchId),
+        ),
+      );
   });
   // Co-located bust: the only place that mutates settings is also the only
   // place that knows what to drop from cache.
-  await cacheDel(settingsKey(tenantId));
+  await cacheDel(settingsKey(tenantId, branchId));
 }

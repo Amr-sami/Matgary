@@ -1,14 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requirePermission } from "@/lib/api/auth-helpers";
+import {
+  resolveActiveBranch,
+  resolveBranchFilter,
+} from "@/lib/api/branch-context";
 import { addSupplier, listSuppliers } from "@/lib/repo/suppliers";
 import { logActivity } from "@/lib/repo/activity";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const r = await requirePermission("view_suppliers");
   if (!r.ok) return r.response;
-  const data = await listSuppliers(r.ctx.tenantId);
-  return NextResponse.json({ data });
+  const filter = await resolveBranchFilter(
+    r.ctx,
+    req.nextUrl.searchParams.get("branchId"),
+  );
+  if (!filter.ok) {
+    return NextResponse.json({ error: filter.error }, { status: filter.status });
+  }
+  const data = await listSuppliers(r.ctx.tenantId, filter.branchId);
+  return NextResponse.json({ data, branchId: filter.branchId });
 }
 
 const createSchema = z.object({
@@ -22,12 +33,19 @@ const createSchema = z.object({
 export async function POST(req: NextRequest) {
   const r = await requirePermission("manage_suppliers");
   if (!r.ok) return r.response;
+  const branch = await resolveActiveBranch(r.ctx);
+  if (!branch) {
+    return NextResponse.json(
+      { error: "NO_BRANCH_ACCESS" },
+      { status: 403 },
+    );
+  }
   const body = await req.json().catch(() => null);
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
   }
-  const result = await addSupplier(r.ctx.tenantId, {
+  const result = await addSupplier(r.ctx.tenantId, branch.branchId, {
     name: parsed.data.name,
     phone: parsed.data.phone || null,
     email: parsed.data.email || null,
@@ -42,6 +60,7 @@ export async function POST(req: NextRequest) {
     entityType: "supplier",
     entityId: (result as { id?: string }).id ?? null,
     entityLabel: parsed.data.name,
+    branchId: branch.branchId,
   });
   return NextResponse.json(result, { status: 201 });
 }

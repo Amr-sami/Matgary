@@ -31,6 +31,9 @@ export interface TeamMemberDto {
   /** Relative path under uploads/. Display via /api/uploads/team/<path>. */
   profilePhotoPath: string | null;
   idPhotoPath: string | null;
+  /** Multi-store: each staff member is locked to ONE branch. NULL on the
+   *  owner row means "implicit access to every branch". */
+  branchId: string | null;
 }
 
 /**
@@ -49,7 +52,13 @@ export function splitLoginEmail(email: string): { username: string; domain: stri
   return { username: email.slice(0, at), domain: email.slice(at + 1) };
 }
 
-export async function listTeamMembers(tenantId: string): Promise<TeamMemberDto[]> {
+export async function listTeamMembers(
+  tenantId: string,
+  /** When set, return only members who can access that branch — owner role
+   *  always counts (implicit access), staff must have the branch on their
+   *  branch_ids list. Null = every member in the tenant. */
+  branchId?: string | null,
+): Promise<TeamMemberDto[]> {
   const rows = await db
     .select({
       userId: users.id,
@@ -65,12 +74,19 @@ export async function listTeamMembers(tenantId: string): Promise<TeamMemberDto[]
       address: tenantMembers.address,
       profilePhotoPath: tenantMembers.profilePhotoPath,
       idPhotoPath: tenantMembers.idPhotoPath,
+      branchId: tenantMembers.branchId,
     })
     .from(tenantMembers)
     .innerJoin(users, eq(users.id, tenantMembers.userId))
     .where(eq(tenantMembers.tenantId, tenantId));
 
-  return rows.map((r) => {
+  // Multi-store: branch filter shows only staff at that branch (owner is
+  // always visible — they own every branch).
+  const filtered = branchId
+    ? rows.filter((r) => r.role === "owner" || r.branchId === branchId)
+    : rows;
+
+  return filtered.map((r) => {
     const { username } = splitLoginEmail(r.email);
     return {
       userId: r.userId,
@@ -86,6 +102,7 @@ export async function listTeamMembers(tenantId: string): Promise<TeamMemberDto[]
       address: r.address,
       profilePhotoPath: r.profilePhotoPath,
       idPhotoPath: r.idPhotoPath,
+      branchId: r.branchId,
     };
   });
 }
@@ -100,6 +117,9 @@ export interface AddTeamMemberInput {
   address?: string | null;
   profilePhotoPath?: string | null;
   idPhotoPath?: string | null;
+  /** Multi-store: the single branch this staff member works at. Required
+   *  for staff. Owner ignores. */
+  branchId: string;
 }
 
 export async function addTeamMember(
@@ -154,6 +174,10 @@ export async function addTeamMember(
     // records routinely have missing phones.
     const phoneNormalised = normalizeEgyptPhone(input.phone) ?? null;
 
+    if (!/^[0-9a-f-]{36}$/i.test(input.branchId)) {
+      throw new TeamConflictError("الفرع غير صحيح");
+    }
+
     await tx.insert(tenantMembers).values({
       tenantId,
       userId: u.id,
@@ -165,6 +189,7 @@ export async function addTeamMember(
       address: input.address?.trim() || null,
       profilePhotoPath: input.profilePhotoPath ?? null,
       idPhotoPath: input.idPhotoPath ?? null,
+      branchId: input.branchId,
     });
 
     return u.id;
@@ -182,6 +207,9 @@ export interface UpdateMemberPatch {
   /** Pass null to clear, undefined to leave alone, string to replace. */
   profilePhotoPath?: string | null;
   idPhotoPath?: string | null;
+  /** Move the staff member to a different branch. Caller must pre-validate
+   *  the id belongs to the tenant. Omit to leave alone. */
+  branchId?: string;
 }
 
 export async function updateMemberPermissions(
@@ -232,6 +260,12 @@ export async function updateMemberPermissions(
   }
   if (patch.profilePhotoPath !== undefined) set.profilePhotoPath = patch.profilePhotoPath;
   if (patch.idPhotoPath !== undefined) set.idPhotoPath = patch.idPhotoPath;
+  if (patch.branchId !== undefined) {
+    if (!/^[0-9a-f-]{36}$/i.test(patch.branchId)) {
+      throw new TeamConflictError("الفرع غير صحيح");
+    }
+    set.branchId = patch.branchId;
+  }
 
   if (Object.keys(set).length === 0) return;
 

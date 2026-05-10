@@ -1,9 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import {
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
   Phone,
   Star,
   MessageCircle,
@@ -18,6 +20,7 @@ import {
   topCategoryLabel,
 } from "@/lib/customers";
 import type { CustomerSaleRecord } from "@/hooks/useCustomersData";
+import { useShopSettings } from "@/hooks/useShopSettings";
 
 interface CustomerRowProps {
   customer: CustomerAggregate;
@@ -35,6 +38,14 @@ export function CustomerRow({ customer, records }: CustomerRowProps) {
   const [expanded, setExpanded] = useState(false);
   const isRepeat = customer.invoiceCount >= 3;
   const inactive = daysSince(customer.lastVisit) >= 60;
+  // WhatsApp messages substitute the real shop name (was hardcoded
+  // "Corner Store" pre-customer-ledger). Detail-page links only show for
+  // customers we have a phone for — the ledger is keyed on phone.
+  const { settings } = useShopSettings();
+  const shopName = settings.shopName?.trim() || "متجرنا";
+  const detailHref = customer.phone
+    ? `/customers/${encodeURIComponent(customer.phone)}`
+    : null;
 
   const invoices = useMemo(() => {
     if (!expanded) return [];
@@ -127,11 +138,26 @@ export function CustomerRow({ customer, records }: CustomerRowProps) {
 
         <div className="flex-1" />
 
-        {/* WhatsApp shortcuts */}
+        {/* Detail-page link — primary CTA when there's debt to chase. */}
+        {detailHref && (
+          <Link
+            href={detailHref}
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              customer.outstandingBalance > 0
+                ? "bg-accent text-white hover:bg-accent/90"
+                : "bg-white border border-border text-text-secondary hover:border-accent hover:text-accent"
+            }`}
+          >
+            {customer.outstandingBalance > 0 ? "إدارة الآجل" : "ملف العميل"}
+            <ChevronLeft className="w-3.5 h-3.5" />
+          </Link>
+        )}
+
+        {/* WhatsApp shortcuts — substitute the active branch's shop name. */}
         <a
           href={waLink(
             customer.phone,
-            `أهلاً ${customer.name}! شكراً لتسوقك من Corner Store ❤️ نتشرف بزيارتك مرة أخرى.`
+            `أهلاً ${customer.name}! شكراً لتسوقك من ${shopName} ❤️ نتشرف بزيارتك مرة أخرى.`
           )}
           target="_blank"
           rel="noreferrer"
@@ -145,7 +171,7 @@ export function CustomerRow({ customer, records }: CustomerRowProps) {
           <a
             href={waLink(
               customer.phone,
-              `أهلاً ${customer.name}، تذكير ودي بمبلغ ${customer.outstandingBalance.toLocaleString("ar-EG")} ج.م الآجل عندك في Corner Store. شكراً!`
+              `أهلاً ${customer.name}، تذكير ودي بمبلغ ${customer.outstandingBalance.toLocaleString("ar-EG")} ج.م الآجل عندك في ${shopName}. شكراً!`
             )}
             target="_blank"
             rel="noreferrer"
@@ -161,7 +187,7 @@ export function CustomerRow({ customer, records }: CustomerRowProps) {
             customer.phone,
             `${customer.name}! وصلتنا تشكيلة جديدة من ${
               customer.topCategory ? CATEGORY_LABELS[customer.topCategory] : "المنتجات"
-            } في Corner Store. تعالى شوفها 🌟`
+            } في ${shopName}. تعالى شوفها 🌟`
           )}
           target="_blank"
           rel="noreferrer"

@@ -24,6 +24,8 @@ export {
   CaretRight as ChevronRight,
   CaretUp as ChevronUp,
   Clock,
+  CloudArrowUp as CloudUpload,
+  CloudSlash as CloudOff,
   Copy,
   CurrencyDollar as DollarSign,
   Download,

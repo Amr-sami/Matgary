@@ -26,7 +26,15 @@ const PUBLIC_PATHS = new Set<string>([
   // Visual preview of error/empty screens — handy on a phone, no auth needed.
   "/preview/errors",
 ]);
-const PUBLIC_PREFIXES = ["/api/auth", "/_next", "/favicon", "/fonts"];
+const PUBLIC_PREFIXES = [
+  "/api/auth",
+  // Cron sweeps run from a sidecar with no session — they're guarded by
+  // a shared-secret bearer token inside the route handler instead.
+  "/api/cron",
+  "/_next",
+  "/favicon",
+  "/fonts",
+];
 
 // NOTE on onboarding gating: middleware runs in the Edge runtime and reads the
 // JWT cookie directly — it does NOT re-run the jwt callback that hits the DB,

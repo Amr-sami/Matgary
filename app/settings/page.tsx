@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useSession } from "next-auth/react";
 import {
   MessageCircle,
   Save,
@@ -11,6 +13,7 @@ import {
   Zap,
   Send,
   ExternalLink,
+  ChevronLeft,
 } from "@/lib/icons";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/Button";
@@ -18,6 +21,7 @@ import { Input } from "@/components/ui/Input";
 import { Toast } from "@/components/ui/Toast";
 import { useShopSettings } from "@/hooks/useShopSettings";
 import { useSettings } from "@/components/settings-context";
+import { useBranches } from "@/hooks/useBranches";
 import {
   DEFAULT_TEMPLATE,
   saveSettings,
@@ -54,11 +58,18 @@ function isEqualSettings(a: ShopSettings, b: ShopSettings): boolean {
     a.greenApiInstanceId === b.greenApiInstanceId &&
     a.greenApiToken === b.greenApiToken &&
     a.greenApiUrl === b.greenApiUrl &&
-    a.sendAsPdf === b.sendAsPdf
+    a.sendAsPdf === b.sendAsPdf &&
+    a.loyaltyEnabled === b.loyaltyEnabled &&
+    a.loyaltyPointsPerEgp === b.loyaltyPointsPerEgp &&
+    a.loyaltyEgpPerPoint === b.loyaltyEgpPerPoint
   );
 }
 
 export default function SettingsPage() {
+  const { data: session } = useSession();
+  const isOwner = session?.user?.role === "owner";
+  const { branches: accessibleBranches } = useBranches();
+  const branchCount = accessibleBranches.length;
   const { settings, loading, refresh: refreshLocalSettings } = useShopSettings();
   const { refresh: refreshGlobalSettings } = useSettings();
   const [draft, setDraft] = useState<ShopSettings>(settings);
@@ -167,8 +178,118 @@ export default function SettingsPage() {
   return (
     <AppShell title="الإعدادات">
       <div className="max-w-3xl mx-auto space-y-4">
+        {/* Branches — owner-only entry point. Hides for staff (they can't
+            manage branches) but stays visible for single-store owners so the
+            multi-branch feature is discoverable. */}
+        {isOwner && (
+          <Link
+            href="/settings/branches"
+            className="group block bg-white rounded-xl border border-border p-5 hover:border-accent transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="shrink-0 w-10 h-10 rounded-lg bg-accent-light text-accent flex items-center justify-center">
+                <Store className="w-5 h-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-bold text-text-primary">إدارة الفروع</h3>
+                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-bg-main text-text-secondary tabular-nums">
+                    {branchCount} {branchCount === 1 ? "فرع" : "فروع"}
+                  </span>
+                </div>
+                <p className="text-xs text-text-secondary mt-0.5">
+                  {branchCount <= 1
+                    ? "أضف فرعاً جديداً لتتبع المبيعات والمخزون لكل موقع على حدة."
+                    : "إدارة الفروع، تعطيل أو حذف فرع، وتعديل بيانات الموقع."}
+                </p>
+              </div>
+              <ChevronLeft className="w-5 h-5 text-text-secondary shrink-0 group-hover:text-accent transition-colors" />
+            </div>
+          </Link>
+        )}
+
         <CategoriesEditor onToast={setToast} />
         <BrandsEditor onToast={setToast} />
+
+        {/* Loyalty programme — per-branch. Owner-only edits would be nice
+            but for v1 anyone with view_settings can change rates. */}
+        <div className="bg-white rounded-xl border border-border p-5 space-y-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="font-bold text-lg">برنامج الولاء</h3>
+              <p className="text-xs text-text-secondary mt-0.5">
+                نقاط ورصيد العميل — كل فرع له برنامجه المستقل.
+              </p>
+            </div>
+            <label className="inline-flex items-center gap-2 cursor-pointer shrink-0">
+              <input
+                type="checkbox"
+                checked={draft.loyaltyEnabled}
+                onChange={(e) => update("loyaltyEnabled", e.target.checked)}
+                className="w-5 h-5 accent-accent"
+              />
+              <span className="text-sm font-medium">
+                {draft.loyaltyEnabled ? "مفعّل" : "غير مفعّل"}
+              </span>
+            </label>
+          </div>
+
+          {draft.loyaltyEnabled && (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Input
+                  label="نقاط لكل ج.م مصروف"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={String(draft.loyaltyPointsPerEgp)}
+                  onChange={(e) =>
+                    update("loyaltyPointsPerEgp", Number(e.target.value) || 0)
+                  }
+                  placeholder="مثال: 0.1 = نقطة لكل 10 ج.م"
+                />
+                <Input
+                  label="قيمة النقطة الواحدة (ج.م)"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={String(draft.loyaltyEgpPerPoint)}
+                  onChange={(e) =>
+                    update("loyaltyEgpPerPoint", Number(e.target.value) || 0)
+                  }
+                  placeholder="مثال: 0.1 = نقطة بـ 10 قروش"
+                />
+              </div>
+
+              {/* Live example so the owner sees what the rates mean. */}
+              <div className="rounded-lg bg-accent-light/30 border border-accent-light p-3 text-xs text-text-secondary leading-relaxed">
+                <p className="font-medium text-text-primary mb-1">مثال:</p>
+                {(() => {
+                  const earned = Math.floor(100 * draft.loyaltyPointsPerEgp);
+                  const value = (
+                    earned * draft.loyaltyEgpPerPoint
+                  ).toFixed(2);
+                  return (
+                    <>
+                      <p>
+                        فاتورة بـ <b>100 ج.م</b> تكسب{" "}
+                        <b className="text-accent">{earned}</b> نقطة قيمتها{" "}
+                        <b className="text-accent">{value} ج.م</b> خصم على
+                        فاتورة قادمة.
+                      </p>
+                      {draft.loyaltyPointsPerEgp === 0 &&
+                        draft.loyaltyEgpPerPoint === 0 && (
+                          <p className="mt-1 text-orange-600">
+                            ⚠ النقاط لن تُكتسب أو تُخصم حتى تحدد أحد المعدلين.
+                          </p>
+                        )}
+                    </>
+                  );
+                })()}
+              </div>
+            </>
+          )}
+        </div>
 
         {/* WhatsApp section */}
         <div className="bg-white rounded-xl border border-border p-5 space-y-4">

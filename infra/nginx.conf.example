@@ -36,6 +36,24 @@ server {
         add_header Cache-Control "public, max-age=31536000, immutable";
     }
 
+    # Notification SSE stream — must NOT be buffered, must be allowed to live
+    # past the default 60 s timeout (server caps at 5 min then closes cleanly
+    # so the client reconnects). Place this block BEFORE the catch-all `/`
+    # location so nginx matches it first.
+    location = /api/notifications/stream {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 6m;
+        proxy_send_timeout 6m;
+        chunked_transfer_encoding on;
+    }
+
     location / {
         proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;

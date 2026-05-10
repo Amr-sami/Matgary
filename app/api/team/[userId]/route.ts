@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { eq, and } from "drizzle-orm";
 import { requirePermission } from "@/lib/api/auth-helpers";
 import {
   removeTeamMember,
@@ -9,6 +10,9 @@ import {
 import { ALL_PERMISSIONS, type Permission } from "@/lib/permissions";
 import { logActivity } from "@/lib/repo/activity";
 import { bustUserContextCache } from "@/lib/auth";
+import { bustBranchAllowListCache } from "@/lib/api/branch-context";
+import { withTenant } from "@/lib/db";
+import { branches } from "@/lib/db/schema";
 
 const patchSchema = z.object({
   displayName: z.string().min(1).max(80).optional(),
@@ -20,6 +24,7 @@ const patchSchema = z.object({
   address: z.string().max(255).nullable().optional(),
   profilePhotoPath: z.string().max(255).nullable().optional(),
   idPhotoPath: z.string().max(255).nullable().optional(),
+  branchId: z.string().uuid().optional(),
 });
 
 export async function PATCH(
@@ -34,9 +39,33 @@ export async function PATCH(
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
   }
+  // Multi-store: if the staff member is being moved to a different branch,
+  // validate that branch belongs to this tenant — without this an attacker
+  // who knows another tenant's branch UUID could attach their staff to it.
+  if (parsed.data.branchId) {
+    const [b] = await withTenant(r.ctx.tenantId, (tx) =>
+      tx
+        .select({ id: branches.id })
+        .from(branches)
+        .where(
+          and(
+            eq(branches.tenantId, r.ctx.tenantId),
+            eq(branches.id, parsed.data.branchId!),
+          ),
+        )
+        .limit(1),
+    );
+    if (!b) {
+      return NextResponse.json({ error: "INVALID_BRANCH" }, { status: 400 });
+    }
+  }
+
   try {
     await updateMemberPermissions(r.ctx.tenantId, userId, parsed.data);
     await bustUserContextCache(userId);
+    if (parsed.data.branchId !== undefined) {
+      await bustBranchAllowListCache(r.ctx.tenantId, userId);
+    }
     logActivity({
       tenantId: r.ctx.tenantId,
       actorUserId: r.ctx.userId,

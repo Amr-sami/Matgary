@@ -26,6 +26,7 @@ const WATCH_BRANDS = [
 export async function seedCornerStorePreset(
   tx: PgTransaction<any, any, any>,
   tenantId: string,
+  branchId: string,
 ): Promise<void> {
   // Idempotent: if any categories already exist for this tenant we skip the
   // whole seed. Re-running onboarding (browser back/refresh, network retry)
@@ -43,6 +44,7 @@ export async function seedCornerStorePreset(
     .values([
       {
         tenantId,
+        branchId,
         key: "watches",
         label: "ساعات",
         icon: "Watch",
@@ -51,6 +53,7 @@ export async function seedCornerStorePreset(
       },
       {
         tenantId,
+        branchId,
         key: "perfumes",
         label: "برفانات",
         icon: "FlaskConical",
@@ -59,6 +62,7 @@ export async function seedCornerStorePreset(
       },
       {
         tenantId,
+        branchId,
         key: "sunglasses",
         label: "نظارات",
         icon: "Glasses",
@@ -74,6 +78,7 @@ export async function seedCornerStorePreset(
     .values([
       {
         tenantId,
+        branchId,
         categoryId: watches.id,
         key: "gender",
         label: "النوع",
@@ -82,6 +87,7 @@ export async function seedCornerStorePreset(
       },
       {
         tenantId,
+        branchId,
         categoryId: sunglasses.id,
         key: "gender",
         label: "النوع",
@@ -95,6 +101,7 @@ export async function seedCornerStorePreset(
   await tx.insert(categoryAttributeValues).values([
     {
       tenantId,
+      branchId,
       attributeId: watchGenderAttr.id,
       key: "male",
       label: "رجالي",
@@ -102,6 +109,7 @@ export async function seedCornerStorePreset(
     },
     {
       tenantId,
+      branchId,
       attributeId: watchGenderAttr.id,
       key: "female",
       label: "حريمي",
@@ -109,6 +117,7 @@ export async function seedCornerStorePreset(
     },
     {
       tenantId,
+      branchId,
       attributeId: sunglassesGenderAttr.id,
       key: "male",
       label: "رجالي",
@@ -116,6 +125,7 @@ export async function seedCornerStorePreset(
     },
     {
       tenantId,
+      branchId,
       attributeId: sunglassesGenderAttr.id,
       key: "female",
       label: "حريمي",
@@ -127,6 +137,7 @@ export async function seedCornerStorePreset(
   await tx.insert(brands).values(
     WATCH_BRANDS.map((name) => ({
       tenantId,
+      branchId,
       categoryId: watches.id,
       name,
     })),

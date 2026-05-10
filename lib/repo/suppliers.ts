@@ -24,12 +24,17 @@ function rowToDescriptor(row: typeof suppliers.$inferSelect): SupplierDescriptor
   };
 }
 
-export async function listSuppliers(tenantId: string): Promise<SupplierDescriptor[]> {
+export async function listSuppliers(
+  tenantId: string,
+  branchId?: string | null,
+): Promise<SupplierDescriptor[]> {
   return withTenant(tenantId, async (tx) => {
+    const filters = [eq(suppliers.tenantId, tenantId)];
+    if (branchId) filters.push(eq(suppliers.branchId, branchId));
     const rows = await tx
       .select()
       .from(suppliers)
-      .where(eq(suppliers.tenantId, tenantId))
+      .where(and(...filters))
       .orderBy(asc(suppliers.name));
     return rows.map(rowToDescriptor);
   });
@@ -51,6 +56,7 @@ export async function getSupplier(
 
 export async function addSupplier(
   tenantId: string,
+  branchId: string,
   input: SupplierInput,
 ): Promise<{ id: string }> {
   return withTenant(tenantId, async (tx) => {
@@ -58,6 +64,7 @@ export async function addSupplier(
       .insert(suppliers)
       .values({
         tenantId,
+        branchId,
         name: input.name,
         phone: input.phone ?? null,
         email: input.email ?? null,

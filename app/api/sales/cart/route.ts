@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireTenant } from "@/lib/api/auth-helpers";
+import { requireTenantWithBranch } from "@/lib/api/auth-helpers";
 import { recordCartSale } from "@/lib/repo/operations";
 import { logActivity } from "@/lib/repo/activity";
 import { normalizeEgyptPhone } from "@/lib/validators/egypt";
+import {
+  getCachedResponse,
+  rememberResponse,
+  validateIdempotencyKey,
+} from "@/lib/api/idempotency";
 
 const lineSchema = z.object({
   productId: z.string().uuid(),
@@ -24,13 +29,51 @@ const schema = z.object({
       customerName: z.string().max(120).optional(),
       customerPhone: z.string().max(40).optional(),
       paymentMethod: z.enum(["cash", "instapay", "card", "deferred"]).optional(),
+      // Client-supplied invoice id, used by the offline POS so the receipt
+      // the cashier already printed matches the eventual server record.
+      invoiceId: z
+        .string()
+        .max(80)
+        .regex(/^[A-Za-z0-9_\-:.]+$/)
+        .optional(),
+      // Loyalty redemption — refused by recordCartSale if customerPhone
+      // is missing, the loyalty programme is disabled for the branch, or
+      // the wallet balance is short.
+      redeemPoints: z.number().int().min(0).max(1_000_000).optional(),
+      applyCreditEgp: z.number().min(0).max(1_000_000).optional(),
     })
     .optional(),
 });
 
 export async function POST(req: NextRequest) {
-  const r = await requireTenant();
+  const r = await requireTenantWithBranch();
   if (!r.ok) return r.response;
+
+  // Offline POS: replays of the same outbox row carry the same
+  // Idempotency-Key. Short-circuit on a known key so the second POST
+  // returns the original response without re-running the sale.
+  const idemp = validateIdempotencyKey(req.headers.get("Idempotency-Key"));
+  if (idemp) {
+    const cached = await getCachedResponse(r.ctx.tenantId, idemp);
+    if (cached) {
+      return NextResponse.json(cached.body, { status: cached.status });
+    }
+  }
+
+  // Multi-store sanity check: if the outbox row was rung up at a branch
+  // the cashier later switched away from, refuse rather than book the
+  // sale at the wrong branch. The header is set by the outbox client.
+  const outboxBranch = req.headers.get("X-Outbox-Branch");
+  if (outboxBranch && outboxBranch !== r.ctx.branchId) {
+    return NextResponse.json(
+      {
+        error:
+          "هذه الفاتورة كانت مُسجَّلة لفرع آخر. بدّل للفرع الصحيح ثم أعد المزامنة.",
+      },
+      { status: 409 },
+    );
+  }
+
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
@@ -51,6 +94,7 @@ export async function POST(req: NextRequest) {
         ? new Date(parsed.data.options.customDate)
         : undefined,
       recordedByUserId: r.ctx.userId,
+      branchId: r.ctx.branchId,
     });
     const totalQty = result.lines.reduce((s, l) => s + l.quantity, 0);
     logActivity({
@@ -61,6 +105,7 @@ export async function POST(req: NextRequest) {
       entityType: "sale",
       entityId: result.saleIds[0] ?? null,
       entityLabel: result.invoiceId,
+      branchId: r.ctx.branchId,
       metadata: {
         invoiceId: result.invoiceId,
         lineCount: result.lines.length,
@@ -73,11 +118,20 @@ export async function POST(req: NextRequest) {
         lines: result.lines,
       },
     });
+    // Cache the response so a replay of the same Idempotency-Key returns
+    // the original instead of re-running the sale.
+    if (idemp) {
+      await rememberResponse(r.ctx.tenantId, idemp, 201, result);
+    }
     return NextResponse.json(result, { status: 201 });
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "خطأ" },
-      { status: 400 },
-    );
+    const errorBody = { error: err instanceof Error ? err.message : "خطأ" };
+    // Cache 4xx-style failures too so a stuck outbox row doesn't keep
+    // failing forever — the same key returns the same error every time.
+    // Outbox owner can edit + resubmit with a fresh key if needed.
+    if (idemp) {
+      await rememberResponse(r.ctx.tenantId, idemp, 400, errorBody);
+    }
+    return NextResponse.json(errorBody, { status: 400 });
   }
 }

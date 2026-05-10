@@ -1,7 +1,7 @@
 "use server";
 
 import bcrypt from "bcryptjs";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
@@ -11,6 +11,7 @@ import {
   tenants,
   tenantMembers,
   shopSettings,
+  branches,
 } from "@/lib/db/schema";
 import { signIn, signOut, auth, bustUserContextCache } from "@/lib/auth";
 import { DEFAULT_MESSAGE_TEMPLATE } from "@/lib/settings.defaults";
@@ -132,6 +133,20 @@ export async function signupAction(formData: FormData): Promise<SignupResult> {
       .values({ name: storeName, slug })
       .returning({ id: tenants.id });
 
+    // Every new tenant gets a primary branch — multi-store: this is the
+    // first "store" they own under their billing account. Owner sees all
+    // branches, branch_id stays NULL on the membership row.
+    const [primaryBranch] = await tx
+      .insert(branches)
+      .values({
+        tenantId: tenant.id,
+        slug: "main",
+        name: storeName,
+        isPrimary: true,
+        isActive: true,
+      })
+      .returning({ id: branches.id });
+
     await tx.insert(tenantMembers).values({
       tenantId: tenant.id,
       userId: user.id,
@@ -139,10 +154,11 @@ export async function signupAction(formData: FormData): Promise<SignupResult> {
     });
 
     // shop_settings is RLS-protected — set app.tenant_id for the rest of the tx
-    // before inserting an empty placeholder row that onboarding will fill.
+    // before inserting the per-branch placeholder row that onboarding will fill.
     await tx.execute(sql`select set_config('app.tenant_id', ${tenant.id}, true)`);
     await tx.insert(shopSettings).values({
       tenantId: tenant.id,
+      branchId: primaryBranch.id,
       shopName: "",
       messageTemplate: DEFAULT_MESSAGE_TEMPLATE,
     });
@@ -241,6 +257,18 @@ export async function completeOnboardingAction(
 
   try {
     await withTenant(tenantId, async (tx) => {
+      // Onboarding fills the tenant's primary-branch settings row + seeds
+      // its catalog. Multi-store: secondary branches are created later from
+      // /settings/branches and start empty by design.
+      const [primary] = await tx
+        .select({ id: branches.id })
+        .from(branches)
+        .where(
+          and(eq(branches.tenantId, tenantId), eq(branches.isPrimary, true)),
+        )
+        .limit(1);
+      if (!primary) throw new Error("الفرع الرئيسي غير موجود");
+
       await tx
         .update(shopSettings)
         .set({
@@ -249,10 +277,15 @@ export async function completeOnboardingAction(
           onboardingCompletedAt: new Date(),
           updatedAt: new Date(),
         })
-        .where(eq(shopSettings.tenantId, tenantId));
+        .where(
+          and(
+            eq(shopSettings.tenantId, tenantId),
+            eq(shopSettings.branchId, primary.id),
+          ),
+        );
 
       if (parsed.data.preset === "cornerstore") {
-        await seedCornerStorePreset(tx, tenantId);
+        await seedCornerStorePreset(tx, tenantId, primary.id);
       }
     });
     // onboardingComplete just flipped — drop the cached context so the next

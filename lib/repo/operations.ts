@@ -8,6 +8,7 @@ import {
   sales,
   returns as returnsTable,
   expenses as expensesTable,
+  shopSettings,
 } from "@/lib/db/schema";
 import type {
   Sale,
@@ -17,6 +18,12 @@ import type {
   PaymentMethod,
   ExpenseCategory,
 } from "@/lib/types";
+import { bustInsightsCache } from "@/lib/repo/insights";
+import {
+  applyCredit as walletApplyCredit,
+  earnPoints as walletEarnPoints,
+  redeemPoints as walletRedeemPoints,
+} from "@/lib/repo/loyalty";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -95,6 +102,44 @@ function rowToExpense(r: typeof expensesTable.$inferSelect): Expense {
 }
 
 /**
+ * Decrement / increment a product's on-hand quantity atomically. `delta` is
+ * signed. Returns the new quantity so callers can drop it into product_history.
+ *
+ * Multi-store: each product belongs to one branch and carries its own qty,
+ * so this function no longer takes a branchId — the product row IS the
+ * branch context.
+ */
+async function adjustProductStock(
+  tx: Parameters<Parameters<typeof withTenant>[1]>[0],
+  tenantId: string,
+  productId: string,
+  delta: number,
+  opts: { allowNegative?: boolean } = {},
+): Promise<number> {
+  const [row] = await tx
+    .select({ quantity: products.quantity, branchId: products.branchId })
+    .from(products)
+    .where(
+      and(eq(products.tenantId, tenantId), eq(products.id, productId)),
+    )
+    .limit(1);
+  if (!row) {
+    throw new Error("المنتج غير موجود");
+  }
+  const next = row.quantity + delta;
+  if (next < 0 && !opts.allowNegative) {
+    throw new Error("الكمية المطلوبة غير متوفرة في هذا الفرع");
+  }
+  await tx
+    .update(products)
+    .set({ quantity: next, updatedAt: new Date() })
+    .where(
+      and(eq(products.tenantId, tenantId), eq(products.id, productId)),
+    );
+  return next;
+}
+
+/**
  * Snapshot a product's attribute labels at sale time so the receipt + history
  * stay accurate even if the tenant later renames an attribute value.
  */
@@ -128,12 +173,18 @@ async function loadAttributeSnapshot(
 // Sales — read paths
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function listSales(tenantId: string): Promise<Sale[]> {
+export async function listSales(
+  tenantId: string,
+  /** When set, restrict to that branch. Null = no filter (every branch). */
+  branchId?: string | null,
+): Promise<Sale[]> {
   return withTenant(tenantId, async (tx) => {
+    const filters = [eq(sales.tenantId, tenantId)];
+    if (branchId) filters.push(eq(sales.branchId, branchId));
     const rows = await tx
       .select()
       .from(sales)
-      .where(eq(sales.tenantId, tenantId))
+      .where(and(...filters))
       .orderBy(desc(sales.saleDate));
     return rows.map(rowToSale);
   });
@@ -171,22 +222,23 @@ export interface RecordSaleInput {
   paymentMethod?: PaymentMethod;
   /** The cashier/owner who recorded this sale. Powers staff performance reports. */
   recordedByUserId?: string;
+  /** Branch the sale was rung up at. Required by the multi-branch rollout —
+   *  callers must pass the active branch from `requireTenantWithBranch()`.
+   *  Inventory is decremented from this branch only. */
+  branchId: string;
 }
 
 export async function recordSale(
   tenantId: string,
   input: RecordSaleInput,
 ): Promise<{ saleId: string }> {
-  return withTenant(tenantId, async (tx) => {
+  const result = await withTenant(tenantId, async (tx) => {
     const [product] = await tx
       .select()
       .from(products)
       .where(and(eq(products.tenantId, tenantId), eq(products.id, input.productId)))
       .limit(1);
     if (!product) throw new Error("المنتج غير موجود");
-    if (product.quantity < input.quantitySold) {
-      throw new Error("الكمية المطلوبة غير متوفرة في المخزن");
-    }
 
     const subtotal = input.quantitySold * input.pricePerUnit;
     let discountAmount = 0;
@@ -198,12 +250,17 @@ export async function recordSale(
     }
     discountAmount = Math.min(discountAmount, subtotal);
     const totalPrice = subtotal - discountAmount;
-    const nextQty = product.quantity - input.quantitySold;
 
-    await tx
-      .update(products)
-      .set({ quantity: nextQty, updatedAt: new Date() })
-      .where(and(eq(products.tenantId, tenantId), eq(products.id, input.productId)));
+    // Multi-store inventory: products carry their own per-branch qty. The
+    // route already verified the product belongs to the active branch
+    // (listProducts filters by branchId before the picker shows it), so we
+    // just decrement.
+    const nextBranchQty = await adjustProductStock(
+      tx,
+      tenantId,
+      input.productId,
+      -input.quantitySold,
+    );
 
     const attrs = await loadAttributeSnapshot(tx, tenantId, input.productId);
     const paymentMethod: PaymentMethod = input.paymentMethod || "cash";
@@ -212,6 +269,7 @@ export async function recordSale(
       .insert(sales)
       .values({
         tenantId,
+        branchId: input.branchId,
         invoiceId: input.invoiceId || makeInvoiceId(),
         productId: input.productId,
         productName: product.name,
@@ -244,11 +302,15 @@ export async function recordSale(
       productName: product.name,
       type: "sold",
       delta: -input.quantitySold,
-      quantityAfter: nextQty,
+      // History reflects the branch-level quantity-after, not the global
+      // sum, so the per-branch stock journal stays sensible.
+      quantityAfter: nextBranchQty,
     });
 
     return { saleId: created.id };
   });
+  await bustInsightsCache(tenantId);
+  return result;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -273,6 +335,20 @@ export interface CartSaleOptions {
   paymentMethod?: PaymentMethod;
   /** The cashier/owner who recorded this sale. Powers staff performance reports. */
   recordedByUserId?: string;
+  /** Branch the sale was rung up at. Required by the multi-branch rollout —
+   *  every line decrements inventory at this branch only. */
+  branchId: string;
+  /** Optional client-supplied invoice id. Used by the offline POS so the
+   *  cashier sees the same invoice number on the receipt regardless of
+   *  whether the sale synced immediately or hours later. Server picks one
+   *  itself when omitted. */
+  invoiceId?: string;
+  /** Loyalty redemption from the customer's wallet. Both default to 0. The
+   *  cart endpoint refuses if customerPhone is missing or balance is short.
+   *  Each is applied to the cart total as a discount; the redemption value
+   *  in EGP is `redeemPoints * loyaltyEgpPerPoint + applyCreditEgp`. */
+  redeemPoints?: number;
+  applyCreditEgp?: number;
 }
 
 export interface CartSaleLineSummary {
@@ -298,14 +374,20 @@ export interface CartSaleResult {
 export async function recordCartSale(
   tenantId: string,
   lines: CartSaleLineInput[],
-  options: CartSaleOptions = {},
+  options: CartSaleOptions,
 ): Promise<CartSaleResult> {
   if (lines.length === 0) throw new Error("الفاتورة فارغة");
-  const invoiceId = makeInvoiceId();
+  // Honour a client-supplied invoice id when valid (offline POS uses this
+  // so the receipt the cashier handed the customer matches the eventual
+  // server record). Falls back to a fresh server-generated id otherwise.
+  const invoiceId =
+    options.invoiceId && /^[A-Za-z0-9_\-:.]{4,80}$/.test(options.invoiceId)
+      ? options.invoiceId
+      : makeInvoiceId();
   const saleDate = options.customDate ?? new Date();
   const paymentMethod: PaymentMethod = options.paymentMethod || "cash";
 
-  return withTenant(tenantId, async (tx) => {
+  const result = await withTenant(tenantId, async (tx) => {
     type Pre = {
       line: CartSaleLineInput;
       product: typeof products.$inferSelect;
@@ -324,6 +406,16 @@ export async function recordCartSale(
         .where(and(eq(products.tenantId, tenantId), eq(products.id, line.productId)))
         .limit(1);
       if (!p) throw new Error(`المنتج غير موجود (${line.productId})`);
+
+      // Multi-store: each product belongs to exactly one branch. Refuse a
+      // cart line that mixes branches with the active sale context — that
+      // would silently move inventory across stores.
+      if (p.branchId !== options.branchId) {
+        throw new Error(
+          `المنتج "${p.name}" لا ينتمي لهذا الفرع — لا يمكن بيعه من هنا`,
+        );
+      }
+
       if (p.quantity < line.quantity) {
         throw new Error(
           `الكمية المطلوبة من "${p.name}" غير متوفرة (المتاح ${p.quantity})`,
@@ -363,6 +455,79 @@ export async function recordCartSale(
       orderDiscountTotal = Math.min(orderDiscountTotal, cartGross);
     }
 
+    // ── Loyalty redemption pre-check ───────────────────────────────────
+    // We resolve points + credit redemption BEFORE the per-line allocation
+    // loop so the customer-facing total reflects the discount. Wallet
+    // balances are mutated AFTER the sale rows are inserted (so the
+    // events can carry the saleIds for traceability).
+    const customerPhoneNorm = options.customerPhone?.trim() || null;
+    const requestedPoints = Math.max(
+      0,
+      Math.floor(Number(options.redeemPoints ?? 0)),
+    );
+    const requestedCredit = Math.max(0, Number(options.applyCreditEgp ?? 0));
+    let pointsToRedeem = 0;
+    let creditToApplyEgp = 0;
+    let loyaltyDiscountEgp = 0;
+    if (requestedPoints > 0 || requestedCredit > 0) {
+      if (!customerPhoneNorm) {
+        throw new Error("لا يمكن خصم نقاط أو رصيد بدون رقم العميل");
+      }
+      // Read the active branch's loyalty config + the customer's wallet
+      // in the same tx so we don't race a concurrent grant/redeem.
+      const [setting] = await tx
+        .select({
+          enabled: shopSettings.loyaltyEnabled,
+          egpPerPoint: shopSettings.loyaltyEgpPerPoint,
+        })
+        .from(shopSettings)
+        .where(
+          and(
+            eq(shopSettings.tenantId, tenantId),
+            eq(shopSettings.branchId, options.branchId),
+          ),
+        )
+        .limit(1);
+      if (!setting?.enabled) {
+        throw new Error("برنامج الولاء غير مفعل لهذا الفرع");
+      }
+      const egpPerPoint = Number(setting.egpPerPoint ?? 0);
+      pointsToRedeem = requestedPoints;
+      creditToApplyEgp = requestedCredit;
+      loyaltyDiscountEgp =
+        Math.round(pointsToRedeem * egpPerPoint * 100) / 100 +
+        creditToApplyEgp;
+      // Cap the loyalty discount to whatever's left after order-level
+      // discount — we never want negative-total invoices.
+      const remaining = cartGross - orderDiscountTotal;
+      if (loyaltyDiscountEgp > remaining) {
+        loyaltyDiscountEgp = remaining;
+        // Re-derive the redemption amounts so the wallet only burns what
+        // actually got used. Prefer to keep credit (more flexible) and
+        // trim points first.
+        const wantedFromPoints = pointsToRedeem * egpPerPoint;
+        if (creditToApplyEgp >= remaining) {
+          creditToApplyEgp = remaining;
+          pointsToRedeem = 0;
+        } else {
+          const fromPoints = remaining - creditToApplyEgp;
+          pointsToRedeem =
+            egpPerPoint > 0 ? Math.floor(fromPoints / egpPerPoint) : 0;
+        }
+        // Recompute exact discount using the trimmed values.
+        loyaltyDiscountEgp =
+          Math.round(pointsToRedeem * egpPerPoint * 100) / 100 +
+          creditToApplyEgp;
+      }
+      // Treat loyalty as another order-level discount layer for the
+      // proportional per-line allocation. Receipts show a combined
+      // "discount" line; the wallet events table is the structured trail.
+      orderDiscountTotal = Math.min(
+        cartGross,
+        orderDiscountTotal + loyaltyDiscountEgp,
+      );
+    }
+
     const saleIds: string[] = [];
     const lineSummaries: CartSaleLineSummary[] = [];
     let cartTotal = 0;
@@ -380,19 +545,21 @@ export async function recordCartSale(
       allocated += allocation;
       const totalLineDiscount = p.lineDiscount + allocation;
       const totalPrice = p.lineSubtotal - totalLineDiscount;
-      const nextQty = p.product.quantity - p.line.quantity;
 
-      await tx
-        .update(products)
-        .set({ quantity: nextQty, updatedAt: new Date() })
-        .where(
-          and(eq(products.tenantId, tenantId), eq(products.id, p.line.productId)),
-        );
+      // Decrement the product's qty directly (multi-store: the product
+      // already belongs to options.branchId, verified in the pre-loop).
+      const nextBranchQty = await adjustProductStock(
+        tx,
+        tenantId,
+        p.line.productId,
+        -p.line.quantity,
+      );
 
       const [created] = await tx
         .insert(sales)
         .values({
           tenantId,
+          branchId: options.branchId,
           invoiceId,
           productId: p.line.productId,
           productName: p.product.name,
@@ -442,8 +609,70 @@ export async function recordCartSale(
         productName: p.product.name,
         type: "sold",
         delta: -p.line.quantity,
-        quantityAfter: nextQty,
+        quantityAfter: nextBranchQty,
       });
+    }
+
+    // ── Loyalty post-pass ─────────────────────────────────────────────
+    // 1. Burn the redeemed points / credit (events tagged with the first
+    //    sale id from this invoice for traceability).
+    // 2. Award points on the FINAL paid amount (after every discount,
+    //    including the loyalty discount itself — points never compound).
+    if (customerPhoneNorm && (pointsToRedeem > 0 || creditToApplyEgp > 0)) {
+      const baseCtx = {
+        tenantId,
+        branchId: options.branchId,
+        customerPhone: customerPhoneNorm,
+        customerName: options.customerName?.trim() || null,
+        actorUserId: options.recordedByUserId ?? null,
+        relatedSaleId: saleIds[0] ?? null,
+      };
+      if (pointsToRedeem > 0) {
+        await walletRedeemPoints(tx, baseCtx, pointsToRedeem);
+      }
+      if (creditToApplyEgp > 0) {
+        await walletApplyCredit(tx, baseCtx, creditToApplyEgp);
+      }
+    }
+
+    if (
+      customerPhoneNorm &&
+      paymentMethod !== "deferred" &&
+      cartTotal > 0
+    ) {
+      // Read loyalty earn rate. Settings might not exist yet for a brand
+      // new branch — silently skip in that case.
+      const [setting] = await tx
+        .select({
+          enabled: shopSettings.loyaltyEnabled,
+          pointsPerEgp: shopSettings.loyaltyPointsPerEgp,
+        })
+        .from(shopSettings)
+        .where(
+          and(
+            eq(shopSettings.tenantId, tenantId),
+            eq(shopSettings.branchId, options.branchId),
+          ),
+        )
+        .limit(1);
+      if (setting?.enabled) {
+        const rate = Number(setting.pointsPerEgp ?? 0);
+        const earned = Math.floor(cartTotal * rate);
+        if (earned > 0) {
+          await walletEarnPoints(
+            tx,
+            {
+              tenantId,
+              branchId: options.branchId,
+              customerPhone: customerPhoneNorm,
+              customerName: options.customerName?.trim() || null,
+              actorUserId: options.recordedByUserId ?? null,
+              relatedSaleId: saleIds[0] ?? null,
+            },
+            earned,
+          );
+        }
+      }
     }
 
     return {
@@ -457,6 +686,8 @@ export async function recordCartSale(
       note: options.note ?? null,
     };
   });
+  await bustInsightsCache(tenantId);
+  return result;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -543,6 +774,7 @@ export async function updateSale(
       .set(set)
       .where(and(eq(sales.tenantId, tenantId), eq(sales.id, saleId)));
   });
+  await bustInsightsCache(tenantId);
 }
 
 export async function voidSale(tenantId: string, saleId: string): Promise<void> {
@@ -572,6 +804,7 @@ export async function voidSale(tenantId: string, saleId: string): Promise<void> 
       .delete(sales)
       .where(and(eq(sales.tenantId, tenantId), eq(sales.id, saleId)));
   });
+  await bustInsightsCache(tenantId);
 }
 
 export async function markSalePaid(tenantId: string, saleId: string): Promise<void> {
@@ -599,8 +832,28 @@ export async function markInvoicePaid(
 // Returns
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function listReturns(tenantId: string): Promise<Return[]> {
+export async function listReturns(
+  tenantId: string,
+  /** When set, restrict to returns whose parent sale was rung up at that
+   *  branch. Null = every branch. */
+  branchId?: string | null,
+): Promise<Return[]> {
   return withTenant(tenantId, async (tx) => {
+    if (branchId) {
+      // Join sales so we can filter on the parent sale's branch.
+      const rows = await tx
+        .select({ r: returnsTable })
+        .from(returnsTable)
+        .innerJoin(sales, eq(sales.id, returnsTable.saleId))
+        .where(
+          and(
+            eq(returnsTable.tenantId, tenantId),
+            eq(sales.branchId, branchId),
+          ),
+        )
+        .orderBy(desc(returnsTable.returnDate));
+      return rows.map((row) => rowToReturn(row.r));
+    }
     const rows = await tx
       .select()
       .from(returnsTable)
@@ -621,7 +874,7 @@ export async function recordReturn(
   tenantId: string,
   input: RecordReturnInput,
 ): Promise<{ returnId: string }> {
-  return withTenant(tenantId, async (tx) => {
+  const result = await withTenant(tenantId, async (tx) => {
     const [sale] = await tx
       .select()
       .from(sales)
@@ -629,13 +882,16 @@ export async function recordReturn(
       .limit(1);
     if (!sale) throw new Error("البيع غير موجود");
 
-    await tx
-      .update(products)
-      .set({
-        quantity: sql`${products.quantity} + ${input.returnedQuantity}`,
-        updatedAt: new Date(),
-      })
-      .where(and(eq(products.tenantId, tenantId), eq(products.id, input.productId)));
+    // Re-credit the product's qty directly — multi-store products always
+    // live at one branch so there's no ambiguity. allowNegative=true on the
+    // off chance the qty went stale via concurrent writes.
+    await adjustProductStock(
+      tx,
+      tenantId,
+      input.productId,
+      input.returnedQuantity,
+      { allowNegative: true },
+    );
 
     await tx
       .update(sales)
@@ -669,6 +925,8 @@ export async function recordReturn(
 
     return { returnId: created.id };
   });
+  await bustInsightsCache(tenantId);
+  return result;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -678,9 +936,19 @@ export async function recordReturn(
 /**
  * Spawn child instances for any recurring expense template whose
  * next_occurrence_date has passed, then bump the template's next date forward.
- * Designed to be called lazily from listExpenses — no cron required.
+ *
+ * Two callers today:
+ *   1. `listExpenses` — lazy catch-up when an owner opens /expenses.
+ *   2. `/api/cron/recurring-expenses` — periodic sweep so the bill appears
+ *      even if no one has visited the page that month.
+ *
+ * Idempotent: each iteration advances `next_occurrence_date`, so a re-run
+ * within the same minute spawns nothing extra.
  */
-async function materializeDueRecurringExpenses(tenantId: string): Promise<void> {
+export async function materializeDueRecurringExpenses(
+  tenantId: string,
+): Promise<{ spawned: number }> {
+  let spawned = 0;
   await withTenant(tenantId, async (tx) => {
     const due = await tx
       .select()
@@ -712,6 +980,7 @@ async function materializeDueRecurringExpenses(tenantId: string): Promise<void> 
           // Children themselves are not recurring.
           isRecurring: false,
         });
+        spawned += 1;
 
         // Optional: debit supplier balance for the child too.
         if (tpl.supplierId) {
@@ -745,17 +1014,26 @@ async function materializeDueRecurringExpenses(tenantId: string): Promise<void> 
         );
     }
   });
+  if (spawned > 0) await bustInsightsCache(tenantId);
+  return { spawned };
 }
 
-export async function listExpenses(tenantId: string): Promise<Expense[]> {
+export async function listExpenses(
+  tenantId: string,
+  /** When set, restrict to that branch (excludes tenant-wide null-branch
+   *  expenses). Null = every branch + tenant-wide. */
+  branchId?: string | null,
+): Promise<Expense[]> {
   // Lazy: catch up any due recurring instances before listing.
   await materializeDueRecurringExpenses(tenantId);
 
   return withTenant(tenantId, async (tx) => {
+    const filters = [eq(expensesTable.tenantId, tenantId)];
+    if (branchId) filters.push(eq(expensesTable.branchId, branchId));
     const rows = await tx
       .select()
       .from(expensesTable)
-      .where(eq(expensesTable.tenantId, tenantId))
+      .where(and(...filters))
       .orderBy(desc(expensesTable.date));
     return rows.map(rowToExpense);
   });
@@ -770,13 +1048,17 @@ export interface AddExpenseInput {
   recurrencePeriod?: "monthly" | "weekly" | null;
   date?: Date;
   note?: string;
+  /** Branch this expense was incurred at. Null = tenant-wide (e.g. SaaS
+   *  subscription, accounting fees) — caller is responsible for the
+   *  semantic. */
+  branchId?: string | null;
 }
 
 export async function addExpense(
   tenantId: string,
   input: AddExpenseInput,
 ): Promise<{ id: string }> {
-  return withTenant(tenantId, async (tx) => {
+  const result = await withTenant(tenantId, async (tx) => {
     const startDate = input.date ?? new Date();
     // For a recurring template, the first occurrence is "now" (recorded as the
     // parent), and the next_occurrence_date is one period after.
@@ -794,6 +1076,7 @@ export async function addExpense(
       .insert(expensesTable)
       .values({
         tenantId,
+        branchId: input.branchId ?? null,
         title: input.title,
         amount: String(input.amount),
         category: input.category,
@@ -819,6 +1102,8 @@ export async function addExpense(
     }
     return { id: created.id };
   });
+  await bustInsightsCache(tenantId);
+  return result;
 }
 
 export async function deleteExpense(tenantId: string, id: string): Promise<void> {
@@ -846,6 +1131,7 @@ export async function deleteExpense(tenantId: string, id: string): Promise<void>
       .delete(expensesTable)
       .where(and(eq(expensesTable.tenantId, tenantId), eq(expensesTable.id, id)));
   });
+  await bustInsightsCache(tenantId);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -887,4 +1173,5 @@ export async function bulkDeleteSales(
       .delete(sales)
       .where(and(eq(sales.tenantId, tenantId), inArray(sales.id, saleIds)));
   });
+  await bustInsightsCache(tenantId);
 }

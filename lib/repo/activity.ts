@@ -1,6 +1,6 @@
-import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lt, lte, sql } from "drizzle-orm";
 import { withTenant } from "@/lib/db";
-import { activityLogs, tenantMembers, users } from "@/lib/db/schema";
+import { activityLogs, tenantMembers, tenants, users } from "@/lib/db/schema";
 import type { ActivityLogRow } from "@/lib/db/schema";
 import type { ActivityCategory } from "@/lib/activity-labels";
 
@@ -23,6 +23,8 @@ export interface LogActivityInput {
   entityLabel?: string | null;
   metadata?: Record<string, unknown> | null;
   ip?: string | null;
+  /** Branch the action happened at, when applicable. Pure context — never a gate. */
+  branchId?: string | null;
 }
 
 /**
@@ -31,6 +33,87 @@ export interface LogActivityInput {
  * mutation. Callers don't need to await this for correctness; awaiting is
  * fine if you want to be sure the row is written before responding.
  */
+/**
+ * Delete activity-log rows older than `cutoff` for a single tenant, in
+ * chunked batches so a long purge doesn't hold a wide lock. Runs inside
+ * `withTenant` so the existing RLS policy is the gate — we never touch
+ * another tenant's rows even if the caller passed the wrong id.
+ *
+ * Returns the number of rows deleted for that tenant.
+ */
+export async function pruneTenantActivity(
+  tenantId: string,
+  cutoff: Date,
+  options: { batchSize?: number; maxBatches?: number } = {},
+): Promise<{ deleted: number }> {
+  const batchSize = Math.max(100, Math.min(50_000, options.batchSize ?? 10_000));
+  const maxBatches = Math.max(1, options.maxBatches ?? 50);
+  let total = 0;
+  await withTenant(tenantId, async (tx) => {
+    for (let i = 0; i < maxBatches; i += 1) {
+      // Select-then-delete by primary key so the affected-row count is
+      // unambiguous (postgres-js's affected-row count surface differs across
+      // driver versions; this avoids relying on it).
+      const rows = await tx
+        .select({ id: activityLogs.id })
+        .from(activityLogs)
+        .where(
+          and(
+            eq(activityLogs.tenantId, tenantId),
+            lt(activityLogs.createdAt, cutoff),
+          ),
+        )
+        .limit(batchSize);
+      if (rows.length === 0) break;
+      await tx
+        .delete(activityLogs)
+        .where(
+          and(
+            eq(activityLogs.tenantId, tenantId),
+            inArray(
+              activityLogs.id,
+              rows.map((r) => r.id),
+            ),
+          ),
+        );
+      total += rows.length;
+      if (rows.length < batchSize) break;
+    }
+  });
+  return { deleted: total };
+}
+
+/**
+ * Sweep the activity-log retention prune across every tenant. Returns
+ * per-tenant counts; failures on a single tenant don't abort the sweep.
+ */
+export async function pruneActivityAllTenants(
+  cutoff: Date,
+  options?: { batchSize?: number; maxBatches?: number },
+): Promise<{
+  totalDeleted: number;
+  tenants: number;
+  failures: number;
+}> {
+  const { db } = await import("@/lib/db");
+  const rows = await db.select({ id: tenants.id }).from(tenants);
+  let totalDeleted = 0;
+  let failures = 0;
+  for (const t of rows) {
+    try {
+      const { deleted } = await pruneTenantActivity(t.id, cutoff, options);
+      totalDeleted += deleted;
+    } catch (err) {
+      failures += 1;
+      console.error(
+        `[activity/prune] tenant ${t.id} failed:`,
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
+  return { totalDeleted, tenants: rows.length, failures };
+}
+
 export async function logActivity(input: LogActivityInput): Promise<void> {
   try {
     let actorName = input.actorName ?? null;
@@ -67,6 +150,7 @@ export async function logActivity(input: LogActivityInput): Promise<void> {
         entityLabel: input.entityLabel ?? null,
         metadata: input.metadata ?? null,
         ip: input.ip ?? null,
+        branchId: input.branchId ?? null,
       });
     });
   } catch (err) {

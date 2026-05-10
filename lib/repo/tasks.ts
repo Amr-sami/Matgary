@@ -39,22 +39,20 @@ const ASSIGNEE_DISPLAY_NAME = sql<string | null>`coalesce(${tenantMembers.displa
  */
 export async function listTasks(
   tenantId: string,
-  opts: { onlyForUserId?: string },
+  opts: { onlyForUserId?: string; branchId?: string | null },
 ): Promise<TaskDto[]> {
   return withTenant(tenantId, async (tx) => {
     // Self-join users for assignee + creator names. Drizzle aliasing is
     // verbose; we do two separate selects and then merge by id.
+    const filters = [eq(tasks.tenantId, tenantId)];
+    if (opts.onlyForUserId) filters.push(eq(tasks.assignedToUserId, opts.onlyForUserId));
+    if (opts.branchId) filters.push(eq(tasks.branchId, opts.branchId));
     const rows = await tx
       .select({
         task: tasks,
       })
       .from(tasks)
-      .where(
-        and(
-          eq(tasks.tenantId, tenantId),
-          opts.onlyForUserId ? eq(tasks.assignedToUserId, opts.onlyForUserId) : sql`true`,
-        ),
-      )
+      .where(and(...filters))
       .orderBy(desc(tasks.createdAt));
 
     if (rows.length === 0) return [];
@@ -136,6 +134,7 @@ export interface CreateTaskInput {
 
 export async function createTask(
   tenantId: string,
+  branchId: string,
   createdByUserId: string,
   input: CreateTaskInput,
 ): Promise<{ id: string }> {
@@ -147,6 +146,7 @@ export async function createTask(
       .insert(tasks)
       .values({
         tenantId,
+        branchId,
         createdByUserId,
         assignedToUserId: input.assignedToUserId,
         title: input.title.trim(),
@@ -159,7 +159,7 @@ export async function createTask(
       .returning({ id: tasks.id });
 
     if (input.assignedToUserId && input.assignedToUserId !== createdByUserId) {
-      await createNotification(tx, tenantId, {
+      await createNotification(tx, tenantId, branchId, {
         userId: input.assignedToUserId,
         kind: "task_assigned",
         title: "مهمة جديدة موكلة إليك",
@@ -209,13 +209,15 @@ export async function updateTask(
       .set(set)
       .where(and(eq(tasks.tenantId, tenantId), eq(tasks.id, id)));
 
-    // Notify the (possibly new) assignee.
+    // Notify the (possibly new) assignee. The notification carries the
+    // task's branch context so multi-store users only see notifications for
+    // their branch.
     const newAssignee = patch.assignedToUserId ?? existing.assignedToUserId;
     if (newAssignee && newAssignee !== existing.createdByUserId) {
       const becameAssigned =
         patch.assignedToUserId !== undefined &&
         patch.assignedToUserId !== existing.assignedToUserId;
-      await createNotification(tx, tenantId, {
+      await createNotification(tx, tenantId, existing.branchId, {
         userId: newAssignee,
         kind: becameAssigned ? "task_assigned" : "task_updated",
         title: becameAssigned ? "مهمة جديدة موكلة إليك" : "تحديث على إحدى مهامك",
@@ -258,7 +260,7 @@ export async function setTaskStatus(
     const creatorIsCaller = existing.createdByUserId === callerUserId;
     if (!creatorIsCaller) {
       if (status === "done" && existing.status !== "done") {
-        await createNotification(tx, tenantId, {
+        await createNotification(tx, tenantId, existing.branchId, {
           userId: existing.createdByUserId,
           kind: "task_done",
           title: "اكتملت إحدى المهام",
@@ -269,7 +271,7 @@ export async function setTaskStatus(
         status === "in_progress" &&
         existing.status !== "in_progress"
       ) {
-        await createNotification(tx, tenantId, {
+        await createNotification(tx, tenantId, existing.branchId, {
           userId: existing.createdByUserId,
           kind: "task_started",
           title: "بدأ موظف العمل على مهمة",

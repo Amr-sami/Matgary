@@ -60,3 +60,56 @@ export function normalizeEgyptPhone(raw: string | null | undefined): string | nu
 export function isValidEgyptPhone(raw: string | null | undefined): boolean {
   return normalizeEgyptPhone(raw) !== null;
 }
+
+// Strip the same prefixes mobile parsing does, then return just the digits.
+// Returns null if the cleaned input is unusable (empty / non-numeric).
+function stripEgyptPrefixes(raw: string): string | null {
+  const cleaned = asciifyDigits(raw)
+    .replace(/[\s()\-_.]/g, "")
+    .trim();
+  if (cleaned.length === 0) return null;
+  let digits = cleaned;
+  if (digits.startsWith("+")) digits = digits.slice(1);
+  if (digits.startsWith("0020")) digits = digits.slice(4);
+  else if (digits.startsWith("0")) digits = digits.slice(1);
+  if (digits.startsWith("20")) digits = digits.slice(2);
+  if (!/^\d+$/.test(digits)) return null;
+  return digits;
+}
+
+/**
+ * Egyptian landline normaliser. Landlines have 1- or 2-digit area codes
+ * (Cairo `2`, Alexandria `3`, plus the governorate codes 13/15/40/45/46/47/
+ * 48/50/55/57/62/64/65/66/68/69/82/84/86/88/92/93/95/97 and friends), so the
+ * total digit count after stripping the country code lands in the 7–9 range
+ * starting with 2–9. Mobiles always start with 1, so refusing leading-1
+ * cleanly separates the two namespaces.
+ *
+ * Returns the canonical `+20<digits>` form or null when the input clearly
+ * isn't an Egyptian landline.
+ */
+export function normalizeEgyptLandline(
+  raw: string | null | undefined,
+): string | null {
+  if (raw == null) return null;
+  const digits = stripEgyptPrefixes(String(raw));
+  if (!digits) return null;
+  // 7–9 digits, doesn't start with 1 (that's the mobile namespace).
+  if (!/^[2-9]\d{6,8}$/.test(digits)) return null;
+  return `+20${digits}`;
+}
+
+/**
+ * Permissive normaliser for "any Egyptian phone" — tries mobile first, then
+ * landline. Use this for B2B / supplier contacts where landlines are common;
+ * for SMS / WhatsApp recipients use the strict `normalizeEgyptPhone` instead.
+ */
+export function normalizeEgyptPhoneAny(
+  raw: string | null | undefined,
+): string | null {
+  return normalizeEgyptPhone(raw) ?? normalizeEgyptLandline(raw);
+}
+
+export function isValidEgyptPhoneAny(raw: string | null | undefined): boolean {
+  return normalizeEgyptPhoneAny(raw) !== null;
+}

@@ -30,6 +30,7 @@ export interface AddCategoryInput {
 
 export async function addCategory(
   tenantId: string,
+  branchId: string,
   input: AddCategoryInput,
 ): Promise<{ id: string }> {
   const result = await withTenant(tenantId, async (tx) => {
@@ -37,6 +38,7 @@ export async function addCategory(
       .insert(categories)
       .values({
         tenantId,
+        branchId,
         key: input.key,
         label: input.label,
         icon: input.icon ?? null,
@@ -112,6 +114,7 @@ export interface AddAttributeInput {
 
 export async function addAttribute(
   tenantId: string,
+  branchId: string,
   input: AddAttributeInput,
 ): Promise<{ id: string }> {
   const result = await withTenant(tenantId, async (tx) => {
@@ -119,6 +122,7 @@ export async function addAttribute(
       .insert(categoryAttributes)
       .values({
         tenantId,
+        branchId,
         categoryId: input.categoryId,
         key: input.key,
         label: input.label,
@@ -209,6 +213,7 @@ export async function deleteAttribute(
 
 export async function addAttributeValue(
   tenantId: string,
+  branchId: string,
   attributeId: string,
   input: { key: string; label: string; position?: number },
 ): Promise<{ id: string }> {
@@ -217,6 +222,7 @@ export async function addAttributeValue(
       .insert(categoryAttributeValues)
       .values({
         tenantId,
+        branchId,
         attributeId,
         key: input.key,
         label: input.label,
@@ -280,6 +286,7 @@ export interface AddBrandInput {
 
 export async function addBrand(
   tenantId: string,
+  branchId: string,
   input: AddBrandInput,
 ): Promise<{ id: string }> {
   const result = await withTenant(tenantId, async (tx) => {
@@ -287,6 +294,7 @@ export async function addBrand(
       .insert(brands)
       .values({
         tenantId,
+        branchId,
         categoryId: input.categoryId,
         name: input.name,
       })

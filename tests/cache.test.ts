@@ -9,16 +9,50 @@ import {
 } from "@/lib/cache";
 import { redis } from "@/lib/redis";
 
-// These tests require a live Redis and silently pass when REDIS_URL isn't
-// set (the cache layer no-ops in that case, so there is nothing to verify).
+// Behaviour matrix:
+//   - REDIS_URL unset / CACHE_DISABLED=1 → `redis` is null → skip with a
+//     console hint. Local-dev convenience.
+//   - REDIS_URL set but Redis unreachable → DON'T skip. We ping before the
+//     suite runs and surface the connection error so CI fails loud instead
+//     of silently no-op'ing through assertions that would otherwise verify
+//     RLS-bypass safety.
+const REDIS_CONFIGURED = !!process.env.REDIS_URL && process.env.CACHE_DISABLED !== "1";
 const SKIP = !redis;
 const desc = SKIP ? describe.skip : describe;
+if (SKIP && REDIS_CONFIGURED) {
+  // Defensive: REDIS_URL is set but the build returned null. That should be
+  // impossible today (only CACHE_DISABLED=1 produces null when URL is set)
+  // but if a future refactor changes the rule we want the test run to bark.
+  throw new Error(
+    "[cache.test] REDIS_URL is set but lib/redis returned null — refusing to skip silently.",
+  );
+}
+if (SKIP) {
+  console.warn(
+    "[cache.test] Skipping cache suite — REDIS_URL not configured. Set it to exercise tenant-isolation guarantees.",
+  );
+}
 
 const TENANT_A = "00000000-0000-0000-0000-00000000000a";
 const TENANT_B = "00000000-0000-0000-0000-00000000000b";
 
 desc("cache key isolation between tenants", () => {
   beforeAll(async () => {
+    // Fail loud (not silent) when REDIS_URL is set but Redis is unreachable.
+    // The cache helpers swallow errors by design (opportunistic), which makes
+    // every assertion below a no-op against a dead Redis — exactly the
+    // failure mode CI is supposed to catch.
+    if (redis) {
+      try {
+        await redis.ping();
+      } catch (err) {
+        throw new Error(
+          `[cache.test] REDIS_URL is set but Redis ping failed: ${
+            err instanceof Error ? err.message : String(err)
+          }. Refusing to run silent no-op assertions.`,
+        );
+      }
+    }
     await cacheBustTenant(TENANT_A);
     await cacheBustTenant(TENANT_B);
   });

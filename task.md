@@ -182,6 +182,165 @@ npm run db:migrate
 
 ## 2. Changelog
 
+### 2026-05-11 — Customer loyalty + store credit (نقاط الولاء / رصيد العميل)
+
+Unified wallet: one `customer_wallets` row per (tenant, branch, phone) holding both points and EGP credit, with an append-only `customer_wallet_events` audit log. Each branch runs its own programme (multi-store).
+
+- **Schema** (`0016_customer_loyalty.sql`):
+  - `customer_wallets` (composite PK on tenant/branch/phone) + `customer_wallet_events` log. Both RLS-forced.
+  - Three new shop_settings cols: `loyalty_enabled`, `loyalty_points_per_egp` (earn rate), `loyalty_egp_per_point` (redeem rate). Disabled by default. Optional `loyalty_expiry_days` for the future expiry cron.
+- **Repo** (`lib/repo/loyalty.ts`):
+  - `getWallet(tenantId, branchId, phone)` returns `{ wallet, events }` — zero-balance default when no row exists.
+  - `earnPoints / redeemPoints / applyCredit` are tx-scoped helpers used inside `recordCartSale`. Refuse to make either balance negative; write the event + update the wallet in the same tx.
+  - `grantCredit(...)` opens its own tx for the owner-only manual grant path. Refuses without a non-empty reason.
+- **Sale flow** (`recordCartSale`):
+  - Two new options: `redeemPoints`, `applyCreditEgp`. Refused without a customer phone OR if loyalty is disabled OR balance is short.
+  - Loyalty discount treated as another order-level discount layer for the proportional per-line allocation. If the requested redemption exceeds what's left after order discount, the cart helper trims (preserves credit, reduces points) so we never produce negative-total invoices.
+  - After the sale lands, points are awarded on the FINAL paid amount (after every discount including the loyalty discount itself — points never compound). Deferred sales don't earn points (the customer hasn't actually paid yet).
+- **API**:
+  - `GET /api/customers/by-phone/[phone]/wallet` — balance + recent events.
+  - `POST /api/customers/by-phone/[phone]/credit` (owner-only) — manual grant/deduct with required reason. Activity log: `loyalty.credit_grant` / `loyalty.credit_deduct`.
+  - `POST /api/sales/cart` schema accepts `redeemPoints` + `applyCreditEgp`.
+- **UI**:
+  - **Settings page** — "برنامج الولاء" card with enable toggle + earn/redeem rate inputs + a live "100 EGP earns X points worth Y EGP" example.
+  - **Customer detail page** — wallet card with points + credit big numbers, "= X EGP discount potential" hint when redeem rate is set, owner-only "إضافة / خصم رصيد" form (reason required), event history list.
+  - **SaleForm** — when loyalty is enabled AND a customer phone is entered, a loyalty box appears showing balances + two inputs (redeem points / apply credit). Wallet fetched with 400ms debounce on phone change so a fast typist doesn't spam the endpoint.
+
+**Trade-offs flagged:**
+- Loyalty applies before order discount but the per-line `discountAmount` field stores the combined allocation. Receipts show one "discount" line; per-source breakdown lives in `customer_wallet_events`. Future iteration could add explicit fields to `sales` for per-source split.
+- Offline-queued sales with redemption are best-effort: if the wallet drops between queue and sync, the row goes to `failed`. Fine for v1.
+- No expiry cron yet — schema supports `loyalty_expiry_days` and `points_expire` events, but the actual sweeper isn't wired. Add when first owner reports a customer hoarding points.
+- No "refund as credit" flow yet (schema reserves `credit_refund` event kind). Add when returns UI gets a credit-instead-of-cash toggle.
+
+### 2026-05-10 — Customer ledger (دفتر العملاء / المبيعات الآجلة)
+
+Owners had every deferred sale's data in `sales.isPaid=false` but no view that aggregated it per customer. Now there's a real ledger.
+
+- **`lib/repo/customers.ts`** — `getCustomerLedger(tenantId, branchId, phone)` rolls every non-returned sale for one (branch, phone) into `{ invoices: [...], lifetimeValue, outstandingBalance, paidBalance, firstVisit, lastVisit }`. Multi-store: scoped to active branch on purpose — owner switches branches via the topbar to see the same customer's debt at the other store separately.
+- **`markCustomerAllPaid(tenantId, branchId, phone)`** — atomic bulk mark-paid. Idempotent; returns `{ markedCount, markedTotal }` for the activity log + UI toast.
+- **`GET /api/customers/by-phone/[phone]`** — ledger detail endpoint. Phone is URL-encoded; route normalises via `normalizeEgyptPhone` so the URL form matches whatever shape was stored on the sale row.
+- **`POST /api/customers/by-phone/[phone]/mark-all-paid`** — bulk mark-paid endpoint. Permission: `modify_sales` (same as the single-sale path). Activity log: `sale.mark_paid` with `bulk: true`.
+- **`/customers/[phone]` page** — header (name, phone, outstanding in big red, lifetime/paid/invoice-count/last-visit stat row), per-invoice list with per-invoice "تأكيد الدفع" + WhatsApp reminder, bulk "تأكيد دفع الكل" + "تذكير بكل الآجل" + "رسالة شكر". Unpaid invoices highlighted with an orange tint.
+- **`CustomerRow`** updated: every customer with a phone gets an "إدارة الآجل" / "ملف العميل" CTA linking to the detail page (orange when there's debt, neutral otherwise). WhatsApp shortcuts on the list now substitute the **real shop name** from `useShopSettings` instead of the hardcoded "Corner Store" that was leftover from the seed preset.
+
+### 2026-05-10 — Offline POS (queue + service worker + idempotent sync)
+
+The cashier dead-time when wifi blinks is no longer a switch-back-to-notebook event.
+
+- **IndexedDB outbox** (`lib/offline/db.ts`, `lib/offline/outbox.ts`) via Dexie. Two tables: `outbox` (queued mutations with `pending`/`syncing`/`synced`/`failed` status, atomic-claim transitions, capped retries with backoff) and `snapshot` (per-(tenant, branch) read cache). All-`pending` rows GC themselves 60s after sync.
+- **Server idempotency** (`lib/api/idempotency.ts`) — every offline-queued sale carries a UUID `Idempotency-Key`. Server caches the response in Redis (24h TTL, key namespaced by tenant + idempotency-key) so a flaky sync that retries the same row never creates two charges. 4xx errors are also cached so a stuck row doesn't loop forever.
+- **POS bootstrap** (`/api/pos/bootstrap`) returns the active branch's products + categories. Cart page refreshes it on mount and every 5 min, so when wifi blinks the catalog is already on disk.
+- **Service worker** (`public/sw.js`) — hand-rolled, no Workbox. Cache-first for static assets (Next hashes filenames so stale cache is safe); network-first with cache fallback for HTML navigations; never intercepts `/api/*`. Registered only in production (HMR + SW conflict in dev).
+- **Sync engine** (`hooks/useOffline.ts`) drains the outbox on `online` event, tab focus, and a 30s polling tick (belt-and-braces). Counts surface live to the topbar.
+- **Topbar indicator** (`<OfflineIndicator />`) self-hides when healthy. Orange offline ("غير متصل · N بانتظار"), blue while syncing ("جارٍ المزامنة"), red on failure with manual-retry button.
+- **Cart integration** (`recordCartSaleOfflineAware` in `lib/offline/recordCartSale.ts`) — generates a UUID idempotency key + a client-side `INV-…` invoice id so the receipt the customer walks out with matches the eventual server record. `SaleForm` switched off `lib/api/sales:recordCartSale` to this offline-aware path.
+- **Multi-store safety**: outbox row carries `branchId` of where the sale was rung up. Server refuses replay (`X-Outbox-Branch` mismatch) if the cashier later switched branches mid-sync — prevents inventory drifting between stores.
+- **`recordCartSale` now accepts an optional client-supplied `invoiceId`** in options (validated by regex). Used only by the offline path; the existing online path still lets the server pick.
+
+**Honest "still owed" list** (none of this blocks the basic flow, but worth tracking):
+- Cart's product picker still reads from `useProducts` (network). When offline the snapshot is on disk but the picker shows nothing — small UI follow-up to swap in `readSnapshot()`.
+- No "discard / retry single failed row" UI yet — the indicator does a global retry; per-row management lives in code (`outbox.ts:discard/retry`) but not wired to UI.
+- Service worker only registers in production. To smoke-test offline: `npm run build && npm start`.
+- Conflict resolution (two cashiers sold the last unit while one was offline) — server currently throws and the row goes `failed`. Industry-standard "accept the sale, flag negative stock" flow is a future iteration.
+
+### 2026-05-10 — Multi-store (sub-tenant) isolation — `0015_multi_store_isolation.sql`
+
+Promoted "branches" from the chain-store model (shared catalog, per-branch sales) to a true multi-store model: each branch is now a fully isolated shop under one billing account. Adding a product or employee to "cairo" doesn't appear in "main".
+
+- **Migration adds `branch_id` to**: `categories`, `brands`, `category_attributes`, `category_attribute_values`, `products`, `product_attribute_values`, `suppliers`, `tasks`, `leave_requests`, `notifications`. All NOT NULL post-backfill (notifications nullable for tenant-wide system pings).
+- **`shop_settings` PK changed** from `(tenantId)` to `(tenantId, branchId)`. Each branch has its own header/logo/WhatsApp credentials/message template.
+- **`tenant_members.branch_ids[]` collapsed to single `branch_id`** (legacy column kept one deploy for safety). Owner: NULL = implicit access to every branch. Staff: NOT NULL = locked to that branch only.
+- **`branches.slug`** added — `"main"` for primary, derived-name+random-suffix for additional. URL-safe identifier within the tenant.
+- **`product_stock` table dropped** + the trigger. Multi-store: a product belongs to ONE branch and carries its own quantity directly.
+- **Backfill semantics**: every existing row → primary branch. New branches start completely empty (no products, categories, employees) — the owner sets them up from scratch, matching the user-mental-model "two stores under one account".
+- **API + UI rewired**:
+  - Every list endpoint (`/api/products`, `/api/categories`, `/api/brands`, `/api/sales`, `/api/expenses`, `/api/returns`, `/api/suppliers`, `/api/tasks`, `/api/leave-requests`, `/api/team`, `/api/settings`) defaults to the active branch via `resolveBranchFilter()`. Owner can pass `?branchId=all` for the consolidated view (returns 403 for staff).
+  - Every write endpoint (`POST /api/categories`, `POST /api/brands`, `POST /api/products`, `POST /api/suppliers`, `POST /api/tasks`, `POST /api/leave-requests`, `POST /api/team`, `PATCH /api/settings`, `POST /api/expenses`, `POST /api/sales/cart`, `POST /api/products/[id]/adjust`, `POST /api/whatsapp/send*`) routes through `requireTenantWithBranch()` and tags the row with the active branch.
+  - **Sidebar header** now shows the active branch name large with the tenant name as a small uppercase subtitle when >1 branch exists.
+  - **`/settings/branches`** has a "فتح" button per row to switch directly. The eye/eye-off icons replaced the older confusing alert/check pair for enable/disable.
+  - **Employee form** — "الفرع" picker is now a single-select (was checkbox list). Email format stays tenant-wide (`username@tenant-slug`) so moving Ahmed between branches is just an edit, no password reset.
+  - **`/settings`** owner card "إدارة الفروع" links to the branches page so single-store owners can discover the feature without the picker showing up.
+
+**Trade-offs we deliberately took** (the "unlogic things" the user asked me to flag):
+- Categories per-branch = double-typing for owners running similar stores. Acceptable for true franchise model (different stores).
+- Customers + suppliers stay tenant-wide via `sales.customer_phone` and `suppliers.branch_id` (suppliers tagged but addressable across branches). A future iteration can lock these too if owners report cross-branch surprises.
+- Email domain stays tenant-wide intentionally — branch-locked emails would force a password reset every time a staff member moves stores.
+
+### 2026-05-09 — Multi-branch (تعدد الفروع) — schema, API, UI, sales path
+
+Six-phase rollout in one session. Multi-branch is the foundation; consolidated reports and inter-branch transfers stay deferred per the doc's original scope.
+
+- **Phase 1 — schema + migration** (`0014_multi_branch.sql`):
+  - New tables: `branches` (id, tenantId, name, address, phone, isActive, isPrimary), `product_stock` (per (product, branch) qty + lowStockThreshold), both with RLS forced and tenant-isolated.
+  - Partial unique index `branches_one_primary_per_tenant_idx ON branches (tenant_id) WHERE is_primary` enforces "exactly one primary per tenant" at the DB level.
+  - `branch_id` columns added (nullable for backwards-compat) to `sales`, `expenses`, `purchase_orders`, `attendance_events`, `store_locations`, `activity_logs`. Indexes `(tenant_id, branch_id, date)` for the per-branch report path.
+  - `tenant_members.branch_ids uuid[]` — staff allow-list. Owners ignore the column at runtime; backfilled to `[primary]` so existing logins keep working.
+  - Trigger `sync_product_total_quantity` on `product_stock` keeps `products.quantity` as a denormalised sum, so the global inventory view continues to work without code changes.
+  - Backfill: every existing tenant gets a primary branch ("الفرع الرئيسي"), every historical sale/expense/PO/attendance row points at it, every product gets a stock row with the existing quantity at the primary branch.
+- **Phase 2 — active-branch context** (`lib/api/branch-context.ts`, `lib/api/auth-helpers.ts`):
+  - HttpOnly `mg.branch` cookie carries the active branch UUID; server validates against the user's allow-list on every read. Tampered cookie just falls back to the user's primary.
+  - `getAccessibleBranches(ctx)` cached 60 s in Redis; busted on branch CRUD and on staff branch-list edits.
+  - New `requireTenantWithBranch()` helper returns `{ tenantId, branchId, branchName, isPrimaryBranch, allowedBranchIds }` — used by every branch-scoped write path.
+- **Phase 3 — branch CRUD repo + API**:
+  - `lib/repo/branches.ts`: list/get/create/update/disable/delete. Delete refuses primary; refuses any branch with referenced rows (returns per-table count so the UI can show "12 sales, 3 attendance events on this branch").
+  - `GET /api/branches` returns `{ data, currentBranchId }`; `POST /api/branches` (owner-only); `PATCH/DELETE /api/branches/[id]` (owner-only); `POST /api/branches/select` flips the cookie.
+  - Activity log: `branch.create/update/disable/enable/delete/switch` with Arabic labels. `logActivity` learned an optional `branchId` field that lands on `activity_logs.branch_id` for context.
+- **Phase 4 — UI**:
+  - `<BranchPicker />` (`components/branches/`) in the topbar. Self-hides when the tenant has only one branch — single-store owners never see the multi-branch concept. Owner gets a "إدارة الفروع" link to the settings page.
+  - `/settings/branches` — owner CRUD (create, edit, enable/disable, delete with conflict-count toast). Primary branch protected from disable/delete.
+  - Team form (`EmployeeFormModal`) shows a "الفروع المسموح بها" multi-select when the tenant has >1 branch. Defaults to primary on new staff. Server validates every id belongs to the tenant before persisting.
+- **Phase 5 — per-branch sales/expenses/inventory**:
+  - `recordSale`, `recordCartSale` now require `branchId` from `requireTenantWithBranch()`. Stock check + decrement go against `product_stock` for that branch only — selling more than the branch has on hand throws "غير متوفرة في هذا الفرع" even if global stock would have covered it.
+  - `recordReturn` re-credits at the parent sale's branch, not the user's currently-active branch — prevents inventory drifting between branches without an explicit transfer.
+  - `addExpense` accepts an optional `branchId`; the route resolves explicit > active and refuses null (tenant-wide) for non-owners.
+  - `addProduct` seeds `product_stock` rows for every branch in the tenant — initial qty at the active branch, 0 elsewhere — so the table stays dense.
+  - `createBranch` backfills `product_stock=0` for every existing product so a newly-added branch starts dense.
+  - Reusable `adjustBranchStock(tx, tenantId, branchId, productId, delta, opts)` helper — used by every stock-moving path.
+- **Phase 6 — insights branch filter**:
+  - `loadInsightsOverview(tenantId, window, branchId)` — `branchId=null` aggregates every branch (owner only on the route); a uuid restricts to that branch. Cache key includes branch so an owner viewing "all" doesn't see a cached single-branch slice.
+  - `/api/insights/overview` accepts `?branchId=all` (owner only) or `?branchId=<uuid>` (validated against allow-list); defaults to active branch from cookie context.
+  - Insights page gets a small `هذا الفرع | كل الفروع` toggle for owners when the tenant has >1 branch.
+
+### 2026-05-09 — Activity-log retention sweep
+
+- **`POST /api/cron/activity-log-cleanup`** new route. Same auth surface as the recurring-expenses cron (bearer-token + per-IP rate limit). Reads `ACTIVITY_LOG_RETENTION_DAYS` (default 730 = 2 years, clamped 30..3650) and deletes everything older than the cutoff.
+- **`pruneTenantActivity(tenantId, cutoff)`** + **`pruneActivityAllTenants(cutoff)`** in `lib/repo/activity.ts`. Per-tenant prune runs inside `withTenant` so the existing RLS policy is the gate even for the janitor — we cannot accidentally delete another tenant's rows. Chunked (10 k rows / round-trip, 50 rounds max) so a long purge doesn't take a wide lock.
+- **Sidecar wiring**: docker-compose `cron` service learned a generic `poke-cron.sh` wrapper; the crontab has two entries now (hourly recurring-expenses + nightly 03:30 activity cleanup). One env file, one secret, two pokes.
+- **Honest scope note**: this is the retention half of the gap. The "partition by month" half is documented in §4 backlog (still owed when a single tenant pushes the table past a few hundred GB — well after launch).
+
+### 2026-05-09 — Cache test fail-loud + Egyptian landline normaliser
+
+- **`tests/cache.test.ts`** now pings Redis in `beforeAll` when `redis` is non-null. A `REDIS_URL`-set-but-unreachable run throws with the connection error instead of letting every assertion silently no-op (the cache helpers swallow errors by design — exactly the failure mode CI was supposed to catch). Local devs without `REDIS_URL` keep the skip behaviour with a `console.warn` hint.
+- **Defensive guard**: if `REDIS_URL` is set but `lib/redis` somehow returned null (a future refactor regression), the suite throws instead of skipping.
+- **`lib/validators/egypt.ts`**: added `normalizeEgyptLandline`, `normalizeEgyptPhoneAny`, `isValidEgyptPhoneAny`. Landline path accepts 7–9 digits starting with 2–9 (after country-code stripping), so Cairo `02 ...`, Alexandria `03 ...`, and governorate codes (13/15/40/45/.../97) all canonicalise to `+20<digits>`. Mobiles still take the strict path. Existing strict call sites (POS customer phone, team phones) deliberately untouched — `Any` is opt-in for B2B / supplier-style fields where landlines are common.
+
+### 2026-05-09 — Notifications: polling → SSE with Redis pub/sub
+
+- **`GET /api/notifications/stream`** new SSE endpoint. Authenticates via the same `requireTenant` helper, sends an initial snapshot, then subscribes to a per-user Redis channel (`notif:user:{userId}`) and refetches+emits on every published marker. Heartbeat comment every 25 s, hard-cap at 5 min (client `EventSource` auto-reconnects).
+- **`lib/notifications/events.ts`** new helper. `publishUserNotificationEvent(userId)` is fire-and-forget; `subscribeUserNotificationEvents(userId, onMessage)` allocates a duplicated ioredis client (subscribe blocks the connection), returns an idempotent `unsubscribe`. Both functions degrade to no-op when Redis isn't configured.
+- **Mutation publishers**: `createNotification` (so all transactional callers — leave, tasks — get pushed for free), `markNotificationRead`, `markAllNotificationsRead`, `markReadByKind` now publish after the work is done. Send is `void`-prefixed and never thrown — a publish failure can't break a notification mutation.
+- **`useNotifications` hook**: SSE-first with polling fallback. After two consecutive `EventSource.error` events it gives up, closes the stream, and falls back to the original 60 s polling loop so the bell still updates on enterprise proxies that strip `text/event-stream`. Optimistic mark-read is unchanged.
+- **Stream fallback path on the server**: when Redis is unreachable, the route still works — it polls the DB at 15 s instead of subscribing to pub/sub. The client never has to know.
+- **nginx template**: new `location = /api/notifications/stream` block with `proxy_buffering off` + `proxy_read_timeout 6m`. Placed before the catch-all `/` block so nginx matches it first. The route already sends `X-Accel-Buffering: no` as a belt-and-braces signal.
+
+### 2026-05-09 — Recurring-expense scheduler (sidecar cron)
+
+- **`POST /api/cron/recurring-expenses`** new route. Iterates every tenant, calls the existing `materializeDueRecurringExpenses` materialiser, returns `{ tenants, totalSpawned, failures, results[] }`. Failures on one tenant don't abort the sweep.
+- **Auth**: shared bearer token in `Authorization: Bearer …`, `timingSafeEqual`'d against `CRON_SECRET`. Refuses when the env var is unset (no implicit open mode). POST-only so it isn't browsable, cacheable, or accidentally hit by a link prefetcher.
+- **Rate limit**: 6 calls / hour / source IP via the existing Redis sliding-window. Mitigates the "leaked secret hammers the materialiser" scenario without affecting the legitimate hourly cron.
+- **Activity log**: emits `expense.recurring_materialized` with the spawn count for any tenant where ≥1 row was created. Actor name "نظام (جدولة)" so owners see this is the system, not a person. Arabic label added in `lib/activity-labels.ts`.
+- **Middleware allowlist**: `/api/cron/*` added to `PUBLIC_PREFIXES` so the bearer-token check stays the only gate (no JWT or subscription wall in front of cron pokes).
+- **Compose sidecar**: new `cron` service in `docker-compose.yml`. Plain alpine + crond + curl. Reads `CRON_SECRET` and `CRON_TARGET_URL` from env, materialises a 0700 wrapper that sources a 0600 env file (so the secret isn't visible in the crontab listing or process args), schedules the hourly poke. `extra_hosts: host.docker.internal:host-gateway` makes it reach the app on the Docker host on Linux too.
+- **Materialiser changes**: `materializeDueRecurringExpenses` exported and now returns `{ spawned: number }` for the cron route's accounting. Existing lazy call from `listExpenses` ignores the return value — same behaviour as before.
+
+### 2026-05-09 — Insights overview moved server-side
+
+- **`/api/insights/overview`** new route. Permission-gated by `view_insights`. Strict Zod input: `from`/`to` are ISO 8601 + offset, must be both-or-neither, `from <= to`, capped at 2 years to bound the trend grouping. Errors are logged server-side (no leakage to the client).
+- **`lib/repo/insights.ts:loadInsightsOverview()`** — six SQL aggregates inside one `withTenant` transaction (current revenue, prior-period revenue, window totals incl. cost/discount/expenses, top 5 products, category breakdown, daily trend with zero-fill). Result tenant-cached for 60 s via `cacheRemember(tenantKey(t, "insights:overview", from, to))`. RLS still bites since aggregates ride the same `withTenant` setup.
+- **Cost of goods now prefers the snapshot.** SQL chooses `nullif(sales.cost_price_at_sale, '')::numeric` first, then falls back to `nullif(products.cost_price, '')::numeric`, then 0. The old client always used the *current* product cost — a price update silently rewrote last month's profit. Snapshot makes historical reports stable; legacy rows without a snapshot keep the old behaviour.
+- **`useInsights` hook is now a thin fetcher.** No more `useSales`/`useReturns`/`useProducts`/`useExpenses` calls from the page — the browser used to download every row just to compute six numbers (multi-MB JSON for big tenants). Same return shape so the page didn't change.
+- **Cache invalidation wired** into every write path that could move a number: `recordSale`, `recordCartSale`, `updateSale`, `voidSale`, `recordReturn`, `addExpense`, `deleteExpense`, `bulkDeleteSales`, and the lazy `materializeDueRecurringExpenses` materialiser when it actually spawns a row.
+
 ### 2026-05-07 — Week 2 + Week 3 (billing + Egypt-specific)
 
 - **Billing tables** — `subscriptions` (1:1 per tenant) and `payment_attempts` added with RLS forced. Migration `0013_absurd_warpath.sql` applied.
@@ -307,22 +466,22 @@ Ordered roughly by likely impact on retention / conversion. Not committed — re
 
 ### Product
 
-- **Multi-branch / تعدد الفروع**: `branches` table per tenant; scope products / sales / inventory / employees by branch. The first 2-store owner will ask. Schema-only is ~1 week; with inter-branch transfers and consolidated reports, more.
-- **Offline POS mode**: queue sales locally (IndexedDB + service worker) and sync on reconnect. Egyptian internet is unreliable; cashier dead-time when wifi blinks is a switch-back-to-notebook event. ~1–2 weeks of focused work, huge differentiator.
+- ~~**Multi-branch / تعدد الفروع**: foundation~~ ✅ Done 2026-05-09. **Still owed**: inter-branch stock transfers (move qty A → B with audit), consolidated multi-branch P&L beyond the simple "كل الفروع" toggle (e.g. side-by-side comparison), per-branch payroll separation, attendance + purchase-order branch wiring (currently still backfill-only — phase 5.5).
+- ~~**Offline POS mode**~~ ✅ Done 2026-05-10. **Still owed**: cart's product picker should fall back to the snapshot when offline (data is there, UI doesn't read it yet); per-row discard/retry UI for failed outbox rows; conflict-resolution flow when stock has gone negative across branches at sync time.
 - **Barcode scanner support** at POS. Cheap USB scanners just type into the focused field; the existing search already mostly works. Need a "scan mode" (auto-submit on Enter, fast SKU lookup, focus management). Half-day.
-- **Customer ledger** (deferred sales / customer credit). The data is there (sales.isPaid=false); needs a per-customer view + reminders.
+- ~~**Customer ledger**~~ ✅ Done 2026-05-10 — per-customer detail page at `/customers/[phone]`, per-invoice + bulk mark-paid, WhatsApp reminders that use the active branch's shop name. Per-invoice WhatsApp deep-links scoped to the active branch only — owner switches branches to see the same customer's debt at the other store.
 - **SMS fallback** alongside WhatsApp. Vodafone Egypt SMS Gateway or EgyptSMS — Twilio is unreliable in Egypt.
 - **2FA for owners** (TOTP or WhatsApp OTP).
 - **Forgot-username** flow for sub-accounts (`username@tenant-slug` is hard to remember).
 - **Bulk product import** from Excel/CSV. Owners arriving from spreadsheet workflows will demand it.
-- **Customer loyalty / store credit** programme.
+- ~~**Customer loyalty / store credit** programme.~~ ✅ Done 2026-05-11. Unified wallet (points + EGP credit) per (tenant, branch, phone) with audit log. Per-branch enable + rates in settings. Earn auto on paid sales, redeem at checkout, owner manual grant. **Still owed**: points expiry cron, "refund as credit" toggle in returns flow.
 - **Per-branch cash drawer reconciliation** (after multi-branch lands).
 - **Staff performance leaderboard improvements**: commissions, targets, bonus calcs.
 - **Receipt customisation** beyond message template (logo size, footer copy, language toggle).
 
 ### Infrastructure / ops
 
-- **Insights server-side aggregation**: today the overview tab aggregates client-side from `useSales`. Move to `/api/insights?from=…&to=…` with a 60 s tenant-keyed cache. Unlocks bigger date ranges, big speed-up.
+- ~~**Insights server-side aggregation**: today the overview tab aggregates client-side from `useSales`. Move to `/api/insights?from=…&to=…` with a 60 s tenant-keyed cache.~~ ✅ done 2026-05-09 — see changelog.
 - **/healthz + /readyz endpoints** for nginx / orchestrator probes.
 - **Structured logging** (pino or similar). Replace `console.log` in repo + API.
 - **Metrics endpoint** (Prometheus exposition or push to Grafana Cloud free tier). Track: cache hit rate, DB pool utilisation, API p50/p95, login success/failure ratio.
@@ -336,7 +495,7 @@ Ordered roughly by likely impact on retention / conversion. Not committed — re
 
 - **PDPL data-export endpoint**: download-everything-as-zip.
 - **Account deletion** (real delete, not just disable). Schedule + 30 day grace.
-- **Audit-log retention policy**: today activity_logs grow forever. Add a partition-by-month + drop-after-2-years job.
+- **Audit-log retention policy**: drop-after-2-years half is done (cron route + sidecar). Partition-by-month is still TODO — useful once any single tenant pushes the table past a few hundred GB (well after launch).
 - **Password reset email throttle by email** (today only by IP — an attacker rotating IPs could harvest usage info; the always-200 mitigates but it's belt + suspenders).
 - **Session revocation UI** ("sign out all other devices"). JWT makes this hard — needs a token-version column on users that the JWT carries, increment to force re-login.
 - **CSP headers** in nginx + Next.
@@ -355,24 +514,24 @@ Ordered roughly by likely impact on retention / conversion. Not committed — re
 
 - **No staging.** Every change is one bad migration away from production data loss. Backups mitigate but don't replace this.
 - **No real CI/CD.** Deploys are manual.
-- **Activity log grows forever.** Will hurt query times after a year of busy tenants. Plan partitioning before that.
-- **Insights overview aggregation is client-side.** A tenant with 50 k sale rows will see slow page loads. The `useInsights` hook needs to move server-side; the date filter we just added makes that more urgent because it's now a useful page.
-- **No offline POS.** First Egyptian wifi outage that costs a customer a sale is a churn risk.
+- ~~**Activity log grows forever.**~~ ✅ Retention sweep shipped 2026-05-09 (daily cleanup, default 2y). Native PG partitioning still owed once a single tenant crosses ~hundreds of GB — see §4 backlog "Audit-log retention policy" item.
+- ~~**Insights overview aggregation is client-side.**~~ ✅ Resolved 2026-05-09 — moved to `/api/insights/overview` with 60 s tenant cache.
+- ~~**No offline POS.**~~ ✅ Resolved 2026-05-10 — IndexedDB outbox + service worker + idempotent sync. Cashier rings up offline, drains automatically when wifi returns. Picker-from-snapshot when offline still owed (snapshot is on disk, the cart's product picker just doesn't read it yet — small UI follow-up).
 - **No ETA integration.** Cannot serve VAT-registered businesses today. Disclaim or build before charging them.
-- **Single-branch only.** Multi-shop owners will switch to a competitor.
+- ~~**Single-branch only.**~~ ✅ Multi-branch foundation shipped 2026-05-09 — branches CRUD, picker in topbar, per-branch inventory + sales + expenses + insights filter, staff branch allow-list. Inter-branch transfers and consolidated reports beyond a simple all-branches insights toggle stay in §4 backlog.
 - **No real billing.** Cannot legally charge today.
 - **No 2FA.** Owner credential compromise = full tenant takeover.
 - **No native mobile app.** Browser POS works on phones but UX is mediocre on small screens, and printer/scanner integration needs native.
-- **Notifications polling.** Cheap today; will burn battery + bandwidth on phones at scale. Switch to SSE or push when concurrent users matter.
-- **Recurring expenses don't auto-spawn.** No scheduler running yet — `next_occurrence_date` is set but nothing reads it. Owners will report "my electricity bill didn't appear this month" eventually.
-- **Cache tests skip silently if Redis is unreachable.** Should fail in CI when REDIS_URL is set but unreachable. Today they no-op.
+- ~~**Notifications polling.**~~ ✅ Resolved 2026-05-09 — SSE stream backed by Redis pub/sub. Polling kept as a fallback when EventSource keeps failing.
+- ~~**Recurring expenses don't auto-spawn.**~~ ✅ Resolved 2026-05-09 — `POST /api/cron/recurring-expenses` (bearer-auth, rate-limited) + `cron` sidecar in docker-compose pokes it hourly. Lazy catch-up on `listExpenses` retained as a belt-and-braces second path.
+- ~~**Cache tests skip silently if Redis is unreachable.**~~ ✅ Resolved 2026-05-09 — `beforeAll` pings Redis when configured; ping failure throws with the underlying error.
 - **Restore drill never run.** I documented how, you haven't done it. Do it once before the first customer signs up.
 - **Paymob env keys are empty.** `/billing` shows a clean disabled state until they're provisioned. Until then nothing can actually be charged — explicit by design, but also a launch blocker.
 - **No SaaS-invoice generation for tax purposes.** Paymob emails its own receipt; we don't issue our own VAT invoice for the subscription itself. Add when our own VAT registration is filed.
 - **No retry / dunning on failed payments.** A `past_due` subscription stays past_due until manually retried by the owner. Email reminders on day 1/3/6 of the grace window are still TODO.
 - **No annual / multi-month plans yet.** Only monthly billing.
 - **National ID is stored free-form.** No format guard at all (validator dropped by owner). Fine for v1, may surprise an audit later.
-- **Phone normaliser is mobile-only.** Egyptian landlines (`02 ...`) are silently rejected (stored as null). If you ever sell to B2B with landline contacts, broaden the regex.
+- ~~**Phone normaliser is mobile-only.**~~ ✅ Resolved 2026-05-09 — `normalizeEgyptLandline` + `normalizeEgyptPhoneAny` shipped. Strict mobile path retained for SMS/WhatsApp recipients; broader path is opt-in.
 - **Trial gate uses a JWT claim with 60s TTL.** A user who pays at the moment their trial expires may see one stale page render before the cache busts. Acceptable trade — alternatives all add request-time DB hits.
 
 ---

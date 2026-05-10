@@ -1,14 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireTenant } from "@/lib/api/auth-helpers";
+import {
+  requireTenant,
+  requireTenantWithBranch,
+} from "@/lib/api/auth-helpers";
+import { resolveBranchFilter } from "@/lib/api/branch-context";
 import { listSales, recordSale } from "@/lib/repo/operations";
 import { logActivity } from "@/lib/repo/activity";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const r = await requireTenant();
   if (!r.ok) return r.response;
-  const data = await listSales(r.ctx.tenantId);
-  return NextResponse.json({ data });
+  const filter = await resolveBranchFilter(
+    r.ctx,
+    req.nextUrl.searchParams.get("branchId"),
+  );
+  if (!filter.ok) {
+    return NextResponse.json({ error: filter.error }, { status: filter.status });
+  }
+  const data = await listSales(r.ctx.tenantId, filter.branchId);
+  return NextResponse.json({ data, branchId: filter.branchId });
 }
 
 const recordSchema = z.object({
@@ -26,7 +37,7 @@ const recordSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const r = await requireTenant();
+  const r = await requireTenantWithBranch();
   if (!r.ok) return r.response;
   const body = await req.json().catch(() => null);
   const parsed = recordSchema.safeParse(body);
@@ -38,6 +49,7 @@ export async function POST(req: NextRequest) {
       ...parsed.data,
       customDate: parsed.data.customDate ? new Date(parsed.data.customDate) : undefined,
       recordedByUserId: r.ctx.userId,
+      branchId: r.ctx.branchId,
     });
     logActivity({
       tenantId: r.ctx.tenantId,
@@ -46,6 +58,7 @@ export async function POST(req: NextRequest) {
       category: "sale",
       entityType: "sale",
       entityId: (result as { id?: string }).id ?? null,
+      branchId: r.ctx.branchId,
       metadata: {
         productId: parsed.data.productId,
         quantitySold: parsed.data.quantitySold,

@@ -27,6 +27,7 @@ import { useSession } from "next-auth/react";
 import { can, canAny, type Permission } from "@/lib/permissions";
 import { useUnreadTaskCount } from "@/hooks/useUnreadTaskCount";
 import { useLeaveUnread } from "@/hooks/useLeaveUnread";
+import { useBranches } from "@/hooks/useBranches";
 
 interface NavItem {
   href: string;
@@ -83,7 +84,17 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     return can(principal, i.requires);
   });
 
-  const storeName = settings.shopName?.trim() || "متجري";
+  // Multi-store: tenant name = the company (whole account); branch name =
+  // the active store. Show the active branch as the headline and the
+  // tenant as a thin subtitle so the user always knows which store they're
+  // operating in.
+  const tenantName =
+    session?.user?.tenantSlug?.replace(/-/g, " ") || "متجري";
+  const { current: activeBranch, branches: allBranches } = useBranches();
+  const branchLabel = activeBranch?.name?.trim();
+  const storeName =
+    branchLabel || settings.shopName?.trim() || tenantName;
+  const showSubtenant = !!branchLabel && allBranches.length > 1;
   const { count: unreadTasks } = useUnreadTaskCount();
   const { counts: leaveUnread } = useLeaveUnread();
 
@@ -183,6 +194,11 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             <h2 className="font-display font-extrabold text-text-primary text-lg truncate leading-tight tracking-tight">
               {storeName}
             </h2>
+            {showSubtenant && (
+              <p className="text-[10px] text-text-secondary mt-0.5 truncate uppercase tracking-wider">
+                {tenantName}
+              </p>
+            )}
             <span className="mt-1.5 block h-[3px] w-8 rounded-full bg-accent" />
           </div>
         )}

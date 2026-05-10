@@ -24,12 +24,22 @@ import { cacheBustPrefix, cacheRemember, tenantKey } from "@/lib/cache";
 const CATALOG_TTL_SEC = 300;
 const CATALOG_PREFIX = "catalog";
 
-const categoriesKey = (tenantId: string) =>
-  tenantKey(tenantId, CATALOG_PREFIX, "categories");
+const categoriesKey = (tenantId: string, branchId: string | null) =>
+  tenantKey(tenantId, CATALOG_PREFIX, "categories", branchId ?? "_all");
 const attrsKey = (tenantId: string, categoryId: string) =>
   tenantKey(tenantId, CATALOG_PREFIX, "attrs", categoryId);
-const brandsKey = (tenantId: string, categoryId?: string) =>
-  tenantKey(tenantId, CATALOG_PREFIX, "brands", categoryId ?? "_all");
+const brandsKey = (
+  tenantId: string,
+  branchId: string | null,
+  categoryId?: string,
+) =>
+  tenantKey(
+    tenantId,
+    CATALOG_PREFIX,
+    "brands",
+    branchId ?? "_all",
+    categoryId ?? "_all",
+  );
 
 /**
  * Drop every cached catalog read for one tenant. Cheap because the prefix is
@@ -44,23 +54,31 @@ export async function bustCatalogCache(tenantId: string): Promise<void> {
 // Read paths
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function listCategories(tenantId: string): Promise<CategoryDescriptor[]> {
-  return cacheRemember(categoriesKey(tenantId), CATALOG_TTL_SEC, () =>
-    withTenant(tenantId, async (tx) => {
-      const rows = await tx
-        .select()
-        .from(categories)
-        .where(eq(categories.tenantId, tenantId))
-        .orderBy(asc(categories.position), asc(categories.label));
-      return rows.map((r) => ({
-        id: r.id,
-        key: r.key,
-        label: r.label,
-        icon: r.icon,
-        position: r.position,
-        hasAttributes: r.hasAttributes,
-      }));
-    }),
+export async function listCategories(
+  tenantId: string,
+  branchId?: string | null,
+): Promise<CategoryDescriptor[]> {
+  return cacheRemember(
+    categoriesKey(tenantId, branchId ?? null),
+    CATALOG_TTL_SEC,
+    () =>
+      withTenant(tenantId, async (tx) => {
+        const filters = [eq(categories.tenantId, tenantId)];
+        if (branchId) filters.push(eq(categories.branchId, branchId));
+        const rows = await tx
+          .select()
+          .from(categories)
+          .where(and(...filters))
+          .orderBy(asc(categories.position), asc(categories.label));
+        return rows.map((r) => ({
+          id: r.id,
+          key: r.key,
+          label: r.label,
+          icon: r.icon,
+          position: r.position,
+          hasAttributes: r.hasAttributes,
+        }));
+      }),
   );
 }
 
@@ -120,18 +138,22 @@ export async function listAttributesForCategory(
 
 export async function listBrands(
   tenantId: string,
+  branchId?: string | null,
   categoryId?: string,
 ): Promise<BrandDescriptor[]> {
-  return cacheRemember(brandsKey(tenantId, categoryId), CATALOG_TTL_SEC, () =>
-    withTenant(tenantId, async (tx) => {
-      const where = categoryId
-        ? and(eq(brands.tenantId, tenantId), eq(brands.categoryId, categoryId))
-        : eq(brands.tenantId, tenantId);
-      const rows = await tx
-        .select()
-        .from(brands)
-        .where(where)
-        .orderBy(asc(brands.name));
+  return cacheRemember(
+    brandsKey(tenantId, branchId ?? null, categoryId),
+    CATALOG_TTL_SEC,
+    () =>
+      withTenant(tenantId, async (tx) => {
+        const filters = [eq(brands.tenantId, tenantId)];
+        if (branchId) filters.push(eq(brands.branchId, branchId));
+        if (categoryId) filters.push(eq(brands.categoryId, categoryId));
+        const rows = await tx
+          .select()
+          .from(brands)
+          .where(and(...filters))
+          .orderBy(asc(brands.name));
       return rows.map((r) => ({ id: r.id, categoryId: r.categoryId, name: r.name }));
     }),
   );
@@ -173,12 +195,19 @@ function rowToProduct(
   };
 }
 
-export async function listProducts(tenantId: string): Promise<Product[]> {
+export async function listProducts(
+  tenantId: string,
+  /** When set, restricts to products owned by that branch. Null = every
+   *  branch in the tenant (owner-only "all branches" view). */
+  branchId?: string | null,
+): Promise<Product[]> {
   return withTenant(tenantId, async (tx) => {
+    const productFilters = [eq(products.tenantId, tenantId)];
+    if (branchId) productFilters.push(eq(products.branchId, branchId));
     const ps = await tx
       .select()
       .from(products)
-      .where(eq(products.tenantId, tenantId))
+      .where(and(...productFilters))
       .orderBy(desc(products.createdAt));
 
     if (ps.length === 0) return [];
@@ -251,6 +280,7 @@ export interface AddProductInput {
 
 export async function addProduct(
   tenantId: string,
+  branchId: string,
   input: AddProductInput,
 ): Promise<{ id: string }> {
   return withTenant(tenantId, async (tx) => {
@@ -288,6 +318,7 @@ export async function addProduct(
       .insert(products)
       .values({
         tenantId,
+        branchId,
         categoryId: input.categoryId,
         name: input.name,
         brand: input.brand ?? null,
@@ -311,6 +342,7 @@ export async function addProduct(
           valueId: s.valueId,
           valueLabel: s.valueLabel,
           tenantId,
+          branchId,
         })),
       );
     }

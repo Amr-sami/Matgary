@@ -2,10 +2,10 @@ import NextAuth, { type DefaultSession } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import bcrypt from "bcryptjs";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, withTenant } from "./db";
-import { users, tenantMembers, shopSettings, tenants } from "./db/schema";
+import { users, tenantMembers, shopSettings, tenants, branches } from "./db/schema";
 import { authConfig } from "./auth.config";
 import type { Permission } from "./permissions";
 import { logActivity } from "./repo/activity";
@@ -151,11 +151,21 @@ async function resolveTenantContext(userId: string): Promise<UserContext> {
       tenantSlug = tenant?.slug ?? null;
 
       // shop_settings IS RLS-protected — set app.tenant_id first.
+      // Multi-store: settings are now per (tenant, branch). Onboarding
+      // completion is decided from the primary branch's settings (the one
+      // the signup flow filled in). Secondary branches can stay empty
+      // without un-onboarding the tenant.
       const settings = await withTenant(tenantId, async (tx) => {
         const [row] = await tx
           .select({ shopName: shopSettings.shopName })
           .from(shopSettings)
-          .where(eq(shopSettings.tenantId, tenantId))
+          .innerJoin(branches, eq(branches.id, shopSettings.branchId))
+          .where(
+            and(
+              eq(shopSettings.tenantId, tenantId),
+              eq(branches.isPrimary, true),
+            ),
+          )
           .limit(1);
         return row;
       });

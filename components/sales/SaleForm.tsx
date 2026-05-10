@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { ProductSearchSelect } from "./ProductSearchSelect";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
-import { recordCartSale } from "@/lib/api/sales";
+import { useBranches } from "@/hooks/useBranches";
+import { recordCartSaleOfflineAware } from "@/lib/offline/recordCartSale";
 import { useSales } from "@/hooks/useSales";
 import { useProducts } from "@/hooks/useProducts";
 import { useCustomersData } from "@/hooks/useCustomersData";
@@ -87,6 +89,40 @@ export function SaleForm({
   const { products } = useProducts();
   const { settings } = useShopSettings();
   const searchParams = useSearchParams();
+  // Multi-store + offline POS: every sale carries the tenant + branch ids
+  // so the outbox row can replay against the correct store even if the
+  // cashier later switches branches mid-shift.
+  const { data: session } = useSession();
+  const tenantId = session?.user?.tenantId ?? null;
+  const { current: activeBranch } = useBranches();
+  const branchId = activeBranch?.id ?? null;
+
+  // Keep the offline snapshot warm: every time the cart page loads while
+  // online, refresh the IndexedDB cache from /api/pos/bootstrap. The
+  // sync runs once on mount and once every 5 minutes after that. When
+  // wifi blinks mid-shift, the most-recent snapshot is already on disk.
+  useEffect(() => {
+    if (!tenantId || !branchId) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const refresh = async () => {
+      if (cancelled) return;
+      if (typeof navigator !== "undefined" && !navigator.onLine) return;
+      try {
+        const { refreshSnapshot } = await import("@/lib/offline/snapshot");
+        await refreshSnapshot(tenantId, branchId);
+      } catch {
+        // Best-effort: a failed refresh just leaves the previous snapshot
+        // in place, which is exactly what we want.
+      }
+    };
+    void refresh();
+    timer = setInterval(refresh, 5 * 60 * 1000);
+    return () => {
+      cancelled = true;
+      if (timer) clearInterval(timer);
+    };
+  }, [tenantId, branchId]);
 
   // Current line being composed
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(preselectedProduct || null);
@@ -110,6 +146,58 @@ export function SaleForm({
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
+
+  // Loyalty redemption — appears only when the active branch's loyalty
+  // programme is enabled AND the cashier has typed a customer phone.
+  const [walletPoints, setWalletPoints] = useState(0);
+  const [walletCredit, setWalletCredit] = useState(0);
+  const [redeemPointsInput, setRedeemPointsInput] = useState("");
+  const [applyCreditInput, setApplyCreditInput] = useState("");
+  useEffect(() => {
+    if (!settings.loyaltyEnabled || !customerPhone.trim()) {
+      setWalletPoints(0);
+      setWalletCredit(0);
+      return;
+    }
+    const phone = customerPhone.trim();
+    let cancelled = false;
+    // 400ms debounce so a fast typist doesn't spam the wallet endpoint.
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/customers/by-phone/${encodeURIComponent(phone)}/wallet`,
+          { cache: "no-store" },
+        );
+        if (cancelled) return;
+        if (!res.ok) {
+          setWalletPoints(0);
+          setWalletCredit(0);
+          return;
+        }
+        const json = (await res.json()) as {
+          wallet: { points: number; credit: number };
+        };
+        setWalletPoints(json.wallet.points);
+        setWalletCredit(json.wallet.credit);
+      } catch {
+        if (!cancelled) {
+          setWalletPoints(0);
+          setWalletCredit(0);
+        }
+      }
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [customerPhone, settings.loyaltyEnabled]);
+
+  // Reset redemption inputs when the customer changes (otherwise a
+  // previous customer's "redeem 50 pts" would silently apply to next sale).
+  useEffect(() => {
+    setRedeemPointsInput("");
+    setApplyCreditInput("");
+  }, [customerPhone]);
 
   const [loading, setLoading] = useState(false);
 
@@ -327,9 +415,15 @@ export function SaleForm({
       saleDate = parsed;
     }
 
+    if (!tenantId || !branchId) {
+      alert("جلسة غير مكتملة. أعد تحميل الصفحة.");
+      return;
+    }
+
     setLoading(true);
     try {
-      const result = await recordCartSale(
+      const result = await recordCartSaleOfflineAware(
+        { tenantId, branchId },
         lines.map((l) => ({
           productId: l.product.id,
           quantity: l.quantity,
@@ -345,6 +439,10 @@ export function SaleForm({
           customerName: customerName.trim() || undefined,
           customerPhone: customerPhone.trim() || undefined,
           paymentMethod,
+          // Loyalty redemption — server validates against current wallet
+          // and refuses if balance is short or programme is disabled.
+          redeemPoints: Math.max(0, Math.floor(Number(redeemPointsInput) || 0)),
+          applyCreditEgp: Math.max(0, Number(applyCreditInput) || 0),
         }
       );
 
@@ -781,6 +879,75 @@ export function SaleForm({
                 suggestions={pastCustomers}
               />
             </div>
+
+            {/* Loyalty redemption — appears only when programme is enabled
+                AND a customer phone has been entered. Shows current
+                balances + two inputs to redeem points / apply credit. */}
+            {settings.loyaltyEnabled && customerPhone.trim() && (
+              <div className="rounded-xl border border-accent-light bg-accent-light/30 p-3 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-text-primary">
+                    محفظة العميل
+                  </span>
+                  <div className="flex items-center gap-3 tabular-nums">
+                    <span>
+                      <b className="text-orange-600">{walletPoints}</b> نقطة
+                      {walletPoints > 0 && settings.loyaltyEgpPerPoint > 0 && (
+                        <span className="text-text-secondary">
+                          {" "}
+                          (={" "}
+                          {(walletPoints * settings.loyaltyEgpPerPoint).toFixed(
+                            2,
+                          )}{" "}
+                          ج)
+                        </span>
+                      )}
+                    </span>
+                    <span className="text-text-secondary">·</span>
+                    <span>
+                      <b className="text-success">
+                        {walletCredit.toFixed(2)} ج
+                      </b>{" "}
+                      رصيد
+                    </span>
+                  </div>
+                </div>
+                {(walletPoints > 0 || walletCredit > 0) && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[11px] text-text-secondary mb-0.5">
+                        خصم نقاط
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max={walletPoints}
+                        step="1"
+                        value={redeemPointsInput}
+                        onChange={(e) => setRedeemPointsInput(e.target.value)}
+                        placeholder="0"
+                        className="w-full px-2.5 py-1.5 rounded-md border border-border text-sm focus:outline-none focus:border-accent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] text-text-secondary mb-0.5">
+                        استخدام رصيد (ج)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max={walletCredit}
+                        step="0.01"
+                        value={applyCreditInput}
+                        onChange={(e) => setApplyCreditInput(e.target.value)}
+                        placeholder="0"
+                        className="w-full px-2.5 py-1.5 rounded-md border border-border text-sm focus:outline-none focus:border-accent"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-1.5">

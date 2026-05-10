@@ -41,6 +41,7 @@ interface Member {
   address: string | null;
   profilePhotoPath: string | null;
   idPhotoPath: string | null;
+  branchId: string | null;
 }
 
 interface Props {
@@ -288,6 +289,7 @@ export function TeamEditor({ onToast }: Props) {
                 address: editTarget.address,
                 profilePhotoPath: editTarget.profilePhotoPath,
                 idPhotoPath: editTarget.idPhotoPath,
+                branchId: editTarget.branchId,
               }
             : null
         }
