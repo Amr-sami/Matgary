@@ -182,6 +182,33 @@ npm run db:migrate
 
 ## 2. Changelog
 
+### 2026-05-11 — Receipt customisation (تخصيص الفاتورة)
+
+Receipts were rendering hardcoded "Corner Store" / phone / location constants — invisible to every other tenant. They now read the active branch's settings and expose four owner-tunable knobs.
+
+- **Schema** (`0017_receipt_customisation.sql`): four new `shop_settings` cols, all per-(tenant, branch) so each store sets its own.
+  - `receipt_logo_size` text default `'medium'` ∈ {`hidden`,`small`,`medium`,`large`}.
+  - `receipt_footer_text` text default `''` (multi-line, ≤500 chars after trim).
+  - `receipt_language` text default `'ar'` ∈ {`ar`,`en`,`bilingual`}.
+  - `receipt_show_loyalty` boolean default `true`.
+- **DTO + API**: extended `ShopSettingsDto` (server) and `ShopSettings` (client) plus `patchSchema` z.enum guards on the language + logo-size enums and 500-char clamp on footer (also strips `\r` for cross-OS round-trip). Defaults match the historic hardcoded layout so existing tenants see no visual change.
+- **Labels** (`lib/receipt-strings.ts`): a tiny `RECEIPT_LABELS` dictionary (en/ar pairs for ~12 keys) + an `rl(key, lang)` helper. `bilingual` returns `EN · AR` so each row stays a single physical line.
+- **Receipt + InvoiceReceipt** components rewritten:
+  - Hardcoded `Corner Store` / `STORE_PHONE` / `STORE_LOCATION_*` constants gone — header pulls `settings.shopName` (uppercased) and `settings.shopPhone`. Empty phone hides the contact line cleanly.
+  - Logo `<img>` gets a `receipt-logo--{size}` modifier class; `hidden` skips rendering entirely.
+  - Optional `receiptFooterText` rendered in a new `.receipt-footer` block (RTL, monospace, whitespace-pre-wrap so multi-line copy survives).
+  - QR payload changed from a hardcoded marketing URL to `INVOICE <id>` (or `tel:<shop>` fallback) so cashiers can scan to pull up the invoice.
+  - Loyalty rows added (POINTS REDEEMED, CREDIT APPLIED above total; POINTS EARNED + WALLET BALANCE below total) — only render when `receipt_show_loyalty` AND data is non-zero.
+  - **Bug fix found in pass**: the receipt's "TOTAL AMOUNT" was showing the pre-loyalty subtotal. Now uses `paidTotal = total - loyaltyDiscountAmount` so the printed total matches what the customer actually paid.
+- **CSS**: added `.receipt-logo--{hidden,small,medium,large}` modifiers (both print + on-screen preview variants) and `.receipt-footer` styling (font-cairo, RTL, whitespace-pre-wrap).
+- **Settings UI** ("تخصيص الفاتورة" card): logo-size dropdown, language radio with hint copy ("TOTAL · الإجمالي"), 500-char footer textarea with live char counter, show-loyalty toggle, and a live miniature mockup that re-renders as the owner edits. Mockup is a CSS facsimile (not pixel-perfect — real receipt is monospace 80mm) but conveys order, language, and logo size accurately.
+
+**Trade-offs:**
+- Mockup mirrors the receipt structure but uses Tailwind boxes instead of the actual `<Receipt>` component — keeps the preview cheap and avoids needing fake invoice data plumbed through. If the real receipt structure drifts, the preview can mislead.
+- `receipt_show_loyalty` only governs the loyalty rows on the *receipt*. Cart preview + customer wallet page always show loyalty (where appropriate). The flag is purely cosmetic.
+- Bilingual mode crams `EN · AR` into one cell. On 80mm thermal printers with very long products this could wrap. Tested with the standard label set; long product names already had this risk.
+- Footer text is rendered verbatim — no template substitution. Owners that want "thanks {customerName}" can request that as a v2.
+
 ### 2026-05-11 — Customer loyalty + store credit (نقاط الولاء / رصيد العميل)
 
 Unified wallet: one `customer_wallets` row per (tenant, branch, phone) holding both points and EGP credit, with an append-only `customer_wallet_events` audit log. Each branch runs its own programme (multi-store).
@@ -473,11 +500,11 @@ Ordered roughly by likely impact on retention / conversion. Not committed — re
 - **SMS fallback** alongside WhatsApp. Vodafone Egypt SMS Gateway or EgyptSMS — Twilio is unreliable in Egypt.
 - **2FA for owners** (TOTP or WhatsApp OTP).
 - **Forgot-username** flow for sub-accounts (`username@tenant-slug` is hard to remember).
-- **Bulk product import** from Excel/CSV. Owners arriving from spreadsheet workflows will demand it.
+- ~~**Bulk product import** from Excel/CSV.~~ ✅ Done 2026-05-11. Two-phase server-side flow: upload CSV → preview table (per-row create/update/error tags + per-field error messages) → confirm. SKU upsert (insert when empty/new, update when matched), `attribute_values` column with `key=label;…` syntax, template download endpoint pre-fills the active branch's category keys. Multi-store: imports go to the active branch. **Still owed**: native .xlsx parser (today: "Excel → save as CSV UTF-8"); inter-row variant generation (today: each variant is a separate row with its own SKU).
 - ~~**Customer loyalty / store credit** programme.~~ ✅ Done 2026-05-11. Unified wallet (points + EGP credit) per (tenant, branch, phone) with audit log. Per-branch enable + rates in settings. Earn auto on paid sales, redeem at checkout, owner manual grant. **Still owed**: points expiry cron, "refund as credit" toggle in returns flow.
 - **Per-branch cash drawer reconciliation** (after multi-branch lands).
 - **Staff performance leaderboard improvements**: commissions, targets, bonus calcs.
-- **Receipt customisation** beyond message template (logo size, footer copy, language toggle).
+- ~~**Receipt customisation** beyond message template (logo size, footer copy, language toggle).~~ ✅ Done 2026-05-11. Per-branch (multi-store) settings for `receipt_logo_size` (hidden/small/medium/large), free-form `receipt_footer_text` (≤500 chars, multi-line), `receipt_language` (`ar`/`en`/`bilingual`), and `receipt_show_loyalty` toggle. New "تخصيص الفاتورة" card in /settings with live mockup preview. Receipt + InvoiceReceipt now read shop name/phone from settings instead of hardcoded "Corner Store" constants, label set chosen by language, footer rendered below thank-you, loyalty rows (points redeemed, credit applied, points earned, wallet balance) shown when enabled. Receipt TOTAL now reflects post-loyalty paid amount.
 
 ### Infrastructure / ops
 

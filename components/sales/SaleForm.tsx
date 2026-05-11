@@ -49,6 +49,14 @@ export interface ReceiptInvoiceData {
   orderDiscountAmount: number;
   totalPrice: number;
   note?: string;
+  /** Loyalty redemption + earn snapshot at the moment of sale. Rendered on
+   *  the receipt only when the branch's `receiptShowLoyalty` is on AND at
+   *  least one of these values is non-zero. */
+  loyaltyPointsRedeemed?: number;
+  loyaltyCreditApplied?: number;
+  loyaltyPointsEarned?: number;
+  loyaltyPointsBalance?: number;
+  loyaltyCreditBalance?: number;
 }
 
 interface CartLineState {
@@ -344,7 +352,53 @@ export function SaleForm({
           cartAfterLines
         )
       : 0;
-  const cartTotal = cartAfterLines - orderDiscountAmount;
+  const cartAfterOrderDiscount = cartAfterLines - orderDiscountAmount;
+
+  // ── Loyalty redemption preview ─────────────────────────────────────
+  // Live-recompute the discount as the cashier types in the redeem fields.
+  // Mirrors the server-side cap-and-trim logic in `recordCartSale`: if the
+  // requested redemption exceeds what's left after the order discount, we
+  // shrink it (preserve credit, trim points) so the displayed total
+  // matches what the server will actually book. The cashier sees the
+  // EXACT final number before submitting.
+  const requestedRedeemPoints = Math.max(
+    0,
+    Math.floor(Number(redeemPointsInput) || 0),
+  );
+  const requestedApplyCredit = Math.max(0, Number(applyCreditInput) || 0);
+  const cappedRedeemPoints = Math.min(requestedRedeemPoints, walletPoints);
+  const cappedApplyCredit = Math.min(requestedApplyCredit, walletCredit);
+
+  let loyaltyDiscountAmount = 0;
+  let loyaltyPointsAppliedDisplay = 0;
+  let loyaltyCreditAppliedDisplay = 0;
+  if (cappedRedeemPoints > 0 || cappedApplyCredit > 0) {
+    const rate = settings.loyaltyEgpPerPoint || 0;
+    const pointsValue = Math.round(cappedRedeemPoints * rate * 100) / 100;
+    let total = pointsValue + cappedApplyCredit;
+    if (total > cartAfterOrderDiscount) {
+      // Trim to the available headroom: keep credit, cut points first.
+      total = cartAfterOrderDiscount;
+      if (cappedApplyCredit >= cartAfterOrderDiscount) {
+        loyaltyCreditAppliedDisplay = cartAfterOrderDiscount;
+        loyaltyPointsAppliedDisplay = 0;
+      } else {
+        loyaltyCreditAppliedDisplay = cappedApplyCredit;
+        const fromPoints = cartAfterOrderDiscount - cappedApplyCredit;
+        loyaltyPointsAppliedDisplay =
+          rate > 0 ? Math.floor(fromPoints / rate) : 0;
+      }
+      loyaltyDiscountAmount =
+        Math.round(loyaltyPointsAppliedDisplay * rate * 100) / 100 +
+        loyaltyCreditAppliedDisplay;
+    } else {
+      loyaltyDiscountAmount = total;
+      loyaltyPointsAppliedDisplay = cappedRedeemPoints;
+      loyaltyCreditAppliedDisplay = cappedApplyCredit;
+    }
+  }
+
+  const cartTotal = Math.max(0, cartAfterOrderDiscount - loyaltyDiscountAmount);
 
   // Inventory check: account for the cart already holding some quantity of this product
   const stockReservedFor = (productId: string) =>
@@ -473,6 +527,24 @@ export function SaleForm({
           : 0;
       const total = after - orderDisc;
 
+      // Loyalty snapshot for the printed receipt — mirror the same cap-and-trim
+      // logic the server applied so what we print matches what was committed.
+      // pointsEarned uses the FINAL paid amount (after redemption), matching
+      // recordCartSale's earnPoints call.
+      const earnRate = settings.loyaltyEnabled
+        ? settings.loyaltyPointsPerEgp || 0
+        : 0;
+      const paidTotal = Math.max(0, total - loyaltyDiscountAmount);
+      const pointsEarned =
+        settings.loyaltyEnabled && earnRate > 0
+          ? Math.floor(paidTotal * earnRate)
+          : 0;
+      const finalPoints = Math.max(
+        0,
+        walletPoints - loyaltyPointsAppliedDisplay + pointsEarned,
+      );
+      const finalCredit = Math.max(0, walletCredit - loyaltyCreditAppliedDisplay);
+
       const invoiceForReceipt: ReceiptInvoiceData = {
         invoiceId: result.invoiceId,
         saleDate,
@@ -491,8 +563,16 @@ export function SaleForm({
         })),
         cartSubtotal: linesGross,
         orderDiscountAmount: orderDisc,
-        totalPrice: total,
+        // The actual paid amount — receipt's TOTAL line should match what
+        // the customer handed over, post-loyalty. Pre-loyalty subtotal
+        // still appears above as SUBTOTAL so the math reads correctly.
+        totalPrice: paidTotal,
         note: note || undefined,
+        loyaltyPointsRedeemed: loyaltyPointsAppliedDisplay || undefined,
+        loyaltyCreditApplied: loyaltyCreditAppliedDisplay || undefined,
+        loyaltyPointsEarned: pointsEarned || undefined,
+        loyaltyPointsBalance: customerPhone.trim() ? finalPoints : undefined,
+        loyaltyCreditBalance: customerPhone.trim() ? finalCredit : undefined,
       };
       setLastInvoice(invoiceForReceipt);
 
@@ -853,10 +933,44 @@ export function SaleForm({
                   <span>- {formatPrice(orderDiscountAmount)}</span>
                 </div>
               )}
+              {loyaltyPointsAppliedDisplay > 0 && (
+                <div className="flex justify-between text-orange-600">
+                  <span>
+                    خصم نقاط ({loyaltyPointsAppliedDisplay} نقطة)
+                  </span>
+                  <span>
+                    -{" "}
+                    {formatPrice(
+                      Math.round(
+                        loyaltyPointsAppliedDisplay *
+                          (settings.loyaltyEgpPerPoint || 0) *
+                          100,
+                      ) / 100,
+                    )}
+                  </span>
+                </div>
+              )}
+              {loyaltyCreditAppliedDisplay > 0 && (
+                <div className="flex justify-between text-success">
+                  <span>خصم الرصيد</span>
+                  <span>- {formatPrice(loyaltyCreditAppliedDisplay)}</span>
+                </div>
+              )}
               <div className="border-t border-accent/20 pt-1 flex justify-between font-bold">
                 <span>الإجمالي</span>
                 <span className="text-2xl text-accent">{formatPrice(cartTotal)}</span>
               </div>
+              {loyaltyDiscountAmount > 0 &&
+                (requestedRedeemPoints > cappedRedeemPoints ||
+                  requestedApplyCredit > cappedApplyCredit ||
+                  requestedRedeemPoints * (settings.loyaltyEgpPerPoint || 0) +
+                    requestedApplyCredit >
+                    cartAfterOrderDiscount) && (
+                  <p className="text-[11px] text-orange-700 leading-relaxed pt-1">
+                    تم تعديل قيمة الخصم تلقائياً لتطابق الحد المتاح من
+                    المحفظة و رصيد الفاتورة.
+                  </p>
+                )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">

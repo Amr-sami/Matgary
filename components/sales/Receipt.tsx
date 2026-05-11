@@ -1,6 +1,8 @@
 "use client";
 
 import type { DiscountType } from "@/lib/types";
+import { useShopSettings } from "@/hooks/useShopSettings";
+import { rl } from "@/lib/receipt-strings";
 
 interface ReceiptSaleData {
   saleId?: string;
@@ -40,36 +42,46 @@ function shortCode(sale: ReceiptSaleData): string {
   return sale.saleDate.getTime().toString().slice(-10);
 }
 
-const STORE_PHONE = "01500228266";
-const STORE_LOCATION_AR = "العاشر من رمضان · الأردنية، خلف فودافون";
-const STORE_LOCATION_EN = "10th of Ramadan City - El Ordnia, behind Vodafone";
-
-const STORE_WEBSITE = "https://cornerwatcesstore.com";
-
 function qrImageUrl(payload: string): string {
   const data = encodeURIComponent(payload);
   return `https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=0&ecc=M&data=${data}`;
 }
 
 export function Receipt({ sale }: ReceiptProps) {
+  const { settings } = useShopSettings();
   const code = shortCode(sale);
-  const qrUrl = qrImageUrl(STORE_WEBSITE);
+  const lang = settings.receiptLanguage;
+  const shopName = (settings.shopName || "STORE").toUpperCase();
+  const shopPhone = settings.shopPhone || "";
+  const qrPayload = shopPhone
+    ? `tel:${shopPhone.replace(/\D/g, "")}`
+    : `INVOICE ${code}`;
+  const qrUrl = qrImageUrl(qrPayload);
+  const logoSrc = "/logo.png";
 
   return (
     <div className="receipt" dir="ltr">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/logo.png" alt="Corner Store" className="receipt-logo" />
-      <div className="receipt-slogan">CORNER STORE · العاشر من رمضان</div>
-      <div className="receipt-contact">TEL: {STORE_PHONE}</div>
-      <div className="receipt-contact">{STORE_LOCATION_EN}</div>
-      <div className="receipt-contact-ar">{STORE_LOCATION_AR}</div>
+      {settings.receiptLogoSize !== "hidden" && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={logoSrc}
+          alt={shopName}
+          className={`receipt-logo receipt-logo--${settings.receiptLogoSize}`}
+        />
+      )}
+      <div className="receipt-slogan">{shopName}</div>
+      {shopPhone && (
+        <div className="receipt-contact">
+          {rl("tel", lang)}: {shopPhone}
+        </div>
+      )}
 
       <div className="receipt-divider">- - - - - - - - - - - - - - - - - - - - - - - - -</div>
 
-      <h1 className="receipt-title">*** RECEIPT ***</h1>
+      <h1 className="receipt-title">{rl("receipt", lang)}</h1>
 
       <div className="receipt-row">
-        <span>CORNER STORE</span>
+        <span>{shopName}</span>
         <span>{formatReceiptDate(sale.saleDate)}</span>
       </div>
 
@@ -81,7 +93,9 @@ export function Receipt({ sale }: ReceiptProps) {
           <span className="receipt-item-price">{formatMoney(sale.subtotal)}</span>
         </div>
         {sale.brand && (
-          <div className="receipt-item-sub">BRAND: {sale.brand}</div>
+          <div className="receipt-item-sub">
+            {rl("brand", lang)}: {sale.brand}
+          </div>
         )}
         {sale.quantity > 1 && (
           <div className="receipt-item-sub">
@@ -90,10 +104,10 @@ export function Receipt({ sale }: ReceiptProps) {
         )}
         {sale.discountAmount > 0 && (
           <div className="receipt-item-sub">
-            DISC.{" "}
+            {rl("discount", lang)}{" "}
             {sale.discountType === "percentage"
               ? `${sale.discountValue}% `
-              : "FIXED "}
+              : ""}
             (- {formatMoney(sale.discountAmount)})
           </div>
         )}
@@ -102,12 +116,12 @@ export function Receipt({ sale }: ReceiptProps) {
       <div className="receipt-divider">- - - - - - - - - - - - - - - - - - - - - - - - -</div>
 
       <div className="receipt-row">
-        <span>SUBTOTAL</span>
+        <span>{rl("subtotal", lang)}</span>
         <span>{formatMoney(sale.subtotal)}</span>
       </div>
       {sale.discountAmount > 0 && (
         <div className="receipt-row">
-          <span>DISCOUNT</span>
+          <span>{rl("discount", lang)}</span>
           <span>- {formatMoney(sale.discountAmount)}</span>
         </div>
       )}
@@ -115,14 +129,17 @@ export function Receipt({ sale }: ReceiptProps) {
       <div className="receipt-divider">- - - - - - - - - - - - - - - - - - - - - - - - -</div>
 
       <div className="receipt-row receipt-total-row">
-        <span>TOTAL AMOUNT</span>
+        <span>{rl("total", lang)}</span>
         <span>{formatMoney(sale.totalPrice)}</span>
       </div>
 
       <div className="receipt-divider">- - - - - - - - - - - - - - - - - - - - - - - - -</div>
 
-      <div className="receipt-thankyou">THANK YOU FOR SHOPPING!</div>
-      <div className="receipt-thankyou-ar">شكراً لتسوقكم معنا ❤</div>
+      <div className="receipt-thankyou">{rl("thankYou", lang)}</div>
+
+      {settings.receiptFooterText && (
+        <div className="receipt-footer">{settings.receiptFooterText}</div>
+      )}
 
       {/* Egyptian Tax Authority disclaimer — this receipt is operational, not
           an e-invoice. VAT-registered merchants must issue separate ETA
@@ -143,7 +160,6 @@ export function Receipt({ sale }: ReceiptProps) {
           className="receipt-qr-img"
         />
       </div>
-      <div className="receipt-qr-hint">SCAN TO VISIT · {STORE_WEBSITE.replace("https://", "")}</div>
       <div className="receipt-barcode-text">#{code}</div>
     </div>
   );

@@ -6,6 +6,7 @@ import {
   returns as returnsTable,
   expenses as expensesTable,
   products,
+  categories,
 } from "@/lib/db/schema";
 import { cacheBustPrefix, cacheRemember, tenantKey } from "@/lib/cache";
 
@@ -270,14 +271,19 @@ async function computeOverview(
       .limit(5);
 
     // ── 4. Category breakdown (revenue per category) ───────────────────────
+    // LEFT JOIN categories so the chart shows the human-readable label
+    // (e.g. "ساعات") instead of a UUID. Falls back to the id when the
+    // category was deleted or doesn't exist anymore — better than blank.
     const categoryRows = await tx
       .select({
-        category: sales.categoryId,
+        categoryId: sales.categoryId,
+        label: categories.label,
         revenue: sumRevenue,
       })
       .from(sales)
+      .leftJoin(categories, eq(categories.id, sales.categoryId))
       .where(and(...winSalesFilters))
-      .groupBy(sales.categoryId);
+      .groupBy(sales.categoryId, categories.label);
 
     // ── 5. Daily trend, capped at TREND_MAX_DAYS ───────────────────────────
     let trendStart: Date;
@@ -369,7 +375,10 @@ async function computeOverview(
         revenue: Number(r.revenue ?? 0),
       })),
       categoryChartData: categoryRows.map((r) => ({
-        name: r.category,
+        // Prefer the joined label; fall back to the id if the category
+        // row is gone (deleted product still has the snapshot id on its
+        // sale rows).
+        name: r.label ?? r.categoryId,
         value: Number(r.revenue ?? 0),
       })),
     };

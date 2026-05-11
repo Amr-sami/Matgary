@@ -14,7 +14,7 @@ import { ProductTable } from "@/components/inventory/ProductTable";
 import { ProductCard } from "@/components/inventory/ProductCard";
 import { EditProductModal } from "@/components/inventory/EditProductModal";
 import { ProductHistoryModal } from "@/components/inventory/ProductHistoryModal";
-import { CsvImportModal } from "@/components/inventory/CsvImportModal";
+import { ImportProductsModal } from "@/components/inventory/ImportProductsModal";
 import {
   BulkActionsBar,
   type BulkAction,
@@ -637,13 +637,15 @@ function InventoryPageInner() {
         product={historyProduct}
       />
 
-      {/* CSV Import */}
-      <CsvImportModal
+      {/* Bulk product import — server-side preview + commit (SKU upsert,
+          per-row errors, branch-scoped). */}
+      <ImportProductsModal
         isOpen={importOpen}
         onClose={() => setImportOpen(false)}
-        onSuccess={(count) =>
-          setToast({ type: "success", message: `تم استيراد ${count} منتج` })
-        }
+        onImported={async () => {
+          await refreshProducts();
+          setToast({ type: "success", message: "تم تحديث القائمة" });
+        }}
       />
 
       {/* Delete Confirmation */}

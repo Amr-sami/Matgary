@@ -61,9 +61,26 @@ function isEqualSettings(a: ShopSettings, b: ShopSettings): boolean {
     a.sendAsPdf === b.sendAsPdf &&
     a.loyaltyEnabled === b.loyaltyEnabled &&
     a.loyaltyPointsPerEgp === b.loyaltyPointsPerEgp &&
-    a.loyaltyEgpPerPoint === b.loyaltyEgpPerPoint
+    a.loyaltyEgpPerPoint === b.loyaltyEgpPerPoint &&
+    a.receiptLogoSize === b.receiptLogoSize &&
+    a.receiptFooterText === b.receiptFooterText &&
+    a.receiptLanguage === b.receiptLanguage &&
+    a.receiptShowLoyalty === b.receiptShowLoyalty
   );
 }
+
+const LOGO_SIZE_OPTIONS: { value: ShopSettings["receiptLogoSize"]; label: string }[] = [
+  { value: "hidden", label: "بدون شعار" },
+  { value: "small", label: "صغير" },
+  { value: "medium", label: "متوسط (افتراضي)" },
+  { value: "large", label: "كبير" },
+];
+
+const LANGUAGE_OPTIONS: { value: ShopSettings["receiptLanguage"]; label: string; hint: string }[] = [
+  { value: "ar", label: "العربية", hint: "الإجمالي، الخصم، شكراً..." },
+  { value: "en", label: "English", hint: "TOTAL, DISCOUNT, THANK YOU..." },
+  { value: "bilingual", label: "ثنائي اللغة", hint: "TOTAL · الإجمالي" },
+];
 
 export default function SettingsPage() {
   const { data: session } = useSession();
@@ -290,6 +307,10 @@ export default function SettingsPage() {
             </>
           )}
         </div>
+
+        {/* Receipt customisation — per-branch. Logo size, footer copy,
+            language, and loyalty visibility on the printed receipt. */}
+        <ReceiptCustomisationCard draft={draft} update={update} />
 
         {/* WhatsApp section */}
         <div className="bg-white rounded-xl border border-border p-5 space-y-4">
@@ -568,5 +589,209 @@ export default function SettingsPage() {
         />
       )}
     </AppShell>
+  );
+}
+
+interface ReceiptCardProps {
+  draft: ShopSettings;
+  update: <K extends keyof ShopSettings>(key: K, value: ShopSettings[K]) => void;
+}
+
+function ReceiptCustomisationCard({ draft, update }: ReceiptCardProps) {
+  // Live mock preview. Numbers are illustrative — the goal is to let the
+  // owner see how their language/logo/footer choices will look without
+  // having to ring up a real sale.
+  const lang = draft.receiptLanguage;
+  const T = (en: string, ar: string) =>
+    lang === "en" ? en : lang === "ar" ? ar : `${en} · ${ar}`;
+  const shopName = (draft.shopName || "STORE").toUpperCase();
+
+  return (
+    <div className="bg-white rounded-xl border border-border p-5 space-y-4">
+      <div>
+        <h3 className="font-bold text-lg">تخصيص الفاتورة</h3>
+        <p className="text-xs text-text-secondary mt-0.5">
+          مظهر ولغة الإيصال المطبوع — كل فرع له إعداداته المستقلة.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {/* Logo size */}
+        <div>
+          <label className="block text-sm font-medium text-text-secondary mb-1.5">
+            حجم الشعار
+          </label>
+          <select
+            value={draft.receiptLogoSize}
+            onChange={(e) =>
+              update("receiptLogoSize", e.target.value as ShopSettings["receiptLogoSize"])
+            }
+            className="w-full px-3 py-2.5 rounded-lg border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+          >
+            {LOGO_SIZE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <p className="text-[10px] text-text-secondary mt-1">
+            لو طابعتك حرارية واللوجو طلع وحش، خليه «صغير» أو «بدون».
+          </p>
+        </div>
+
+        {/* Language */}
+        <div>
+          <label className="block text-sm font-medium text-text-secondary mb-1.5">
+            لغة المسميات
+          </label>
+          <div className="space-y-1.5">
+            {LANGUAGE_OPTIONS.map((o) => (
+              <label
+                key={o.value}
+                className={`flex items-start gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${
+                  draft.receiptLanguage === o.value
+                    ? "border-accent bg-accent-light/30"
+                    : "border-border"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="receipt-language"
+                  checked={draft.receiptLanguage === o.value}
+                  onChange={() =>
+                    update("receiptLanguage", o.value)
+                  }
+                  className="mt-1 accent-accent"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">{o.label}</p>
+                  <p className="text-[10px] text-text-secondary truncate">
+                    {o.hint}
+                  </p>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Footer text */}
+      <div>
+        <label className="block text-sm font-medium text-text-secondary mb-1.5">
+          نص ذيل الفاتورة (اختياري)
+        </label>
+        <textarea
+          value={draft.receiptFooterText}
+          onChange={(e) => update("receiptFooterText", e.target.value)}
+          dir="rtl"
+          rows={3}
+          maxLength={500}
+          placeholder="مثلاً: سياسة الإرجاع خلال 7 أيام بالفاتورة. تابعنا على إنستجرام @yourshop"
+          className="w-full px-3 py-2.5 rounded-lg border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+        />
+        <p className="text-[10px] text-text-secondary mt-1">
+          {draft.receiptFooterText.length}/500 — يظهر تحت «شكراً لتسوقكم».
+        </p>
+      </div>
+
+      {/* Show loyalty toggle */}
+      <label className="flex items-start gap-3 p-3 rounded-lg border border-border cursor-pointer">
+        <input
+          type="checkbox"
+          checked={draft.receiptShowLoyalty}
+          onChange={(e) => update("receiptShowLoyalty", e.target.checked)}
+          className="mt-1 w-5 h-5 accent-accent"
+        />
+        <div className="flex-1">
+          <p className="font-medium">إظهار النقاط والرصيد على الفاتورة</p>
+          <p className="text-xs text-text-secondary mt-0.5">
+            يطبع «نقاط مكتسبة» و«رصيد المحفظة» — أقوى محفز لاستخدام برنامج
+            الولاء. يحتاج برنامج الولاء مفعّل.
+          </p>
+        </div>
+      </label>
+
+      {/* Live preview — a thin facsimile of what the cashier will see on the
+          printed receipt. Not pixel-perfect (real receipt is monospace at
+          80mm) but conveys order, language, and logo size accurately. */}
+      <div className="rounded-lg border border-dashed border-border bg-bg-main p-3">
+        <p className="text-[10px] text-text-secondary mb-2 text-center">
+          ↓ معاينة مبدئية ↓
+        </p>
+        <div className="mx-auto bg-white border border-border rounded p-3 max-w-xs text-[11px] leading-relaxed font-mono text-black">
+          {draft.receiptLogoSize !== "hidden" && (
+            <div className="text-center mb-1">
+              <div
+                className={`inline-block bg-bg-main rounded ${
+                  draft.receiptLogoSize === "small"
+                    ? "w-10 h-10"
+                    : draft.receiptLogoSize === "large"
+                      ? "w-24 h-24"
+                      : "w-16 h-16"
+                }`}
+                aria-hidden
+              />
+            </div>
+          )}
+          <div className="text-center font-bold tracking-wide">{shopName}</div>
+          {draft.shopPhone && (
+            <div className="text-center">TEL: {draft.shopPhone}</div>
+          )}
+          <hr className="my-1 border-black" />
+          <div className="text-center font-black tracking-widest">
+            {T("*** RECEIPT ***", "*** فاتورة ***")}
+          </div>
+          <hr className="my-1 border-black" />
+          <div className="flex justify-between">
+            <span>SAMPLE ITEM</span>
+            <span>100.00 ج.م</span>
+          </div>
+          <hr className="my-1 border-black" />
+          <div className="flex justify-between">
+            <span>{T("SUBTOTAL", "المجموع")}</span>
+            <span>100.00 ج.م</span>
+          </div>
+          {draft.receiptShowLoyalty && draft.loyaltyEnabled && (
+            <>
+              <div className="flex justify-between">
+                <span>{T("CREDIT APPLIED", "رصيد مستخدم")}</span>
+                <span>- 10.00 ج.م</span>
+              </div>
+            </>
+          )}
+          <hr className="my-1 border-black" />
+          <div className="flex justify-between font-black">
+            <span>{T("TOTAL AMOUNT", "الإجمالي")}</span>
+            <span>
+              {draft.receiptShowLoyalty && draft.loyaltyEnabled
+                ? "90.00"
+                : "100.00"}{" "}
+              ج.م
+            </span>
+          </div>
+          {draft.receiptShowLoyalty && draft.loyaltyEnabled && (
+            <>
+              <hr className="my-1 border-black" />
+              <div className="flex justify-between">
+                <span>{T("POINTS EARNED", "نقاط مكتسبة")}</span>
+                <span>+9</span>
+              </div>
+            </>
+          )}
+          <hr className="my-1 border-black" />
+          <div className="text-center font-bold">
+            {T("THANK YOU FOR SHOPPING!", "شكراً لتسوقكم معنا")}
+          </div>
+          {draft.receiptFooterText && (
+            <div
+              dir="rtl"
+              className="text-center whitespace-pre-wrap mt-1 text-[10px]"
+            >
+              {draft.receiptFooterText}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

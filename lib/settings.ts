@@ -6,6 +6,9 @@ import { DEFAULT_MESSAGE_TEMPLATE } from "./settings.defaults";
 
 export const DEFAULT_TEMPLATE = DEFAULT_MESSAGE_TEMPLATE;
 
+export type ReceiptLogoSize = "hidden" | "small" | "medium" | "large";
+export type ReceiptLanguage = "ar" | "en" | "bilingual";
+
 export interface ShopSettings {
   autoOpenWhatsApp: boolean;
   messageTemplate: string;
@@ -22,6 +25,11 @@ export interface ShopSettings {
   loyaltyPointsPerEgp: number;
   /** Redeem rate: EGP value of one point (e.g. 0.1 = 1 pt = 0.10 EGP off). */
   loyaltyEgpPerPoint: number;
+  /** Receipt customisation — see migration 0017. */
+  receiptLogoSize: ReceiptLogoSize;
+  receiptFooterText: string;
+  receiptLanguage: ReceiptLanguage;
+  receiptShowLoyalty: boolean;
 }
 
 export const DEFAULT_SETTINGS: ShopSettings = {
@@ -37,6 +45,10 @@ export const DEFAULT_SETTINGS: ShopSettings = {
   loyaltyEnabled: false,
   loyaltyPointsPerEgp: 0,
   loyaltyEgpPerPoint: 0,
+  receiptLogoSize: "medium",
+  receiptFooterText: "",
+  receiptLanguage: "ar",
+  receiptShowLoyalty: true,
 };
 
 export interface ReceiptVars {

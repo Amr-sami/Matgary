@@ -30,6 +30,11 @@ const patchSchema = z.object({
   loyaltyEnabled: z.boolean().optional(),
   loyaltyPointsPerEgp: z.number().min(0).max(100).optional(),
   loyaltyEgpPerPoint: z.number().min(0).max(1000).optional(),
+  // Receipt customisation
+  receiptLogoSize: z.enum(["hidden", "small", "medium", "large"]).optional(),
+  receiptFooterText: z.string().max(500).optional(),
+  receiptLanguage: z.enum(["ar", "en", "bilingual"]).optional(),
+  receiptShowLoyalty: z.boolean().optional(),
 });
 
 export async function PATCH(req: NextRequest) {

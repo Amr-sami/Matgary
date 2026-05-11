@@ -30,8 +30,11 @@ const SORT_LABELS: Record<SortKey, string> = {
 };
 
 export default function CustomersPage() {
-  // Read sales directly from Firestore (independent of subscribeToSales)
-  const { records, loading } = useCustomersData();
+  // Hook auto-refetches on tab focus + visibility, so the list reflects
+  // changes made on the customer detail page when the user navigates back.
+  // We also pass `refresh` down so inline mark-paid actions inside
+  // CustomerRow can re-aggregate without a hard reload.
+  const { records, loading, refresh: refreshRecords } = useCustomersData();
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("ltv");
   const [filter, setFilter] = useState<Filter>("all");
@@ -347,7 +350,12 @@ export default function CustomersPage() {
 
         <div className="space-y-3">
           {filtered.map((c) => (
-            <CustomerRow key={c.key} customer={c} records={records} />
+            <CustomerRow
+              key={c.key}
+              customer={c}
+              records={records}
+              onChange={() => refreshRecords(false)}
+            />
           ))}
         </div>
       </div>

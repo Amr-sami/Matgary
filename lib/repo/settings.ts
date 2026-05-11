@@ -36,6 +36,40 @@ export interface ShopSettingsDto {
   loyaltyEnabled: boolean;
   loyaltyPointsPerEgp: number;
   loyaltyEgpPerPoint: number;
+  /** Receipt customisation. Defaults match the historical hardcoded layout
+   *  so existing tenants see no visual change until they tune them. */
+  receiptLogoSize: ReceiptLogoSize;
+  receiptFooterText: string;
+  receiptLanguage: ReceiptLanguage;
+  receiptShowLoyalty: boolean;
+}
+
+export type ReceiptLogoSize = "hidden" | "small" | "medium" | "large";
+export const RECEIPT_LOGO_SIZES: readonly ReceiptLogoSize[] = [
+  "hidden",
+  "small",
+  "medium",
+  "large",
+];
+
+export type ReceiptLanguage = "ar" | "en" | "bilingual";
+export const RECEIPT_LANGUAGES: readonly ReceiptLanguage[] = [
+  "ar",
+  "en",
+  "bilingual",
+];
+
+const FOOTER_MAX = 500;
+
+function clampLogoSize(v: unknown): ReceiptLogoSize {
+  return RECEIPT_LOGO_SIZES.includes(v as ReceiptLogoSize)
+    ? (v as ReceiptLogoSize)
+    : "medium";
+}
+function clampLanguage(v: unknown): ReceiptLanguage {
+  return RECEIPT_LANGUAGES.includes(v as ReceiptLanguage)
+    ? (v as ReceiptLanguage)
+    : "ar";
 }
 
 export const DEFAULT_DTO: ShopSettingsDto = {
@@ -51,6 +85,10 @@ export const DEFAULT_DTO: ShopSettingsDto = {
   loyaltyEnabled: false,
   loyaltyPointsPerEgp: 0,
   loyaltyEgpPerPoint: 0,
+  receiptLogoSize: "medium",
+  receiptFooterText: "",
+  receiptLanguage: "ar",
+  receiptShowLoyalty: true,
 };
 
 /** Load settings for the UI — never exposes the raw Green API token. */
@@ -86,6 +124,10 @@ export async function getShopSettings(
         loyaltyEnabled: row.loyaltyEnabled,
         loyaltyPointsPerEgp: Number(row.loyaltyPointsPerEgp ?? 0),
         loyaltyEgpPerPoint: Number(row.loyaltyEgpPerPoint ?? 0),
+        receiptLogoSize: clampLogoSize(row.receiptLogoSize),
+        receiptFooterText: row.receiptFooterText ?? "",
+        receiptLanguage: clampLanguage(row.receiptLanguage),
+        receiptShowLoyalty: row.receiptShowLoyalty,
       };
     }),
   );
@@ -169,6 +211,18 @@ export async function saveShopSettings(
       const v = Math.max(0, Math.min(1000, Number(patch.loyaltyEgpPerPoint)));
       set.loyaltyEgpPerPoint = v.toFixed(4);
     }
+    if (patch.receiptLogoSize !== undefined)
+      set.receiptLogoSize = clampLogoSize(patch.receiptLogoSize);
+    if (patch.receiptFooterText !== undefined)
+      // Cap to FOOTER_MAX so a runaway paste can't blow up receipt rendering;
+      // strip carriage returns so the textarea round-trips cleanly across OSes.
+      set.receiptFooterText = String(patch.receiptFooterText)
+        .replace(/\r/g, "")
+        .slice(0, FOOTER_MAX);
+    if (patch.receiptLanguage !== undefined)
+      set.receiptLanguage = clampLanguage(patch.receiptLanguage);
+    if (patch.receiptShowLoyalty !== undefined)
+      set.receiptShowLoyalty = !!patch.receiptShowLoyalty;
 
     await tx
       .update(shopSettings)

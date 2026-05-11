@@ -8,6 +8,7 @@ import {
   ChevronLeft,
   Phone,
   Star,
+  CheckCircle,
   MessageCircle,
   Bell,
   Megaphone,
@@ -25,6 +26,9 @@ import { useShopSettings } from "@/hooks/useShopSettings";
 interface CustomerRowProps {
   customer: CustomerAggregate;
   records: CustomerSaleRecord[];
+  /** Called after a successful inline mark-paid so the parent list
+   *  re-aggregates without a hard page reload. */
+  onChange?: () => void | Promise<void>;
 }
 
 function waLink(phone: string | undefined, message: string): string {
@@ -34,8 +38,9 @@ function waLink(phone: string | undefined, message: string): string {
     : `https://wa.me/?text=${encodeURIComponent(message)}`;
 }
 
-export function CustomerRow({ customer, records }: CustomerRowProps) {
+export function CustomerRow({ customer, records, onChange }: CustomerRowProps) {
   const [expanded, setExpanded] = useState(false);
+  const [busyInvoice, setBusyInvoice] = useState<string | null>(null);
   const isRepeat = customer.invoiceCount >= 3;
   const inactive = daysSince(customer.lastVisit) >= 60;
   // WhatsApp messages substitute the real shop name (was hardcoded
@@ -70,9 +75,35 @@ export function CustomerRow({ customer, records }: CustomerRowProps) {
         lines,
         date: lines[0].saleDate,
         total: lines.reduce((s, l) => s + l.totalPrice, 0),
+        // An invoice is "paid" only if every line is paid (the per-line
+        // isPaid mirrors what the server stores). A single unpaid line
+        // keeps the invoice in the "آجل" bucket.
+        isPaid: lines.every((l) => l.isPaid !== false),
+        saleIds: lines.map((l) => l.id),
       }))
       .sort((a, b) => b.date.getTime() - a.date.getTime());
   }, [expanded, records, customer.key]);
+
+  const markInvoicePaid = async (
+    invId: string,
+    saleIds: string[],
+  ): Promise<void> => {
+    setBusyInvoice(invId);
+    try {
+      await Promise.all(
+        saleIds.map((id) =>
+          fetch(`/api/sales/${id}/paid`, { method: "POST" }),
+        ),
+      );
+      // Tell the parent to re-fetch so this row's outstanding total +
+      // the page-level "آجل غير مدفوع" summary update without a manual
+      // refresh. The expanded list closes itself if there's nothing
+      // left to chase, otherwise stays open showing the now-paid badge.
+      if (onChange) await onChange();
+    } finally {
+      setBusyInvoice(null);
+    }
+  };
 
   return (
     <div className="bg-white rounded-xl border border-border overflow-hidden">
@@ -206,19 +237,53 @@ export function CustomerRow({ customer, records }: CustomerRowProps) {
               لا يوجد فواتير
             </p>
           )}
-          {invoices.map((inv) => (
-            <div key={inv.id} className="p-3 flex items-center justify-between flex-wrap gap-2">
-              <div>
-                <p className="text-xs text-text-secondary">
-                  {formatDate(inv.date)} · {inv.lines.length} قطعة
-                </p>
-                <p className="text-sm">
-                  {inv.lines.map((l) => l.productName).join("، ")}
-                </p>
+          {invoices.map((inv) => {
+            const busy = busyInvoice === inv.id;
+            return (
+              <div
+                key={inv.id}
+                className={`p-3 flex items-center justify-between flex-wrap gap-2 ${
+                  !inv.isPaid ? "bg-orange-50/40" : ""
+                }`}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-xs text-text-secondary">
+                      {formatDate(inv.date)} · {inv.lines.length} قطعة
+                    </p>
+                    {inv.isPaid ? (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-success-light text-success font-medium">
+                        مدفوع
+                      </span>
+                    ) : (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium">
+                        آجل
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm mt-0.5">
+                    {inv.lines.map((l) => l.productName).join("، ")}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <p className="font-bold text-accent tabular-nums">
+                    {formatPrice(inv.total)}
+                  </p>
+                  {!inv.isPaid && (
+                    <button
+                      type="button"
+                      onClick={() => markInvoicePaid(inv.id, inv.saleIds)}
+                      disabled={busy}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-success text-white text-xs font-medium hover:bg-success/90 disabled:opacity-60"
+                    >
+                      <CheckCircle className="w-3 h-3" />
+                      {busy ? "..." : "تأكيد الدفع"}
+                    </button>
+                  )}
+                </div>
               </div>
-              <p className="font-bold text-accent">{formatPrice(inv.total)}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

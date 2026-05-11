@@ -201,6 +201,11 @@ export const shopSettings = pgTable(
     loyaltyEgpPerPoint: text("loyalty_egp_per_point").notNull().default("0"),
     /** Optional expiry window for earned points. Null = never expire. */
     loyaltyExpiryDays: integer("loyalty_expiry_days"),
+    /** Receipt customisation — see migration 0017. */
+    receiptLogoSize: text("receipt_logo_size").notNull().default("medium"),
+    receiptFooterText: text("receipt_footer_text").notNull().default(""),
+    receiptLanguage: text("receipt_language").notNull().default("ar"),
+    receiptShowLoyalty: boolean("receipt_show_loyalty").notNull().default(true),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .default(sql`now()`),
