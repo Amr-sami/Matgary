@@ -72,6 +72,38 @@ export function extractEvents(envelope: MetaWebhookEnvelope): ExtractedEvent[] {
         });
       }
 
+      // Template status updates (field='message_template_status_update').
+      // The Meta payload puts event/template_name/language/reason directly
+      // on `value` — no nested messages/statuses arrays. One logical
+      // event per change. Idempotency key folds in the event verb so a
+      // template that bounces PENDING→REJECTED→APPROVED gets distinct
+      // rows for each transition.
+      if (
+        change.field === "message_template_status_update" &&
+        (value.event || value.message_template_name)
+      ) {
+        const ts =
+          (value as unknown as { timestamp?: string | number }).timestamp ??
+          "0";
+        const evVerb = (value.event ?? "unknown").toLowerCase();
+        const nameKey = value.message_template_name ?? "unnamed";
+        const langKey = value.message_template_language ?? "—";
+        out.push({
+          providerEventId: `tpl:${nameKey}:${langKey}:${evVerb}:${ts}`,
+          eventType: "template.status_update",
+          // Template events arrive on the WABA, not a phone number —
+          // metadata.phone_number_id is absent. Tenant resolution will
+          // fall through to the WABA fallback path.
+          phoneNumberId: null,
+          wabaId,
+          payload: {
+            field: change.field,
+            value,
+          },
+        });
+        continue;
+      }
+
       // Account-level errors (rare; e.g. WABA-wide rate limit). Persist
       // for forensics but they don't map to a message row.
       for (const err of value.errors ?? []) {

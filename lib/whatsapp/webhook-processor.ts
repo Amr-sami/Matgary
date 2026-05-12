@@ -32,6 +32,7 @@ import {
   type ProcessingStatus,
 } from "./webhook-events";
 import { applyStatusUpdate, upsertInboundMessage } from "./messages";
+import { applyTemplateStatusUpdate } from "./templates";
 import { logger } from "@/lib/logger";
 import type {
   ExtractedEvent,
@@ -168,6 +169,8 @@ export async function processEvent(eventId: string): Promise<void> {
       await handleInbound(row);
     } else if (row.eventType === "message.status") {
       await handleStatus(row);
+    } else if (row.eventType === "template.status_update") {
+      await handleTemplateStatusUpdate(row);
     } else {
       // 'unknown' events are stored for forensics but not actionable. We
       // mark them processed so they don't keep retrying.
@@ -230,6 +233,49 @@ async function handleInbound(
     message: msg,
     rawPayload: payload as Record<string, unknown>,
   });
+}
+
+async function handleTemplateStatusUpdate(
+  row: typeof waWebhookEvents.$inferSelect,
+): Promise<void> {
+  const payload = row.payload as {
+    value?: {
+      event?: string;
+      message_template_name?: string;
+      message_template_language?: string;
+      reason?: string;
+    };
+  };
+  const v = payload.value;
+  if (!v || !v.event || !v.message_template_name) {
+    throw new TerminalError("Template status payload missing event/name");
+  }
+  const result = await applyTemplateStatusUpdate(row.tenantId!, row.branchId!, {
+    name: v.message_template_name,
+    language: v.message_template_language ?? "en_US",
+    event: v.event,
+    reason: v.reason ?? null,
+    rawPayload: payload as Record<string, unknown>,
+  });
+  if (!result.updated) {
+    // Cached row doesn't exist — log + ack. The operator's next manual
+    // sync will pull it in.
+    logger.info({
+      event: "wa.webhook.template_update.uncached",
+      tenantId: row.tenantId,
+      branchId: row.branchId,
+      templateName: v.message_template_name,
+      eventVerb: v.event,
+    });
+  } else {
+    logger.info({
+      event: "wa.webhook.template_update.applied",
+      tenantId: row.tenantId,
+      branchId: row.branchId,
+      templateName: v.message_template_name,
+      eventVerb: v.event,
+    });
+  }
 }
 
 async function handleStatus(

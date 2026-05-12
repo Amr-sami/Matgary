@@ -34,6 +34,19 @@ export interface MetaWebhookChangeValue {
     message?: string;
     error_data?: { details?: string };
   }>;
+  // ── message_template_status_update payload shape ──────────────────────
+  // event:
+  //   APPROVED | REJECTED | PENDING_DELETION | DELETED | DISABLED |
+  //   PAUSED | UNPAUSED | IN_APPEAL | FLAGGED | LOCKED
+  // We mirror the wording onto wa_templates.status (lowercased). The
+  // change.field on the envelope is 'message_template_status_update'.
+  event?: string;
+  message_template_id?: string | number;
+  message_template_name?: string;
+  message_template_language?: string;
+  reason?: string;
+  // Optional: rejection details / quality update details
+  other_info?: { title?: string; description?: string };
 }
 
 export interface MetaInboundMessage {
@@ -92,7 +105,11 @@ export interface MetaStatusUpdate {
 }
 
 /** Logical event kinds the processor knows how to handle. */
-export type WaEventType = "message.received" | "message.status" | "unknown";
+export type WaEventType =
+  | "message.received"
+  | "message.status"
+  | "template.status_update"
+  | "unknown";
 
 /** One unit of work extracted from a webhook batch. Each item gets its
  *  own row in wa_webhook_events. */

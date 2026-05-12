@@ -224,6 +224,27 @@ The facade looks up the template by (tenant, branch, name, language) with `statu
 - *Spam-like patterns* — long URLs, excessive emoji, "FREE!" type copy. Marketing rejects fastest.
 - *Inconsistent formatting* — `{{1}}` references with no body context.
 
+## 8e. OTP, template webhooks, receipt-as-template (Phase 6)
+
+**Template status webhook.** Meta sends `message_template_status_update` events when a template is approved/rejected/paused/etc. Our webhook handler now extracts these into `wa_webhook_events` with `event_type='template.status_update'` and idempotency key `tpl:<name>:<language>:<event>:<timestamp>`. The processor calls `applyTemplateStatusUpdate` on the cached row — status flips, `rejected_reason` is overloaded for the explanation text. Templates not in our cache produce a `wa.webhook.template_update.uncached` log + no-op; the operator's next manual sync will pull them in.
+
+**OTP convenience endpoint.** `POST /api/whatsapp/otp/send`:
+```json
+{ "phone": "201500000000", "code": "123456", "templateName": "otp", "language": "en_US" }
+```
+Wraps `sendOutboundTemplate` with the authentication-template body shape. Two layered rate limits: **5 sends / 15 min per (tenant, branch, phone)** to prevent harassment of a single number; **60 / hour per tenant** as a global fan-out cap. The caller generates and verifies the code — we just deliver. Templates must be approved in `authentication` (or `utility`) category; defaults assume a template named `otp` exists.
+
+**Receipt-as-template path.** When operators set both `receiptTemplateName` and `receiptTemplateLanguage` in settings, `SaleForm` sends receipts via that template instead of as a PDF. The template MUST accept four body parameters in order:
+1. `{{1}}` — customer name (defaults to "عميلنا الكريم" when empty)
+2. `{{2}}` — invoice code (last 8 chars of invoice id, uppercased)
+3. `{{3}}` — formatted total price (e.g. "EGP 250.00")
+4. `{{4}}` — product names (comma-separated, capped at 1024 chars)
+
+When unconfigured, the legacy PDF path stays in effect. Operators set the receipt template via the dropdown in the templates card (visible once WhatsApp is connected). Only `approved` templates with category `utility`/`authentication` are selectable.
+
+**Why a fixed parameter contract instead of a mapping UI:**
+- 95% of receipt templates need the same four fields. A mapping UI would be over-engineered for v1 and slow operator onboarding. If a tenant needs a different shape, they extend the template body — Meta accepts any wording around the placeholders so long as the count + order match.
+
 ## 9. Production checklist
 
 - [ ] App switched to Live mode in Meta dashboard
@@ -267,6 +288,7 @@ app/api/whatsapp/conversations/[id]/messages/ Message page in a conversation
 app/api/whatsapp/templates/                   List cached templates
 app/api/whatsapp/templates/sync/              Owner re-sync from Meta
 app/api/whatsapp/cloud/send-template/         Send by template name
+app/api/whatsapp/otp/send/                    OTP convenience (authentication template)
 
 lib/whatsapp/queue.ts               BullMQ Queue + Worker singletons
 lib/whatsapp/jobs.ts                Worker processors (routeJob switch)

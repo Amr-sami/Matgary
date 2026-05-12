@@ -25,6 +25,10 @@ export interface ShopSettings {
   whatsappCloudPhoneId: string;
   whatsappCloudToken: string;
   whatsappCloudBusinessId: string;
+  /** Phase 6: when both are non-empty, receipts go through this
+   *  Meta-approved template instead of as a PDF. */
+  receiptTemplateName: string;
+  receiptTemplateLanguage: string;
   sendAsPdf: boolean;
   /** Loyalty programme — disabled by default. Per-branch in multi-store. */
   loyaltyEnabled: boolean;
@@ -52,6 +56,8 @@ export const DEFAULT_SETTINGS: ShopSettings = {
   whatsappCloudPhoneId: "",
   whatsappCloudToken: "",
   whatsappCloudBusinessId: "",
+  receiptTemplateName: "",
+  receiptTemplateLanguage: "",
   sendAsPdf: false,
   loyaltyEnabled: false,
   loyaltyPointsPerEgp: 0,

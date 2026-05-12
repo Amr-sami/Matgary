@@ -612,7 +612,60 @@ export function SaleForm({
           !!settings.greenApiInstanceId &&
           !!settings.greenApiToken;
 
-        if (useCloud) {
+        // Phase 6: receipt-template path takes priority over PDF when
+        // configured. Bypasses Meta's 24-hour window and renders
+        // natively in WhatsApp instead of as an attachment.
+        const useReceiptTemplate =
+          useCloud &&
+          !!settings.receiptTemplateName &&
+          !!settings.receiptTemplateLanguage;
+
+        if (useReceiptTemplate) {
+          const productNames = lines
+            .map((l) => l.product.name)
+            .join("، ")
+            .slice(0, 1024);
+          fetch("/api/whatsapp/cloud/send-template", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              phone: trimmedPhone,
+              templateName: settings.receiptTemplateName,
+              language: settings.receiptTemplateLanguage,
+              components: [
+                {
+                  type: "body",
+                  parameters: [
+                    {
+                      type: "text",
+                      text: customerName.trim() || "عميلنا الكريم",
+                    },
+                    {
+                      type: "text",
+                      text: result.invoiceId.slice(-8).toUpperCase(),
+                    },
+                    { type: "text", text: formatPrice(total) },
+                    { type: "text", text: productNames },
+                  ],
+                },
+              ],
+            }),
+          })
+            .then((r) => r.json())
+            .then((res) => {
+              if (res?.ok) {
+                console.log(
+                  "[whatsapp] receipt template sent",
+                  res.clientMessageId,
+                );
+              } else {
+                console.warn("[whatsapp] receipt template failed", res);
+              }
+            })
+            .catch((e) =>
+              console.warn("[whatsapp] receipt template network error", e),
+            );
+        } else if (useCloud) {
           // PDF caption builder — same logic as the Green API branch.
           const buildCaption = () =>
             substitute(settings.messageTemplate, {

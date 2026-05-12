@@ -30,6 +30,9 @@ const patchSchema = z.object({
   whatsappCloudPhoneId: z.string().max(40).optional(),
   whatsappCloudToken: z.string().max(500).optional(),
   whatsappCloudBusinessId: z.string().max(40).optional(),
+  // Phase 6 receipt-template selection. Empty string clears.
+  receiptTemplateName: z.string().max(120).optional(),
+  receiptTemplateLanguage: z.string().max(20).optional(),
   sendAsPdf: z.boolean().optional(),
   // Loyalty programme. Rates are clamped server-side too — accept anything
   // a non-negative number can be, server enforces the safe ceiling.

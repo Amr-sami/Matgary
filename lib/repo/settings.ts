@@ -33,6 +33,11 @@ export interface ShopSettingsDto {
   whatsappCloudPhoneId: string;
   whatsappCloudToken: string;
   whatsappCloudBusinessId: string;
+  /** Phase 6: when both are non-empty, receipts go through a
+   *  Meta-approved template (utility category) instead of as a PDF.
+   *  Empty strings = unconfigured = legacy PDF path. */
+  receiptTemplateName: string;
+  receiptTemplateLanguage: string;
   sendAsPdf: boolean;
   /** Loyalty programme — disabled by default. Each branch runs its own.
    *  Rates are EGP-denominated:
@@ -91,6 +96,8 @@ export const DEFAULT_DTO: ShopSettingsDto = {
   whatsappCloudPhoneId: "",
   whatsappCloudToken: "",
   whatsappCloudBusinessId: "",
+  receiptTemplateName: "",
+  receiptTemplateLanguage: "",
   sendAsPdf: false,
   loyaltyEnabled: false,
   loyaltyPointsPerEgp: 0,
@@ -135,6 +142,8 @@ export async function getShopSettings(
         // Same placeholder treatment as Green API — never leak the real token.
         whatsappCloudToken: row.whatsappCloudToken ? TOKEN_PLACEHOLDER : "",
         whatsappCloudBusinessId: row.whatsappCloudBusinessId || "",
+        receiptTemplateName: row.receiptTemplateName || "",
+        receiptTemplateLanguage: row.receiptTemplateLanguage || "",
         sendAsPdf: row.sendAsPdf,
         loyaltyEnabled: row.loyaltyEnabled,
         loyaltyPointsPerEgp: Number(row.loyaltyPointsPerEgp ?? 0),
@@ -270,6 +279,14 @@ export async function saveShopSettings(
     }
     if (patch.whatsappCloudBusinessId !== undefined)
       set.whatsappCloudBusinessId = patch.whatsappCloudBusinessId || null;
+    if (patch.receiptTemplateName !== undefined) {
+      const v = patch.receiptTemplateName.trim();
+      set.receiptTemplateName = v.length > 0 ? v.slice(0, 120) : null;
+    }
+    if (patch.receiptTemplateLanguage !== undefined) {
+      const v = patch.receiptTemplateLanguage.trim();
+      set.receiptTemplateLanguage = v.length > 0 ? v.slice(0, 20) : null;
+    }
     if (patch.sendAsPdf !== undefined) set.sendAsPdf = patch.sendAsPdf;
     if (patch.loyaltyEnabled !== undefined)
       set.loyaltyEnabled = patch.loyaltyEnabled;

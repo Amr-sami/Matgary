@@ -182,6 +182,41 @@ npm run db:migrate
 
 ## 2. Changelog
 
+### 2026-05-12 — WhatsApp Phase 6 (template webhooks, OTP endpoint, receipt-as-template)
+
+Production-impact phase. The integration now reacts to Meta-side template approvals in real time, ships a hardened OTP endpoint, and lets operators flip the receipt send path from PDF to a Meta-approved utility template — which is the unlock for working *outside* Meta's 24-hour customer-service window for post-purchase receipts.
+
+- **Template status webhook**:
+  - `webhook-types.ts` extended: `MetaWebhookChangeValue` gains the `event` / `message_template_id` / `message_template_name` / `message_template_language` / `reason` / `other_info` fields Meta sends on `field='message_template_status_update'`.
+  - `extractEvents` adds a branch for the new field. One logical event per change; idempotency key folds in the verb + timestamp so a template that bounces `PENDING → REJECTED → APPROVED` produces three distinct event rows (each preserved). `phone_number_id` is intentionally null — template events route via the WABA fallback in `resolveTenant`.
+  - `webhook-processor:handleTemplateStatusUpdate` applies the verb to the cached `wa_templates` row via `applyTemplateStatusUpdate` (new repo method). `reason` lands in `rejected_reason` regardless of which terminal state we hit (overloaded explanation field). Uncached templates log `wa.webhook.template_update.uncached` and ack — no synthetic insert, since Meta's webhook doesn't include the full components blob.
+
+- **OTP endpoint** (`POST /api/whatsapp/otp/send`):
+  - Body: `{ phone, code (4-8 digits regex), templateName?, language? }`. Defaults: `otp` / `en_US`.
+  - Layered rate limit:
+    - **Per-(tenant, branch, phone)**: 5 sends / 15 min — blocks abuse of a single number.
+    - **Per-tenant**: 60 sends / hour — caps global fan-out.
+  - Wraps `sendOutboundTemplate` with the authentication-template shape: body param `[{ type:'text', text:code }]` plus a `sub_type:'url'` button parameter populated with the same code (harmless when the template lacks a button, populated when it has one — covers both auth-template flavours Meta auto-creates).
+  - The caller (signup/login flow on the consumer side) generates and verifies the code; we just deliver. Keeps retention, hashing, and verify semantics in caller control.
+
+- **Receipt-as-template**:
+  - Schema: `0024_shop_settings_receipt_template.sql` adds `receipt_template_name` + `receipt_template_language` to `shop_settings`. Both nullable; both empty = legacy PDF path.
+  - DTO + repo + API patch schema + client `ShopSettings` type + `DEFAULT_SETTINGS` + `isEqualSettings` all updated.
+  - Settings UI: new "قالب الفاتورة (اختياري)" sub-card inside the templates card. Dropdown populated from approved templates filtered to `category in (utility, authentication)`. Documents the fixed 4-parameter contract inline: `{{1}}` customerName, `{{2}}` invoiceCode, `{{3}}` totalPrice, `{{4}}` productNames. Owner-set; empty selection clears both columns at once.
+  - `SaleForm`: new `useReceiptTemplate` branch (gated on `useCloud && both columns set`) takes priority over the PDF branch. Sends `POST /api/whatsapp/cloud/send-template` with the 4 body parameters. Falls through to PDF / text / Green API when unconfigured. Restructured the if-chain so the form-reset code at the bottom is still reached after the fire-and-forget send.
+
+**Why a fixed parameter contract instead of mapping UI:**
+- 95% of receipt templates need the same four fields. A mapping UI would slow operator onboarding and add a permanently-extra config surface. Tenants whose template needs more or different fields can ship Phase 6.5 with an explicit mapping; for now the contract is documented and minimal.
+
+**Why we don't synthesize a wa_templates row from the webhook:**
+- The status-update webhook carries name + language + event but NOT the components blob. Creating a row without components would mean the next send-time lookup returns a usable-looking row that explodes when we try to render. Better to ack and rely on the operator running sync once.
+
+**Carry-forward into Phase 7:**
+- Inbox UI shell — the conversation/message APIs from Phase 4 + the template send infrastructure from Phase 5/6 are ready to back a thread view. Open question: realtime updates (SSE vs polling) and whether to colocate with the existing notifications system.
+- Per-template parameter mapping UI when the fixed contract gets in the way.
+- Daily background template-sync cron (in addition to webhook + manual). Phase 7 nicety.
+- Inbound-media download worker. Lower priority — `media_id` is captured but the blob isn't fetched.
+
 ### 2026-05-12 — WhatsApp Phase 5 (message templates: cache, sync, send)
 
 Adds the template layer that lets tenants send outbound messages outside Meta's 24-hour customer-service window. Templates are created and approved in Meta Business Manager; our app caches the approved set per branch and the send facade refuses to dispatch non-approved templates.

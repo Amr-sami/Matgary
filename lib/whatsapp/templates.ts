@@ -307,6 +307,46 @@ export async function listTemplates(
   });
 }
 
+/** Apply a `message_template_status_update` from a webhook to the
+ *  cached row. The event verb maps to our status enum; reason ends up
+ *  in rejected_reason (overloading the column for any non-approved
+ *  state's explanation). When no cached row exists we no-op — a future
+ *  manual sync will pull the template in. */
+export async function applyTemplateStatusUpdate(
+  tenantId: string,
+  branchId: string,
+  patch: {
+    name: string;
+    language: string;
+    event: string;
+    reason?: string | null;
+    rawPayload?: Record<string, unknown>;
+  },
+): Promise<{ updated: boolean }> {
+  const status = normaliseStatus(patch.event.toLowerCase());
+  return withTenant(tenantId, async (tx) => {
+    const updated = await tx
+      .update(waTemplates)
+      .set({
+        status,
+        rejectedReason: patch.reason ?? null,
+        rawPayload: patch.rawPayload ?? null,
+        lastSyncedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(waTemplates.tenantId, tenantId),
+          eq(waTemplates.branchId, branchId),
+          eq(waTemplates.name, patch.name),
+          eq(waTemplates.language, patch.language),
+        ),
+      )
+      .returning({ id: waTemplates.id });
+    return { updated: updated.length > 0 };
+  });
+}
+
 /** Send-time lookup. ONLY returns approved templates so paused/rejected
  *  rows can't reach Meta. Returns null when missing — caller surfaces a
  *  clear error to the operator. */

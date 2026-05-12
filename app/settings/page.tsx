@@ -146,6 +146,8 @@ function isEqualSettings(a: ShopSettings, b: ShopSettings): boolean {
     a.whatsappCloudPhoneId === b.whatsappCloudPhoneId &&
     a.whatsappCloudToken === b.whatsappCloudToken &&
     a.whatsappCloudBusinessId === b.whatsappCloudBusinessId &&
+    a.receiptTemplateName === b.receiptTemplateName &&
+    a.receiptTemplateLanguage === b.receiptTemplateLanguage &&
     a.sendAsPdf === b.sendAsPdf &&
     a.loyaltyEnabled === b.loyaltyEnabled &&
     a.loyaltyPointsPerEgp === b.loyaltyPointsPerEgp &&
@@ -1180,6 +1182,81 @@ export default function SettingsPage() {
                 ))}
               </div>
             )}
+
+            {/* Receipt-template selection. Pick from approved utility/
+                authentication templates; saved on the shop_settings
+                row. When set, SaleForm sends receipts via this template
+                instead of as a PDF. */}
+            <div className="rounded-lg border border-border p-3 space-y-2">
+              <div>
+                <p className="text-sm font-medium">قالب الفاتورة (اختياري)</p>
+                <p className="text-[11px] text-text-secondary leading-relaxed mt-0.5">
+                  لو حددت قالب، البرنامج هيرسل الفاتورة كرسالة قالب موافَق
+                  عليها من Meta بدل من PDF — وده هيشتغل حتى خارج نافذة الـ
+                  24 ساعة. لازم يكون عند القالب 4 متغيرات في الـ body
+                  بالترتيب التالي:{" "}
+                  <code className="bg-bg-main px-1 rounded">{"{{1}}"}</code>{" "}
+                  اسم العميل ·{" "}
+                  <code className="bg-bg-main px-1 rounded">{"{{2}}"}</code>{" "}
+                  كود الفاتورة ·{" "}
+                  <code className="bg-bg-main px-1 rounded">{"{{3}}"}</code>{" "}
+                  الإجمالي ·{" "}
+                  <code className="bg-bg-main px-1 rounded">{"{{4}}"}</code>{" "}
+                  أسماء المنتجات.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px] gap-2">
+                <select
+                  value={
+                    draft.receiptTemplateName && draft.receiptTemplateLanguage
+                      ? `${draft.receiptTemplateName}::${draft.receiptTemplateLanguage}`
+                      : ""
+                  }
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (!v) {
+                      update("receiptTemplateName", "");
+                      update("receiptTemplateLanguage", "");
+                      return;
+                    }
+                    const [name, lang] = v.split("::");
+                    update("receiptTemplateName", name);
+                    update("receiptTemplateLanguage", lang);
+                  }}
+                  className="px-3 py-2 rounded-lg border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                >
+                  <option value="">— بدون قالب (PDF افتراضياً) —</option>
+                  {templates
+                    .filter(
+                      (t) =>
+                        t.status === "approved" &&
+                        (t.category === "utility" ||
+                          t.category === "authentication"),
+                    )
+                    .map((t) => (
+                      <option
+                        key={t.id}
+                        value={`${t.name}::${t.language}`}
+                      >
+                        {t.name} ({t.language})
+                      </option>
+                    ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => {
+                    update("receiptTemplateName", "");
+                    update("receiptTemplateLanguage", "");
+                  }}
+                  className="text-xs text-text-secondary hover:text-error border border-border rounded-lg px-3 py-2"
+                  disabled={
+                    !draft.receiptTemplateName && !draft.receiptTemplateLanguage
+                  }
+                >
+                  مسح
+                </button>
+              </div>
+            </div>
           </div>
         )}
 

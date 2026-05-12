@@ -199,6 +199,10 @@ export const shopSettings = pgTable(
     whatsappCloudPhoneId: text("whatsapp_cloud_phone_id"),
     whatsappCloudToken: text("whatsapp_cloud_token"),
     whatsappCloudBusinessId: text("whatsapp_cloud_business_id"),
+    // Phase 6: when both set, SaleForm uses this template for the receipt
+    // path instead of sending a PDF. Bypasses the 24h window.
+    receiptTemplateName: text("receipt_template_name"),
+    receiptTemplateLanguage: text("receipt_template_language"),
     sendAsPdf: boolean("send_as_pdf").notNull().default(false),
     onboardingCompletedAt: timestamp("onboarding_completed_at", { withTimezone: true }),
     /** Loyalty programme — disabled by default. Each branch runs its own. */
