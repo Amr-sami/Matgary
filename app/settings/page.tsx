@@ -28,7 +28,7 @@ import {
   substitute,
   type ShopSettings,
 } from "@/lib/settings";
-import { sendViaGreenApi } from "@/lib/whatsapp";
+import { sendViaGreenApi, sendViaWhatsAppCloud } from "@/lib/whatsapp";
 import { formatPrice } from "@/lib/utils";
 import { CategoriesEditor } from "@/components/settings/CategoriesEditor";
 import { BrandsEditor } from "@/components/settings/BrandsEditor";
@@ -58,6 +58,10 @@ function isEqualSettings(a: ShopSettings, b: ShopSettings): boolean {
     a.greenApiInstanceId === b.greenApiInstanceId &&
     a.greenApiToken === b.greenApiToken &&
     a.greenApiUrl === b.greenApiUrl &&
+    a.whatsappCloudEnabled === b.whatsappCloudEnabled &&
+    a.whatsappCloudPhoneId === b.whatsappCloudPhoneId &&
+    a.whatsappCloudToken === b.whatsappCloudToken &&
+    a.whatsappCloudBusinessId === b.whatsappCloudBusinessId &&
     a.sendAsPdf === b.sendAsPdf &&
     a.loyaltyEnabled === b.loyaltyEnabled &&
     a.loyaltyPointsPerEgp === b.loyaltyPointsPerEgp &&
@@ -93,6 +97,8 @@ export default function SettingsPage() {
   const [busy, setBusy] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testPhone, setTestPhone] = useState("");
+  const [cloudTesting, setCloudTesting] = useState(false);
+  const [cloudTestPhone, setCloudTestPhone] = useState("");
   const [toast, setToast] = useState<{
     type: "success" | "error";
     message: string;
@@ -165,6 +171,37 @@ export default function SettingsPage() {
       }
     } finally {
       setTesting(false);
+    }
+  };
+
+  const handleCloudTestSend = async () => {
+    if (!cloudTestPhone.trim()) {
+      setToast({ type: "error", message: "أدخل رقم للاختبار" });
+      return;
+    }
+    if (!draft.whatsappCloudPhoneId.trim() || !draft.whatsappCloudToken.trim()) {
+      setToast({ type: "error", message: "أدخل Phone Number ID والتوكن أولاً" });
+      return;
+    }
+    setCloudTesting(true);
+    try {
+      const res = await sendViaWhatsAppCloud({
+        phone: cloudTestPhone.trim(),
+        message: `🧪 رسالة اختبار من ${draft.shopName}\nالتاريخ: ${new Date().toLocaleString("ar-EG")}`,
+      });
+      if (res.ok) {
+        setToast({
+          type: "success",
+          message: `تم الإرسال (id: ${res.idMessage || "—"})`,
+        });
+      } else {
+        setToast({
+          type: "error",
+          message: res.error || "تعذر الإرسال",
+        });
+      }
+    } finally {
+      setCloudTesting(false);
     }
   };
 
@@ -469,6 +506,194 @@ export default function SettingsPage() {
             <p className="text-[10px] text-text-secondary">
               سيُرسل رسالة قصيرة "🧪 رسالة اختبار" للتأكد من ربط الحساب.
               تأكد من حفظ الإعدادات بعد الاختبار الناجح.
+            </p>
+          </div>
+        </div>
+
+        {/* WhatsApp Business Cloud API (Meta — official) */}
+        <div className="bg-white rounded-xl border border-border p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <Zap className="w-5 h-5 text-accent" />
+            <h3 className="font-bold text-lg">
+              WhatsApp Cloud API — القناة الرسمية من Meta
+            </h3>
+          </div>
+
+          <div className="rounded-lg bg-accent-light/30 border border-accent-light p-3 text-xs space-y-1.5">
+            <div className="flex items-start gap-2">
+              <Info className="w-4 h-4 text-accent shrink-0 mt-0.5" />
+              <div className="space-y-1.5">
+                <p className="font-medium">خطوات التفعيل:</p>
+                <ol className="list-decimal list-inside space-y-0.5 text-text-secondary">
+                  <li>
+                    افتح حساب على{" "}
+                    <a
+                      href="https://business.facebook.com/"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-accent hover:underline inline-flex items-center gap-0.5"
+                    >
+                      Meta Business Manager{" "}
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                    {" "}وأنشئ <b>WhatsApp Business Account</b> (WABA)
+                  </li>
+                  <li>
+                    من{" "}
+                    <a
+                      href="https://developers.facebook.com/apps"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-accent hover:underline inline-flex items-center gap-0.5"
+                    >
+                      Meta for Developers{" "}
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                    {" "}أنشئ App من نوع <code className="bg-white px-1 rounded">Business</code> وأضف منتج <code className="bg-white px-1 rounded">WhatsApp</code>
+                  </li>
+                  <li>
+                    من شاشة WhatsApp {`>`} API Setup، اربط رقم المتجر
+                    (Add phone number) ووثّقه عبر SMS/مكالمة
+                  </li>
+                  <li>
+                    انسخ <code className="bg-white px-1 rounded">Phone number ID</code>{" "}
+                    والصقه في الخانة تحت (مش رقم الموبايل — الـ ID رقمي بـ 15-17 خانة)
+                  </li>
+                  <li>
+                    أنشئ{" "}
+                    <a
+                      href="https://developers.facebook.com/docs/whatsapp/business-management-api/get-started"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-accent hover:underline inline-flex items-center gap-0.5"
+                    >
+                      System User Token دائم{" "}
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                    {" "}بصلاحيتي{" "}
+                    <code className="bg-white px-1 rounded">whatsapp_business_messaging</code>{" "}
+                    و{" "}
+                    <code className="bg-white px-1 rounded">whatsapp_business_management</code>،
+                    والصقه في خانة Access Token (التوكن المؤقت 24 ساعة لن يصلح
+                    للإنتاج)
+                  </li>
+                  <li>
+                    فعّل الخيار واضغط "حفظ الإعدادات"، ثم جرب الإرسال من
+                    خانة الاختبار
+                  </li>
+                </ol>
+                <p className="text-text-secondary leading-relaxed">
+                  <strong>ملاحظات مهمة:</strong>
+                </p>
+                <ul className="list-disc list-inside space-y-0.5 text-text-secondary">
+                  <li>
+                    Meta بتسمح بإرسال رسائل حرّة فقط خلال{" "}
+                    <b>نافذة 24 ساعة</b> بعد أول رسالة من العميل. الفواتير
+                    بعد البيع غالباً ما تكون بره النافذة، لازم{" "}
+                    <a
+                      href="https://business.facebook.com/wa/manage/message-templates/"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-accent hover:underline inline-flex items-center gap-0.5"
+                    >
+                      تعتمد قالب رسالة{" "}
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                    {" "}في Meta أو يبعت العميل أي رسالة الأول.
+                  </li>
+                  <li>
+                    إرسال PDF شغّال في الحالتين (داخل أو خارج النافذة) لو
+                    المرفق جزء من قالب موافَق عليه؛ غير كده يحتاج تأكيد
+                    العميل أولاً.
+                  </li>
+                  <li>
+                    القناة رسمية ومستقرة — لا تعرّض رقمك للحظر زي ما ممكن
+                    يحصل مع Green API.
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <label className="flex items-start gap-3 p-3 rounded-lg border border-border cursor-pointer">
+            <input
+              type="checkbox"
+              checked={draft.whatsappCloudEnabled}
+              onChange={(e) =>
+                update("whatsappCloudEnabled", e.target.checked)
+              }
+              className="mt-1 w-5 h-5 accent-accent"
+            />
+            <div className="flex-1">
+              <p className="font-medium">
+                تفعيل الإرسال التلقائي عبر WhatsApp Cloud API
+              </p>
+              <p className="text-xs text-text-secondary mt-0.5">
+                لو مفعّل، الفاتورة تُرسل في الخلفية عبر القناة الرسمية. لو
+                Green API و Cloud API الاتنين مفعّلين، البرنامج بيستخدم
+                Cloud API.
+              </p>
+            </div>
+          </label>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input
+              label="Phone Number ID"
+              value={draft.whatsappCloudPhoneId}
+              onChange={(e) =>
+                update("whatsappCloudPhoneId", e.target.value)
+              }
+              placeholder="123456789012345"
+            />
+            <Input
+              label="Access Token (System User)"
+              value={draft.whatsappCloudToken}
+              onChange={(e) =>
+                update("whatsappCloudToken", e.target.value)
+              }
+              type="password"
+              placeholder="EAAG••••••••••••••••"
+            />
+          </div>
+          <Input
+            label="WhatsApp Business Account ID (اختياري)"
+            value={draft.whatsappCloudBusinessId}
+            onChange={(e) =>
+              update("whatsappCloudBusinessId", e.target.value)
+            }
+            placeholder="987654321098765"
+          />
+
+          <div className="rounded-lg border border-border p-3 space-y-2">
+            <p className="text-sm font-medium flex items-center gap-2">
+              <Send className="w-4 h-4 text-accent" />
+              اختبار الإرسال
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="tel"
+                inputMode="tel"
+                value={cloudTestPhone}
+                onChange={(e) => setCloudTestPhone(e.target.value)}
+                placeholder="01000000000"
+                dir="ltr"
+                className="flex-1 px-3 py-2 rounded-lg border border-border bg-white text-sm"
+              />
+              <Button
+                onClick={handleCloudTestSend}
+                loading={cloudTesting}
+                disabled={
+                  !draft.whatsappCloudPhoneId || !draft.whatsappCloudToken
+                }
+                className="whitespace-nowrap"
+              >
+                إرسال تجريبي
+              </Button>
+            </div>
+            <p className="text-[10px] text-text-secondary">
+              لو خرجت رسالة "Recipient phone number not in allowed list" فأنت
+              لسه في وضع الاختبار — أضف رقم المستلم من شاشة API Setup أو
+              اعتمد التطبيق ليخرج من sandbox.
             </p>
           </div>
         </div>

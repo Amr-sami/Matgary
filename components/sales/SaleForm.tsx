@@ -13,7 +13,7 @@ import { useProducts } from "@/hooks/useProducts";
 import { useCustomersData } from "@/hooks/useCustomersData";
 import { useShopSettings } from "@/hooks/useShopSettings";
 import { buildWhatsAppLink, substitute } from "@/lib/settings";
-import { sendViaGreenApi } from "@/lib/whatsapp";
+import { sendViaGreenApi, sendViaWhatsAppCloud } from "@/lib/whatsapp";
 import type { Product, DiscountType, PaymentMethod } from "@/lib/types";
 import { PAYMENT_METHOD_LABELS } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
@@ -577,10 +577,11 @@ export function SaleForm({
       setLastInvoice(invoiceForReceipt);
 
       // After-sale WhatsApp delivery.
-      // Rule: when greenApiEnabled is true, NEVER open a wa.me tab — the
-      // toggle is a hard kill-switch. If the API call fails, log it and
-      // give up silently. wa.me only fires when greenApiEnabled is off
-      // AND autoOpenWhatsApp is on.
+      // Rule: when any auto-send provider is enabled (Cloud API or Green API),
+      // NEVER open a wa.me tab — those toggles are hard kill-switches. wa.me
+      // only fires when both providers are off AND autoOpenWhatsApp is on.
+      // When both providers are configured, Cloud API wins (it's the official
+      // channel and doesn't risk number bans).
       const trimmedPhone = customerPhone.trim();
       if (trimmedPhone && result.saleIds.length > 0) {
         // Receipts are sent as PDF attachments in v1 — no public web URL.
@@ -600,9 +601,108 @@ export function SaleForm({
           shopPhone: settings.shopPhone,
         });
 
-        if (settings.greenApiEnabled) {
+        // Cloud API takes priority over Green API.
+        const useCloud =
+          settings.whatsappCloudEnabled &&
+          !!settings.whatsappCloudPhoneId &&
+          !!settings.whatsappCloudToken;
+        const useGreen =
+          !useCloud &&
+          settings.greenApiEnabled &&
+          !!settings.greenApiInstanceId &&
+          !!settings.greenApiToken;
+
+        if (useCloud) {
+          // PDF caption builder — same logic as the Green API branch.
+          const buildCaption = () =>
+            substitute(settings.messageTemplate, {
+              customerName: customerName.trim() || "عميلنا الكريم",
+              customerPhone: trimmedPhone,
+              invoiceId: result.invoiceId,
+              invoiceCode: result.invoiceId.slice(-8).toUpperCase(),
+              totalPrice: formatPrice(total),
+              productNames: lines.map((l) => l.product.name).join("، "),
+              receiptLink: "",
+              date: saleDate.toLocaleDateString("ar-EG"),
+              shopName: settings.shopName,
+              shopPhone: settings.shopPhone,
+            })
+              .split("\n")
+              .filter((line) => {
+                const t = line.trim();
+                if (/^رابط الفاتورة:\s*$/.test(t)) return false;
+                if (/^receipt link:\s*$/i.test(t)) return false;
+                return true;
+              })
+              .join("\n")
+              .replace(/\n{3,}/g, "\n\n")
+              .trim();
+
+          if (settings.sendAsPdf) {
+            const invoicePayload = {
+              invoiceId: result.invoiceId,
+              saleDate: saleDate.toISOString(),
+              customerName: customerName.trim() || undefined,
+              customerPhone: trimmedPhone,
+              lines: lines.map((l) => ({
+                productName: l.product.name,
+                brand: l.product.brand,
+                quantity: l.quantity,
+                pricePerUnit: l.pricePerUnit,
+                subtotal: l.quantity * l.pricePerUnit,
+                lineDiscountAmount: calcLineDiscount(
+                  l.quantity,
+                  l.pricePerUnit,
+                  l.lineDiscountType,
+                  l.lineDiscountValue
+                ),
+              })),
+              cartSubtotal: cartSubtotalGross,
+              orderDiscountAmount,
+              totalPrice: total,
+              note: note || undefined,
+              shopName: settings.shopName,
+              shopPhone: settings.shopPhone,
+            };
+            fetch("/api/whatsapp/cloud/send-pdf", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                phone: trimmedPhone,
+                caption: buildCaption(),
+                invoice: invoicePayload,
+              }),
+            })
+              .then((r) => r.json())
+              .then((res) => {
+                if (res?.ok) {
+                  console.log("[whatsapp] Cloud PDF sent", res.idMessage);
+                } else {
+                  console.warn("[whatsapp] Cloud PDF send failed", res);
+                }
+              })
+              .catch((e) =>
+                console.warn("[whatsapp] Cloud PDF send network error", e)
+              );
+          } else {
+            sendViaWhatsAppCloud({
+              phone: trimmedPhone,
+              message,
+            }).then((res) => {
+              if (res.ok) {
+                console.log("[whatsapp] Cloud API sent", res.idMessage);
+              } else {
+                console.warn("[whatsapp] Cloud API send failed", res);
+              }
+            });
+          }
+        } else if (settings.whatsappCloudEnabled && !useCloud) {
+          console.warn(
+            "[whatsapp] Cloud API enabled but credentials missing — skipping send (no tab opened)"
+          );
+        } else if (settings.greenApiEnabled) {
           // Hard kill-switch: never open a tab when this toggle is on.
-          if (!settings.greenApiInstanceId || !settings.greenApiToken) {
+          if (!useGreen) {
             console.warn(
               "[whatsapp] Green API enabled but credentials missing — skipping send (no tab opened)"
             );

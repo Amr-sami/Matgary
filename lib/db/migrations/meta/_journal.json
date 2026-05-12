@@ -127,6 +127,13 @@
       "when": 1779100000000,
       "tag": "0017_receipt_customisation",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1779200000000,
+      "tag": "0018_whatsapp_cloud_api",
+      "breakpoints": true
     }
   ]
 }

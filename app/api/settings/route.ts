@@ -24,6 +24,12 @@ const patchSchema = z.object({
   greenApiInstanceId: z.string().max(80).optional(),
   greenApiToken: z.string().max(200).optional(),
   greenApiUrl: z.string().max(200).optional(),
+  // Meta WhatsApp Cloud API. Phone-number IDs are ~15-17 digits, tokens
+  // are JWT-ish blobs that can be quite long — cap generously.
+  whatsappCloudEnabled: z.boolean().optional(),
+  whatsappCloudPhoneId: z.string().max(40).optional(),
+  whatsappCloudToken: z.string().max(500).optional(),
+  whatsappCloudBusinessId: z.string().max(40).optional(),
   sendAsPdf: z.boolean().optional(),
   // Loyalty programme. Rates are clamped server-side too — accept anything
   // a non-negative number can be, server enforces the safe ceiling.
@@ -46,9 +52,9 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
   }
   await saveShopSettings(r.ctx.tenantId, r.ctx.branchId, parsed.data);
-  // Don't echo secrets (greenApiToken) into the audit metadata.
+  // Don't echo secrets (greenApiToken, whatsappCloudToken) into audit metadata.
   const safeChanged = Object.keys(parsed.data).filter(
-    (k) => k !== "greenApiToken",
+    (k) => k !== "greenApiToken" && k !== "whatsappCloudToken",
   );
   logActivity({
     tenantId: r.ctx.tenantId,

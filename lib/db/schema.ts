@@ -190,6 +190,13 @@ export const shopSettings = pgTable(
     greenApiInstanceId: text("green_api_instance_id"),
     greenApiToken: text("green_api_token"), // encrypted at rest (Phase 4)
     greenApiUrl: text("green_api_url"),
+    // Meta's official WhatsApp Business Cloud API. Sits alongside Green API;
+    // when both are configured the application prefers this one. Token is
+    // encrypted at rest with the same lib/crypto scheme as greenApiToken.
+    whatsappCloudEnabled: boolean("whatsapp_cloud_enabled").notNull().default(false),
+    whatsappCloudPhoneId: text("whatsapp_cloud_phone_id"),
+    whatsappCloudToken: text("whatsapp_cloud_token"),
+    whatsappCloudBusinessId: text("whatsapp_cloud_business_id"),
     sendAsPdf: boolean("send_as_pdf").notNull().default(false),
     onboardingCompletedAt: timestamp("onboarding_completed_at", { withTimezone: true }),
     /** Loyalty programme — disabled by default. Each branch runs its own. */

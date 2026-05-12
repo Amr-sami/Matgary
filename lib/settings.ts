@@ -18,6 +18,13 @@ export interface ShopSettings {
   greenApiInstanceId: string;
   greenApiToken: string;
   greenApiUrl: string;
+  /** WhatsApp Business Cloud API (Meta's official). Independent of Green
+   *  API — when both are enabled the app prefers Cloud API. Token is
+   *  masked on client read; sending happens server-side. */
+  whatsappCloudEnabled: boolean;
+  whatsappCloudPhoneId: string;
+  whatsappCloudToken: string;
+  whatsappCloudBusinessId: string;
   sendAsPdf: boolean;
   /** Loyalty programme — disabled by default. Per-branch in multi-store. */
   loyaltyEnabled: boolean;
@@ -41,6 +48,10 @@ export const DEFAULT_SETTINGS: ShopSettings = {
   greenApiInstanceId: "",
   greenApiToken: "",
   greenApiUrl: "",
+  whatsappCloudEnabled: false,
+  whatsappCloudPhoneId: "",
+  whatsappCloudToken: "",
+  whatsappCloudBusinessId: "",
   sendAsPdf: false,
   loyaltyEnabled: false,
   loyaltyPointsPerEgp: 0,

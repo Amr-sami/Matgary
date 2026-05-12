@@ -27,6 +27,12 @@ export interface ShopSettingsDto {
   greenApiInstanceId: string;
   greenApiToken: string;
   greenApiUrl: string;
+  /** Meta WhatsApp Business Cloud API (the official channel). Sits next to
+   *  the Green API fields — when both are enabled, the app prefers Cloud. */
+  whatsappCloudEnabled: boolean;
+  whatsappCloudPhoneId: string;
+  whatsappCloudToken: string;
+  whatsappCloudBusinessId: string;
   sendAsPdf: boolean;
   /** Loyalty programme — disabled by default. Each branch runs its own.
    *  Rates are EGP-denominated:
@@ -81,6 +87,10 @@ export const DEFAULT_DTO: ShopSettingsDto = {
   greenApiInstanceId: "",
   greenApiToken: "",
   greenApiUrl: "",
+  whatsappCloudEnabled: false,
+  whatsappCloudPhoneId: "",
+  whatsappCloudToken: "",
+  whatsappCloudBusinessId: "",
   sendAsPdf: false,
   loyaltyEnabled: false,
   loyaltyPointsPerEgp: 0,
@@ -120,6 +130,11 @@ export async function getShopSettings(
         // The placeholder lets the UI show "configured" without revealing it.
         greenApiToken: row.greenApiToken ? TOKEN_PLACEHOLDER : "",
         greenApiUrl: row.greenApiUrl || "",
+        whatsappCloudEnabled: row.whatsappCloudEnabled,
+        whatsappCloudPhoneId: row.whatsappCloudPhoneId || "",
+        // Same placeholder treatment as Green API — never leak the real token.
+        whatsappCloudToken: row.whatsappCloudToken ? TOKEN_PLACEHOLDER : "",
+        whatsappCloudBusinessId: row.whatsappCloudBusinessId || "",
         sendAsPdf: row.sendAsPdf,
         loyaltyEnabled: row.loyaltyEnabled,
         loyaltyPointsPerEgp: Number(row.loyaltyPointsPerEgp ?? 0),
@@ -131,6 +146,48 @@ export async function getShopSettings(
       };
     }),
   );
+}
+
+/** Server-only: decrypt and return the real WhatsApp Cloud API token for
+ *  outbound Meta Graph calls. Mirrors getGreenApiCredentials(). */
+export async function getWhatsAppCloudCredentials(
+  tenantId: string,
+  branchId: string,
+): Promise<{
+  enabled: boolean;
+  phoneId: string;
+  token: string;
+  businessId: string;
+  sendAsPdf: boolean;
+}> {
+  return withTenant(tenantId, async (tx) => {
+    const [row] = await tx
+      .select()
+      .from(shopSettings)
+      .where(
+        and(
+          eq(shopSettings.tenantId, tenantId),
+          eq(shopSettings.branchId, branchId),
+        ),
+      )
+      .limit(1);
+    if (!row) {
+      return {
+        enabled: false,
+        phoneId: "",
+        token: "",
+        businessId: "",
+        sendAsPdf: false,
+      };
+    }
+    return {
+      enabled: row.whatsappCloudEnabled,
+      phoneId: row.whatsappCloudPhoneId || "",
+      token: row.whatsappCloudToken ? decryptSecret(row.whatsappCloudToken) : "",
+      businessId: row.whatsappCloudBusinessId || "",
+      sendAsPdf: row.sendAsPdf,
+    };
+  });
 }
 
 /** Server-only: decrypt and return the real Green API token for outbound API calls. */
@@ -198,6 +255,21 @@ export async function saveShopSettings(
     }
     if (patch.greenApiUrl !== undefined)
       set.greenApiUrl = patch.greenApiUrl || null;
+    if (patch.whatsappCloudEnabled !== undefined)
+      set.whatsappCloudEnabled = patch.whatsappCloudEnabled;
+    if (patch.whatsappCloudPhoneId !== undefined)
+      set.whatsappCloudPhoneId = patch.whatsappCloudPhoneId || null;
+    if (patch.whatsappCloudToken !== undefined) {
+      // Same cycle as Green API: empty -> clear, placeholder -> no-op,
+      // anything else -> encrypt and store.
+      if (patch.whatsappCloudToken === "") {
+        set.whatsappCloudToken = null;
+      } else if (patch.whatsappCloudToken !== TOKEN_PLACEHOLDER) {
+        set.whatsappCloudToken = encryptSecret(patch.whatsappCloudToken);
+      }
+    }
+    if (patch.whatsappCloudBusinessId !== undefined)
+      set.whatsappCloudBusinessId = patch.whatsappCloudBusinessId || null;
     if (patch.sendAsPdf !== undefined) set.sendAsPdf = patch.sendAsPdf;
     if (patch.loyaltyEnabled !== undefined)
       set.loyaltyEnabled = patch.loyaltyEnabled;
