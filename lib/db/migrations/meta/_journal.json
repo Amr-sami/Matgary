@@ -134,6 +134,13 @@
       "when": 1779200000000,
       "tag": "0018_whatsapp_cloud_api",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1779300000000,
+      "tag": "0019_wa_connections",
+      "breakpoints": true
     }
   ]
 }

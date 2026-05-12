@@ -3,7 +3,7 @@ import { z } from "zod";
 import { normalizePhone } from "@/lib/settings";
 import { generateReceiptPdf, type PdfInvoiceData } from "@/lib/pdfReceipt";
 import { requireTenantWithBranch } from "@/lib/api/auth-helpers";
-import { getWhatsAppCloudCredentials } from "@/lib/repo/settings";
+import { resolveCloudCredentials } from "@/lib/whatsapp/resolve-credentials";
 import { rateLimit } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
@@ -48,8 +48,8 @@ export async function POST(req: Request) {
     );
   }
 
-  const creds = await getWhatsAppCloudCredentials(auth.ctx.tenantId, auth.ctx.branchId);
-  if (!creds.enabled || !creds.phoneId || !creds.token) {
+  const creds = await resolveCloudCredentials(auth.ctx.tenantId, auth.ctx.branchId);
+  if (!creds) {
     return NextResponse.json(
       { ok: false, error: "WhatsApp Cloud API is not configured for this tenant" },
       { status: 409 },
@@ -79,7 +79,7 @@ export async function POST(req: Request) {
   // ID, then reference that ID in the document message. Resumable uploads
   // exist but are overkill for sub-MB receipts.
   const uploadUrl = `https://graph.facebook.com/${GRAPH_VERSION}/${encodeURIComponent(
-    creds.phoneId,
+    creds.phoneNumberId,
   )}/media`;
 
   const uploadForm = new FormData();
@@ -127,7 +127,7 @@ export async function POST(req: Request) {
 
   // Step 2 — send the document message referencing the media ID.
   const sendUrl = `https://graph.facebook.com/${GRAPH_VERSION}/${encodeURIComponent(
-    creds.phoneId,
+    creds.phoneNumberId,
   )}/messages`;
   const body = {
     messaging_product: "whatsapp",

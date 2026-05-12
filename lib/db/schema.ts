@@ -7,6 +7,8 @@ import {
   primaryKey,
   integer,
   index,
+  jsonb,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 
@@ -471,7 +473,6 @@ export const productsRelations = relations(products, ({ many, one }) => ({
 // Operations (scoped) — sales / returns / expenses.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { jsonb } from "drizzle-orm/pg-core";
 
 export const sales = pgTable(
   "sales",
@@ -1192,6 +1193,88 @@ export const activityLogs = pgTable(
 
 export type ActivityLogRow = typeof activityLogs.$inferSelect;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// WhatsApp Cloud API connections (provider-agnostic shape so we can later add
+// SMS fallback providers, Twilio, etc. without another schema migration).
+//
+// Each row = one (tenant, branch, phone_number_id) binding. The Embedded
+// Signup OAuth flow writes here; manual fields on shop_settings stay as the
+// fallback for tenants that haven't been onboarded through App Review yet.
+// Webhook events route to a tenant by phone_number_id — that's why this
+// table is NOT scoped by current_setting('app.tenant_id') at the WHERE
+// level on inserts; we use raw db + an explicit tenant_id column with RLS
+// USING/WITH CHECK still in place.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const waConnections = pgTable(
+  "wa_connections",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branches.id, { onDelete: "cascade" }),
+
+    // Provider identity. 'meta_cloud' today; 'twilio' / 'sms_*' later.
+    provider: text("provider").notNull().default("meta_cloud"),
+
+    // Meta identifiers (canonical for routing webhooks → tenant).
+    wabaId: text("waba_id").notNull(),
+    phoneNumberId: text("phone_number_id").notNull(),
+    businessId: text("business_id"),
+    displayPhoneNumber: text("display_phone_number"),
+    verifiedName: text("verified_name"),
+
+    // Credentials. Token is always encrypted at rest via lib/crypto.
+    // tokenType: 'user' (short-lived OAuth code exchange),
+    //            'long_lived' (60d, refreshable),
+    //            'system_user' (non-expiring, from BSP path).
+    accessToken: text("access_token").notNull(),
+    tokenType: text("token_type").notNull().default("long_lived"),
+    tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }),
+    scopes: text("scopes"),
+
+    // Lifecycle. status: 'active' | 'disconnected' | 'expired' | 'revoked' | 'error'
+    status: text("status").notNull().default("active"),
+    // mode: 'sandbox' (test number) | 'live' (post business verification)
+    mode: text("mode").notNull().default("sandbox"),
+    webhookSubscribed: boolean("webhook_subscribed").notNull().default(false),
+
+    // Audit / debugging trail. raw_metadata holds the latest Graph response
+    // for the WABA + phone lookup so we can diagnose token-scope issues
+    // without re-running the OAuth flow.
+    connectedByUserId: uuid("connected_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    connectedAt: timestamp("connected_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    disconnectedAt: timestamp("disconnected_at", { withTimezone: true }),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    rawMetadata: jsonb("raw_metadata").$type<Record<string, unknown>>(),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [
+    // Webhook routing: phone_number_id is globally unique on Meta's side,
+    // so we enforce that here too. If a number moves between tenants we
+    // delete-then-insert (the old connection is marked disconnected first).
+    uniqueIndex("wa_connections_phone_number_id_uniq").on(t.phoneNumberId),
+    index("wa_connections_tenant_idx").on(t.tenantId),
+    index("wa_connections_branch_idx").on(t.tenantId, t.branchId),
+    index("wa_connections_waba_idx").on(t.wabaId),
+    index("wa_connections_status_idx").on(t.status),
+  ],
+);
+
 // Convenience type exports for the rest of the app
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -1212,4 +1295,6 @@ export type AttendanceSettingsRow = typeof attendanceSettings.$inferSelect;
 export type StoreLocationRow = typeof storeLocations.$inferSelect;
 export type AttendanceEventRow = typeof attendanceEvents.$inferSelect;
 export type EmployeeCompensationRow = typeof employeeCompensation.$inferSelect;
+export type WaConnectionRow = typeof waConnections.$inferSelect;
+export type NewWaConnection = typeof waConnections.$inferInsert;
 export type PayrollPeriodRow = typeof payrollPeriods.$inferSelect;

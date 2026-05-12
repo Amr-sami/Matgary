@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import {
   MessageCircle,
@@ -32,6 +33,27 @@ import { sendViaGreenApi, sendViaWhatsAppCloud } from "@/lib/whatsapp";
 import { formatPrice } from "@/lib/utils";
 import { CategoriesEditor } from "@/components/settings/CategoriesEditor";
 import { BrandsEditor } from "@/components/settings/BrandsEditor";
+
+// Shape mirrored from /api/whatsapp/connection. Kept local so changes to
+// the API shape force an update here too (no shared type drift).
+interface WaConnectionView {
+  id: string;
+  provider: string;
+  wabaId: string;
+  phoneNumberId: string;
+  businessId: string | null;
+  displayPhoneNumber: string | null;
+  verifiedName: string | null;
+  status: "active" | "disconnected" | "expired" | "revoked" | "error";
+  mode: "sandbox" | "live";
+  webhookSubscribed: boolean;
+  scopes: string[];
+  tokenType: string;
+  tokenExpiresAt: string | null;
+  connectedAt: string;
+  lastSyncedAt: string | null;
+  lastError: string | null;
+}
 
 const PLACEHOLDERS: { key: string; description: string }[] = [
   { key: "customerName", description: "اسم العميل" },
@@ -103,6 +125,82 @@ export default function SettingsPage() {
     type: "success" | "error";
     message: string;
   } | null>(null);
+
+  // Embedded Signup connection state — separate from shop_settings.
+  const [connection, setConnection] = useState<WaConnectionView | null>(null);
+  const [connectionLoading, setConnectionLoading] = useState(true);
+  const [showManualCloudFields, setShowManualCloudFields] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Refresh connection status from /api/whatsapp/connection.
+  const refreshConnection = async () => {
+    try {
+      const res = await fetch("/api/whatsapp/connection", { cache: "no-store" });
+      if (!res.ok) {
+        setConnection(null);
+        return;
+      }
+      const json = (await res.json()) as { connected: boolean; connection: WaConnectionView | null };
+      setConnection(json.connection);
+    } catch {
+      setConnection(null);
+    } finally {
+      setConnectionLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    refreshConnection();
+  }, []);
+
+  // Pick up the OAuth callback flash and surface it as a toast.
+  useEffect(() => {
+    const wa = searchParams.get("wa");
+    if (!wa) return;
+    const detail = searchParams.get("wa_detail") || undefined;
+    if (wa === "ok") {
+      setToast({
+        type: "success",
+        message: detail
+          ? `تم ربط واتساب — ${detail}`
+          : "تم ربط حساب واتساب بنجاح",
+      });
+      refreshConnection();
+    } else {
+      setToast({
+        type: "error",
+        message: detail || "تعذر إكمال ربط واتساب",
+      });
+    }
+    // Strip the flash params so a refresh doesn't re-fire the toast.
+    router.replace("/settings");
+  }, [searchParams, router]);
+
+  const handleConnect = () => {
+    // Full navigation — the OAuth start route 302s to Meta. Using an
+    // anchor would also work, but window.location.href keeps the rest of
+    // the page's state in case the user backs out of Meta's popup.
+    window.location.href = "/api/whatsapp/oauth/start";
+  };
+
+  const handleDisconnect = async () => {
+    if (!confirm("تأكيد فصل ربط واتساب؟ يمكنك الربط مرة أخرى لاحقاً.")) return;
+    setDisconnecting(true);
+    try {
+      const res = await fetch("/api/whatsapp/oauth/disconnect", { method: "POST" });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json?.ok) {
+        setToast({ type: "success", message: "تم فصل الربط" });
+        await refreshConnection();
+      } else {
+        setToast({ type: "error", message: json?.error || "تعذر فصل الربط" });
+      }
+    } finally {
+      setDisconnecting(false);
+    }
+  };
 
   // Sync draft when remote settings load
   useEffect(() => {
@@ -519,6 +617,122 @@ export default function SettingsPage() {
             </h3>
           </div>
 
+          {/* Connection status — primary path. Embedded Signup writes
+              wa_connections and we render the live state here. */}
+          {connectionLoading ? (
+            <div className="rounded-lg border border-border p-3 text-xs text-text-secondary">
+              جارٍ التحقق من حالة الربط...
+            </div>
+          ) : connection && connection.status === "active" ? (
+            <div className="rounded-lg border border-success/40 bg-success/5 p-3 space-y-2">
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div>
+                  <p className="font-medium text-sm flex items-center gap-2">
+                    <span className="inline-block w-2 h-2 rounded-full bg-success" />
+                    حساب واتساب مربوط
+                  </p>
+                  <p className="text-xs text-text-secondary mt-0.5">
+                    {connection.verifiedName || "—"}{" "}
+                    {connection.displayPhoneNumber && (
+                      <>
+                        ·{" "}
+                        <span dir="ltr" className="font-mono">
+                          {connection.displayPhoneNumber}
+                        </span>
+                      </>
+                    )}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`text-[10px] px-2 py-0.5 rounded-full ${
+                      connection.mode === "live"
+                        ? "bg-success/15 text-success"
+                        : "bg-orange-100 text-orange-700"
+                    }`}
+                  >
+                    {connection.mode === "live" ? "إنتاج" : "اختبار (sandbox)"}
+                  </span>
+                  {!connection.webhookSubscribed && (
+                    <span
+                      className="text-[10px] px-2 py-0.5 rounded-full bg-orange-100 text-orange-700"
+                      title="لم يتم تفعيل اشتراك الويبهوك بعد"
+                    >
+                      webhook معلّق
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="text-[11px] text-text-secondary space-y-0.5">
+                <div>
+                  WABA: <span dir="ltr" className="font-mono">{connection.wabaId}</span>
+                </div>
+                <div>
+                  Phone ID:{" "}
+                  <span dir="ltr" className="font-mono">{connection.phoneNumberId}</span>
+                </div>
+                <div>
+                  تم الربط:{" "}
+                  {new Date(connection.connectedAt).toLocaleString("ar-EG")}
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <Button
+                  onClick={handleConnect}
+                  className="!py-1.5 !text-xs"
+                  variant="secondary"
+                >
+                  إعادة الربط
+                </Button>
+                <Button
+                  onClick={handleDisconnect}
+                  loading={disconnecting}
+                  variant="ghost"
+                  className="!py-1.5 !text-xs text-error"
+                >
+                  فصل الربط
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-border p-4 space-y-2">
+              <p className="font-medium text-sm">لم يتم ربط حساب واتساب بعد</p>
+              <p className="text-xs text-text-secondary leading-relaxed">
+                اضغط "ربط حساب واتساب" لفتح Meta Embedded Signup. ستختار
+                حساب WhatsApp Business، تضيف/تتحقق من رقم، وتعتمد الصلاحيات،
+                وسنحفظ التوكن مشفّر تلقائياً — بدون نسخ يدوي.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={handleConnect} className="!py-2">
+                  ربط حساب واتساب
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => setShowManualCloudFields((v) => !v)}
+                  className="text-xs text-text-secondary hover:text-accent underline underline-offset-4"
+                >
+                  {showManualCloudFields
+                    ? "إخفاء الضبط اليدوي"
+                    : "أو ضبط يدوي للتوكن (مؤقت)"}
+                </button>
+              </div>
+              {connection?.lastError && (
+                <p className="text-[11px] text-error">
+                  آخر خطأ: {connection.lastError}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Manual cloud-API fields — fallback for tenants not yet on
+              Embedded Signup. Hidden once an active connection exists, or
+              until the operator explicitly opts in via the toggle. We also
+              show them automatically when there's already a manual config
+              saved, so we don't strand legacy setups. */}
+          {(showManualCloudFields ||
+            (!connection &&
+              (draft.whatsappCloudPhoneId || draft.whatsappCloudToken))) && (
+          <>
           <div className="rounded-lg bg-accent-light/30 border border-accent-light p-3 text-xs space-y-1.5">
             <div className="flex items-start gap-2">
               <Info className="w-4 h-4 text-accent shrink-0 mt-0.5" />
@@ -696,6 +910,8 @@ export default function SettingsPage() {
               اعتمد التطبيق ليخرج من sandbox.
             </p>
           </div>
+          </>
+          )}
         </div>
 
         {/* Shop info */}

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { normalizePhone } from "@/lib/settings";
 import { requireTenantWithBranch } from "@/lib/api/auth-helpers";
-import { getWhatsAppCloudCredentials } from "@/lib/repo/settings";
+import { resolveCloudCredentials } from "@/lib/whatsapp/resolve-credentials";
 import { rateLimit } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
@@ -51,8 +51,10 @@ export async function POST(req: Request) {
     );
   }
 
-  const creds = await getWhatsAppCloudCredentials(auth.ctx.tenantId, auth.ctx.branchId);
-  if (!creds.enabled || !creds.phoneId || !creds.token) {
+  // OAuth connection wins; manual columns are the fallback until the
+  // tenant goes through Embedded Signup.
+  const creds = await resolveCloudCredentials(auth.ctx.tenantId, auth.ctx.branchId);
+  if (!creds) {
     return NextResponse.json(
       { ok: false, error: "WhatsApp Cloud API is not configured for this tenant" },
       { status: 409 },
@@ -65,7 +67,7 @@ export async function POST(req: Request) {
   }
 
   const url = `https://graph.facebook.com/${GRAPH_VERSION}/${encodeURIComponent(
-    creds.phoneId,
+    creds.phoneNumberId,
   )}/messages`;
 
   // Freeform text. Note: Cloud API only allows freeform messages inside the
