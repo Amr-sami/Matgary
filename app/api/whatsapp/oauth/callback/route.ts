@@ -32,10 +32,11 @@ import {
 } from "@/lib/whatsapp/meta-graph";
 import {
   verifyState,
-  OAUTH_STATE_COOKIE,
+  oauthStateCookieName,
   oauthStateCookieAttributes,
 } from "@/lib/whatsapp/oauth-state";
 import { upsertConnection } from "@/lib/whatsapp/connections";
+import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
 
@@ -43,16 +44,20 @@ function flashRedirect(
   req: NextRequest,
   status: "ok" | "error",
   detail?: string,
+  cookieName?: string,
 ): NextResponse {
   const url = new URL("/settings", req.url);
   url.searchParams.set("wa", status);
   if (detail) url.searchParams.set("wa_detail", detail.slice(0, 200));
   const res = NextResponse.redirect(url);
-  // Always clear the state cookie — single-use.
-  res.cookies.set(OAUTH_STATE_COOKIE, "", {
-    ...oauthStateCookieAttributes(),
-    maxAge: 0,
-  });
+  // Always clear the per-flow state cookie — single-use. cookieName is
+  // unknown only when the state itself was malformed (no flowId).
+  if (cookieName) {
+    res.cookies.set(cookieName, "", {
+      ...oauthStateCookieAttributes(),
+      maxAge: 0,
+    });
+  }
   return res;
 }
 
@@ -67,26 +72,45 @@ export async function GET(req: NextRequest) {
 
   // User cancelled / Meta rejected before we even get a code.
   if (errorParam) {
-    console.warn(
-      `[wa-oauth-callback] meta returned error=${errorParam} reason=${errorReason ?? "—"}`,
-    );
+    logger.warn({
+      event: "wa.oauth.callback.meta_error",
+      error: errorParam,
+      reason: errorReason ?? null,
+    });
     return flashRedirect(req, "error", errorReason || errorParam);
   }
 
   if (!code || !stateParam) {
+    logger.warn({
+      event: "wa.oauth.callback.missing_params",
+      hasCode: !!code,
+      hasState: !!stateParam,
+    });
     return flashRedirect(req, "error", "Missing code or state");
   }
 
-  // 1. Verify state — both HMAC and cookie binding.
-  const cookieStore = await cookies();
-  const cookieState = cookieStore.get(OAUTH_STATE_COOKIE)?.value;
-  if (!cookieState || cookieState !== stateParam) {
-    console.warn("[wa-oauth-callback] state cookie mismatch (possible CSRF)");
-    return flashRedirect(req, "error", "Invalid state");
-  }
+  // 1. Verify state — HMAC first so we can extract the per-flow id, then
+  //    cookie binding under that flow's cookie name.
   const payload = verifyState(stateParam);
   if (!payload) {
+    logger.warn({
+      event: "wa.oauth.invalid_state",
+      reason: "verifyState_returned_null",
+    });
     return flashRedirect(req, "error", "Expired or invalid state");
+  }
+  const cookieName = oauthStateCookieName(payload.flowId);
+  const cookieStore = await cookies();
+  const cookieState = cookieStore.get(cookieName)?.value;
+  if (!cookieState || cookieState !== stateParam) {
+    logger.warn({
+      event: "wa.oauth.csrf_mismatch",
+      tenantId: payload.tenantId,
+      branchId: payload.branchId,
+      flowId: payload.flowId,
+      reason: !cookieState ? "missing_cookie" : "cookie_state_mismatch",
+    });
+    return flashRedirect(req, "error", "Invalid state", cookieName);
   }
 
   // 2. Exchange code → short-lived → long-lived.
@@ -94,7 +118,12 @@ export async function GET(req: NextRequest) {
   try {
     assertMetaConfigured(cfg);
   } catch (err) {
-    return flashRedirect(req, "error", err instanceof Error ? err.message : "Meta not configured");
+    return flashRedirect(
+      req,
+      "error",
+      err instanceof Error ? err.message : "Meta not configured",
+      cookieName,
+    );
   }
 
   let token: string;
@@ -113,7 +142,12 @@ export async function GET(req: NextRequest) {
         tokenExpiresAt = new Date(Date.now() + long.expires_in * 1000);
       }
     } catch (extendErr) {
-      console.warn("[wa-oauth-callback] extendToken failed, keeping short-lived", extendErr);
+      logger.warn({
+        event: "wa.oauth.extend_token_failed",
+        tenantId: payload.tenantId,
+        branchId: payload.branchId,
+        reason: extendErr instanceof Error ? extendErr.message : String(extendErr),
+      });
       token = short.access_token;
       tokenType = "user";
       if (short.expires_in && short.expires_in > 0) {
@@ -122,8 +156,15 @@ export async function GET(req: NextRequest) {
     }
   } catch (err) {
     const msg = err instanceof MetaGraphError ? err.message : "Token exchange failed";
-    console.error("[wa-oauth-callback] token exchange failed", err);
-    return flashRedirect(req, "error", msg);
+    logger.error({
+      event: "wa.oauth.code_exchange_failed",
+      tenantId: payload.tenantId,
+      branchId: payload.branchId,
+      metaCode: err instanceof MetaGraphError ? err.code : null,
+      status: err instanceof MetaGraphError ? err.status : null,
+      message: msg,
+    });
+    return flashRedirect(req, "error", msg, cookieName);
   }
 
   // 3. Discover WABA + phone. We take the first WABA the user gave us
@@ -144,14 +185,19 @@ export async function GET(req: NextRequest) {
         req,
         "error",
         "No WhatsApp Business Account was granted. Re-run setup and select a WABA.",
+        cookieName,
       );
     }
     if (wabas.data.length > 1) {
       // Phase-2 nicety: render a chooser. For Phase 1 we explain the
       // multi-WABA case so the operator knows how to fix it.
-      console.warn(
-        `[wa-oauth-callback] user granted ${wabas.data.length} WABAs — picking first`,
-      );
+      logger.warn({
+        event: "wa.oauth.multi_waba_granted",
+        tenantId: payload.tenantId,
+        branchId: payload.branchId,
+        count: wabas.data.length,
+        wabaIdPicked: wabas.data[0].id,
+      });
     }
     wabaId = wabas.data[0].id;
 
@@ -161,6 +207,7 @@ export async function GET(req: NextRequest) {
         req,
         "error",
         "WABA has no phone number yet. Add and verify one in Meta Business Manager, then reconnect.",
+        cookieName,
       );
     }
     const phone = phones.data[0];
@@ -174,8 +221,15 @@ export async function GET(req: NextRequest) {
     rawMetadata = { waba: wabas.data[0], phone, business: biz };
   } catch (err) {
     const msg = err instanceof MetaGraphError ? err.message : "Discovery failed";
-    console.error("[wa-oauth-callback] WABA/phone discovery failed", err);
-    return flashRedirect(req, "error", msg);
+    logger.error({
+      event: "wa.oauth.discovery_failed",
+      tenantId: payload.tenantId,
+      branchId: payload.branchId,
+      metaCode: err instanceof MetaGraphError ? err.code : null,
+      status: err instanceof MetaGraphError ? err.status : null,
+      message: msg,
+    });
+    return flashRedirect(req, "error", msg, cookieName);
   }
 
   // 4. Subscribe our app to the WABA. Best-effort: if this fails we still
@@ -188,7 +242,13 @@ export async function GET(req: NextRequest) {
     webhookSubscribed = !!sub.success;
   } catch (err) {
     subscribeError = err instanceof Error ? err.message : "subscribe failed";
-    console.warn(`[wa-oauth-callback] subscribeAppToWaba failed: ${subscribeError}`);
+    logger.warn({
+      event: "wa.oauth.subscribe_failed",
+      tenantId: payload.tenantId,
+      branchId: payload.branchId,
+      wabaId,
+      reason: subscribeError,
+    });
   }
 
   // 5. Inspect token to detect sandbox vs live + actual granted scopes.
@@ -210,7 +270,12 @@ export async function GET(req: NextRequest) {
       mode = "live";
     }
   } catch (err) {
-    console.warn("[wa-oauth-callback] debugToken failed (continuing)", err);
+    logger.warn({
+      event: "wa.oauth.debug_token_failed",
+      tenantId: payload.tenantId,
+      branchId: payload.branchId,
+      reason: err instanceof Error ? err.message : String(err),
+    });
   }
 
   // 6. Persist. Repo encrypts the token; we never log it here.
@@ -233,13 +298,33 @@ export async function GET(req: NextRequest) {
       rawMetadata,
     });
   } catch (err) {
-    console.error("[wa-oauth-callback] upsertConnection failed", err);
-    return flashRedirect(req, "error", "Failed to save connection");
+    logger.error({
+      event: "wa.oauth.persist_failed",
+      tenantId: payload.tenantId,
+      branchId: payload.branchId,
+      wabaId,
+      phoneNumberId,
+      message: err instanceof Error ? err.message : String(err),
+    });
+    return flashRedirect(req, "error", "Failed to save connection", cookieName);
   }
+
+  logger.info({
+    event: "wa.oauth.connected",
+    tenantId: payload.tenantId,
+    branchId: payload.branchId,
+    wabaId,
+    phoneNumberId,
+    mode,
+    webhookSubscribed,
+    tokenType,
+    scopesGranted: grantedScopes.length,
+  });
 
   return flashRedirect(
     req,
     "ok",
     subscribeError ? `connected (webhook subscribe pending: ${subscribeError})` : undefined,
+    cookieName,
   );
 }

@@ -16,6 +16,7 @@ import {
   readMetaConfig,
   unsubscribeAppFromWaba,
 } from "@/lib/whatsapp/meta-graph";
+import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
 
@@ -39,7 +40,13 @@ export async function POST() {
       await unsubscribeAppFromWaba(cfg, active.conn.wabaId, active.token);
     }
   } catch (err) {
-    console.warn("[wa-disconnect] unsubscribeAppFromWaba failed", err);
+    logger.warn({
+      event: "wa.oauth.unsubscribe_failed",
+      tenantId: auth.ctx.tenantId,
+      branchId: auth.ctx.branchId,
+      wabaId: active.conn.wabaId,
+      reason: err instanceof Error ? err.message : String(err),
+    });
   }
 
   await markDisconnected(
@@ -47,6 +54,14 @@ export async function POST() {
     auth.ctx.branchId,
     "user_disconnect",
   );
+
+  logger.info({
+    event: "wa.oauth.disconnected",
+    tenantId: auth.ctx.tenantId,
+    branchId: auth.ctx.branchId,
+    wabaId: active.conn.wabaId,
+    phoneNumberId: active.conn.phoneNumberId,
+  });
 
   return NextResponse.json({ ok: true });
 }

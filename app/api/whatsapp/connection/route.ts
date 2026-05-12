@@ -35,6 +35,9 @@ export async function GET() {
           connectedAt: conn.connectedAt,
           lastSyncedAt: conn.lastSyncedAt,
           lastError: conn.lastError,
+          tokenLastValidatedAt: conn.tokenLastValidatedAt,
+          lastGraphHealthcheckAt: conn.lastGraphHealthcheckAt,
+          connectionErrorState: conn.connectionErrorState,
         }
       : null,
   });

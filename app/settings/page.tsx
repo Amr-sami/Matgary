@@ -53,7 +53,49 @@ interface WaConnectionView {
   connectedAt: string;
   lastSyncedAt: string | null;
   lastError: string | null;
+  tokenLastValidatedAt: string | null;
+  lastGraphHealthcheckAt: string | null;
+  connectionErrorState:
+    | "ok"
+    | "token_expired"
+    | "token_revoked"
+    | "scope_missing"
+    | "waba_inaccessible"
+    | "phone_unverified"
+    | "network"
+    | "unknown"
+    | null;
 }
+
+// Map machine error states to actionable Arabic copy. Anything not listed
+// here falls back to the raw `note` from the health endpoint, so adding a
+// new state code in lib/whatsapp/health.ts doesn't break the UI.
+const ERROR_STATE_COPY: Record<string, { title: string; cta: "reconnect" | "verify" | "retry" }> = {
+  token_expired: {
+    title: "انتهت صلاحية التوكن. اضغط إعادة الربط لإصدار توكن جديد.",
+    cta: "reconnect",
+  },
+  token_revoked: {
+    title: "تم إبطال التوكن من Meta. اضغط إعادة الربط لإعادة المصادقة.",
+    cta: "reconnect",
+  },
+  scope_missing: {
+    title: "صلاحيات ناقصة على التوكن. اعد الربط ووافق على جميع الصلاحيات.",
+    cta: "reconnect",
+  },
+  phone_unverified: {
+    title: "الرقم غير موثّق على Meta. أكمل التحقق من Business Manager.",
+    cta: "verify",
+  },
+  waba_inaccessible: {
+    title: "تعذر الوصول لحساب WhatsApp Business. تحقق من الإذن أو أعد الربط.",
+    cta: "reconnect",
+  },
+  network: {
+    title: "تعذر الاتصال بـ Meta مؤقتاً. أعد المحاولة بعد لحظات.",
+    cta: "retry",
+  },
+};
 
 const PLACEHOLDERS: { key: string; description: string }[] = [
   { key: "customerName", description: "اسم العميل" },
@@ -183,6 +225,31 @@ export default function SettingsPage() {
     // anchor would also work, but window.location.href keeps the rest of
     // the page's state in case the user backs out of Meta's popup.
     window.location.href = "/api/whatsapp/oauth/start";
+  };
+
+  const [healthChecking, setHealthChecking] = useState(false);
+  const handleHealthCheck = async () => {
+    setHealthChecking(true);
+    try {
+      const res = await fetch("/api/whatsapp/connection/healthcheck", {
+        method: "POST",
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setToast({
+          type: json.ok ? "success" : "error",
+          message: json.note || (json.ok ? "الاتصال سليم" : "تعذر التحقق"),
+        });
+        await refreshConnection();
+      } else {
+        setToast({
+          type: "error",
+          message: json?.error || `HTTP ${res.status}`,
+        });
+      }
+    } finally {
+      setHealthChecking(false);
+    }
   };
 
   const handleDisconnect = async () => {
@@ -676,7 +743,57 @@ export default function SettingsPage() {
                   {new Date(connection.connectedAt).toLocaleString("ar-EG")}
                 </div>
               </div>
+              {/* Health-state banner — only shows when the last health
+                  check flagged a problem. ERROR_STATE_COPY decides the
+                  CTA; anything not mapped falls back to lastError. */}
+              {connection.connectionErrorState &&
+                connection.connectionErrorState !== "ok" && (
+                  <div className="rounded-md border border-orange-300 bg-orange-50 p-2 text-xs space-y-1">
+                    <p className="font-medium text-orange-800">
+                      {ERROR_STATE_COPY[connection.connectionErrorState]
+                        ?.title ||
+                        connection.lastError ||
+                        "تنبيه على الاتصال — راجع التفاصيل."}
+                    </p>
+                    {(() => {
+                      const cta =
+                        ERROR_STATE_COPY[connection.connectionErrorState]?.cta;
+                      if (cta === "reconnect") {
+                        return (
+                          <Button
+                            onClick={handleConnect}
+                            className="!py-1 !text-[11px]"
+                            variant="secondary"
+                          >
+                            إعادة الربط الآن
+                          </Button>
+                        );
+                      }
+                      if (cta === "retry") {
+                        return (
+                          <Button
+                            onClick={handleHealthCheck}
+                            loading={healthChecking}
+                            className="!py-1 !text-[11px]"
+                            variant="secondary"
+                          >
+                            إعادة المحاولة
+                          </Button>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
+                )}
               <div className="flex flex-wrap gap-2 pt-1">
+                <Button
+                  onClick={handleHealthCheck}
+                  loading={healthChecking}
+                  className="!py-1.5 !text-xs"
+                  variant="secondary"
+                >
+                  فحص الاتصال
+                </Button>
                 <Button
                   onClick={handleConnect}
                   className="!py-1.5 !text-xs"

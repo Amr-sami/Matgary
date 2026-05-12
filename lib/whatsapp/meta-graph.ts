@@ -16,6 +16,7 @@
 // Graph's variant responses. Token strings are *never* logged.
 
 import "server-only";
+import { logger } from "@/lib/logger";
 
 const DEFAULT_VERSION = "v21.0";
 const GRAPH_BASE = "https://graph.facebook.com";
@@ -138,6 +139,7 @@ async function graphRequest<T>(
     bodyInit = JSON.stringify(body);
   }
 
+  const startedAt = Date.now();
   const res = await fetch(url.toString(), { method, headers, body: bodyInit });
   const text = await res.text();
   let json: unknown = null;
@@ -149,17 +151,23 @@ async function graphRequest<T>(
 
   if (!res.ok) {
     const errBody = json as
-      | { error?: { message?: string; code?: number; type?: string } }
+      | { error?: { message?: string; code?: number; subcode?: number; type?: string } }
       | null;
     const msg =
       errBody?.error?.message ||
       `Meta Graph ${method} ${path} returned ${res.status}`;
-    // Never log Authorization header / tokens — only the path and code.
-    console.warn(
-      `[meta-graph] ${method} ${path} failed status=${res.status} code=${
-        errBody?.error?.code ?? "—"
-      } msg="${msg}"`,
-    );
+    // Never log Authorization header / tokens — path + Meta error codes only.
+    logger.warn({
+      event: "wa.graph.error",
+      method,
+      path,
+      status: res.status,
+      durationMs: Date.now() - startedAt,
+      metaCode: errBody?.error?.code ?? null,
+      metaSubcode: errBody?.error?.subcode ?? null,
+      metaType: errBody?.error?.type ?? null,
+      message: msg,
+    });
     throw new MetaGraphError(
       msg,
       res.status,
@@ -167,6 +175,14 @@ async function graphRequest<T>(
       json ?? text,
     );
   }
+
+  logger.debug({
+    event: "wa.graph.ok",
+    method,
+    path,
+    status: res.status,
+    durationMs: Date.now() - startedAt,
+  });
 
   return (json as T) ?? ({} as T);
 }

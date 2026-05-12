@@ -18,8 +18,8 @@ import {
 import {
   signState,
   oauthStateCookieAttributes,
-  OAUTH_STATE_COOKIE,
 } from "@/lib/whatsapp/oauth-state";
+import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
 
@@ -31,6 +31,12 @@ export async function GET() {
   try {
     assertMetaConfigured(cfg);
   } catch (err) {
+    logger.warn({
+      event: "wa.oauth.start.not_configured",
+      tenantId: auth.ctx.tenantId,
+      branchId: auth.ctx.branchId,
+      message: err instanceof Error ? err.message : String(err),
+    });
     if (err instanceof MetaGraphError) {
       return NextResponse.json(
         { ok: false, error: err.message },
@@ -40,14 +46,22 @@ export async function GET() {
     throw err;
   }
 
-  const state = signState({
+  const signed = signState({
     tenantId: auth.ctx.tenantId,
     branchId: auth.ctx.branchId,
     userId: auth.ctx.userId,
   });
   const cookieStore = await cookies();
-  cookieStore.set(OAUTH_STATE_COOKIE, state, oauthStateCookieAttributes());
+  cookieStore.set(signed.cookieName, signed.state, oauthStateCookieAttributes());
 
-  const url = buildOAuthAuthorizeUrl(cfg, state);
+  logger.info({
+    event: "wa.oauth.start",
+    tenantId: auth.ctx.tenantId,
+    branchId: auth.ctx.branchId,
+    userId: auth.ctx.userId,
+    flowId: signed.flowId,
+  });
+
+  const url = buildOAuthAuthorizeUrl(cfg, signed.state);
   return NextResponse.redirect(url);
 }

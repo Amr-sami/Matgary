@@ -23,6 +23,16 @@ export type WaConnectionStatus =
 
 export type WaConnectionMode = "sandbox" | "live";
 
+export type ConnectionErrorState =
+  | "ok"
+  | "token_expired"
+  | "token_revoked"
+  | "scope_missing"
+  | "waba_inaccessible"
+  | "phone_unverified"
+  | "network"
+  | "unknown";
+
 export interface WaConnectionPublic {
   id: string;
   tenantId: string;
@@ -43,6 +53,9 @@ export interface WaConnectionPublic {
   disconnectedAt: Date | null;
   lastSyncedAt: Date | null;
   lastError: string | null;
+  tokenLastValidatedAt: Date | null;
+  lastGraphHealthcheckAt: Date | null;
+  connectionErrorState: ConnectionErrorState | null;
 }
 
 function toPublic(
@@ -68,6 +81,9 @@ function toPublic(
     disconnectedAt: row.disconnectedAt,
     lastSyncedAt: row.lastSyncedAt,
     lastError: row.lastError,
+    tokenLastValidatedAt: row.tokenLastValidatedAt,
+    lastGraphHealthcheckAt: row.lastGraphHealthcheckAt,
+    connectionErrorState: (row.connectionErrorState as ConnectionErrorState | null) ?? null,
   };
 }
 
@@ -277,6 +293,45 @@ export async function refreshConnection(
     if (patch.rawMetadata !== undefined) set.rawMetadata = patch.rawMetadata;
     if (patch.lastError !== undefined) set.lastError = patch.lastError;
 
+    await tx
+      .update(waConnections)
+      .set(set)
+      .where(
+        and(
+          eq(waConnections.tenantId, tenantId),
+          eq(waConnections.id, connectionId),
+        ),
+      );
+  });
+}
+
+/** Update health-check outcome columns. tokenLastValidatedAt is moved
+ *  only when `errorState` is 'ok' — every other state means we didn't
+ *  prove the token works against Graph this round. */
+export async function recordHealthcheck(
+  tenantId: string,
+  connectionId: string,
+  result: {
+    errorState: ConnectionErrorState;
+    note?: string | null;
+    // Optional metadata snapshots from this run; preserves the rolling
+    // raw_metadata so we can see what changed between checks.
+    rawMetadata?: Record<string, unknown>;
+    // If the connection is now flat-out unusable mark the row 'expired'
+    // or 'revoked' so send routes refuse fast without an extra Graph hop.
+    statusOverride?: WaConnectionStatus;
+  },
+): Promise<void> {
+  await withTenant(tenantId, async (tx) => {
+    const set: Record<string, unknown> = {
+      lastGraphHealthcheckAt: new Date(),
+      connectionErrorState: result.errorState,
+      lastError: result.note ?? null,
+      updatedAt: new Date(),
+    };
+    if (result.errorState === "ok") set.tokenLastValidatedAt = new Date();
+    if (result.rawMetadata) set.rawMetadata = result.rawMetadata;
+    if (result.statusOverride) set.status = result.statusOverride;
     await tx
       .update(waConnections)
       .set(set)

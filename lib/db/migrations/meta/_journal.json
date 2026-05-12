@@ -141,6 +141,13 @@
       "when": 1779300000000,
       "tag": "0019_wa_connections",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1779400000000,
+      "tag": "0020_wa_connections_health",
+      "breakpoints": true
     }
   ]
 }

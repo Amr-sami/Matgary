@@ -1,21 +1,32 @@
 // HMAC-signed state token for the Embedded Signup OAuth round-trip.
 //
-// The payload encodes (tenantId, branchId, userId, nonce, iat). Both the
-// `state=` query param and a parallel httpOnly cookie carry the same token;
-// the callback rejects unless they match (defence against CSRF and against
-// a stolen authorize-redirect link being completed by a different user).
+// The payload encodes (tenantId, branchId, userId, flowId, nonce, iat).
+// Each "Connect WhatsApp" click mints a *new* flowId (8 random hex chars)
+// which is embedded in both:
+//   - the state token (signed)
+//   - the httpOnly cookie *name* (mg.wa_oauth_state.<flowId>)
+//
+// This means two tabs starting the flow in parallel get distinct cookies
+// and can each complete independently. Without per-flow naming the second
+// tab's cookie would silently overwrite the first's, breaking that user's
+// flow and producing spurious "CSRF mismatch" logs.
 
 import "server-only";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 const SIG_LEN_BYTES = 32; // HMAC-SHA256 -> 32 bytes
 const STATE_MAX_AGE_SEC = 15 * 60; // 15 minutes is plenty for an OAuth round-trip
+const FLOW_ID_BYTES = 4; // 4 bytes hex -> 8 chars
 
 export interface OAuthStatePayload {
   tenantId: string;
   branchId: string;
   userId: string;
-  // Random nonce so two consecutive Connect clicks produce distinct states.
+  // Per-flow identifier. Doubles as the cookie-name suffix so two tabs
+  // don't clobber each other's cookies.
+  flowId: string;
+  // Random nonce so two flows in the same tab differ even if everything
+  // else is identical.
   nonce: string;
   // Issued-at, unix seconds.
   iat: number;
@@ -41,15 +52,29 @@ function b64urlDecode(s: string): Buffer {
   return Buffer.from(s.replace(/-/g, "+").replace(/_/g, "/") + pad, "base64");
 }
 
-export function signState(input: Omit<OAuthStatePayload, "nonce" | "iat">): string {
+export interface SignedState {
+  state: string;
+  flowId: string;
+  cookieName: string;
+}
+
+export function signState(
+  input: Omit<OAuthStatePayload, "nonce" | "iat" | "flowId">,
+): SignedState {
+  const flowId = randomBytes(FLOW_ID_BYTES).toString("hex");
   const payload: OAuthStatePayload = {
     ...input,
+    flowId,
     nonce: randomBytes(8).toString("hex"),
     iat: Math.floor(Date.now() / 1000),
   };
   const body = b64url(Buffer.from(JSON.stringify(payload), "utf8"));
   const sig = b64url(createHmac("sha256", secret()).update(body).digest());
-  return `${body}.${sig}`;
+  return {
+    state: `${body}.${sig}`,
+    flowId,
+    cookieName: `${OAUTH_STATE_COOKIE_PREFIX}.${flowId}`,
+  };
 }
 
 export function verifyState(state: string | null | undefined): OAuthStatePayload | null {
@@ -82,6 +107,7 @@ export function verifyState(state: string | null | undefined): OAuthStatePayload
     typeof payload.tenantId !== "string" ||
     typeof payload.branchId !== "string" ||
     typeof payload.userId !== "string" ||
+    typeof payload.flowId !== "string" ||
     typeof payload.iat !== "number"
   ) {
     return null;
@@ -93,10 +119,17 @@ export function verifyState(state: string | null | undefined): OAuthStatePayload
   return payload;
 }
 
-// Cookie used to bind the state token to *this* browser session. If the
-// `state` query param doesn't match the cookie, we treat it as a CSRF
-// attempt regardless of HMAC validity.
-export const OAUTH_STATE_COOKIE = "mg.wa_oauth_state";
+// Cookie *prefix*. Full name is `${prefix}.${flowId}`, so two simultaneous
+// Connect flows in different tabs each get their own cookie. If the state
+// param doesn't match the cookie at the same flowId, we treat it as CSRF
+// regardless of HMAC validity.
+export const OAUTH_STATE_COOKIE_PREFIX = "mg.wa_oauth_state";
+
+/** Build the per-flow cookie name from a verified payload (or the raw flowId
+ *  during start-flow). */
+export function oauthStateCookieName(flowId: string): string {
+  return `${OAUTH_STATE_COOKIE_PREFIX}.${flowId}`;
+}
 
 export function oauthStateCookieAttributes(): {
   httpOnly: true;

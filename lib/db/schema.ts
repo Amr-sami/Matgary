@@ -1254,6 +1254,19 @@ export const waConnections = pgTable(
     disconnectedAt: timestamp("disconnected_at", { withTimezone: true }),
     lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
     lastError: text("last_error"),
+    // Set only on successful /debug_token. Drives the "token validated
+    // X ago" hint in the settings UI.
+    tokenLastValidatedAt: timestamp("token_last_validated_at", {
+      withTimezone: true,
+    }),
+    // Set on each full health-check run regardless of outcome. Throttles
+    // the UI's "Run check" button.
+    lastGraphHealthcheckAt: timestamp("last_graph_healthcheck_at", {
+      withTimezone: true,
+    }),
+    // Machine-readable health code; see migration 0020 for the value
+    // domain. Null = never checked.
+    connectionErrorState: text("connection_error_state"),
     rawMetadata: jsonb("raw_metadata").$type<Record<string, unknown>>(),
 
     createdAt: timestamp("created_at", { withTimezone: true })

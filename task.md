@@ -182,6 +182,28 @@ npm run db:migrate
 
 ## 2. Changelog
 
+### 2026-05-12 — WhatsApp Embedded Signup Phase 1.5 (health check + structured logging + multi-tab safety)
+
+Polish pass on top of Phase 1 before the Phase-2 webhook work lands. Three discrete additions; nothing existing changed semantically.
+
+- **Token metadata** (`0020_wa_connections_health.sql`): three new columns — `token_last_validated_at` (only moves on successful `/debug_token`), `last_graph_healthcheck_at` (bumped every run regardless of outcome — drives UI throttling), `connection_error_state` (machine-readable code: `ok`/`token_expired`/`token_revoked`/`scope_missing`/`waba_inaccessible`/`phone_unverified`/`network`/`unknown`). All nullable; existing rows show as "never checked" until the first run.
+- **Health-check service** (`lib/whatsapp/health.ts` + `POST /api/whatsapp/connection/healthcheck`): runs `/debug_token` → `listPhoneNumbersForWaba` → `getBusinessForWaba`, classifies Meta OAuthException codes/subcodes into the state enum (190+458 → revoked; 190+463 → expired; 401/403 → revoked; 5xx → network), persists outcome via `recordHealthcheck`, and returns the actionable diagnostic (note + needsReauth) to the UI. Rate-limited 4/30s per (tenant, branch). When the check decides the token is unusable it also flips `status` to `revoked`/`expired` so send routes refuse fast without an extra Graph hop.
+- **Structured logger** (`lib/logger.ts`): single-line JSON in production (`NODE_ENV=production` or `LOG_FORMAT=json`), compact human format in dev. Stable event-name namespace — `wa.oauth.start`, `wa.oauth.connected`, `wa.oauth.csrf_mismatch`, `wa.oauth.invalid_state`, `wa.oauth.code_exchange_failed`, `wa.oauth.discovery_failed`, `wa.oauth.subscribe_failed`, `wa.oauth.unsubscribe_failed`, `wa.oauth.persist_failed`, `wa.oauth.multi_waba_granted`, `wa.oauth.debug_token_failed`, `wa.oauth.disconnected`, `wa.oauth.start.not_configured`, `wa.oauth.extend_token_failed`, `wa.healthcheck.completed`, `wa.graph.ok`, `wa.graph.error`. `SENSITIVE_KEYS` redacts `accessToken`/`access_token`/`token`/`appSecret`/`secret`/`Authorization`/`rawMetadata` at any nesting depth; phone numbers are still emitted but only the IDs (Phase 2 will trim inbound user numbers to last-4). Wired through `meta-graph.ts` HTTP helper and every OAuth route.
+- **Multi-tab CSRF hardening** (`lib/whatsapp/oauth-state.ts`): per-flow cookie names — each Connect click mints a `flowId` (4 random bytes hex) embedded in both the signed state payload and the cookie name (`mg.wa_oauth_state.<flowId>`). Two tabs starting Connect now get distinct cookies instead of clobbering each other. Callback parses `flowId` out of the state HMAC *first*, then verifies the cookie at the matching name — so flowId mismatch and cookie-name mismatch are the same failure mode. State TTL stays 15min; cookie is cleared on every callback exit path regardless of success.
+- **Reconnect/re-auth UX**: settings page reads `connectionErrorState` from the connection endpoint and renders an inline orange banner with a state-specific CTA — "Reconnect now" for `token_expired`/`token_revoked`/`scope_missing`/`waba_inaccessible`, "Retry" for `network`, and free-form copy from the health-check `note` field for `phone_unverified`. Added a permanent "فحص الاتصال" button next to Reconnect/Disconnect.
+- **Developer setup doc** (`docs/whatsapp-onboarding.md`): step-by-step Meta App creation, Facebook Login for Business configuration, redirect-URL whitelist, scopes + App Review notes, local ngrok/cloudflared, env-var table, common OAuth failure modes, log-event reference, and a production checklist.
+
+**Why per-flow cookies (instead of moving state into Redis):**
+- Cookies are already free; adding a Redis-backed session for this would mean a network hop on every callback for marginal benefit. The cookie *is* the binding evidence — moving it server-side just trades one trust assumption (cookie integrity) for another (session-store lookup correctness). HMAC + per-flow naming gets the same anti-CSRF property without the infra.
+
+**Why classify Meta error codes manually:**
+- Meta documents `error_subcode` better than they document the parent code's meaning, and the subcodes are stable enough that string-matching `err.message` would be fragile. The classifier in `lib/whatsapp/health.ts:classifyError` is a small switch — adding a new subcode means one line, not a migration.
+
+**Known gaps still open going into Phase 2:**
+- Health-check runs only on demand (manual button). Phase 3 will schedule it via BullMQ; the rate-limit + persistence is ready for that consumer.
+- `tokenLastValidatedAt` is set but not yet visible in the UI — Phase 2 polish will surface "validated X ago".
+- `phone_unverified` doesn't yet open a deep link to Meta Business Manager. Phase 2 will add a "Verify in Business Manager →" link when the state hits.
+
 ### 2026-05-12 — WhatsApp Embedded Signup Phase 1 (OAuth onboarding + connection storage)
 
 First step toward a full BSP-grade integration: store owners can connect their own WhatsApp Business Account via Meta's Login for Business flow without copying tokens by hand. Green API and the manual Cloud-API fields stay in place as fallbacks during the App Review window.
