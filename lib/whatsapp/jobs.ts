@@ -9,13 +9,16 @@ import {
   type WaJobData,
   type OutboundTextJobData,
   type OutboundDocumentJobData,
+  type OutboundTemplateJobData,
   type InboundProcessJobData,
   type QuarantineReplayJobData,
 } from "./queue";
 import {
   sendTextToMeta,
   sendDocumentToMeta,
+  sendTemplateToMeta,
   isRetryableSendError,
+  type TemplateComponent,
 } from "./outbound-sender";
 import { patchOutboundOnSendResult } from "./messages";
 import {
@@ -35,6 +38,8 @@ export async function routeJob(job: Job<WaJobData>): Promise<void> {
       return handleOutboundText(job as Job<OutboundTextJobData>);
     case "outbound.document":
       return handleOutboundDocument(job as Job<OutboundDocumentJobData>);
+    case "outbound.template":
+      return handleOutboundTemplate(job as Job<OutboundTemplateJobData>);
     case "inbound.process":
       return handleInboundProcess(job as Job<InboundProcessJobData>);
     case "quarantine.replay":
@@ -127,6 +132,49 @@ async function handleOutboundDocument(
     tenantId: d.tenantId,
     branchId: d.branchId,
     clientMessageId: d.clientMessageId,
+    ok: outcome.ok,
+    metaStatus: outcome.status,
+  });
+}
+
+// ─── Outbound template ───────────────────────────────────────────────────
+
+async function handleOutboundTemplate(
+  job: Job<OutboundTemplateJobData>,
+): Promise<void> {
+  const d = job.data;
+  const outcome = await sendTemplateToMeta({
+    tenantId: d.tenantId,
+    branchId: d.branchId,
+    phoneE164NoPlus: d.phone,
+    templateName: d.templateName,
+    language: d.language,
+    components: d.components as unknown as TemplateComponent[],
+  });
+  await patchOutboundOnSendResult({
+    tenantId: d.tenantId,
+    rowId: d.rowId,
+    metaMessageId: outcome.metaMessageId ?? null,
+    ok: outcome.ok,
+    failureReason: outcome.errorMessage ?? null,
+    failureCode: outcome.errorCode ?? null,
+  });
+  if (
+    !outcome.ok &&
+    isRetryableSendError(outcome) &&
+    job.attemptsMade < (job.opts.attempts ?? 5)
+  ) {
+    throw new Error(
+      `meta template send failed (status ${outcome.status}, code ${outcome.errorCode ?? "—"}): ${outcome.errorMessage}`,
+    );
+  }
+  logger.info({
+    event: "wa.outbound.delivered_to_meta",
+    kind: "template",
+    tenantId: d.tenantId,
+    branchId: d.branchId,
+    clientMessageId: d.clientMessageId,
+    templateName: d.templateName,
     ok: outcome.ok,
     metaStatus: outcome.status,
   });

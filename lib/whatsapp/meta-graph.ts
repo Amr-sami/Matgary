@@ -390,3 +390,67 @@ export async function unsubscribeAppFromWaba(
     { method: "DELETE", token },
   );
 }
+
+// ─── Templates ───────────────────────────────────────────────────────────
+
+export interface MetaTemplate {
+  id?: string;
+  name: string;
+  language: string;
+  status?: string; // APPROVED | PENDING | REJECTED | PAUSED | ...
+  category?: string; // AUTHENTICATION | UTILITY | MARKETING
+  parameter_format?: string; // POSITIONAL | NAMED
+  components: Array<{
+    type?: string; // HEADER | BODY | FOOTER | BUTTONS
+    format?: string; // TEXT | IMAGE | DOCUMENT | ...
+    text?: string;
+    example?: Record<string, unknown>;
+    buttons?: Array<Record<string, unknown>>;
+  }>;
+  quality_score?: { score?: string; date?: number };
+  rejected_reason?: string;
+}
+
+export interface TemplateListResponse {
+  data: MetaTemplate[];
+  paging?: {
+    cursors?: { before?: string; after?: string };
+    next?: string;
+    previous?: string;
+  };
+}
+
+/** Page through ALL message templates on a WABA. Meta paginates at 25
+ *  per page; we follow the cursor until exhausted. Caller can pass a
+ *  bound to short-circuit very large libraries (rare). */
+export async function listMessageTemplates(
+  cfg: MetaConfig,
+  wabaId: string,
+  token: string,
+  options: { maxPages?: number; pageLimit?: number } = {},
+): Promise<MetaTemplate[]> {
+  const maxPages = options.maxPages ?? 40; // 40 * 100 = 4000 templates ceiling
+  const limit = options.pageLimit ?? 100;
+  const out: MetaTemplate[] = [];
+  let after: string | undefined;
+
+  for (let i = 0; i < maxPages; i++) {
+    const resp = await graphRequest<TemplateListResponse>(
+      cfg,
+      `/${encodeURIComponent(wabaId)}/message_templates`,
+      {
+        token,
+        query: {
+          fields:
+            "id,name,language,status,category,parameter_format,components,quality_score,rejected_reason",
+          limit: String(limit),
+          after,
+        },
+      },
+    );
+    for (const t of resp.data ?? []) out.push(t);
+    after = resp.paging?.cursors?.after;
+    if (!after || (resp.data?.length ?? 0) < limit) break;
+  }
+  return out;
+}

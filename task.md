@@ -182,6 +182,47 @@ npm run db:migrate
 
 ## 2. Changelog
 
+### 2026-05-12 — WhatsApp Phase 5 (message templates: cache, sync, send)
+
+Adds the template layer that lets tenants send outbound messages outside Meta's 24-hour customer-service window. Templates are created and approved in Meta Business Manager; our app caches the approved set per branch and the send facade refuses to dispatch non-approved templates.
+
+- **Schema** (`0023_wa_templates.sql`): `wa_templates` table per (tenant, branch, name, language) — `category` (authentication/utility/marketing), `status` (approved/pending/rejected/paused/in_appeal/pending_deletion/disabled/flagged/stale/unknown — `stale` is our addition for templates that disappeared from Meta's response), `components` jsonb (header/body/footer/buttons structure verbatim), `quality_score` + `rejected_reason`, `parameter_format` (POSITIONAL vs NAMED), `last_synced_at`. RLS forced.
+
+- **Meta Graph extension** (`lib/whatsapp/meta-graph.ts:listMessageTemplates`): walks `GET /{waba}/message_templates` with cursor pagination (capped at 40 pages * 100 = 4000 templates per branch). Returns typed `MetaTemplate[]` with all relevant fields.
+
+- **Templates repo** (`lib/whatsapp/templates.ts`):
+  - `syncTemplatesForBranch` — owner-triggered full re-sync. Fetches via Graph (with the decrypted token from the active connection), upserts via `(tenant, branch, name, language)` unique index, then marks cached rows not seen in this run as `status='stale'`. Idempotent; safe to re-run.
+  - `listTemplates(tenantId, branchId, opts)` — UI listing, filterable by status/category, defaults exclude `stale`.
+  - `getApprovedTemplate(name, language)` — send-time lookup, ONLY returns rows with `status='approved'`. Paused/rejected templates can't slip through to a real send.
+
+- **Send pipeline**:
+  - `outbound-sender.ts:sendTemplateToMeta` — builds Cloud API `type:'template'` payload with `template.name` + `template.language.code` + `template.components`.
+  - `outbound.ts:sendOutboundTemplate` — facade. Validates approved status before persisting any queued row, so a missing/paused/rejected template returns 400 with a clear message instead of failing in the worker. Bypasses the 24h window (that's the whole point of templates). Preview text is taken from the body component when available, else `[template:<name>]`.
+  - `queue.ts` — new `outbound.template` job kind + `OutboundTemplateJobData`. Same retry policy and `jobId` (`outtpl:<clientMessageId>`) dedupe as the other outbound kinds.
+  - `jobs.ts:handleOutboundTemplate` — symmetric to the text/document handlers; patches `wa_messages` regardless of outcome before deciding whether to retry.
+
+- **API routes**:
+  - `GET /api/whatsapp/templates?status=&category=&includeStale=1` — paginated cached list.
+  - `POST /api/whatsapp/templates/sync` — owner-only re-sync. Rate-limited 6 / 5 min per branch.
+  - `POST /api/whatsapp/cloud/send-template` — body `{ phone, templateName, language, components[] }`. Returns the standard `{ ok, clientMessageId, status, idMessage? }` shape; pollable via the existing `/api/whatsapp/messages/[clientMessageId]` endpoint.
+
+- **Settings UI**: new card under the WhatsApp section, visible only when an active OAuth connection exists. Lists templates with name/language/category badges + colored status pill (`approved` green / `pending` orange / `rejected` red / `stale` grey). "مزامنة من Meta" button is owner-gated. Rejected templates surface the `rejected_reason` inline. Max-height with scroll so 100+ templates don't blow up the page.
+
+**Why we don't *submit* templates from the app:**
+- Meta requires the create flow to be done in Business Manager so the operator can preview, supply examples for parameters, and route to the right Business Account. The submission flow is also more strict than the list flow (requires the WABA owner role). Phase 6+ may add it once tenants ask, but caching + sending is the higher-leverage build right now.
+
+**Why `status='stale'` instead of deleting absent rows:**
+- A "template I had yesterday is gone today" event is forensically interesting (likely a manual delete in Business Manager, possibly an audit signal). Soft-marking keeps the cached row + last_synced_at for the operator to see, and the send-time lookup filters them out anyway.
+
+**Why approve-check at facade time (not just at worker time):**
+- The HTTP caller (or the SaleForm Phase-6 code) gets immediate feedback. Without it, a tenant who deletes a template would still see queued rows pile up before each one fails in the worker — bad UX and noisy retries.
+
+**Known gaps going into Phase 6:**
+- `message_template_status_update` webhook isn't handled yet. Approval-state changes only land via manual sync; Phase 6 will hook the webhook so `paused`/`rejected` updates appear in real time.
+- Receipt-as-template migration: `SaleForm` still uses `cloud/send-pdf`. Phase 6 will route receipts through a configurable utility template (e.g. `receipt_v1`) so post-purchase sends work outside the 24h window. The infra is ready; needs UI + tenant-side template setup.
+- OTP convenience endpoint deferred — once tenants approve an authentication template, `POST /api/whatsapp/otp/send` will wrap `sendOutboundTemplate` with rate-limit + numeric-code generation.
+- No template-creation UI. Operators create templates in Business Manager (the documented Meta path).
+
 ### 2026-05-12 — WhatsApp Phase 4 (conversations + contacts + 24h window awareness)
 
 The missing aggregate layer between individual `wa_messages` and the future inbox UI. Every message now updates a per-contact conversation row; the 24-hour Meta customer-service window is tracked and checkable; the inbox read API is in place.

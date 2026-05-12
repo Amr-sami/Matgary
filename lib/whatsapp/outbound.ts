@@ -13,6 +13,7 @@ import { normalizePhone } from "@/lib/settings";
 import { logger } from "@/lib/logger";
 import {
   enqueueOutboundDocument,
+  enqueueOutboundTemplate,
   enqueueOutboundText,
   isQueueEnabled,
 } from "./queue";
@@ -23,9 +24,12 @@ import {
 import { resolveCloudCredentials } from "./resolve-credentials";
 import {
   sendDocumentToMeta,
+  sendTemplateToMeta,
   sendTextToMeta,
   type SendOutcome,
+  type TemplateComponent,
 } from "./outbound-sender";
+import { getApprovedTemplate } from "./templates";
 import { checkSendWindow, explainClosedWindow } from "./window";
 import type { PdfInvoiceData } from "@/lib/pdfReceipt";
 
@@ -259,6 +263,132 @@ export async function sendOutboundDocument(
     tenantId: input.tenantId,
     branchId: input.branchId,
     clientMessageId,
+    ok: outcome.ok,
+    metaStatus: outcome.status,
+  });
+  return resultFromOutcome(rowId, clientMessageId, outcome);
+}
+
+// ─── Template ────────────────────────────────────────────────────────────
+
+export interface SendTemplateInput {
+  tenantId: string;
+  branchId: string;
+  phone: string;
+  templateName: string;
+  language: string;
+  /** Cloud API template components — body/header/button parameter
+   *  groups. See lib/whatsapp/outbound-sender:TemplateComponent. */
+  components: TemplateComponent[];
+}
+
+/** Send a Meta-approved template. Validates the template exists + is
+ *  approved BEFORE creating the queued row, so a paused/rejected
+ *  template returns 409 instead of failing in the worker. Templates
+ *  bypass the 24h customer-service window — that's the whole point of
+ *  them. */
+export async function sendOutboundTemplate(
+  input: SendTemplateInput,
+): Promise<OutboundResult> {
+  const normalised = normalizePhone(input.phone);
+  if (!normalised) {
+    return failBadInput("Invalid phone number");
+  }
+  const creds = await resolveCloudCredentials(input.tenantId, input.branchId);
+  if (!creds) {
+    return failBadInput("WhatsApp Cloud API is not configured for this tenant");
+  }
+  // Approve-or-bust. Send-time lookup filters to status='approved' so
+  // paused templates never leave the system.
+  const tpl = await getApprovedTemplate(
+    input.tenantId,
+    input.branchId,
+    input.templateName,
+    input.language,
+  );
+  if (!tpl) {
+    return failBadInput(
+      `Template "${input.templateName}" (${input.language}) is not approved or not synced. Run /api/whatsapp/templates/sync.`,
+    );
+  }
+
+  const clientMessageId = randomUUID();
+  // Preview: first body component's text (where Meta carries it),
+  // truncated. Better than blank for the conversation list.
+  const bodyComponent = (tpl.components as Array<{ type?: string; text?: string }>).find(
+    (c) => (c.type ?? "").toLowerCase() === "body",
+  );
+  const preview = bodyComponent?.text ?? `[template:${input.templateName}]`;
+  const rowId = await recordOutboundQueued({
+    tenantId: input.tenantId,
+    branchId: input.branchId,
+    connectionId: null,
+    contactPhoneNumber: normalised,
+    messageType: "template",
+    textBody: preview,
+    payload: {
+      templateName: input.templateName,
+      language: input.language,
+      components: input.components,
+    } as Record<string, unknown>,
+    clientMessageId,
+  });
+
+  if (isQueueEnabled()) {
+    const job = await enqueueOutboundTemplate({
+      tenantId: input.tenantId,
+      branchId: input.branchId,
+      rowId,
+      clientMessageId,
+      phone: normalised,
+      templateName: input.templateName,
+      language: input.language,
+      components: input.components as unknown as Array<Record<string, unknown>>,
+    });
+    if (job) {
+      logger.info({
+        event: "wa.outbound.enqueued",
+        kind: "template",
+        tenantId: input.tenantId,
+        branchId: input.branchId,
+        clientMessageId,
+        jobId: job.id ?? null,
+        templateName: input.templateName,
+      });
+      return {
+        ok: true,
+        clientMessageId,
+        status: "queued",
+        rowId,
+        metaStatus: 202,
+      };
+    }
+  }
+
+  // Inline fallback.
+  const outcome = await sendTemplateToMeta({
+    tenantId: input.tenantId,
+    branchId: input.branchId,
+    phoneE164NoPlus: normalised,
+    templateName: input.templateName,
+    language: input.language,
+    components: input.components,
+  });
+  await patchOutboundOnSendResult({
+    tenantId: input.tenantId,
+    rowId,
+    metaMessageId: outcome.metaMessageId ?? null,
+    ok: outcome.ok,
+    failureReason: outcome.errorMessage ?? null,
+    failureCode: outcome.errorCode ?? null,
+  });
+  logger.info({
+    event: "wa.outbound.inline",
+    kind: "template",
+    tenantId: input.tenantId,
+    branchId: input.branchId,
+    clientMessageId,
+    templateName: input.templateName,
     ok: outcome.ok,
     metaStatus: outcome.status,
   });

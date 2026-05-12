@@ -1460,6 +1460,64 @@ export const waContacts = pgTable(
   ],
 );
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Meta message templates (Phase 5). Cache of WABA-scoped templates with
+// status + components so the send path can refer to a template by name
+// without re-fetching from Meta on every send.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const waTemplates = pgTable(
+  "wa_templates",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branches.id, { onDelete: "cascade" }),
+    connectionId: uuid("connection_id").references(() => waConnections.id, {
+      onDelete: "set null",
+    }),
+    provider: text("provider").notNull().default("meta_cloud"),
+
+    metaTemplateId: text("meta_template_id"),
+    name: text("name").notNull(),
+    language: text("language").notNull(),
+    category: text("category").notNull(),
+    status: text("status").notNull(),
+
+    components: jsonb("components")
+      .$type<Array<Record<string, unknown>>>()
+      .notNull(),
+    qualityScore: jsonb("quality_score").$type<Record<string, unknown>>(),
+    rejectedReason: text("rejected_reason"),
+    parameterFormat: text("parameter_format"),
+
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    rawPayload: jsonb("raw_payload").$type<Record<string, unknown>>(),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [
+    uniqueIndex("wa_templates_branch_name_lang_uniq").on(
+      t.tenantId,
+      t.branchId,
+      t.name,
+      t.language,
+    ),
+    index("wa_templates_tenant_branch_idx").on(t.tenantId, t.branchId),
+    index("wa_templates_status_idx").on(t.tenantId, t.status),
+  ],
+);
+
 export const waConversations = pgTable(
   "wa_conversations",
   {
@@ -1538,4 +1596,6 @@ export type WaContactRow = typeof waContacts.$inferSelect;
 export type NewWaContact = typeof waContacts.$inferInsert;
 export type WaConversationRow = typeof waConversations.$inferSelect;
 export type NewWaConversation = typeof waConversations.$inferInsert;
+export type WaTemplateRow = typeof waTemplates.$inferSelect;
+export type NewWaTemplate = typeof waTemplates.$inferInsert;
 export type PayrollPeriodRow = typeof payrollPeriods.$inferSelect;

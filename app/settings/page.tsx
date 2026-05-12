@@ -67,6 +67,26 @@ interface WaConnectionView {
     | null;
 }
 
+interface WaTemplateView {
+  id: string;
+  name: string;
+  language: string;
+  category: "authentication" | "utility" | "marketing" | "unknown";
+  status:
+    | "approved"
+    | "pending"
+    | "rejected"
+    | "paused"
+    | "in_appeal"
+    | "pending_deletion"
+    | "disabled"
+    | "flagged"
+    | "stale"
+    | "unknown";
+  rejectedReason: string | null;
+  lastSyncedAt: string;
+}
+
 // Map machine error states to actionable Arabic copy. Anything not listed
 // here falls back to the raw `note` from the health endpoint, so adding a
 // new state code in lib/whatsapp/health.ts doesn't break the UI.
@@ -173,6 +193,50 @@ export default function SettingsPage() {
   const [connectionLoading, setConnectionLoading] = useState(true);
   const [showManualCloudFields, setShowManualCloudFields] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+
+  // Templates — cached Meta message-template library for this branch.
+  const [templates, setTemplates] = useState<WaTemplateView[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [templatesSyncing, setTemplatesSyncing] = useState(false);
+  const refreshTemplates = async () => {
+    setTemplatesLoading(true);
+    try {
+      const res = await fetch("/api/whatsapp/templates", { cache: "no-store" });
+      if (!res.ok) {
+        setTemplates([]);
+        return;
+      }
+      const json = (await res.json()) as { templates?: WaTemplateView[] };
+      setTemplates(json.templates ?? []);
+    } catch {
+      setTemplates([]);
+    } finally {
+      setTemplatesLoading(false);
+    }
+  };
+  const handleSyncTemplates = async () => {
+    setTemplatesSyncing(true);
+    try {
+      const res = await fetch("/api/whatsapp/templates/sync", { method: "POST" });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json.ok) {
+        setToast({
+          type: "success",
+          message: `تم تحديث القوالب — ${json.upserted ?? 0} قالب${
+            (json.fetched ?? 0) > 0 ? ` من ${json.fetched}` : ""
+          }`,
+        });
+        await refreshTemplates();
+      } else {
+        setToast({
+          type: "error",
+          message: json?.reason || json?.error || `HTTP ${res.status}`,
+        });
+      }
+    } finally {
+      setTemplatesSyncing(false);
+    }
+  };
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -195,6 +259,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     refreshConnection();
+    refreshTemplates();
   }, []);
 
   // Pick up the OAuth callback flash and surface it as a toast.
@@ -1030,6 +1095,93 @@ export default function SettingsPage() {
           </>
           )}
         </div>
+
+        {/* Message templates — Meta-approved library cached locally.
+            Visible only when an OAuth connection exists (templates live
+            on the WABA that connection points at). */}
+        {connection && connection.status === "active" && (
+          <div className="bg-white rounded-xl border border-border p-5 space-y-4">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <h3 className="font-bold text-lg">قوالب الرسائل (Meta)</h3>
+                <p className="text-xs text-text-secondary mt-0.5">
+                  القوالب المعتمدة فقط هي اللي تقدر تستخدمها للإرسال خارج نافذة
+                  الـ 24 ساعة. اعتمد القوالب من Meta Business Manager، بعدين
+                  اضغط مزامنة هنا.
+                </p>
+              </div>
+              <Button
+                onClick={handleSyncTemplates}
+                loading={templatesSyncing}
+                disabled={!isOwner}
+                className="!py-1.5 !text-xs whitespace-nowrap"
+                variant="secondary"
+              >
+                مزامنة من Meta
+              </Button>
+            </div>
+
+            {templatesLoading ? (
+              <p className="text-xs text-text-secondary">جارٍ التحميل...</p>
+            ) : templates.length === 0 ? (
+              <div className="rounded-md border border-dashed border-border p-3 text-xs text-text-secondary">
+                لا توجد قوالب مخزّنة بعد. أنشئ قوالبك في Meta Business Manager
+                واضغط "مزامنة من Meta".
+              </div>
+            ) : (
+              <div className="space-y-1.5 max-h-72 overflow-y-auto">
+                {templates.map((t) => (
+                  <div
+                    key={t.id}
+                    className="flex items-start justify-between gap-3 rounded-md border border-border p-2.5 text-xs"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono font-medium">{t.name}</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-bg-main text-text-secondary">
+                          {t.language}
+                        </span>
+                        <span
+                          className={`text-[10px] px-1.5 py-0.5 rounded ${
+                            t.category === "authentication"
+                              ? "bg-blue-100 text-blue-700"
+                              : t.category === "utility"
+                                ? "bg-success/15 text-success"
+                                : t.category === "marketing"
+                                  ? "bg-orange-100 text-orange-700"
+                                  : "bg-bg-main text-text-secondary"
+                          }`}
+                        >
+                          {t.category}
+                        </span>
+                      </div>
+                      {t.rejectedReason && (
+                        <p className="text-[11px] text-error mt-0.5">
+                          {t.rejectedReason}
+                        </p>
+                      )}
+                    </div>
+                    <span
+                      className={`text-[10px] px-2 py-0.5 rounded-full shrink-0 ${
+                        t.status === "approved"
+                          ? "bg-success/15 text-success"
+                          : t.status === "pending"
+                            ? "bg-orange-100 text-orange-700"
+                            : t.status === "rejected"
+                              ? "bg-error/15 text-error"
+                              : t.status === "stale"
+                                ? "bg-bg-main text-text-secondary"
+                                : "bg-bg-main text-text-secondary"
+                      }`}
+                    >
+                      {t.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Shop info */}
         <div className="bg-white rounded-xl border border-border p-5 space-y-4">

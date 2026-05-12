@@ -22,6 +22,56 @@ export interface SendOutcome {
   status: number;
 }
 
+// Components match Meta's send-time schema:
+// https://developers.facebook.com/docs/whatsapp/cloud-api/guides/send-message-templates
+//
+// We don't validate parameter counts against the cached template
+// components here — Meta will reject mismatches with a clear error and
+// the worker will surface that in failureReason. Keeping the API shape
+// permissive lets callers compose dynamic parameter lists.
+export interface TemplateComponent {
+  type: "header" | "body" | "footer" | "button";
+  // For body/header: parameters list. For button: sub_type + index.
+  parameters?: Array<Record<string, unknown>>;
+  sub_type?: "quick_reply" | "url" | "copy_code" | "flow";
+  index?: number;
+}
+
+export async function sendTemplateToMeta(args: {
+  tenantId: string;
+  branchId: string;
+  phoneE164NoPlus: string;
+  templateName: string;
+  language: string;
+  components: TemplateComponent[];
+}): Promise<SendOutcome> {
+  const creds = await resolveCloudCredentials(args.tenantId, args.branchId);
+  if (!creds) {
+    return {
+      ok: false,
+      status: 409,
+      errorMessage: "WhatsApp Cloud API is not configured for this tenant",
+    };
+  }
+
+  const url = `https://graph.facebook.com/${GRAPH_VERSION}/${encodeURIComponent(
+    creds.phoneNumberId,
+  )}/messages`;
+  const body = {
+    messaging_product: "whatsapp",
+    recipient_type: "individual",
+    to: args.phoneE164NoPlus,
+    type: "template",
+    template: {
+      name: args.templateName,
+      language: { code: args.language },
+      components: args.components,
+    },
+  };
+
+  return graphPost(url, creds.token, body);
+}
+
 export async function sendTextToMeta(args: {
   tenantId: string;
   branchId: string;

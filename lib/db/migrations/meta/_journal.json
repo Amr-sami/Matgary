@@ -162,6 +162,13 @@
       "when": 1779600000000,
       "tag": "0022_wa_conversations_and_contacts",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1779700000000,
+      "tag": "0023_wa_templates",
+      "breakpoints": true
     }
   ]
 }

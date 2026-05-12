@@ -28,6 +28,7 @@ export const QUEUE_NAME = "wa-jobs";
 export type WaJobName =
   | "outbound.text"
   | "outbound.document"
+  | "outbound.template"
   | "inbound.process"
   | "quarantine.replay";
 
@@ -54,6 +55,19 @@ export interface OutboundDocumentJobData {
   fileName: string;
 }
 
+export interface OutboundTemplateJobData {
+  tenantId: string;
+  branchId: string;
+  rowId: string;
+  clientMessageId: string;
+  phone: string;
+  templateName: string;
+  language: string;
+  // Cast through unknown so we don't drag the sender type into the
+  // queue module's surface. Worker re-types when it dispatches.
+  components: Array<Record<string, unknown>>;
+}
+
 export interface InboundProcessJobData {
   eventId: string; // wa_webhook_events.id
 }
@@ -65,6 +79,7 @@ export interface QuarantineReplayJobData {
 export type WaJobData =
   | OutboundTextJobData
   | OutboundDocumentJobData
+  | OutboundTemplateJobData
   | InboundProcessJobData
   | QuarantineReplayJobData;
 
@@ -156,6 +171,16 @@ export async function enqueueOutboundDocument(
   if (!q) return null;
   return q.add("outbound.document" satisfies WaJobName, data, {
     jobId: `outdoc:${data.clientMessageId}`,
+  });
+}
+
+export async function enqueueOutboundTemplate(
+  data: OutboundTemplateJobData,
+): Promise<Job<OutboundTemplateJobData> | null> {
+  const q = getQueue();
+  if (!q) return null;
+  return q.add("outbound.template" satisfies WaJobName, data, {
+    jobId: `outtpl:${data.clientMessageId}`,
   });
 }
 

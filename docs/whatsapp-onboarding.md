@@ -192,6 +192,38 @@ Every inbound + outbound message now updates a per-contact aggregate row in `wa_
 - `GET /api/whatsapp/conversations/[id]/messages?before=<iso>&limit=<n>` — reverse-chronological message page.
 - `PATCH /api/whatsapp/conversations/[id]` body `{ read?: bool, archived?: bool }` — owner-only for archive.
 
+## 8d. Message templates (Phase 5)
+
+Approved templates are the only way to send outbound messages outside Meta's 24-hour customer-service window. Categories:
+- **Authentication** — OTPs and login codes. Strict copy rules; Meta auto-templates this category in some markets.
+- **Utility** — transactional updates (receipts, order status, appointment reminders). Most receipt-flow templates land here.
+- **Marketing** — promotional. Higher rejection rate; some markets restrict.
+
+**Approval flow lives in Meta.** Templates are created and approved in Meta Business Manager → WhatsApp Manager → Message Templates. Our app does NOT submit templates; it caches the approved ones and sends them.
+
+**Sync.** Owner clicks "مزامنة من Meta" in the WhatsApp settings card (or `POST /api/whatsapp/templates/sync`). The route walks `GET /{waba}/message_templates?fields=...&limit=100` with cursor pagination, upserts each into `wa_templates`, and marks any cached row not seen this run as `status='stale'`. Rate-limited 6 syncs / 5 min per branch.
+
+**Read.** `GET /api/whatsapp/templates?status=approved&category=utility` returns the cached list. UI filters live there.
+
+**Send.** `POST /api/whatsapp/cloud/send-template`:
+```json
+{
+  "phone": "201500000000",
+  "templateName": "receipt_v1",
+  "language": "ar",
+  "components": [
+    { "type": "body", "parameters": [{ "type": "text", "text": "Ahmed" }, { "type": "currency", "currency": { "fallback_value": "EGP 250.00", "code": "EGP", "amount_1000": 250000 } }] }
+  ]
+}
+```
+The facade looks up the template by (tenant, branch, name, language) with `status='approved'` only — paused/rejected templates are blocked at the API layer. The send job queues like outbound text/document; status webhooks land in `wa_messages` via the existing Phase-2 pipeline.
+
+**Common rejection reasons:**
+- *Invalid content / promotional language in a utility template* — re-categorise or rewrite.
+- *Missing or unclear parameter examples* — provide every placeholder with a realistic example value during template creation.
+- *Spam-like patterns* — long URLs, excessive emoji, "FREE!" type copy. Marketing rejects fastest.
+- *Inconsistent formatting* — `{{1}}` references with no body context.
+
 ## 9. Production checklist
 
 - [ ] App switched to Live mode in Meta dashboard
@@ -232,6 +264,9 @@ app/api/whatsapp/messages/[clientMessageId]/  Outbound message status poll
 app/api/whatsapp/conversations/               Conversation list (paginated)
 app/api/whatsapp/conversations/[id]/          Single conversation + PATCH (read/archive)
 app/api/whatsapp/conversations/[id]/messages/ Message page in a conversation
+app/api/whatsapp/templates/                   List cached templates
+app/api/whatsapp/templates/sync/              Owner re-sync from Meta
+app/api/whatsapp/cloud/send-template/         Send by template name
 
 lib/whatsapp/queue.ts               BullMQ Queue + Worker singletons
 lib/whatsapp/jobs.ts                Worker processors (routeJob switch)
@@ -240,6 +275,7 @@ lib/whatsapp/outbound-sender.ts     Graph send implementation (shared)
 lib/whatsapp/contacts.ts            wa_contacts repo
 lib/whatsapp/conversations.ts       wa_conversations repo + window state
 lib/whatsapp/window.ts              24-hour window decision helper
+lib/whatsapp/templates.ts           Templates repo + Meta sync
 instrumentation.ts                  Next boot hook — spawns the worker
 
 lib/db/migrations/0019_wa_connections.sql                 Connection table + RLS
