@@ -245,6 +245,25 @@ When unconfigured, the legacy PDF path stays in effect. Operators set the receip
 **Why a fixed parameter contract instead of a mapping UI:**
 - 95% of receipt templates need the same four fields. A mapping UI would be over-engineered for v1 and slow operator onboarding. If a tenant needs a different shape, they extend the template body — Meta accepts any wording around the placeholders so long as the count + order match.
 
+## 8f. Inbox shell (Phase 7)
+
+The `/whatsapp` page provides the operator-facing view of conversations and lets them reply when the 24h window is open.
+
+**Layout.** Desktop is a two-pane grid — conversation list left, thread right. Mobile stacks: list-only until a conversation is picked, then thread-only with a chevron-back to the list. The active conversation lives in `?c=<id>` so refresh / browser-back / shareable URLs all work.
+
+**Permission.** Gated on the existing `manage_whatsapp` permission. Owner always passes.
+
+**Polling cadence.** No SSE yet — the existing notifications stream is a separate concern. Two timers:
+- Conversation list polls `/api/whatsapp/conversations` every **10s**.
+- Open thread polls `/api/whatsapp/conversations/[id]` + `/messages` every **8s**.
+- A `refreshSignal` ref-bumps when the thread sends, archives, or marks-read, so the list updates immediately instead of waiting for its own tick.
+
+**Window awareness.** The thread header shows a coloured banner with the 24h state — open (green) / "ends within 1h" (orange) / closed (grey). When closed, the composer is replaced with a hint and a link to `/settings` for template management. Future Phase 8 could add an in-thread template picker.
+
+**Mark-as-read** is automatic on open (PATCHes the conversation with `{ read: true }`). Archive / restore is a one-click toggle in the header.
+
+**Status icons** on outbound bubbles: clock = queued; tick = sent; double-tick = delivered; blue double-tick = read; alert = failed (with reason rendered inline). Inbound bubbles are bg-main with `ar-right` alignment; outbound are accent-coloured and right-aligned.
+
 ## 9. Production checklist
 
 - [ ] App switched to Live mode in Meta dashboard
@@ -289,6 +308,13 @@ app/api/whatsapp/templates/                   List cached templates
 app/api/whatsapp/templates/sync/              Owner re-sync from Meta
 app/api/whatsapp/cloud/send-template/         Send by template name
 app/api/whatsapp/otp/send/                    OTP convenience (authentication template)
+
+app/whatsapp/page.tsx                         Inbox page (list + thread)
+components/whatsapp/ConversationList.tsx      Paginated list with tabs + polling
+components/whatsapp/ThreadView.tsx            Header + messages + composer
+components/whatsapp/MessageBubble.tsx         Inbound/outbound bubble + status icons
+components/whatsapp/format.ts                 Relative time + window-state formatter
+components/whatsapp/types.ts                  Client-side DTO shapes
 
 lib/whatsapp/queue.ts               BullMQ Queue + Worker singletons
 lib/whatsapp/jobs.ts                Worker processors (routeJob switch)

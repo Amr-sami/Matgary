@@ -19,6 +19,7 @@ import {
   History,
   PanelRightClose,
   PanelRightOpen,
+  MessageCircle,
 } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/components/settings-context";
@@ -55,6 +56,7 @@ const secondaryItems: NavItem[] = [
   // /team also hosts the leaves tab (merged in). Anyone with team management
   // OR leave-request capability can open it; the page itself filters tabs.
   { href: "/team", label: "الموظفون", icon: UsersGroup, requires: "manage_team" },
+  { href: "/whatsapp", label: "WhatsApp", icon: MessageCircle, requires: "manage_whatsapp" },
   { href: "/activity", label: "السجل", icon: History, requires: "view_activity_log" },
   { href: "/settings", label: "الإعدادات", icon: Settings, requires: "view_settings" },
 ];

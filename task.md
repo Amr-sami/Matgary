@@ -182,6 +182,42 @@ npm run db:migrate
 
 ## 2. Changelog
 
+### 2026-05-12 — WhatsApp Phase 7 (inbox UI shell)
+
+The operator-facing surface for conversations. Six previous phases of plumbing are now visible at `/whatsapp`. Layout is responsive: two-pane on desktop, stacked on mobile.
+
+- **Page** (`app/whatsapp/page.tsx`): permission-gated on `manage_whatsapp`. The active conversation lives in `?c=<id>` so refresh / browser-back / shareable URLs all work. Mobile shows list OR thread, never both; desktop shows them side-by-side on a `md:grid-cols-[340px_1fr]` grid. Height pinned at `100dvh - 9rem` so the thread fills the viewport instead of pushing the footer.
+
+- **ConversationList** (`components/whatsapp/ConversationList.tsx`): paginated fetch with cursor (`?before=<iso>`). Tabs: All / Unread / Archived. Auto-polls every 10s for new previews + unread counts. A `refreshSignal` prop is bumped by the parent whenever the thread acts (send, archive, mark-read), so the list re-fetches immediately rather than waiting for its own tick. "Load more" button appears when `nextBefore` is present. Last-message preview prefixed with "أنت:" when the last message was outbound.
+
+- **ThreadView** (`components/whatsapp/ThreadView.tsx`):
+  - Header: contact display name (falls back to phone) + LTR-rendered international phone + an Archive/Restore toggle.
+  - Window-state banner under the header, coloured per `windowDisplay()` — green when open, orange in the last hour, grey when closed. Closed-window banner replaces the composer with a hint linking to /settings for template management.
+  - Messages paginated reverse-chrono. "Load older" button at the top when there's more history. Auto-scrolls to bottom on initial load and on new-message growth, but NOT when older history is prepended (initial-load ref guard).
+  - Auto-marks-read once on open (`PATCH /api/whatsapp/conversations/[id] { read: true }`); failure is harmless.
+  - Composer is a textarea — Enter sends, Shift+Enter newlines. Sends via `/api/whatsapp/cloud/send`. After a successful send, immediately re-fetches the thread + conversation so the queued message shows up instantly.
+  - Polls thread + conversation summary every 8s.
+  - `useImperativeHandle` exposes a `refresh()` so the page can force a re-poll from outside (reserved for future SSE-bridge work).
+
+- **MessageBubble** (`components/whatsapp/MessageBubble.tsx`): WhatsApp-style bubbles — outbound accent-coloured + right-aligned, inbound bg-main + left-aligned. Non-text content gets a bracketed label (`[صورة]`, `[مستند]`, etc.). Outbound status icons: clock (queued) / single tick (sent) / double tick (delivered) / blue double tick (read) / alert (failed). Failed bubbles render the `failureReason` inline so the operator understands why a send didn't land.
+
+- **Sidebar nav**: new `WhatsApp` entry under secondary items, gated on the same `manage_whatsapp` permission. Icon `MessageCircle` (Phosphor `ChatCircle` via the existing icon shim).
+
+**Why URL-state for the active conversation:**
+- Lets the operator share a link directly to a thread (e.g. for support handoffs). Browser back/forward also works as expected — no in-memory-only navigation traps.
+
+**Why polling instead of SSE for v1:**
+- The notifications stream lives at `/api/notifications/stream` and is already wired for that domain. Bolting WhatsApp events onto the same stream is the right shape (Phase 8 work) but means cross-cutting changes; polling is good enough at the cadences chosen (10s list / 8s thread) and degrades gracefully under load.
+
+**Why no template picker in the closed-window state yet:**
+- Each template has a different parameter shape; a generic in-thread picker would need a per-template parameter form. We surface the hint + link to /settings where the receipt template can be configured, which handles the highest-value freeform-blocked case.
+
+**Carry-forward into Phase 8+:**
+- SSE bridge for live message updates (extend the notifications stream or run a parallel `/api/whatsapp/stream` keyed by tenant+branch).
+- In-thread template picker for the closed-window flow.
+- Inbound-media download worker (Phase 3 carry-forward) — `media_id` is captured on the inbound row but the blob isn't fetched, so the bubble label `[صورة]` is as deep as it goes today.
+- Per-conversation labels/tags UI surface.
+
 ### 2026-05-12 — WhatsApp Phase 6 (template webhooks, OTP endpoint, receipt-as-template)
 
 Production-impact phase. The integration now reacts to Meta-side template approvals in real time, ships a hardened OTP endpoint, and lets operators flip the receipt send path from PDF to a Meta-approved utility template — which is the unlock for working *outside* Meta's 24-hour customer-service window for post-purchase receipts.
