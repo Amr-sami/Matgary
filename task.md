@@ -182,6 +182,49 @@ npm run db:migrate
 
 ## 2. Changelog
 
+### 2026-05-12 — WhatsApp Phase 3 (BullMQ outbound queue, inbound enqueue, retry policy, replay)
+
+Reliability layer: every WhatsApp send and every webhook event now flows through BullMQ when Redis is available, with retry semantics, dead-letter, and graceful inline fallback when not. The send routes return immediately with a client message id; the worker drives the Graph round-trip in the background and patches the row when Meta responds.
+
+- **Queue infra** (`lib/whatsapp/queue.ts`): single named queue `wa-jobs`, four typed job kinds (`outbound.text`, `outbound.document`, `inbound.process`, `quarantine.replay`). Dedicated ioredis connection (`maxRetriesPerRequest: null`, `enableReadyCheck: false`, `lazyConnect: true`) because BullMQ's blocking commands are incompatible with the cache client's retry config. Singletons attached to `globalThis` so Next dev hot-reload doesn't pile up workers. `getQueue()` / `isQueueEnabled()` / `enqueue*` helpers — all return `null` when `REDIS_URL` is unset, callers fall through to inline execution.
+
+- **Worker bootstrap** (`instrumentation.ts`): Next 16's per-server-boot hook. On Node runtime + `REDIS_URL` set, spawns one in-process `Worker(QUEUE_NAME, routeJob)` with `concurrency: 10`, `lockDuration: 60_000`. Idempotent SIGTERM/SIGINT handlers (name-matched on `process.listeners` so hot-reload doesn't duplicate) call `closeQueueInfra()` to drain in-flight jobs before exit.
+
+- **Outbound facade** (`lib/whatsapp/outbound.ts`): single entry point `sendOutboundText` / `sendOutboundDocument`. Flow: validate phone → resolve credentials → `randomUUID()` clientMessageId → `recordOutboundQueued` (wa_messages row, `status='queued'`) → enqueue or inline. Pre-flight credential check avoids creating queued rows for tenants who can't send. Always returns `{ ok, clientMessageId, status, rowId, metaStatus, idMessage? }` — `status` is `'queued'` after enqueue, `'sent'`/`'failed'` after inline.
+
+- **Shared sender** (`lib/whatsapp/outbound-sender.ts`): the actual Graph round-trip extracted from the old send routes. Reused by both the inline path and the worker. PDF mode is a three-step dance (generate PDF → upload to `/media` → send document referencing media_id). Returns a structured `SendOutcome { ok, metaMessageId, errorMessage, errorCode, status }` plus `isRetryableSendError(outcome)` classifier — 429 + 5xx + network errors + Meta error codes 1/2/4 retry; 4xx terminate.
+
+- **Job router** (`lib/whatsapp/jobs.ts:routeJob`): switch on `job.name` → handler. Each handler patches `wa_messages` BEFORE deciding whether to retry, so even the final attempt's failure leaves a clean terminal state. Throwing from the handler triggers BullMQ retry; not throwing acks the job. Inbound delegate to `processEvent(eventId)` which is itself idempotent + walks the state machine added in Phase 2. Quarantine replay re-resolves tenant against current connections and flips status `quarantined → pending` before re-processing.
+
+- **Send routes refactored** (`/api/whatsapp/cloud/send` + `/send-pdf`): now ~50 lines each. Validation → rate-limit → `sendOutboundText`/`sendOutboundDocument` → response. Response carries `clientMessageId` + `status` always, plus `idMessage` when the inline path completed in-band.
+
+- **Webhook enqueue** (`/api/whatsapp/webhook` POST): replaced `setImmediate(processEvent)` with `enqueueInboundProcess({ eventId })` when the queue is enabled. Falls back to `setImmediate` when Redis is off so a minimal-infra deploy still works. Enqueue failures log + continue — the event row is already `pending` in the DB and any future worker run can pick it up via the partial index `wa_webhook_events_pending_idx`.
+
+- **Status polling** (`GET /api/whatsapp/messages/[clientMessageId]`): tenant-scoped (RLS-enforced) status read. Returns the wa_messages row keyed by the clientMessageId minted at queue time. Lets the settings test-send UI poll for the eventual WAMID + sent/delivered/read timestamps once status webhooks arrive.
+
+- **Quarantine replay** (`POST /api/whatsapp/webhook/events/[id]/replay`): owner-only. Re-runs tenant resolution. If the row is no longer quarantined (raced), returns 400. If still unrouted after re-resolution, returns ok=false with a clear note. Otherwise rewrites routing columns + processes inline (or enqueues via `quarantine.replay` when the queue is on).
+
+- **Messages repo** (`lib/whatsapp/messages.ts`):
+  - `recordOutboundQueued` — pre-existing, now actually called.
+  - `patchOutboundOnSendResult` — new; flips `queued → sent` (with WAMID) or `queued → failed` (with reason + Meta code). Does **not** overwrite the *_at columns that the status webhook will fill in later (delivered/read), so the lifecycle stays append-only.
+  - `getMessageByClientId` — tenant-scoped lookup for the status polling endpoint.
+
+**Why one queue, not many:**
+- Single queue simplifies dashboards, monitoring (Bull Board / arena point at one key), and the worker lifecycle. Job priorities and per-name concurrency limits are a Phase 4+ concern.
+
+**Why inline fallback when Redis is unavailable:**
+- A self-hosted POS without Redis still needs WhatsApp to work — the cache + rate-limit already follow this pattern. Inline execution loses retries but not correctness; `wa_messages` is still durable.
+
+**Why `randomUUID` at the API layer (not in the queue):**
+- The clientMessageId is the *external* identifier that callers see in the response and use to poll. Generating it at the API ensures the row exists before the queue even sees the job, so a failed enqueue still leaves a queryable record.
+
+**Known gaps going into Phase 4+:**
+- Bull Board / arena UI isn't wired — admins inspect failed jobs via Redis CLI or extend `/api/whatsapp/webhook/events` for the queue side too.
+- The worker is co-located with the HTTP server. Multi-instance HTTP would mean each instance runs a worker — fine for moderate volume (BullMQ leases jobs cleanly) but a dedicated worker container is the real long-term shape.
+- SaleForm still uses `fetch("/api/whatsapp/cloud/send-pdf")` directly. The contract change (response carries `clientMessageId` + `status` instead of just `idMessage`) is back-compat because we still emit `idMessage` when the inline path runs; the `console.log` lines will say `"queued"` instead of a WAMID when async, but no UX breakage.
+- Media download for *inbound* media messages (`media_id` field on inbound rows) still isn't wired. A `media.download` job kind can slot in once we choose blob storage.
+- Template approval/sync, OTP flows, and the inbox UI remain Phase 4+. The queue + persisted message + lifecycle layer here is the foundation they'll plug into.
+
 ### 2026-05-12 — WhatsApp Phase 2 (webhooks: signature, persistence, tenant routing, status lifecycle)
 
 The receive-side of the integration: Meta now has a verified webhook endpoint, every delivery is signature-checked, dedup'd, persisted before processing, and routed to the right tenant by phone_number_id. Inbound customer messages and outbound status transitions land in `wa_messages` with the full lifecycle.

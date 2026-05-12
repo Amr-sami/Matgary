@@ -282,9 +282,9 @@ export async function applyStatusUpdate(input: ApplyStatusInput): Promise<{
   });
 }
 
-/** Phase-3 hook. Records an outbound message at queue time with a client
- *  UUID; once the send actually goes out, the caller patches in the
- *  meta_message_id via the same client_message_id key. Not used yet. */
+/** Records an outbound message at queue time with a client UUID. Once
+ *  the send actually goes out, patchOutboundOnSendResult fills in the
+ *  meta_message_id and flips status. */
 export async function recordOutboundQueued(input: {
   tenantId: string;
   branchId: string;
@@ -313,5 +313,63 @@ export async function recordOutboundQueued(input: {
       })
       .returning({ id: waMessages.id });
     return row.id;
+  });
+}
+
+/** Patch the outbound row with the Graph send result. Called from the
+ *  worker after the Graph call returns. Pre-status webhook arrival means
+ *  status='sent' here; later 'sent'/'delivered'/'read' webhooks refine
+ *  it via applyStatusUpdate without overwriting these initial values. */
+export async function patchOutboundOnSendResult(input: {
+  tenantId: string;
+  rowId: string;
+  metaMessageId: string | null;
+  ok: boolean;
+  failureReason?: string | null;
+  failureCode?: number | null;
+}): Promise<void> {
+  await withTenant(input.tenantId, async (tx) => {
+    const set: Record<string, unknown> = {
+      updatedAt: new Date(),
+    };
+    if (input.ok) {
+      set.status = "sent";
+      set.sentAt = new Date();
+      if (input.metaMessageId) set.metaMessageId = input.metaMessageId;
+    } else {
+      set.status = "failed";
+      set.failedAt = new Date();
+      set.failureReason = input.failureReason ?? "send failed";
+      if (input.failureCode != null) set.failureCode = input.failureCode;
+    }
+    await tx
+      .update(waMessages)
+      .set(set)
+      .where(
+        and(
+          eq(waMessages.tenantId, input.tenantId),
+          eq(waMessages.id, input.rowId),
+        ),
+      );
+  });
+}
+
+/** Lookup by clientMessageId for the status-polling endpoint. */
+export async function getMessageByClientId(
+  tenantId: string,
+  clientMessageId: string,
+): Promise<typeof waMessages.$inferSelect | null> {
+  return withTenant(tenantId, async (tx) => {
+    const [row] = await tx
+      .select()
+      .from(waMessages)
+      .where(
+        and(
+          eq(waMessages.tenantId, tenantId),
+          eq(waMessages.clientMessageId, clientMessageId),
+        ),
+      )
+      .limit(1);
+    return row ?? null;
   });
 }

@@ -144,6 +144,37 @@ The structured logger emits one JSON line per event when `LOG_FORMAT=json` (auto
 
 Tokens, secrets, and the encrypted blob are never emitted. The logger redacts a fixed set of field names; if you add a new sensitive field, list it in `SENSITIVE_KEYS` in `lib/logger.ts`.
 
+## 8b. Background queue (Phase 3)
+
+Outbound sends and inbound webhook processing run through BullMQ when `REDIS_URL` is set. Without Redis, both fall back to inline execution — the same `lib/whatsapp/outbound-sender.ts` and `lib/whatsapp/webhook-processor.ts` modules drive both paths, so behaviour is identical except for the retry policy.
+
+**Worker boot.** `instrumentation.ts` at repo root is Next.js's per-server-boot hook. On Node runtime + `REDIS_URL` set, it spawns one in-process `Worker(QUEUE_NAME, routeJob)` with concurrency 10. SIGTERM/SIGINT trigger a graceful drain. In dev with hot-reload, the worker is attached to `globalThis` so module re-evaluation doesn't pile duplicates.
+
+**Job kinds:**
+- `outbound.text` — text send through `/api/whatsapp/cloud/send`. Job id = `out:<clientMessageId>` so duplicate enqueues collapse.
+- `outbound.document` — PDF send (renders PDF, uploads media, sends document). Job id = `outdoc:<clientMessageId>`.
+- `inbound.process` — webhook event processing. Job id = `in:<wa_webhook_events.id>` so retries from Meta + queue retries are both deduped.
+- `quarantine.replay` — re-route a stuck event after a connection is restored. Triggered by `POST /api/whatsapp/webhook/events/[id]/replay` (owner-only).
+
+**Retry policy:** 5 attempts, exponential backoff (1s → 16s). Failures classified by `lib/whatsapp/outbound-sender.ts:isRetryableSendError` — 429, 5xx, and transient Meta error codes (1/2/4) retry; 4xx terminate. The send row in `wa_messages` is patched on *every* attempt so a final terminal failure leaves `status='failed'` with the latest reason.
+
+**Status polling.** Callers that need the WAMID can poll `GET /api/whatsapp/messages/[clientMessageId]` — returns the full lifecycle (sent/delivered/read/failed timestamps) once the worker (and later, status webhooks) write them.
+
+**Scaling out.** Today the worker runs in the same Next.js process. To move workers to a dedicated container:
+1. Run a Node entrypoint that imports `lib/whatsapp/queue.startWorker(routeJob)` from `lib/whatsapp/jobs`.
+2. Set `REDIS_URL` on the worker container.
+3. Leave HTTP-only nodes without the import (or gate `instrumentation.register` on an env flag).
+
+The current `routeJob` signature is queue-friendly already — no in-process state, all job context lives in `job.data`.
+
+**Observability events to watch:**
+- `wa.outbound.enqueued` / `wa.outbound.inline` — produce-side path picked
+- `wa.outbound.delivered_to_meta` — worker drained the job (ok or not — check `ok` field)
+- `wa.worker.spawned` / `wa.worker.ready` / `wa.worker.shutdown.*`
+- `wa.worker.job_failed` (carries `attemptsMade`)
+- `wa.queue.redis.error` (connection blips)
+- `wa.webhook.replay.requested` / `wa.webhook.replay.routed` / `wa.webhook.replay.still_unrouted`
+
 ## 9. Production checklist
 
 - [ ] App switched to Live mode in Meta dashboard
@@ -179,6 +210,14 @@ app/api/whatsapp/cloud/send/        Text send (OAuth or manual creds)
 app/api/whatsapp/cloud/send-pdf/    Document send
 app/api/whatsapp/webhook/           GET challenge + POST event receiver
 app/api/whatsapp/webhook/events/    Admin inspection (quarantine, dead-letter)
+app/api/whatsapp/webhook/events/[id]/replay/  Quarantine replay (owner-only)
+app/api/whatsapp/messages/[clientMessageId]/  Outbound message status poll
+
+lib/whatsapp/queue.ts               BullMQ Queue + Worker singletons
+lib/whatsapp/jobs.ts                Worker processors (routeJob switch)
+lib/whatsapp/outbound.ts            sendOutbound facade (persist + enqueue|inline)
+lib/whatsapp/outbound-sender.ts     Graph send implementation (shared)
+instrumentation.ts                  Next boot hook — spawns the worker
 
 lib/db/migrations/0019_wa_connections.sql                 Connection table + RLS
 lib/db/migrations/0020_wa_connections_health.sql          Health metadata columns

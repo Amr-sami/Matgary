@@ -24,6 +24,7 @@ import {
   persistEvent,
   processEvent,
 } from "@/lib/whatsapp/webhook-processor";
+import { enqueueInboundProcess, isQueueEnabled } from "@/lib/whatsapp/queue";
 import type { MetaWebhookEnvelope } from "@/lib/whatsapp/webhook-types";
 import { logger } from "@/lib/logger";
 
@@ -149,18 +150,37 @@ export async function POST(req: NextRequest) {
 
   // 6. ACK Meta immediately. Heavy lifting (message normalisation,
   //    inbound classification) runs after the response is sent.
-  //    setImmediate keeps the work on the same Node loop without holding
-  //    the response open. Phase 3 swaps this for BullMQ enqueue.
-  for (const { id } of persisted) {
-    setImmediate(() => {
-      processEvent(id).catch((err) => {
-        logger.error({
-          event: "webhook.process.unhandled",
+  //    When BullMQ is enabled, we enqueue one job per persisted event;
+  //    the worker drains them with retry semantics. When Redis is
+  //    unavailable we fall back to setImmediate so the app still
+  //    functions on minimal infra.
+  if (isQueueEnabled()) {
+    for (const { id } of persisted) {
+      try {
+        await enqueueInboundProcess({ eventId: id });
+      } catch (err) {
+        // Enqueue failure shouldn't block the ACK — the event row is
+        // already in 'pending' state and a future worker run can pick
+        // it up via the partial index. Log + continue.
+        logger.warn({
+          event: "wa.webhook.enqueue_failed",
           eventId: id,
           reason: err instanceof Error ? err.message : String(err),
         });
+      }
+    }
+  } else {
+    for (const { id } of persisted) {
+      setImmediate(() => {
+        processEvent(id).catch((err) => {
+          logger.error({
+            event: "webhook.process.unhandled",
+            eventId: id,
+            reason: err instanceof Error ? err.message : String(err),
+          });
+        });
       });
-    });
+    }
   }
 
   return new NextResponse(null, { status: 200 });
