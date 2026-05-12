@@ -347,9 +347,9 @@ export async function recordHealthcheck(
 // ─── Webhook-side tenant resolution (raw db) ─────────────────────────────
 
 /** Resolve which tenant owns a given phone_number_id. Used by the webhook
- *  handler in Phase 2 — webhooks arrive *outside* any tenant session, so
- *  we look up the row through the admin handle, then re-enter withTenant
- *  for any follow-up writes. Returns null when the number isn't ours. */
+ *  handler — webhooks arrive *outside* any tenant session, so we look
+ *  up the row through the admin handle, then re-enter withTenant for any
+ *  follow-up writes. Returns null when the number isn't ours. */
 export async function getConnectionByPhoneNumberId(
   phoneNumberId: string,
 ): Promise<WaConnectionPublic | null> {
@@ -357,6 +357,23 @@ export async function getConnectionByPhoneNumberId(
     .select()
     .from(waConnections)
     .where(eq(waConnections.phoneNumberId, phoneNumberId))
+    .limit(1);
+  return row ? toPublic(row) : null;
+}
+
+/** Fallback resolution when the webhook lacks a phone_number_id we know
+ *  but does carry a WABA id. Returns the most recently active connection
+ *  for that WABA; null when we don't know the WABA either. */
+export async function getActiveConnectionByWabaId(
+  wabaId: string,
+): Promise<WaConnectionPublic | null> {
+  const [row] = await db
+    .select()
+    .from(waConnections)
+    .where(
+      and(eq(waConnections.wabaId, wabaId), eq(waConnections.status, "active")),
+    )
+    .orderBy(desc(waConnections.connectedAt))
     .limit(1);
   return row ? toPublic(row) : null;
 }

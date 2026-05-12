@@ -182,6 +182,65 @@ npm run db:migrate
 
 ## 2. Changelog
 
+### 2026-05-12 — WhatsApp Phase 2 (webhooks: signature, persistence, tenant routing, status lifecycle)
+
+The receive-side of the integration: Meta now has a verified webhook endpoint, every delivery is signature-checked, dedup'd, persisted before processing, and routed to the right tenant by phone_number_id. Inbound customer messages and outbound status transitions land in `wa_messages` with the full lifecycle.
+
+- **Schema** (`0021_wa_webhook_events_and_messages.sql`):
+  - `wa_webhook_events` — internal audit log of every webhook delivery. Columns: `provider_event_id` (idempotency key with provider), `event_type` (`message.received` / `message.status` / `unknown`), nullable `tenant_id` / `branch_id` / `connection_id` (NULL = quarantined because routing failed), preserved `phone_number_id` + `waba_id`, `payload jsonb` (the slice we processed — single message or single status, not the whole batch), processing-state machine (`pending` / `processing` / `processed` / `failed` / `quarantined` / `dead_letter`) plus `retry_count`, `last_attempt_at`, `next_attempt_at`, `error_details`. Unique index on `(provider, provider_event_id)` enforces idempotency; partial index over `(processing_status, next_attempt_at) WHERE status IN ('pending', 'failed')` is the hot path for the future worker. **No RLS** on this table — quarantine rows have no tenant by definition, and the admin inspection endpoint filters at the SQL level.
+  - `wa_messages` — normalised inbound + outbound messages, tenant-scoped, RLS forced. `meta_message_id` (WAMID) is unique within (provider) via partial index; `client_message_id` is unique within tenant for Phase-3 queue correlation. Content fields (`text_body`, `media_id`, `media_mime_type`, `media_filename`, `media_sha256`, full `payload jsonb`), full status lifecycle (`queued`/`sent`/`delivered`/`read`/`failed`) with per-state timestamp columns, failure reason + Meta code, and conversation/pricing metadata for future cost-attribution analytics.
+
+- **Signature verification** (`lib/whatsapp/webhook-signature.ts`): timing-safe HMAC-SHA256 against `META_APP_SECRET`. Rejects all of `missing_secret`, `missing_header`, `malformed_header` (wrong prefix or non-hex), `length_mismatch`, `digest_mismatch` with a discriminated reason for the structured logger. Verification runs against the **raw request body** (`req.text()` called before any `JSON.parse`); invalid signatures return 401 before parsing.
+
+- **Webhook receiver** (`app/api/whatsapp/webhook/route.ts`):
+  - `GET` — Meta subscription challenge. Compares `hub.verify_token` against `WHATSAPP_WEBHOOK_VERIFY_TOKEN`; echoes `hub.challenge` only on match. 403 otherwise; 500 if env var unset.
+  - `POST` — raw body → signature → JSON parse → extract per-message/per-status events → persist each idempotently → ACK 200 → `setImmediate` background processing. ACK is fast even on batches: persistence is one upsert per event, processing happens after the response is sent. Phase 3 will swap `setImmediate` for BullMQ — `processEvent(id)` already has a queue-friendly signature.
+  - `export const dynamic = "force-dynamic"` so Next 16 doesn't try to cache the route.
+
+- **Event extraction** (`lib/whatsapp/webhook-events.ts:extractEvents`): walks Meta's nested envelope and yields one `ExtractedEvent` per message / per status. Idempotency keys:
+  - `msg:<wamid>` for inbound messages
+  - `status:<wamid>:<state>` for status transitions (sent/delivered/read each get distinct rows so we never collapse a lifecycle)
+  - `change:<sha1>` for `errors[]` blocks or change kinds we don't yet decode (rare but persisted for forensics)
+
+- **Tenant resolution** (`lib/whatsapp/webhook-processor.ts:resolveTenant`):
+  1. Primary: `wa_connections` lookup by `phone_number_id` (globally unique on Meta's side, enforced by our own unique index).
+  2. Fallback: `wa_connections` lookup by `waba_id` filtered to `status='active'` (most-recently connected wins).
+  3. Neither resolves → event is persisted with `tenant_id=NULL`, `processing_status='quarantined'`, and `error_details` captures the unrouted IDs. Logged as `wa.webhook.quarantined`. Never silently dropped.
+
+- **Processor** (`lib/whatsapp/webhook-processor.ts:processEvent`): re-fetches the row by id, walks the state machine, dispatches by `event_type`. Inbound → `upsertInboundMessage` (idempotent on WAMID; never overwrites bodies). Status → `applyStatusUpdate` (per-state timestamps appended; failure code/reason captured; conversation + pricing metadata extracted; if no matching outbound row exists yet — possible when the queue is added — creates a placeholder with `direction='outbound'`). `RetryableError` advances `retry_count` and schedules backoff (`60s * 2^attempt`, capped at 1h). `TerminalError` flips to `dead_letter`. Anything else is treated as retryable.
+
+- **Connections lookup hardening** (`lib/whatsapp/connections.ts:getActiveConnectionByWabaId`): added for the fallback resolution path. Uses raw `db` because the webhook handler runs outside any tenant session.
+
+- **Admin inspection** (`GET /api/whatsapp/webhook/events?status=...&scope=...&limit=...`): owner-only. Two scopes:
+  - `scope=tenant` (default) — caller's own tenant_id only.
+  - `scope=quarantine` — rows with `tenant_id IS NULL`. Owners can see these because by definition they belong to nobody; renders payloads truncated to ~1KB per top-level value so a runaway webhook can't blow up the response.
+
+- **Structured logging** events added to the namespace:
+  - `webhook.verify.ok`, `webhook.verify.rejected`, `webhook.verify.misconfigured`
+  - `webhook.signature.invalid` (with discriminated `reason`)
+  - `webhook.receive.ok`, `webhook.receive.body_read_failed`, `webhook.receive.json_parse_failed`, `webhook.receive.persist_failed`
+  - `wa.webhook.routed`, `wa.webhook.quarantined`, `wa.webhook.dedup`
+  - `wa.webhook.process.ok`, `wa.webhook.process.noop`, `wa.webhook.process.missing_row`
+  - `wa.webhook.retry_scheduled`, `wa.webhook.deadletter`
+  - `webhook.process.unhandled` (caught at the setImmediate boundary so worker errors never escape silently)
+
+- **Env** (`.env.example`): `WHATSAPP_WEBHOOK_VERIFY_TOKEN` upgraded from "Phase 2" to "REQUIRED once a webhook URL is registered" with the matching Meta-dashboard field documented.
+
+**Why no BullMQ yet:**
+- The processing path is already queue-shaped (`processEvent(eventId)` is the unit of work). Phase 3 replaces `setImmediate` with a queue producer and adds the worker loop. The DB schema is the durability boundary — events are safe before any worker exists.
+
+**Why mark inbound payloads idempotent on `meta_message_id` instead of inserting always:**
+- Meta retries unacknowledged webhooks every few seconds for ~24h. Without per-WAMID uniqueness we'd accumulate duplicate inbound rows. The unique index on `(provider, meta_message_id) WHERE meta_message_id IS NOT NULL` collapses retries to a single row regardless of how many times the webhook fires.
+
+**Why classify status transitions as separate events:**
+- A single outbound message goes through `sent` → `delivered` → `read` (or → `failed`) on three distinct webhook deliveries. Treating them as one logical event would mean we'd dedup the *transition* against the previous one and lose the timeline. Each `(WAMID, state)` is its own event row; the WAMID row in `wa_messages` accumulates the per-state timestamps.
+
+**Known gaps going into Phase 3:**
+- Worker is in-process via `setImmediate`. Single-instance deploy is fine; multi-instance will need BullMQ + lock semantics on the event row before processing.
+- Quarantined events don't auto-replay when a connection is restored. The admin endpoint exposes them; manual re-process endpoint is a Phase 3 nicety.
+- Outbound `SaleForm` send path still uses fetch-and-forget — once a 'sent' status arrives the row materialises in `wa_messages` retroactively. Phase 3 will move sending to a queue and pre-create the outbound row at queue time with `client_message_id`.
+- Media download from `media_id` isn't wired yet — the id is captured on inbound rows but Phase 3 will add the Graph fetch + storage step.
+
 ### 2026-05-12 — WhatsApp Embedded Signup Phase 1.5 (health check + structured logging + multi-tab safety)
 
 Polish pass on top of Phase 1 before the Phase-2 webhook work lands. Three discrete additions; nothing existing changed semantically.

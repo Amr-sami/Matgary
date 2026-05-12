@@ -81,6 +81,24 @@ Add these to `.env` (see `.env.example` for the full block):
 | `AUTH_SECRET` | yes (existing) | Reused for HMAC-signing OAuth state. Already required at app boot |
 | `SECRET_KEY` | yes (existing) | AES-256-GCM key for encrypting stored tokens at rest |
 
+## 5b. Webhook URL registration (Phase 2)
+
+Once `WHATSAPP_WEBHOOK_VERIFY_TOKEN` is set in `.env`:
+
+1. Meta App → WhatsApp → Configuration → **Webhook**
+2. Click **Edit** and enter:
+   - **Callback URL**: `https://<your-host>/api/whatsapp/webhook`
+   - **Verify token**: same string as `WHATSAPP_WEBHOOK_VERIFY_TOKEN`
+3. Click **Verify and save**. Meta will GET your callback URL with `hub.mode=subscribe&hub.verify_token=…&hub.challenge=…`; our handler responds 200 with the challenge echoed back when the token matches.
+4. Subscribe to the **messages** field. Optional but useful: **message_template_status_update** (Phase 4).
+5. Per-WABA subscription happens automatically inside the OAuth callback (`subscribeAppToWaba`). For WABAs connected before this Phase shipped, click **Reconnect** in the settings UI — the OAuth flow re-runs the subscribe call.
+
+Confirm by sending a message **to** the connected WhatsApp number from a personal phone — within a few seconds you should see:
+- A new row in `wa_webhook_events` with `processing_status='processed'`, `event_type='message.received'`.
+- A new row in `wa_messages` with `direction='inbound'`, the text body, and the sender's phone.
+
+If you instead see `processing_status='quarantined'` with `tenant_id=NULL`, the receiving `phone_number_id` doesn't match any connection — usually means you sent to a different test number than the one OAuth bound.
+
 ## 6. Verify the wiring
 
 1. Open `/settings` while logged in as an owner.
@@ -118,6 +136,11 @@ The structured logger emits one JSON line per event when `LOG_FORMAT=json` (auto
 - `event:"wa.oauth.code_exchange_failed"` / `wa.oauth.discovery_failed` / `wa.oauth.persist_failed` — flow failures
 - `event:"wa.graph.error"` — every Graph 4xx/5xx (includes `metaCode`, `metaSubcode`, `status`, `durationMs`)
 - `event:"wa.healthcheck.completed"` — manual or scheduled health check outcome
+- `event:"webhook.verify.*"` — subscription handshake outcomes (GET)
+- `event:"webhook.signature.invalid"` — rejected webhooks (with discriminated `reason`)
+- `event:"webhook.receive.ok"` — accepted webhook batch (with `eventCount`, `durationMs`)
+- `event:"wa.webhook.routed"` / `wa.webhook.quarantined"` / `"wa.webhook.dedup"` — per-event routing outcomes
+- `event:"wa.webhook.process.ok"` / `"wa.webhook.retry_scheduled"` / `"wa.webhook.deadletter"` — processor state transitions
 
 Tokens, secrets, and the encrypted blob are never emitted. The logger redacts a fixed set of field names; if you add a new sensitive field, list it in `SENSITIVE_KEYS` in `lib/logger.ts`.
 
@@ -140,6 +163,11 @@ lib/whatsapp/connections.ts         Repo + tenant routing
 lib/whatsapp/resolve-credentials.ts Send-route credential picker
 lib/whatsapp/oauth-state.ts         HMAC-signed state + cookie binding
 lib/whatsapp/health.ts              Health-check service
+lib/whatsapp/webhook-signature.ts   X-Hub-Signature-256 verification
+lib/whatsapp/webhook-types.ts       Typed Meta webhook payloads
+lib/whatsapp/webhook-events.ts      Event repo + idempotent extract
+lib/whatsapp/webhook-processor.ts   Tenant routing + processing state machine
+lib/whatsapp/messages.ts            Inbound/outbound message repo
 lib/logger.ts                       Structured logger
 
 app/api/whatsapp/oauth/start/       OAuth entry
@@ -149,7 +177,10 @@ app/api/whatsapp/connection/        Status read
 app/api/whatsapp/connection/healthcheck/  Manual health probe
 app/api/whatsapp/cloud/send/        Text send (OAuth or manual creds)
 app/api/whatsapp/cloud/send-pdf/    Document send
+app/api/whatsapp/webhook/           GET challenge + POST event receiver
+app/api/whatsapp/webhook/events/    Admin inspection (quarantine, dead-letter)
 
-lib/db/migrations/0019_wa_connections.sql       Connection table + RLS
-lib/db/migrations/0020_wa_connections_health.sql Health metadata columns
+lib/db/migrations/0019_wa_connections.sql                 Connection table + RLS
+lib/db/migrations/0020_wa_connections_health.sql          Health metadata columns
+lib/db/migrations/0021_wa_webhook_events_and_messages.sql Webhook + messages tables
 ```

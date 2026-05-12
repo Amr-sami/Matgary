@@ -25,6 +25,10 @@ const PUBLIC_PATHS = new Set<string>([
   "/api/account/password/reset",
   // Visual preview of error/empty screens — handy on a phone, no auth needed.
   "/preview/errors",
+  // Meta WhatsApp webhook — exact match so the /events admin sub-path
+  // stays gated. Meta posts here without our session; the route enforces
+  // its own X-Hub-Signature-256 + verify-token checks.
+  "/api/whatsapp/webhook",
 ]);
 const PUBLIC_PREFIXES = [
   "/api/auth",

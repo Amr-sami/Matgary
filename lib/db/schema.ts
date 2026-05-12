@@ -1288,6 +1288,137 @@ export const waConnections = pgTable(
   ],
 );
 
+// ─────────────────────────────────────────────────────────────────────────────
+// WhatsApp webhook event store (Phase 2).
+//
+// Internal admin-only audit log. Quarantine rows (tenant_id NULL) need
+// cross-tenant visibility so RLS is intentionally NOT enabled on this
+// table. The inspection endpoint gates on owner role + filters by
+// tenantId at the SQL level.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const waWebhookEvents = pgTable(
+  "wa_webhook_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    provider: text("provider").notNull().default("meta_cloud"),
+    providerEventId: text("provider_event_id").notNull(),
+    eventType: text("event_type").notNull(),
+
+    tenantId: uuid("tenant_id").references(() => tenants.id, {
+      onDelete: "set null",
+    }),
+    branchId: uuid("branch_id").references(() => branches.id, {
+      onDelete: "set null",
+    }),
+    connectionId: uuid("connection_id").references(() => waConnections.id, {
+      onDelete: "set null",
+    }),
+
+    phoneNumberId: text("phone_number_id"),
+    wabaId: text("waba_id"),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+
+    processingStatus: text("processing_status").notNull().default("pending"),
+    retryCount: integer("retry_count").notNull().default(0),
+    lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
+    errorDetails: text("error_details"),
+
+    receivedAt: timestamp("received_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [
+    uniqueIndex("wa_webhook_events_provider_event_uniq").on(
+      t.provider,
+      t.providerEventId,
+    ),
+    index("wa_webhook_events_tenant_idx").on(t.tenantId),
+    index("wa_webhook_events_status_idx").on(t.processingStatus),
+    index("wa_webhook_events_phone_idx").on(t.phoneNumberId),
+  ],
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WhatsApp messages — normalised inbound + outbound (Phase 2).
+// Tenant-scoped via RLS.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const waMessages = pgTable(
+  "wa_messages",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branches.id, { onDelete: "cascade" }),
+    connectionId: uuid("connection_id").references(() => waConnections.id, {
+      onDelete: "set null",
+    }),
+
+    provider: text("provider").notNull().default("meta_cloud"),
+    direction: text("direction").notNull(), // 'inbound' | 'outbound'
+
+    metaMessageId: text("meta_message_id"),
+    clientMessageId: text("client_message_id"),
+
+    contactPhoneNumber: text("contact_phone_number").notNull(),
+    contactWaId: text("contact_wa_id"),
+
+    messageType: text("message_type").notNull(),
+    textBody: text("text_body"),
+    mediaId: text("media_id"),
+    mediaMimeType: text("media_mime_type"),
+    mediaFilename: text("media_filename"),
+    mediaSha256: text("media_sha256"),
+    payload: jsonb("payload").$type<Record<string, unknown>>(),
+
+    status: text("status"),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    failedAt: timestamp("failed_at", { withTimezone: true }),
+    failureReason: text("failure_reason"),
+    failureCode: integer("failure_code"),
+
+    receivedAt: timestamp("received_at", { withTimezone: true }),
+
+    conversationId: text("conversation_id"),
+    conversationCategory: text("conversation_category"),
+    conversationOrigin: text("conversation_origin"),
+    pricingCategory: text("pricing_category"),
+    pricingModel: text("pricing_model"),
+    pricingBillable: boolean("pricing_billable"),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [
+    index("wa_messages_tenant_branch_idx").on(t.tenantId, t.branchId),
+    index("wa_messages_contact_idx").on(
+      t.tenantId,
+      t.branchId,
+      t.contactPhoneNumber,
+    ),
+    index("wa_messages_status_idx").on(t.tenantId, t.status),
+  ],
+);
+
 // Convenience type exports for the rest of the app
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -1310,4 +1441,8 @@ export type AttendanceEventRow = typeof attendanceEvents.$inferSelect;
 export type EmployeeCompensationRow = typeof employeeCompensation.$inferSelect;
 export type WaConnectionRow = typeof waConnections.$inferSelect;
 export type NewWaConnection = typeof waConnections.$inferInsert;
+export type WaWebhookEventRow = typeof waWebhookEvents.$inferSelect;
+export type NewWaWebhookEvent = typeof waWebhookEvents.$inferInsert;
+export type WaMessageRow = typeof waMessages.$inferSelect;
+export type NewWaMessage = typeof waMessages.$inferInsert;
 export type PayrollPeriodRow = typeof payrollPeriods.$inferSelect;

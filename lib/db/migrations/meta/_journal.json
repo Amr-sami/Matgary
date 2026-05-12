@@ -148,6 +148,13 @@
       "when": 1779400000000,
       "tag": "0020_wa_connections_health",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1779500000000,
+      "tag": "0021_wa_webhook_events_and_messages",
+      "breakpoints": true
     }
   ]
 }
