@@ -175,6 +175,23 @@ The current `routeJob` signature is queue-friendly already — no in-process sta
 - `wa.queue.redis.error` (connection blips)
 - `wa.webhook.replay.requested` / `wa.webhook.replay.routed` / `wa.webhook.replay.still_unrouted`
 
+## 8c. Conversations + 24h window (Phase 4)
+
+Every inbound + outbound message now updates a per-contact aggregate row in `wa_conversations` (created lazily; contact row in `wa_contacts` likewise). The aggregate tracks:
+
+- `last_message_at`, `last_message_preview`, `last_message_direction`
+- `unread_count` (incremented on inbound, zeroed via `PATCH conversations/[id] {"read": true}`)
+- `window_expires_at` — Meta's 24-hour customer-service window, extended on every inbound message; outbound activity does NOT reset it
+- `archived_at` — soft-hide flag (owner-only PATCH)
+
+**Window enforcement.** Outbound freeform messages outside the window will be rejected by Meta (error codes 131047 / 131051). The `lib/whatsapp/window.ts:checkSendWindow` helper exposes the check; the outbound facade accepts an opt-in `enforceWindow: true` flag that pre-rejects with a clear error before hitting Graph. The flag is OFF by default during this phase so existing receipt sends continue to work — Phase 5 will route receipts through approved utility templates and flip it ON.
+
+**Read API.**
+- `GET /api/whatsapp/conversations?before=<iso>&limit=<n>&unread=1&includeArchived=1` — paginated list, ordered by `last_message_at` desc. Returns `nextBefore` for cursor pagination.
+- `GET /api/whatsapp/conversations/[id]` — single conversation + contact metadata + `windowOpen` boolean.
+- `GET /api/whatsapp/conversations/[id]/messages?before=<iso>&limit=<n>` — reverse-chronological message page.
+- `PATCH /api/whatsapp/conversations/[id]` body `{ read?: bool, archived?: bool }` — owner-only for archive.
+
 ## 9. Production checklist
 
 - [ ] App switched to Live mode in Meta dashboard
@@ -212,11 +229,17 @@ app/api/whatsapp/webhook/           GET challenge + POST event receiver
 app/api/whatsapp/webhook/events/    Admin inspection (quarantine, dead-letter)
 app/api/whatsapp/webhook/events/[id]/replay/  Quarantine replay (owner-only)
 app/api/whatsapp/messages/[clientMessageId]/  Outbound message status poll
+app/api/whatsapp/conversations/               Conversation list (paginated)
+app/api/whatsapp/conversations/[id]/          Single conversation + PATCH (read/archive)
+app/api/whatsapp/conversations/[id]/messages/ Message page in a conversation
 
 lib/whatsapp/queue.ts               BullMQ Queue + Worker singletons
 lib/whatsapp/jobs.ts                Worker processors (routeJob switch)
 lib/whatsapp/outbound.ts            sendOutbound facade (persist + enqueue|inline)
 lib/whatsapp/outbound-sender.ts     Graph send implementation (shared)
+lib/whatsapp/contacts.ts            wa_contacts repo
+lib/whatsapp/conversations.ts       wa_conversations repo + window state
+lib/whatsapp/window.ts              24-hour window decision helper
 instrumentation.ts                  Next boot hook — spawns the worker
 
 lib/db/migrations/0019_wa_connections.sql                 Connection table + RLS

@@ -216,7 +216,9 @@ async function handleInbound(
   if (!msg || !msg.id || !msg.from) {
     throw new TerminalError("Inbound payload missing message id/from");
   }
-  const contactWaId = payload.contacts?.[0]?.wa_id ?? null;
+  const contact = payload.contacts?.[0];
+  const contactWaId = contact?.wa_id ?? null;
+  const contactDisplayName = contact?.profile?.name ?? null;
 
   await upsertInboundMessage({
     tenantId: row.tenantId!,
@@ -224,6 +226,7 @@ async function handleInbound(
     connectionId: row.connectionId,
     contactPhoneNumber: msg.from,
     contactWaId,
+    contactDisplayName,
     message: msg,
     rawPayload: payload as Record<string, unknown>,
   });

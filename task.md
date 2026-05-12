@@ -182,6 +182,48 @@ npm run db:migrate
 
 ## 2. Changelog
 
+### 2026-05-12 — WhatsApp Phase 4 (conversations + contacts + 24h window awareness)
+
+The missing aggregate layer between individual `wa_messages` and the future inbox UI. Every message now updates a per-contact conversation row; the 24-hour Meta customer-service window is tracked and checkable; the inbox read API is in place.
+
+- **Schema** (`0022_wa_conversations_and_contacts.sql`):
+  - `wa_contacts` — one row per (tenant, branch, phone). `display_name` from Meta `contacts[].profile.name`, `merchant_label` owner-editable (takes precedence), `tags` reserved for future segmentation. Unique on (tenant, branch, phone). RLS forced.
+  - `wa_conversations` — one row per (tenant, branch, contact). Aggregates `last_message_at` / `last_message_preview` / `last_message_direction` / `unread_count` / `window_expires_at` / `archived_at` plus the latest conversation_id + category snapshot from Meta status webhooks. Unique on (tenant, branch, contact). RLS forced. Partial index on `unread_count > 0` for the inbox unread badge.
+  - `wa_messages.conversation_row_id` — new FK back to the aggregate, populated on new writes; nullable so Phase 2-3 historicals don't break (Phase 5 backfill job).
+
+- **Repos**:
+  - `lib/whatsapp/contacts.ts:upsertContact` — idempotent; only fills `display_name` when empty so merchant edits never get clobbered by stale webhooks.
+  - `lib/whatsapp/conversations.ts` — `ensureConversation` (lazy create), `touchInbound` (extends 24h window via `lastInbound + CUSTOMER_WINDOW_MS`, bumps unread, atomic SQL increment for concurrent writes), `touchOutbound` (preview + last_message_at; does NOT reset window — Meta's rule), `getWindowState`, `listConversations` (paginated by `last_message_at` desc, with `unreadOnly` + `includeArchived`), `getConversationById`, `listMessages`, `markRead`, `setArchived`, `linkMessageToConversation`.
+  - Both `touchInbound`/`touchOutbound` are best-effort — caller (webhook processor / outbound facade) never fails if conversation maintenance fails.
+
+- **Auto-maintenance hooks**:
+  - `upsertInboundMessage` now extracts `contactDisplayName` from `payload.contacts[0].profile.name` (added a field to its input type), calls `touchInbound`, and links the new message row to the conversation.
+  - `recordOutboundQueued` calls `touchOutbound` and links the row.
+  - Inbound/outbound previews fall back to `"[image]"` / `"[document]"` / etc. labels for non-text content so the inbox list isn't blank.
+
+- **24-hour window helper** (`lib/whatsapp/window.ts`): `checkSendWindow(tenant, branch, phone)` returns `{ allowed, reason, expiresAt }`. Reasons: `open` / `closed_expired` / `closed_never_contacted`. `explainClosedWindow` renders the human copy. Wired into the outbound facade behind an opt-in `enforceWindow: true` flag — OFF by default this phase so receipt sends still work; Phase 5 flips it ON once utility-template sending lands.
+
+- **Read API**:
+  - `GET /api/whatsapp/conversations` — paginated list. Query: `before=<iso>&limit=<n>&unread=1&includeArchived=1`. Returns `nextBefore` cursor.
+  - `GET /api/whatsapp/conversations/[id]` — single, with `windowOpen` boolean computed at read time.
+  - `GET /api/whatsapp/conversations/[id]/messages` — reverse-chrono page on `created_at`.
+  - `PATCH /api/whatsapp/conversations/[id]` — body `{ read?, archived? }`. Archive is owner-only.
+
+**Why a separate `wa_contacts` table (instead of denormalising onto `wa_conversations`):**
+- The contact identity is per (tenant, branch, phone) and survives across conversations (e.g. if we ever delete + recreate a conversation). Owner-set `merchant_label` lives there independent of any single conversation row. Cleaner aggregate boundary; one extra join in list queries is cheap.
+
+**Why `touchInbound` increments unread via raw SQL:**
+- Two concurrent inbound messages racing on the same conversation row would lose increments under a read-then-write pattern. `unreadCount = unreadCount + 1` in SQL is atomic at the row level.
+
+**Why window enforcement is opt-in:**
+- The receipt path in `SaleForm` sends to customers who often haven't messaged us first — flipping enforcement on now would block every receipt. Phase 5 will swap that path to a pre-approved utility template (`receipt_v1` or similar) which can send outside the window, and only *then* flip `enforceWindow` to true for any remaining freeform paths.
+
+**Known gaps going into Phase 5:**
+- `wa_messages.conversation_row_id` isn't backfilled for pre-Phase-4 rows. Historical messages won't appear in the conversation thread view until we run a one-shot backfill (cheap; one `UPDATE … FROM wa_conversations` is enough).
+- Inbox UI shell hasn't been built — these API routes are in place but no React component consumes them yet.
+- Message templates not implemented. Phase 5 brings template sync + the receipt path migration.
+- No realtime push to the inbox (long-poll/SSE) yet. The settings page polls `/api/whatsapp/connection` already; conversations can do the same with a 5s tick when an inbox shell lands.
+
 ### 2026-05-12 — WhatsApp Phase 3 (BullMQ outbound queue, inbound enqueue, retry policy, replay)
 
 Reliability layer: every WhatsApp send and every webhook event now flows through BullMQ when Redis is available, with retry semantics, dead-letter, and graceful inline fallback when not. The send routes return immediately with a client message id; the worker drives the Graph round-trip in the background and patches the row when Meta responds.

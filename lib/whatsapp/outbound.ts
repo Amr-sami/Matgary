@@ -26,6 +26,7 @@ import {
   sendTextToMeta,
   type SendOutcome,
 } from "./outbound-sender";
+import { checkSendWindow, explainClosedWindow } from "./window";
 import type { PdfInvoiceData } from "@/lib/pdfReceipt";
 
 export type OutboundStatus = "queued" | "sent" | "failed";
@@ -48,6 +49,11 @@ export interface SendTextInput {
   branchId: string;
   phone: string;
   message: string;
+  /** When true, refuse to send if the 24h customer-service window is
+   *  closed. Default false during the Phase-4 transition so existing
+   *  receipts keep working. Phase 5 will flip this to true on the
+   *  receipt path (it'll route through a utility template instead). */
+  enforceWindow?: boolean;
 }
 
 export interface SendDocumentInput {
@@ -56,6 +62,7 @@ export interface SendDocumentInput {
   phone: string;
   caption: string | null;
   invoice: PdfInvoiceData;
+  enforceWindow?: boolean;
 }
 
 // ─── Text ────────────────────────────────────────────────────────────────
@@ -73,6 +80,22 @@ export async function sendOutboundText(
   const creds = await resolveCloudCredentials(input.tenantId, input.branchId);
   if (!creds) {
     return failBadInput("WhatsApp Cloud API is not configured for this tenant");
+  }
+
+  // Optional 24h window enforcement. Off by default so the existing
+  // receipt path continues to work; Phase 5 will gate the receipt path
+  // through a utility template and flip this on.
+  if (input.enforceWindow) {
+    const decision = await checkSendWindow(input.tenantId, input.branchId, normalised);
+    if (!decision.allowed) {
+      logger.info({
+        event: "wa.outbound.window_closed",
+        tenantId: input.tenantId,
+        branchId: input.branchId,
+        reason: decision.reason,
+      });
+      return failBadInput(explainClosedWindow(decision));
+    }
   }
 
   const clientMessageId = randomUUID();
@@ -153,6 +176,19 @@ export async function sendOutboundDocument(
   const creds = await resolveCloudCredentials(input.tenantId, input.branchId);
   if (!creds) {
     return failBadInput("WhatsApp Cloud API is not configured for this tenant");
+  }
+
+  if (input.enforceWindow) {
+    const decision = await checkSendWindow(input.tenantId, input.branchId, normalised);
+    if (!decision.allowed) {
+      logger.info({
+        event: "wa.outbound.window_closed",
+        tenantId: input.tenantId,
+        branchId: input.branchId,
+        reason: decision.reason,
+      });
+      return failBadInput(explainClosedWindow(decision));
+    }
   }
 
   const clientMessageId = randomUUID();

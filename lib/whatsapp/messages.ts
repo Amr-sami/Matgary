@@ -23,6 +23,11 @@ import type {
   MetaInboundMessage,
   MetaStatusUpdate,
 } from "./webhook-types";
+import {
+  linkMessageToConversation,
+  touchInbound,
+  touchOutbound,
+} from "./conversations";
 
 export type WaMessageStatus = "queued" | "sent" | "delivered" | "read" | "failed";
 export type WaMessageDirection = "inbound" | "outbound";
@@ -97,6 +102,9 @@ export interface UpsertInboundInput {
   connectionId: string | null;
   contactPhoneNumber: string;
   contactWaId: string | null;
+  /** Optional — comes from Meta's contacts[].profile.name. Used to
+   *  populate wa_contacts.display_name. */
+  contactDisplayName?: string | null;
   message: MetaInboundMessage;
   rawPayload: Record<string, unknown>;
 }
@@ -157,7 +165,53 @@ export async function upsertInboundMessage(
       )
       .limit(1);
     return { id: existing?.id ?? "", inserted: false };
+  }).then(async (res) => {
+    // Outside the tx: touch the conversation aggregate. Best-effort —
+    // touchInbound swallows errors. Runs once even when the underlying
+    // row was a dedup-noop, because window/unread state can lag.
+    if (res.id) {
+      const messageAt = tsFromMetaSeconds(input.message.timestamp) ?? new Date();
+      const classified = classifyType(input.message);
+      const conversationId = await touchInbound({
+        tenantId: input.tenantId,
+        branchId: input.branchId,
+        phoneNumber: input.contactPhoneNumber,
+        waId: input.contactWaId,
+        displayName: input.contactDisplayName ?? null,
+        messageAt,
+        previewText: classified.textBody ?? labelFor(classified.messageType),
+      });
+      if (conversationId && res.inserted) {
+        await linkMessageToConversation(input.tenantId, res.id, conversationId);
+      }
+    }
+    return res;
   });
+}
+
+function labelFor(t: string): string {
+  switch (t) {
+    case "image":
+      return "[image]";
+    case "document":
+      return "[document]";
+    case "video":
+      return "[video]";
+    case "audio":
+      return "[audio]";
+    case "sticker":
+      return "[sticker]";
+    case "button_reply":
+      return "[button]";
+    case "interactive_reply":
+      return "[interactive]";
+    case "reaction":
+      return "[reaction]";
+    case "location":
+      return "[location]";
+    default:
+      return "[message]";
+  }
 }
 
 export interface ApplyStatusInput {
@@ -295,7 +349,7 @@ export async function recordOutboundQueued(input: {
   payload?: Record<string, unknown>;
   clientMessageId: string;
 }): Promise<string> {
-  return withTenant(input.tenantId, async (tx) => {
+  const rowId = await withTenant(input.tenantId, async (tx) => {
     const [row] = await tx
       .insert(waMessages)
       .values({
@@ -314,6 +368,19 @@ export async function recordOutboundQueued(input: {
       .returning({ id: waMessages.id });
     return row.id;
   });
+
+  // Best-effort conversation maintenance — never throws.
+  const conversationId = await touchOutbound({
+    tenantId: input.tenantId,
+    branchId: input.branchId,
+    phoneNumber: input.contactPhoneNumber,
+    messageAt: new Date(),
+    previewText: input.textBody ?? labelFor(input.messageType),
+  });
+  if (conversationId) {
+    await linkMessageToConversation(input.tenantId, rowId, conversationId);
+  }
+  return rowId;
 }
 
 /** Patch the outbound row with the Graph send result. Called from the

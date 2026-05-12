@@ -1401,6 +1401,11 @@ export const waMessages = pgTable(
     pricingModel: text("pricing_model"),
     pricingBillable: boolean("pricing_billable"),
 
+    // Phase 4: link to the wa_conversations aggregate row. Nullable so
+    // historical messages from Phases 2-3 (before the table existed)
+    // remain valid; new writes populate it.
+    conversationRowId: uuid("conversation_row_id"),
+
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .default(sql`now()`),
@@ -1416,6 +1421,90 @@ export const waMessages = pgTable(
       t.contactPhoneNumber,
     ),
     index("wa_messages_status_idx").on(t.tenantId, t.status),
+  ],
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WhatsApp contacts + conversations (Phase 4). Both tenant-scoped, RLS-forced.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const waContacts = pgTable(
+  "wa_contacts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branches.id, { onDelete: "cascade" }),
+    phoneNumber: text("phone_number").notNull(),
+    waId: text("wa_id"),
+    displayName: text("display_name"),
+    merchantLabel: text("merchant_label"),
+    tags: text("tags"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [
+    uniqueIndex("wa_contacts_tenant_branch_phone_uniq").on(
+      t.tenantId,
+      t.branchId,
+      t.phoneNumber,
+    ),
+    index("wa_contacts_tenant_branch_idx").on(t.tenantId, t.branchId),
+  ],
+);
+
+export const waConversations = pgTable(
+  "wa_conversations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branches.id, { onDelete: "cascade" }),
+    contactId: uuid("contact_id")
+      .notNull()
+      .references(() => waContacts.id, { onDelete: "cascade" }),
+    phoneNumber: text("phone_number").notNull(),
+
+    lastMessageAt: timestamp("last_message_at", { withTimezone: true }),
+    lastMessagePreview: text("last_message_preview"),
+    lastMessageDirection: text("last_message_direction"),
+    unreadCount: integer("unread_count").notNull().default(0),
+
+    windowExpiresAt: timestamp("window_expires_at", { withTimezone: true }),
+
+    lastConversationId: text("last_conversation_id"),
+    lastConversationCategory: text("last_conversation_category"),
+
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [
+    uniqueIndex("wa_conversations_tenant_branch_contact_uniq").on(
+      t.tenantId,
+      t.branchId,
+      t.contactId,
+    ),
+    index("wa_conversations_tenant_branch_last_idx").on(
+      t.tenantId,
+      t.branchId,
+      t.lastMessageAt,
+    ),
   ],
 );
 
@@ -1445,4 +1534,8 @@ export type WaWebhookEventRow = typeof waWebhookEvents.$inferSelect;
 export type NewWaWebhookEvent = typeof waWebhookEvents.$inferInsert;
 export type WaMessageRow = typeof waMessages.$inferSelect;
 export type NewWaMessage = typeof waMessages.$inferInsert;
+export type WaContactRow = typeof waContacts.$inferSelect;
+export type NewWaContact = typeof waContacts.$inferInsert;
+export type WaConversationRow = typeof waConversations.$inferSelect;
+export type NewWaConversation = typeof waConversations.$inferInsert;
 export type PayrollPeriodRow = typeof payrollPeriods.$inferSelect;
