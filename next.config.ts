@@ -7,6 +7,8 @@ const nextConfig: NextConfig = {
   // .next/standalone, which the production Dockerfile copies. Cuts the image
   // from ~1.2GB to ~280MB and starts in <1s.
   output: "standalone",
+  // H07 — don't advertise the framework in response headers.
+  poweredByHeader: false,
 };
 
 export default nextConfig;

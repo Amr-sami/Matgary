@@ -21,6 +21,31 @@ const EXT_BY_MIME: Record<string, string> = {
 
 const MAX_BYTES = 3 * 1024 * 1024; // 3 MB
 
+// H07 — server-side magic-byte sniff. The client-supplied MIME (via
+// `file.type`) is taken at face value by the form parser, so a hostile
+// upload of a `.exe` claiming `Content-Type: image/jpeg` would otherwise
+// land in /uploads. This double-check trusts only the first 12 bytes.
+function sniffImageMime(buf: Buffer): "image/jpeg" | "image/png" | "image/webp" | null {
+  if (buf.length < 12) return null;
+  // JPEG: FF D8 FF
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return "image/jpeg";
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (
+    buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47 &&
+    buf[4] === 0x0d && buf[5] === 0x0a && buf[6] === 0x1a && buf[7] === 0x0a
+  ) {
+    return "image/png";
+  }
+  // WebP: RIFF........WEBP (RIFF at 0-3, WEBP at 8-11)
+  if (
+    buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 &&
+    buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50
+  ) {
+    return "image/webp";
+  }
+  return null;
+}
+
 export class UploadValidationError extends Error {
   constructor(message: string) {
     super(message);
@@ -44,6 +69,12 @@ export async function saveTenantUpload(
   }
   if (file.buffer.byteLength > MAX_BYTES) {
     throw new UploadValidationError("الملف كبير جداً — الحد الأقصى 3 ميجابايت");
+  }
+  // H07 — verify the bytes match the declared MIME. Client-set
+  // Content-Type cannot be trusted on its own.
+  const sniffed = sniffImageMime(file.buffer);
+  if (!sniffed || sniffed !== file.mime) {
+    throw new UploadValidationError("الملف لا يطابق نوعه المُعلَن");
   }
 
   const ext = EXT_BY_MIME[file.mime];

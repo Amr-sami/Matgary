@@ -15,7 +15,7 @@ Working surface for the launch-readiness work. Each spec lives in its own file s
 | [H04](hard/H04-health-endpoints.md) | /healthz + /readyz endpoints | ✅ done 2026-06-03 | 30 min |
 | [H05](hard/H05-e2e-smoke.md) | E2E smoke test (Playwright) | ✅ done 2026-06-03 | 3 hrs |
 | [H06](hard/H06-money-math-tests.md) | Repo-level unit tests for money math | ✅ done 2026-06-03 (leave-overlap dropped) | 2 hrs |
-| [H07](hard/H07-pre-pentest-hardening.md) | Pre-pentest security hardening pass | pending | 4-6 hrs |
+| [H07](hard/H07-pre-pentest-hardening.md) | Pre-pentest security hardening pass | ✅ done 2026-06-03 | 4-6 hrs |
 | [H08](hard/H08-csp.md) | CSP headers | ✅ done 2026-06-03 (report-only; CSP_ENFORCE=1 flips) | 1-2 hrs |
 | [H09](hard/H09-session-revocation.md) | Session revocation ("sign out everywhere") | ✅ done 2026-06-03 | 1-2 hrs |
 | [H10](hard/H10-pwd-reset-throttle.md) | Password reset throttle by email | ✅ done 2026-06-03 | 30 min |

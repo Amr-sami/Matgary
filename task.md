@@ -183,6 +183,16 @@ npm run db:migrate
 
 ## 2. Changelog
 
+### 2026-06-03 — H07 pre-pentest audit pass (closing)
+
+Twelve-item audit per `specs/hard/H07-pre-pentest-hardening.md`. Output: [`infra/pre-pentest-audit.md`](infra/pre-pentest-audit.md). All of H01-H12 are now done; the codebase is ready for an external pen-test engagement.
+
+- **2 FIX commits landed in this pass:**
+  - `lib/uploads.ts` — server-side magic-byte sniff rejects uploads whose actual file signature doesn't match the declared `Content-Type` (closes the rename-`.exe`-to-`.jpg` attack).
+  - `next.config.ts` — `poweredByHeader: false` so we stop broadcasting the framework.
+- **3 DEFER items documented as non-exploitable** under current usage: Next 16.2.3 i18n middleware bypass (we don't use i18n), nodemailer SMTP/CRLF CVEs (no user-controlled input reaches `envelope.size` or transport name; Auth.js Email provider is not wired), postcss<8.5.10 (dev-only transitive). All three should still be patched upstream before pen-test sign-off.
+- **Everything else passed without change** — CSRF posture, authorization gates, rate-limit coverage (14 buckets catalogued), secrets-no-defaults-in-source, error response sanitisation, WhatsApp webhook timing-safe HMAC compare, SQL injection grep (only `sql.raw` hit is the PDPL export over a hard-coded table list), security headers (CSP report-only + 4 always-on headers via middleware, HSTS + X-Frame-Options via nginx), NextAuth cookie flags (`HttpOnly`+`Secure`+`SameSite=Lax`), RLS spot-check (force-RLS confirmed on all sampled tables during the H01 restore drill).
+
 ### 2026-06-03 — H12 account deletion + 30-day grace
 
 - **Schema:** `tenants.deletion_scheduled_at timestamptz` (nullable) + new `tenant_deletions` gravestone table (`tenant_id`, `tenant_slug_snapshot`, `owner_email_snapshot`, `scheduled_at`, `deleted_at`, `reason`). Gravestone is NOT FK-bound to `tenants` so it survives the cascade. Migration `0028_tenant_deletion.sql`, journal idx 28.
