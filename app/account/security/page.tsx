@@ -224,6 +224,29 @@ export default function SecurityPage() {
         </div>
       )}
 
+      {(status === "on" || status === "off") && (
+        <div className="bg-white rounded-2xl border border-border p-6 space-y-3">
+          <p className="text-sm font-medium">تسجيل خروج من جميع الأجهزة</p>
+          <p className="text-xs text-text-secondary">
+            ينهي كل جلسات هذا الحساب فوراً، بما في ذلك الجلسة الحالية. مفيد إذا فقدت جهازاً أو شككت في تسريب حسابك.
+          </p>
+          <Button
+            variant="secondary"
+            onClick={async () => {
+              setBusy(true);
+              try {
+                await fetch("/api/account/sessions/revoke-all", { method: "POST" });
+              } finally {
+                window.location.href = "/login";
+              }
+            }}
+            loading={busy}
+          >
+            تسجيل الخروج من كل مكان
+          </Button>
+        </div>
+      )}
+
       {status === "on" && (
         <>
           <div className="bg-white rounded-2xl border border-border p-6 space-y-4">

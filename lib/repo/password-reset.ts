@@ -1,5 +1,5 @@
 import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
@@ -130,9 +130,15 @@ export async function consumeResetToken(
 
   const passwordHash = await bcrypt.hash(newPassword, 12);
   try {
+    // H09 — bump token_version atomically alongside the password change so
+    // every other live session for this user is invalidated on next request.
     await db
       .update(users)
-      .set({ passwordHash, mustChangePassword: false })
+      .set({
+        passwordHash,
+        mustChangePassword: false,
+        tokenVersion: sql`${users.tokenVersion} + 1`,
+      })
       .where(eq(users.id, payload.userId));
   } catch (err) {
     console.error("[pwreset] failed to update password:", err);

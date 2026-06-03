@@ -4,6 +4,7 @@ import { requireTenant } from "@/lib/api/auth-helpers";
 import { changeOwnPassword, TeamConflictError } from "@/lib/repo/team";
 import { logActivity } from "@/lib/repo/activity";
 import { bustUserContextCache } from "@/lib/auth";
+import { bumpTokenVersion } from "@/lib/repo/account-security";
 import { rateLimit } from "@/lib/ratelimit";
 
 // 5 password changes / hour / user. Tight because this endpoint takes a
@@ -41,6 +42,8 @@ export async function POST(req: NextRequest) {
       parsed.data.currentPassword,
       parsed.data.newPassword,
     );
+    // H09 — also invalidates every other live session for this user.
+    await bumpTokenVersion(r.ctx.userId);
     await bustUserContextCache(r.ctx.userId);
     logActivity({
       tenantId: r.ctx.tenantId,

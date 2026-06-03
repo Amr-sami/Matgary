@@ -183,6 +183,15 @@ npm run db:migrate
 
 ## 2. Changelog
 
+### 2026-06-03 — H09 session revocation ("sign out everywhere")
+
+- **Schema.** `users.token_version int not null default 0` (migration `0027_user_token_version.sql`).
+- **Enforcement.** `resolveTenantContext` reads the column into the cached user-context bundle. JWT callback writes `tv` at sign-in; on subsequent calls compares `token.tv` to `ctx.tokenVersion` and clears `id` + all claims on mismatch. Session callback (edge-safe, in `auth.config.ts`) returns `null` when `token.id` is empty — middleware then redirects to `/login`.
+- **Auto-bumps.** `verifyAndEnable` + `disable2fa` (H03), `/api/account/password` (change), and `lib/repo/password-reset.ts` (reset) all bump `token_version` atomically inside the same write. Every other session for the user dies on its next request.
+- **Manual revoke.** `POST /api/account/sessions/revoke-all` exposes the same primitive. `/account/security` surfaces it as a button visible whether 2FA is on or off.
+- **Activity log.** `auth.session_revoke_all` with Arabic label.
+- **Trade-off documented:** user-context cache TTL is 60 s, so revoke can take up to 60 s to bite for the in-flight request. The alternative is a per-request DB hit; not worth it in v1.
+
 ### 2026-06-03 — H03 2FA for owners (TOTP + recovery codes)
 
 - **Schema.** Migration `0026_user_totp.sql` adds three nullable columns to `users`: `totp_secret`, `totp_enabled_at`, `recovery_codes_hash text[]`. All three NULL = 2FA off; populated = 2FA on. Journal entry registered.

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
@@ -48,6 +48,7 @@ export async function verifyAndEnable(
       totpSecret: secret,
       totpEnabledAt: new Date(),
       recoveryCodesHash: codes.map((c) => c.hash),
+      tokenVersion: sql`${users.tokenVersion} + 1`,
     })
     .where(eq(users.id, userId));
   await bustUserContextCache(userId);
@@ -78,6 +79,7 @@ export async function disable2fa(
       totpSecret: null,
       totpEnabledAt: null,
       recoveryCodesHash: null,
+      tokenVersion: sql`${users.tokenVersion} + 1`,
     })
     .where(eq(users.id, userId));
   await bustUserContextCache(userId);
@@ -139,6 +141,17 @@ export async function verifySecondFactor(
     return true;
   }
   return false;
+}
+
+/** H09 — atomic increment of `users.token_version`. Invalidates every JWT
+ *  issued for this user before the call. Callers should also bust the
+ *  user-context cache so the bump is visible on the next request. */
+export async function bumpTokenVersion(userId: string): Promise<void> {
+  await db
+    .update(users)
+    .set({ tokenVersion: sql`${users.tokenVersion} + 1` })
+    .where(eq(users.id, userId));
+  await bustUserContextCache(userId);
 }
 
 export async function isTotpEnabled(userId: string): Promise<boolean> {

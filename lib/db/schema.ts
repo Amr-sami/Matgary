@@ -31,6 +31,10 @@ export const users = pgTable("users", {
   totpEnabledAt: timestamp("totp_enabled_at", { withTimezone: true }),
   /** bcrypt-hashed recovery codes. Each is consumed (removed) on use. */
   recoveryCodesHash: text("recovery_codes_hash").array(),
+  /** Bumped on password change, 2FA enable/disable, and explicit "sign out
+   *  everywhere". JWTs carry the value at issue; session callback rejects
+   *  tokens whose `tv` claim no longer matches. */
+  tokenVersion: integer("token_version").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .default(sql`now()`),

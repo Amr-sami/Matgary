@@ -86,6 +86,8 @@ declare module "@auth/core/jwt" {
     mustChangePassword: boolean;
     subscriptionAccessActive: boolean;
     subscriptionStatus: string | null;
+    /** H09 token version at issue time; rejected on mismatch with users.token_version. */
+    tv: number;
   }
 }
 
@@ -127,6 +129,8 @@ interface UserContext {
   mustChangePassword: boolean;
   subscriptionAccessActive: boolean;
   subscriptionStatus: string | null;
+  /** H09 — incremented on password change / 2FA toggle / "sign out all". */
+  tokenVersion: number;
 }
 
 async function resolveTenantContext(userId: string): Promise<UserContext> {
@@ -147,7 +151,10 @@ async function resolveTenantContext(userId: string): Promise<UserContext> {
       .limit(1);
 
     const [user] = await db
-      .select({ mustChangePassword: users.mustChangePassword })
+      .select({
+        mustChangePassword: users.mustChangePassword,
+        tokenVersion: users.tokenVersion,
+      })
       .from(users)
       .where(eq(users.id, userId))
       .limit(1);
@@ -156,6 +163,7 @@ async function resolveTenantContext(userId: string): Promise<UserContext> {
     const role = membership?.role ?? null;
     const permissions = (membership?.permissions ?? []) as Permission[];
     const mustChangePassword = !!user?.mustChangePassword;
+    const tokenVersion = user?.tokenVersion ?? 0;
 
     let onboardingComplete = false;
     let tenantSlug: string | null = null;
@@ -215,6 +223,7 @@ async function resolveTenantContext(userId: string): Promise<UserContext> {
       mustChangePassword,
       subscriptionAccessActive,
       subscriptionStatus,
+      tokenVersion,
     };
   });
 }
@@ -351,6 +360,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.mustChangePassword = ctx.mustChangePassword;
         token.subscriptionAccessActive = ctx.subscriptionAccessActive;
         token.subscriptionStatus = ctx.subscriptionStatus;
+        token.tv = ctx.tokenVersion;
         if (ctx.tenantId) {
           logActivity({
             tenantId: ctx.tenantId,
@@ -364,6 +374,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
       } else if ((trigger === "update" || token.id) && typeof token.id === "string") {
         const ctx = await resolveTenantContext(token.id);
+        // H09 — token_version mismatch means the user (or an admin) has
+        // revoked this session since it was issued. Clear the identifying
+        // claims so the session callback yields a logged-out shape; the
+        // middleware then redirects to /login on the next navigation.
+        if (typeof token.tv === "number" && token.tv !== ctx.tokenVersion) {
+          token.id = "";
+          token.tenantId = null;
+          token.tenantSlug = null;
+          token.role = null;
+          token.permissions = [];
+          token.onboardingComplete = false;
+          token.mustChangePassword = false;
+          token.subscriptionAccessActive = true;
+          token.subscriptionStatus = null;
+          return token;
+        }
         token.tenantId = ctx.tenantId;
         token.tenantSlug = ctx.tenantSlug;
         token.role = ctx.role;
@@ -372,6 +398,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.mustChangePassword = ctx.mustChangePassword;
         token.subscriptionAccessActive = ctx.subscriptionAccessActive;
         token.subscriptionStatus = ctx.subscriptionStatus;
+        token.tv = ctx.tokenVersion;
       }
       return token;
     },

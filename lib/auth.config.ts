@@ -12,6 +12,11 @@ export const authConfig = {
   callbacks: {
     // Edge-safe — only reads the JWT, no DB calls.
     session: ({ session, token }) => {
+      // H09 — JWT callback clears `id` on token_version mismatch. Drop the
+      // session entirely so middleware redirects to /login.
+      if (token && (!token.id || token.id === "")) {
+        return null as unknown as typeof session;
+      }
       if (token && session.user) {
         session.user.id = token.id as string;
         session.user.tenantId = (token.tenantId as string | null) ?? null;

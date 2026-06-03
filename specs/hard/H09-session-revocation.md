@@ -2,8 +2,8 @@
 
 > Source: `task.md` §7.1 H9
 
-- **Status:** pending
-- **Effort estimate:** 1-2 hrs
+- **Status:** done (2026-06-03)
+- **Effort estimate:** 1-2 hrs (actual: ~45 min)
 - **Depends on:** H03 (this is the recovery action after 2FA enable / compromise)
 
 ## Why
@@ -45,4 +45,31 @@ Today a leaked JWT is valid until expiry — no server-side way to invalidate. A
 
 ## Verification log
 
-(populated during execution)
+```
+$ npx tsc --noEmit                                            # clean
+$ npx vitest run tests/cache.test.ts tests/ratelimit.test.ts tests/repo/
+ Test Files  5 passed (5)
+      Tests  46 passed (46)
+```
+
+Files touched:
+- `lib/db/schema.ts` — `users.token_version int not null default 0`.
+- `lib/db/migrations/0027_user_token_version.sql` + journal idx 27.
+- `lib/auth.ts` — `resolveTenantContext` reads `token_version`; JWT callback writes `tv` claim at sign-in; on subsequent runs compares `token.tv` to `ctx.tokenVersion` and clears claims on mismatch.
+- `lib/auth.config.ts` — session callback returns `null` when `token.id` was cleared (the mismatch signal from the JWT callback). Middleware sees no session and redirects to `/login`.
+- `lib/repo/account-security.ts` — new `bumpTokenVersion(userId)`. `verifyAndEnable` and `disable2fa` now bump atomically alongside their existing writes.
+- `app/api/account/password/route.ts` — `bumpTokenVersion(userId)` after `changeOwnPassword`.
+- `lib/repo/password-reset.ts` — bump happens inline with the UPDATE setting the new hash.
+- `app/api/account/sessions/revoke-all/route.ts` (new) — owner-or-self POST.
+- `app/account/security/page.tsx` — "Sign out everywhere" button visible whether 2FA is on or off.
+- `lib/activity-labels.ts` — `auth.session_revoke_all` label.
+
+## Acceptance criteria
+
+- [x] Schema column + migration.
+- [x] JWT writes `tv` at sign-in.
+- [x] Session callback rejects on mismatch — implemented at the JWT layer (clear claims) + session layer (drop to null) so middleware redirects.
+- [x] `/account/security` exposes "Sign out everywhere".
+- [x] Auto-bump on password change, password reset, 2FA enable, 2FA disable.
+- [x] Activity log entry `auth.session_revoke_all`.
+- [x] Trade-off documented: user-context cache TTL is 60 s, so a revocation can take up to 60 s to bite if the user has a request in flight. Acceptable in v1 — the alternative is a per-request DB read.
