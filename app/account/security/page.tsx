@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import QRCode from "qrcode";
+import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { PasswordInput } from "@/components/ui/PasswordInput";
@@ -104,6 +105,8 @@ export default function SecurityPage() {
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [revoking, setRevoking] = useState(false);
 
   useEffect(() => {
     // Probe initial state via the session — the JWT carries no 2FA flag so
@@ -228,18 +231,25 @@ export default function SecurityPage() {
   };
 
   if (status === "loading") {
-    return <div className="p-8 text-center text-text-secondary">…</div>;
+    return (
+      <AppShell title="الأمان">
+        <div className="p-8 text-center text-text-secondary">…</div>
+      </AppShell>
+    );
   }
 
   if (!isOwner) {
     return (
-      <div className="max-w-xl mx-auto p-8 text-center">
-        <p className="text-text-secondary">المصادقة الثنائية متاحة لمالك المتجر فقط في هذه النسخة.</p>
-      </div>
+      <AppShell title="الأمان">
+        <div className="max-w-xl mx-auto p-8 text-center">
+          <p className="text-text-secondary">المصادقة الثنائية متاحة لمالك المتجر فقط في هذه النسخة.</p>
+        </div>
+      </AppShell>
     );
   }
 
   return (
+    <AppShell title="الأمان">
     <div className="max-w-xl mx-auto p-6 space-y-6">
       <header className="flex items-center gap-3">
         <ShieldCheck className="w-7 h-7 text-accent" />
@@ -348,7 +358,7 @@ export default function SecurityPage() {
           <Button
             variant="secondary"
             onClick={async () => {
-              setBusy(true);
+              setExporting(true);
               try {
                 const res = await fetch("/api/account/export", { method: "POST" });
                 if (!res.ok) {
@@ -367,10 +377,10 @@ export default function SecurityPage() {
                 a.remove();
                 URL.revokeObjectURL(url);
               } finally {
-                setBusy(false);
+                setExporting(false);
               }
             }}
-            loading={busy}
+            loading={exporting}
           >
             تنزيل البيانات
           </Button>
@@ -386,14 +396,14 @@ export default function SecurityPage() {
           <Button
             variant="secondary"
             onClick={async () => {
-              setBusy(true);
+              setRevoking(true);
               try {
                 await fetch("/api/account/sessions/revoke-all", { method: "POST" });
               } finally {
                 window.location.href = "/login";
               }
             }}
-            loading={busy}
+            loading={revoking}
           >
             تسجيل الخروج من كل مكان
           </Button>
@@ -423,5 +433,6 @@ export default function SecurityPage() {
         </>
       )}
     </div>
+    </AppShell>
   );
 }
