@@ -3,7 +3,7 @@
 import { useState, useTransition, useRef, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { DollarSign, LogOut, User } from "@/lib/icons";
+import { DollarSign, LogOut, ShieldCheck, User } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { logoutAction } from "@/app/(auth)/actions";
 
@@ -83,6 +83,14 @@ export function UserMenu({ collapsed }: Props) {
               الاشتراك
             </Link>
           )}
+          <Link
+            href="/account/security"
+            onClick={() => setOpen(false)}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-bg-main hover:text-text-primary transition-colors"
+          >
+            <ShieldCheck className="w-4 h-4" />
+            الأمان والخصوصية
+          </Link>
           <button
             type="button"
             onClick={signOut}
