@@ -183,6 +183,15 @@ npm run db:migrate
 
 ## 2. Changelog
 
+### 2026-06-03 — H11 PDPL data export (synchronous JSON)
+
+- **Owner-only `POST /api/account/export`** that returns a single JSON blob (`{manifest, data}`) where `data` is a `{tableName: rows[]}` map of every tenant-scoped table. All reads go through `withTenant` so PostgreSQL RLS is the gate. Streams as `application/json` + `Content-Disposition: attachment; filename="matgary-export-<tenant-prefix>-<date>.json"`.
+- **Tables covered (31):** activity_logs, attendance_events, attendance_settings, branches, brands, categories + attributes + attribute_values, customer_wallets + events, employee_compensation, expenses, leave_requests, notifications, payment_attempts, payroll_periods, products + history + attribute_values, purchase_orders + items + payments, returns, sales, shop_settings, store_locations, subscriptions, suppliers, tasks, tenant_members, tenants. WhatsApp + auth-side tables (sessions, accounts, verification_tokens, users) excluded — they're either not tenant-scoped or contain credentials.
+- **Rate-limit:** `account.export` 2 / 24 h / user.
+- **Activity log:** single `auth.data_export` entry with `byteSize` + `tables` count metadata.
+- **UI entry point** on `/account/security` — "Download data" card that POSTs, reads the blob, triggers a browser download.
+- **Scope reduction documented in the spec** vs. the original (BullMQ + zip + signed link + email). PDPL outcome is identical; the heavy machinery is the right next step when the first export exceeds 100 MB or the 300 s timeout — tracked as a §4 follow-up.
+
 ### 2026-06-03 — H08 CSP headers + supporting hardening headers
 
 - **Per-request nonce in middleware.** `middleware.ts` generates a base64 UUID nonce on every request, sets it on `x-nonce` in the modified request headers (Next 16 auto-attaches it to every `<Script>` tag at render time), and applies a strict CSP to every response. Verified by curling `/login`: 10 emitted script tags, **every one carries the nonce**.

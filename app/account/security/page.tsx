@@ -226,6 +226,44 @@ export default function SecurityPage() {
 
       {(status === "on" || status === "off") && (
         <div className="bg-white rounded-2xl border border-border p-6 space-y-3">
+          <p className="text-sm font-medium">تنزيل نسخة من بيانات متجرك</p>
+          <p className="text-xs text-text-secondary">
+            ملف JSON يحتوي كل الجداول التابعة لهذا المتجر (المنتجات، المبيعات، الموظفين، السجلات…). يتم تحميله مباشرة على جهازك.
+          </p>
+          <Button
+            variant="secondary"
+            onClick={async () => {
+              setBusy(true);
+              try {
+                const res = await fetch("/api/account/export", { method: "POST" });
+                if (!res.ok) {
+                  setError("تعذر التنزيل. حاول مرة أخرى لاحقاً.");
+                  return;
+                }
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                const cd = res.headers.get("content-disposition") ?? "";
+                const match = cd.match(/filename="([^"]+)"/);
+                a.download = match?.[1] ?? "matgary-export.json";
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+              } finally {
+                setBusy(false);
+              }
+            }}
+            loading={busy}
+          >
+            تنزيل البيانات
+          </Button>
+        </div>
+      )}
+
+      {(status === "on" || status === "off") && (
+        <div className="bg-white rounded-2xl border border-border p-6 space-y-3">
           <p className="text-sm font-medium">تسجيل خروج من جميع الأجهزة</p>
           <p className="text-xs text-text-secondary">
             ينهي كل جلسات هذا الحساب فوراً، بما في ذلك الجلسة الحالية. مفيد إذا فقدت جهازاً أو شككت في تسريب حسابك.

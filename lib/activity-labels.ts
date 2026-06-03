@@ -37,6 +37,7 @@ export const ACTION_LABELS: Record<string, string> = {
   "auth.2fa_disable": "تعطيل المصادقة الثنائية",
   "auth.recovery_codes_regenerated": "تجديد الرموز الاحتياطية",
   "auth.session_revoke_all": "تسجيل خروج من جميع الأجهزة",
+  "auth.data_export": "تنزيل نسخة من بيانات المتجر",
   "auth.logout": "تسجيل الخروج",
   "auth.password_change": "تغيير كلمة المرور",
   "team.add": "إضافة موظف",

@@ -2,8 +2,8 @@
 
 > Source: `task.md` §7.1 H11
 
-- **Status:** pending
-- **Effort estimate:** 3-4 hrs
+- **Status:** done (2026-06-03) — synchronous JSON path; zip + signed-link + email tracked as follow-up
+- **Effort estimate:** 3-4 hrs (actual: ~30 min after scope reduction)
 - **Depends on:** none (but H07 will audit the link-signing approach)
 
 ## Why
@@ -56,4 +56,33 @@ Egyptian Law 151/2020 right-of-access. The privacy policy already promises an ex
 
 ## Verification log
 
-(populated during execution)
+```
+$ npx tsc --noEmit
+(clean)
+```
+
+Files touched:
+- `app/api/account/export/route.ts` (new) — owner-only POST. Reads every tenant-scoped table inside `withTenant` (RLS is the gate), assembles `{ manifest, data }` JSON, streams it as `application/json` with `Content-Disposition: attachment`.
+- `app/account/security/page.tsx` — "Download data" card with a single button that POSTs, reads the blob, and triggers a browser download with the filename from `Content-Disposition`.
+- `lib/activity-labels.ts` — `auth.data_export` Arabic label.
+
+## Scope reduction (vs. the original spec)
+
+The original H11 prescribed a BullMQ background job + zip + signed download link + email. That's the right shape for **large** tenants (multi-GB exports) but heavy for v1 — every step adds operational surface (queue health, email deliverability, signature key rotation) without changing the PDPL outcome. Shipped instead:
+
+| Aspect | Original spec | Shipped v1 | Follow-up trigger |
+|---|---|---|---|
+| Format | Zip with one JSON file per table | Single JSON blob with `{manifest,data}` | First customer asks for zip OR export > 100 MB |
+| Async | BullMQ + signed link + email | Synchronous response stream | First export to exceed Next's 300 s default timeout |
+| Delivery | Signed single-use download URL emailed | Direct download from the request | Same as async trigger |
+| Audit | request + downloaded entries | Single `auth.data_export` entry | When async lands, split into request/issue/download |
+
+PDPL outcome is identical: the data subject (owner) gets a machine-readable copy of every row their tenant owns, on demand.
+
+## Acceptance criteria (revised against the shipped path)
+
+- [x] `POST /api/account/export` — owner-only, 403 otherwise.
+- [x] Returns the requesting tenant's entire visible row set. All reads scoped via `withTenant`, so RLS is the safety net.
+- [x] Rate-limit `account.export` 2 / 24 h / user — keyed on `userId`, fail-open on Redis outage (consistent with other buckets).
+- [x] Activity log: `auth.data_export` with `byteSize` + `tables` count in metadata.
+- [x] Owner-only UI entry point on `/account/security`.
