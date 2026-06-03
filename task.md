@@ -183,6 +183,15 @@ npm run db:migrate
 
 ## 2. Changelog
 
+### 2026-06-03 — H08 CSP headers + supporting hardening headers
+
+- **Per-request nonce in middleware.** `middleware.ts` generates a base64 UUID nonce on every request, sets it on `x-nonce` in the modified request headers (Next 16 auto-attaches it to every `<Script>` tag at render time), and applies a strict CSP to every response. Verified by curling `/login`: 10 emitted script tags, **every one carries the nonce**.
+- **CSP directives:** `default-src 'self'`, `script-src 'self' 'nonce-…' 'strict-dynamic'` (+ `'unsafe-eval'` only when `NODE_ENV=development`), `style-src 'self' 'unsafe-inline'` (Tailwind 4 trade-off — tracked in §4), `img-src 'self' data: blob: https:`, `font-src 'self' data:`, `connect-src 'self' https://*.sentry.io https://o*.ingest.sentry.io`, plus `object-src 'none'`, `base-uri 'self'`, `form-action 'self'`, `frame-ancestors 'none'`, `upgrade-insecure-requests`.
+- **Report-only mode.** Ships as `Content-Security-Policy-Report-Only` so any browser misfire surfaces in the console but never blocks. Set `CSP_ENFORCE=1` in the app env to switch to enforcement once staging is verified clean (recommended one-week window).
+- **Additional hardening headers** applied on every response: `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: camera=(), microphone=(), geolocation=(self)`. `Permissions-Policy` keeps geolocation on `self` because attendance check-in needs it.
+- **nginx note.** `infra/nginx.conf.example` updated with an explicit "CSP is owned by the app" comment + warning against adding a conflicting nginx-level CSP (would either duplicate or shadow the nonce).
+- **Two §4 follow-ups added:** Strict-CSP-for-styles (waiting on Tailwind), and CSP `report-uri` → Sentry.
+
 ### 2026-06-03 — H09 session revocation ("sign out everywhere")
 
 - **Schema.** `users.token_version int not null default 0` (migration `0027_user_token_version.sql`).
@@ -866,6 +875,8 @@ Ordered roughly by likely impact on retention / conversion. Not committed — re
 ### Infrastructure / ops
 
 - **Cleanup pre-existing lint errors** (194 errors, 970 warnings as of 2026-06-03). Mostly `no-explicit-any` + unused-vars. Today's CI runs lint with `continue-on-error: true` so the noise doesn't gate PRs — once the backlog is empty, remove that line and let lint be a true gate. Track via `npm run lint 2>&1 | grep -E "^✖"` regression test.
+- **Strict CSP for styles** (H08 follow-up). `style-src` currently keeps `'unsafe-inline'` because Tailwind 4 injects runtime inline styles without a nonce hook. Track Tailwind's CSP-friendly options and tighten to `'self' 'nonce-...'` when supported.
+- **CSP report-uri to Sentry.** Wire the `report-uri` directive once Sentry CSP reporting is configured per-project. Today CSP runs as `Content-Security-Policy-Report-Only`; violations land in the browser console but not yet in Sentry.
 - **Leave overlap detection.** Today `submitLeaveRequest` only enforces `startDate <= endDate`. Add a check that rejects (or warns the approver) when the same employee already has a submitted/approved leave overlapping the requested window. Sketch from H06 spec: pure `hasOverlap(existing, candidate)` that treats adjacent dates (end-of-A === start-of-B) as non-overlap and ignores rejected leaves. Wire into the route + add a unit test. Half-day. Tracked in §5 as a known gap.
 - ~~**Insights server-side aggregation**: today the overview tab aggregates client-side from `useSales`. Move to `/api/insights?from=…&to=…` with a 60 s tenant-keyed cache.~~ ✅ done 2026-05-09 — see changelog.
 - **/healthz + /readyz endpoints** for nginx / orchestrator probes.

@@ -25,6 +25,14 @@ server {
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     add_header Permissions-Policy "geolocation=(self), camera=()" always;
 
+    # H08: Content-Security-Policy is owned by the app (middleware.ts) because
+    # each request gets its own per-page nonce that Next attaches to every
+    # script tag. Ships as Content-Security-Policy-Report-Only by default; set
+    # CSP_ENFORCE=1 in the app env to flip to enforcement after staging proves
+    # the policy clean. Do NOT also `add_header Content-Security-Policy ...`
+    # here — duplicate headers conflict and the browser typically uses the
+    # most restrictive policy.
+
     # Egyptian receipts can be Arabic + emoji; bump body limit so PDF uploads
     # and image uploads (team photos, logos) don't 413.
     client_max_body_size 25m;

@@ -1,8 +1,58 @@
 import NextAuth from "next-auth";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { authConfig } from "@/lib/auth.config";
 
 const { auth } = NextAuth(authConfig);
+
+// H08 — Content Security Policy. Per-request nonce so we don't have to ship
+// 'unsafe-inline' for scripts. Report-Only by default until staging proves
+// the policy clean; set CSP_ENFORCE=1 to flip to enforcement.
+//
+// `style-src` keeps `'unsafe-inline'` for v1 because Tailwind 4 injects
+// runtime inline styles without a nonce hook today. Tracked in task.md §4
+// backlog "Strict CSP for styles".
+function buildCspHeader(nonce: string): string {
+  const isDev = process.env.NODE_ENV === "development";
+  const directives = [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https:",
+    "font-src 'self' data:",
+    "connect-src 'self' https://*.sentry.io https://o*.ingest.sentry.io",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    "upgrade-insecure-requests",
+  ];
+  return directives.join("; ");
+}
+
+const CSP_HEADER_NAME =
+  process.env.CSP_ENFORCE === "1"
+    ? "Content-Security-Policy"
+    : "Content-Security-Policy-Report-Only";
+
+const SECURITY_HEADERS: Record<string, string> = {
+  "X-Content-Type-Options": "nosniff",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  // attendance check-in uses geolocation — left allowed on self;
+  // camera/microphone are not used by any current feature.
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=(self)",
+};
+
+function applyCsp(
+  _req: NextRequest,
+  nonce: string,
+  response: NextResponse,
+): NextResponse {
+  response.headers.set(CSP_HEADER_NAME, buildCspHeader(nonce));
+  for (const [k, v] of Object.entries(SECURITY_HEADERS)) {
+    if (!response.headers.has(k)) response.headers.set(k, v);
+  }
+  return response;
+}
 
 const PUBLIC_PATHS = new Set<string>([
   "/login",
@@ -54,26 +104,38 @@ export default auth((req) => {
   const { nextUrl } = req;
   const pathname = nextUrl.pathname;
 
+  // Generate a fresh nonce for every request and propagate it forward via
+  // the modified request headers so server components can read it.
+  const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set("x-nonce", nonce);
+  const passThrough = () =>
+    applyCsp(
+      req,
+      nonce,
+      NextResponse.next({ request: { headers: requestHeaders } }),
+    );
+
   if (
     PUBLIC_PATHS.has(pathname) ||
     PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))
   ) {
-    return NextResponse.next();
+    return passThrough();
   }
 
   const session = req.auth;
 
   if (!session?.user) {
     if (pathname.startsWith("/api/")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return applyCsp(req, nonce, NextResponse.json({ error: "Unauthorized" }, { status: 401 }));
     }
     // Anonymous "/" → marketing landing, not the login wall.
     if (pathname === "/") {
-      return NextResponse.redirect(new URL("/welcome", nextUrl));
+      return applyCsp(req, nonce, NextResponse.redirect(new URL("/welcome", nextUrl)));
     }
     const loginUrl = new URL("/login", nextUrl);
     loginUrl.searchParams.set("next", pathname);
-    return NextResponse.redirect(loginUrl);
+    return applyCsp(req, nonce, NextResponse.redirect(loginUrl));
   }
 
   // Force users with mustChangePassword=true through the change-password page
@@ -88,12 +150,17 @@ export default auth((req) => {
     if (pathname.startsWith("/api/")) {
       // API consumers can't follow an HTML redirect — give them a 403 with a
       // hint so the client can route the user to the change-password page.
-      return NextResponse.json(
-        { error: "PASSWORD_CHANGE_REQUIRED" },
-        { status: 403 },
+      return applyCsp(
+        req,
+        nonce,
+        NextResponse.json({ error: "PASSWORD_CHANGE_REQUIRED" }, { status: 403 }),
       );
     }
-    return NextResponse.redirect(new URL("/account/change-password", nextUrl));
+    return applyCsp(
+      req,
+      nonce,
+      NextResponse.redirect(new URL("/account/change-password", nextUrl)),
+    );
   }
 
   // Subscription gate. When the trial has expired without a paid subscription
@@ -111,15 +178,20 @@ export default auth((req) => {
     !allowedWhenSuspended
   ) {
     if (pathname.startsWith("/api/")) {
-      return NextResponse.json(
-        { error: "SUBSCRIPTION_REQUIRED" },
-        { status: 402 },
+      return applyCsp(
+        req,
+        nonce,
+        NextResponse.json({ error: "SUBSCRIPTION_REQUIRED" }, { status: 402 }),
       );
     }
-    return NextResponse.redirect(new URL("/billing", nextUrl));
+    return applyCsp(
+      req,
+      nonce,
+      NextResponse.redirect(new URL("/billing", nextUrl)),
+    );
   }
 
-  return NextResponse.next();
+  return passThrough();
 });
 
 export const config = {

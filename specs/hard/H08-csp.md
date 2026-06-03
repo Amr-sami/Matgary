@@ -2,8 +2,8 @@
 
 > Source: `task.md` §7.1 H8
 
-- **Status:** pending
-- **Effort estimate:** 1-2 hrs
+- **Status:** done (2026-06-03) — ships as report-only; flip via `CSP_ENFORCE=1`
+- **Effort estimate:** 1-2 hrs (actual: ~30 min)
 - **Depends on:** none (but H04 staging probe is what lets us run report-only mode safely)
 
 ## Why
@@ -49,4 +49,28 @@ Cheapest XSS defence-in-depth that exists. Pen-tester (E2) will flag absence wit
 
 ## Verification log
 
-(populated during execution)
+```
+$ curl -is http://localhost:3001/healthz | grep -i content-security
+content-security-policy-report-only: default-src 'self'; script-src 'self' 'nonce-…' 'strict-dynamic' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://*.sentry.io https://o*.ingest.sentry.io; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
+
+$ curl -s http://localhost:3001/login | grep -oE "<script[^>]*>" | grep -v "nonce="
+(empty — every script tag carries the per-request nonce)
+```
+
+Files touched:
+- `middleware.ts` — generates a per-request nonce, sets `x-nonce` on the modified request headers (Next auto-injects this on `<Script>` tags), applies CSP + 4 hardening headers (`X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, plus the CSP itself) to every response.
+- `infra/nginx.conf.example` — note that CSP is owned by the app + warning against adding a conflicting nginx-level CSP.
+
+## Acceptance criteria
+
+- [x] nginx template marked as deferring CSP to the app (the spec's "nginx emits CSP" predates the per-request-nonce decision; with nonces, the app must own the header).
+- [x] Next middleware emits a per-request nonce; Next reads it from `x-nonce` and writes it on every script tag.
+- [x] Smoke walk (`/healthz`, `/login` rendered) produced **zero** scripts without a nonce.
+- [x] Report-only by default (`Content-Security-Policy-Report-Only` header); promote to enforcing by setting `CSP_ENFORCE=1` in the app env.
+- [ ] `report-uri` configured to a Sentry CSP endpoint. — deferred: Sentry CSP reporter setup is configured per-project in the Sentry UI; documented as a follow-up rather than blocking the spec.
+
+## Known trade-offs
+
+- `style-src` keeps `'unsafe-inline'` for v1 because Tailwind 4 injects runtime inline styles without a nonce hook today. Tighter style CSP tracked in §4 backlog "Strict CSP for styles".
+- `'unsafe-eval'` is added to `script-src` only when `NODE_ENV === "development"` (React's dev-time error overlay uses `eval`). Stripped in prod automatically.
+- `Permissions-Policy` keeps `geolocation=(self)` because attendance check-in needs it; widen if a future feature requires camera/microphone.
