@@ -1,5 +1,4 @@
 import NextAuth, { type DefaultSession } from "next-auth";
-import { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import bcrypt from "bcryptjs";
@@ -25,15 +24,14 @@ const LOGIN_EMAIL_WINDOW_SEC = 15 * 60;
 const TOTP_LIMIT = 5;
 const TOTP_WINDOW_SEC = 15 * 60;
 
-// H03 — custom CredentialsSignin subclasses so the login UI can distinguish
-// "password right, TOTP missing" from "wrong password" without a second
-// round-trip. The `code` field propagates to the client as ?error=<code>.
-export class TotpRequiredError extends CredentialsSignin {
-  code = "TotpRequired";
-}
-export class InvalidTotpError extends CredentialsSignin {
-  code = "InvalidTotp";
-}
+// H03 — 2FA signalling. We DON'T throw custom CredentialsSignin subclasses
+// here because Auth.js v5 beta's custom-error-code propagation is flaky; the
+// browser ends up seeing the generic ?error=CredentialsSignin&code=credentials
+// regardless of what we throw. Instead, the login form pre-checks whether the
+// account has 2FA enabled via /api/auth/2fa-needed BEFORE submitting the
+// password, and includes the TOTP code on the (single) credentials POST.
+// On a code mismatch we still return null from authorize — the UI surfaces
+// a generic "wrong password or code" message.
 
 function clientIpFromRequest(req: Request | undefined): string {
   if (!req) return "unknown";
@@ -299,23 +297,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         // ── 2FA gate ──────────────────────────────────────────────────
         // If the user has TOTP enrolled, the password is necessary but not
-        // sufficient. Either we got a code along with the password (verify
-        // it now) or we send the client back with a TotpRequired signal so
-        // it can prompt for the code and retry.
+        // sufficient. The login form pre-checks via /api/auth/2fa-needed and
+        // submits the code on the same credentials POST — a missing or wrong
+        // code returns null (treated as a credential failure by the UI).
         if (user!.totpEnabledAt && user!.totpSecret) {
           const supplied = parsed.data.totp?.replace(/\s+/g, "");
-          if (!supplied) {
-            throw new TotpRequiredError();
-          }
+          if (!supplied) return null;
           const totpRl = await rateLimit("auth.totp", user!.id, {
             limit: TOTP_LIMIT,
             windowSec: TOTP_WINDOW_SEC,
             commit: false,
           });
-          if (!totpRl.ok) {
-            // Same UX as a bad code — don't leak that we're throttling.
-            throw new InvalidTotpError();
-          }
+          if (!totpRl.ok) return null;
           const passed = verifyTotp(supplied, user!.totpSecret);
           if (!passed) {
             // Could be a recovery code; try that path.
@@ -326,7 +319,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 limit: TOTP_LIMIT,
                 windowSec: TOTP_WINDOW_SEC,
               });
-              throw new InvalidTotpError();
+              return null;
             }
             // Recovery code consumed — splice the matched hash out.
             const next = hashes.filter((_, i) => i !== idx);

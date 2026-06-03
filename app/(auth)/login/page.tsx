@@ -65,6 +65,27 @@ function LoginInner() {
     }
 
     try {
+      // Step 1 (only on the first submit) — ask the server whether this
+      // email has 2FA enabled. Avoids Auth.js v5's flaky custom-error-code
+      // propagation by detecting the need for TOTP BEFORE submitting the
+      // password.
+      if (!needsTotp) {
+        const needed = await fetch("/api/auth/2fa-needed", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        })
+          .then((r) => r.json() as Promise<{ needsTotp: boolean }>)
+          .catch(() => ({ needsTotp: false as boolean }));
+        if (needed.needsTotp) {
+          setEmailValue(email);
+          setPasswordValue(password);
+          setNeedsTotp(true);
+          setBusy(false);
+          return;
+        }
+      }
+
       const csrfRes = await fetch("/api/auth/csrf");
       const { csrfToken } = (await csrfRes.json()) as { csrfToken: string };
 
@@ -78,41 +99,24 @@ function LoginInner() {
       if (needsTotp && totp) params.totp = totp;
       const body = new URLSearchParams(params).toString();
 
-      // With json:"true" the callback returns JSON { url } instead of
-      // redirecting — read the url to detect the TotpRequired error code.
-      const callbackRes = await fetch("/api/auth/callback/credentials", {
+      await fetch("/api/auth/callback/credentials", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body,
       });
-      const callbackBody = (await callbackRes
-        .json()
-        .catch(() => ({}))) as { url?: string };
-      const errorCode = callbackBody.url
-        ? new URL(callbackBody.url, window.location.origin).searchParams.get(
-            "error",
-          )
-        : null;
-
-      if (errorCode === "TotpRequired") {
-        setEmailValue(email);
-        setPasswordValue(password);
-        setNeedsTotp(true);
-        return;
-      }
-      if (errorCode === "InvalidTotp") {
-        setEmailValue(email);
-        setPasswordValue(password);
-        setNeedsTotp(true);
-        setError("الرمز غير صحيح");
-        return;
-      }
 
       const sessionRes = await fetch("/api/auth/session", { cache: "no-store" });
       const session = (await sessionRes.json()) as { user?: { id?: string } };
 
       if (!session?.user?.id) {
-        setError("البريد أو كلمة المرور غير صحيحة");
+        // Could be wrong password OR (when needsTotp) wrong/expired TOTP
+        // code. We can't distinguish the two from the session probe alone;
+        // the message stays generic to avoid leaking which one failed.
+        setError(
+          needsTotp
+            ? "كلمة المرور أو الرمز غير صحيحة"
+            : "البريد أو كلمة المرور غير صحيحة",
+        );
         return;
       }
 
