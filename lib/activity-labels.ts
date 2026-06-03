@@ -33,6 +33,9 @@ export const ACTIVITY_CATEGORIES: ActivityCategory[] = [
 // so adding a new action without updating this map is harmless.
 export const ACTION_LABELS: Record<string, string> = {
   "auth.login": "تسجيل الدخول",
+  "auth.2fa_enable": "تفعيل المصادقة الثنائية",
+  "auth.2fa_disable": "تعطيل المصادقة الثنائية",
+  "auth.recovery_codes_regenerated": "تجديد الرموز الاحتياطية",
   "auth.logout": "تسجيل الخروج",
   "auth.password_change": "تغيير كلمة المرور",
   "team.add": "إضافة موظف",

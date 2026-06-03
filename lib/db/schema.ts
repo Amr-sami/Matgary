@@ -25,6 +25,12 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash"),
   /** When true, login succeeds but every page redirects to /account/change-password. */
   mustChangePassword: boolean("must_change_password").notNull().default(false),
+  /** Base32-encoded TOTP shared secret. Set during enrollment, null when 2FA is off. */
+  totpSecret: text("totp_secret"),
+  /** Non-null marks 2FA active. Login requires a TOTP / recovery code on top of the password. */
+  totpEnabledAt: timestamp("totp_enabled_at", { withTimezone: true }),
+  /** bcrypt-hashed recovery codes. Each is consumed (removed) on use. */
+  recoveryCodesHash: text("recovery_codes_hash").array(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .default(sql`now()`),
@@ -652,6 +658,8 @@ export const purchaseOrders = pgTable(
     receivedDate: timestamp("received_date", { withTimezone: true }),
     notes: text("notes"),
     total: text("total").notNull().default("0"),
+    /** Running amount paid against this PO. Settled when paidAmount = total. */
+    paidAmount: text("paid_amount").notNull().default("0"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .default(sql`now()`),
@@ -688,17 +696,71 @@ export const purchaseOrderItems = pgTable(
   ],
 );
 
+export const purchaseOrderPayments = pgTable(
+  "purchase_order_payments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id").references(() => branches.id, {
+      onDelete: "restrict",
+    }),
+    purchaseOrderId: uuid("purchase_order_id")
+      .notNull()
+      .references(() => purchaseOrders.id, { onDelete: "cascade" }),
+    supplierId: uuid("supplier_id")
+      .notNull()
+      .references(() => suppliers.id, { onDelete: "restrict" }),
+    amount: text("amount").notNull(),
+    method: text("method").notNull().default("cash"),
+    paidAt: timestamp("paid_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [
+    index("po_payments_tenant_po_idx").on(t.tenantId, t.purchaseOrderId),
+    index("po_payments_tenant_supplier_date_idx").on(
+      t.tenantId,
+      t.supplierId,
+      t.paidAt,
+    ),
+  ],
+);
+
 export const suppliersRelations = relations(suppliers, ({ many }) => ({
   purchaseOrders: many(purchaseOrders),
 }));
 
 export const purchaseOrdersRelations = relations(purchaseOrders, ({ many, one }) => ({
   items: many(purchaseOrderItems),
+  payments: many(purchaseOrderPayments),
   supplier: one(suppliers, {
     fields: [purchaseOrders.supplierId],
     references: [suppliers.id],
   }),
 }));
+
+export const purchaseOrderPaymentsRelations = relations(
+  purchaseOrderPayments,
+  ({ one }) => ({
+    purchaseOrder: one(purchaseOrders, {
+      fields: [purchaseOrderPayments.purchaseOrderId],
+      references: [purchaseOrders.id],
+    }),
+    supplier: one(suppliers, {
+      fields: [purchaseOrderPayments.supplierId],
+      references: [suppliers.id],
+    }),
+  }),
+);
 
 export const purchaseOrderItemsRelations = relations(purchaseOrderItems, ({ one }) => ({
   purchaseOrder: one(purchaseOrders, {
@@ -997,14 +1059,14 @@ export const subscriptions = pgTable("subscriptions", {
     .references(() => tenants.id, { onDelete: "cascade" }),
   /**
    * Plan key. We start with two plans + the trial sentinel:
-   *  - 'trial'        — fresh signup, 14-day full access
+   *  - 'trial'        — fresh signup, full access during TRIAL_DAYS window
    *  - 'professional' — single store, full feature set, paid monthly
    *  - 'multi_branch' — placeholder; gated behind future multi-branch work
    */
   plan: text("plan").notNull().default("trial"),
   /**
    * Lifecycle:
-   *  - 'trialing'   — inside the 14-day window
+   *  - 'trialing'   — inside the trial window (TRIAL_DAYS)
    *  - 'active'     — paid + within current period
    *  - 'past_due'   — payment failed; inside the 7-day grace
    *  - 'cancelled'  — owner cancelled; access until current_period_ends_at

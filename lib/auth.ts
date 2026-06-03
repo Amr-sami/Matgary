@@ -1,4 +1,5 @@
 import NextAuth, { type DefaultSession } from "next-auth";
+import { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import bcrypt from "bcryptjs";
@@ -11,6 +12,7 @@ import type { Permission } from "./permissions";
 import { logActivity } from "./repo/activity";
 import { cacheBustPrefix, cacheRemember, globalKey } from "./cache";
 import { rateLimit, rateLimitConsume } from "./ratelimit";
+import { findRecoveryCodeIndex, verifyTotp } from "./totp";
 
 // Login limits — both must pass. The IP guard slows credential-stuffing from
 // a single host; the email guard slows targeted attacks. Numbers are tight
@@ -20,6 +22,18 @@ const LOGIN_IP_LIMIT = 10;
 const LOGIN_IP_WINDOW_SEC = 15 * 60;
 const LOGIN_EMAIL_LIMIT = 5;
 const LOGIN_EMAIL_WINDOW_SEC = 15 * 60;
+const TOTP_LIMIT = 5;
+const TOTP_WINDOW_SEC = 15 * 60;
+
+// H03 — custom CredentialsSignin subclasses so the login UI can distinguish
+// "password right, TOTP missing" from "wrong password" without a second
+// round-trip. The `code` field propagates to the client as ?error=<code>.
+export class TotpRequiredError extends CredentialsSignin {
+  code = "TotpRequired";
+}
+export class InvalidTotpError extends CredentialsSignin {
+  code = "InvalidTotp";
+}
 
 function clientIpFromRequest(req: Request | undefined): string {
   if (!req) return "unknown";
@@ -98,6 +112,10 @@ const credentialsSchema = z.object({
       z.string().regex(/^[a-z0-9._%+-]+@[a-z0-9.-]+$/i, "Invalid login identifier"),
     ),
   password: z.string().min(8).max(128),
+  // Optional second-factor input. Empty/missing on the first submit; the
+  // client re-submits with this populated after the TotpRequired error
+  // bounces it back. Strings only — recovery codes look like "xxxxx-xxxxx".
+  totp: z.string().min(6).max(20).optional(),
 });
 
 interface UserContext {
@@ -268,6 +286,46 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             }),
           ]);
           return null;
+        }
+
+        // ── 2FA gate ──────────────────────────────────────────────────
+        // If the user has TOTP enrolled, the password is necessary but not
+        // sufficient. Either we got a code along with the password (verify
+        // it now) or we send the client back with a TotpRequired signal so
+        // it can prompt for the code and retry.
+        if (user!.totpEnabledAt && user!.totpSecret) {
+          const supplied = parsed.data.totp?.replace(/\s+/g, "");
+          if (!supplied) {
+            throw new TotpRequiredError();
+          }
+          const totpRl = await rateLimit("auth.totp", user!.id, {
+            limit: TOTP_LIMIT,
+            windowSec: TOTP_WINDOW_SEC,
+            commit: false,
+          });
+          if (!totpRl.ok) {
+            // Same UX as a bad code — don't leak that we're throttling.
+            throw new InvalidTotpError();
+          }
+          const passed = verifyTotp(supplied, user!.totpSecret);
+          if (!passed) {
+            // Could be a recovery code; try that path.
+            const hashes = (user!.recoveryCodesHash ?? []) as string[];
+            const idx = await findRecoveryCodeIndex(supplied, hashes);
+            if (idx < 0) {
+              await rateLimitConsume("auth.totp", user!.id, {
+                limit: TOTP_LIMIT,
+                windowSec: TOTP_WINDOW_SEC,
+              });
+              throw new InvalidTotpError();
+            }
+            // Recovery code consumed — splice the matched hash out.
+            const next = hashes.filter((_, i) => i !== idx);
+            await db
+              .update(users)
+              .set({ recoveryCodesHash: next })
+              .where(eq(users.id, user!.id));
+          }
         }
 
         return {

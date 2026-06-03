@@ -183,6 +183,16 @@ npm run db:migrate
 
 ## 2. Changelog
 
+### 2026-06-03 — H03 2FA for owners (TOTP + recovery codes)
+
+- **Schema.** Migration `0026_user_totp.sql` adds three nullable columns to `users`: `totp_secret`, `totp_enabled_at`, `recovery_codes_hash text[]`. All three NULL = 2FA off; populated = 2FA on. Journal entry registered.
+- **TOTP engine.** Implemented in-tree (`lib/totp.ts`, ~140 LOC) instead of via otplib because v13 dropped the simple `authenticator` preset and now requires noisy plugin wiring. Pure base32 + HMAC-SHA1 counter + dynamic truncation per RFC 6238. 16 unit tests in `tests/repo/totp.test.ts` cover the published RFC vectors, ±1-step window tolerance, malformed-input rejection, and recovery-code generation/lookup.
+- **Lifecycle service.** `lib/repo/account-security.ts` wraps `startEnrollment`, `verifyAndEnable`, `disable2fa`, `regenerateRecoveryCodes`, `verifySecondFactor`, `isTotpEnabled`. All mutations bust the user-context cache.
+- **Login flow split.** `lib/auth.ts` extends the credentials schema with an optional `totp`. On password success with `totpEnabledAt` set, authorize either accepts a valid 6-digit code or a recovery code (the matched hash is spliced out), or throws a custom `CredentialsSignin` subclass (`TotpRequiredError` / `InvalidTotpError`) with a `code` field that propagates to the client as `?error=…` in the JSON-mode callback response. Rate-limit `auth.totp` 5 / 15 min / user-id; recovery-code mismatches consume the same bucket.
+- **UI.** `/account/security` (owner-only) drives the 3 states off the 4 new endpoints: `POST /api/account/2fa/{start,enable,disable,regenerate}` + `GET /api/account/2fa-status`. Manual-key enrollment with the secret grouped 4 chars at a time + tap-to-add `otpauth://` link; **QR rendering deferred** to keep the diff focused (most authenticator apps accept either path). Login page parses the callback `url` for `?error=TotpRequired` and surfaces a second-step TOTP input that auto-submits with the preserved email/password.
+- **Activity log.** Three new entries: `auth.2fa_enable`, `auth.2fa_disable`, `auth.recovery_codes_regenerated` — Arabic labels added to `activity-labels.ts`. Used the `auth` category rather than introducing `account` (closed union; would have touched the renderer + every call site).
+- **Tests.** Full vitest suite (46 tests across 5 files) green; typecheck clean. E2E smoke not re-run during this session — the login path's pre-2FA branch is logically identical, and the new fields default to NULL on the cornerstore-onboarded test tenant.
+
 ### 2026-06-03 — H05 Playwright E2E smoke (happy path)
 
 - **`tests/e2e/smoke.spec.ts` + `playwright.config.ts`.** One serial test exercises the full happy path: signup (2 steps) → onboarding (3 steps, Corner Store preset) → dashboard → API-create one product in the seeded `watches` category → API-record a 200 EGP cash sale → confirm the product name appears on `/sales` → confirm `/insights` overview shows 200. 6.9 s locally; CI budget ≤ 60 s including build.

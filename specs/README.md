@@ -11,7 +11,7 @@ Working surface for the launch-readiness work. Each spec lives in its own file s
 |---|---|---|---|
 | [H01](hard/H01-restore-drill.md) | Restore drill execution | ✅ done 2026-06-03 | 30 min |
 | [H02](hard/H02-ci-pipeline.md) | CI pipeline (GitHub Actions) | ✅ done 2026-06-03 | 1-2 hrs |
-| [H03](hard/H03-2fa.md) | 2FA for owners (TOTP + recovery codes) | pending | 3-4 hrs |
+| [H03](hard/H03-2fa.md) | 2FA for owners (TOTP + recovery codes) | ✅ done 2026-06-03 (manual-key path; QR deferred) | 3-4 hrs |
 | [H04](hard/H04-health-endpoints.md) | /healthz + /readyz endpoints | ✅ done 2026-06-03 | 30 min |
 | [H05](hard/H05-e2e-smoke.md) | E2E smoke test (Playwright) | ✅ done 2026-06-03 | 3 hrs |
 | [H06](hard/H06-money-math-tests.md) | Repo-level unit tests for money math | ✅ done 2026-06-03 (leave-overlap dropped) | 2 hrs |

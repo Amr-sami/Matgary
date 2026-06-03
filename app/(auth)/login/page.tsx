@@ -34,6 +34,13 @@ function LoginInner() {
   const next = search.get("next") || "/";
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // H03 — 2FA step is shown after a first-pass submit returns TotpRequired.
+  // `totp` is supplied on the second submit; the email/password fields are
+  // preserved (controlled values) so the user doesn't retype.
+  const [needsTotp, setNeedsTotp] = useState(false);
+  const [emailValue, setEmailValue] = useState("");
+  const [passwordValue, setPasswordValue] = useState("");
+  const [totp, setTotp] = useState("");
 
   // Read the form values straight from the DOM at submit time. This is the
   // bulletproof path: browser password managers / autofill can populate
@@ -46,8 +53,10 @@ function LoginInner() {
     setBusy(true);
 
     const formData = new FormData(e.currentTarget);
-    const email = cleanIdentifier(String(formData.get("email") ?? ""));
-    const password = String(formData.get("password") ?? "");
+    const emailFromForm = cleanIdentifier(String(formData.get("email") ?? ""));
+    const passwordFromForm = String(formData.get("password") ?? "");
+    const email = needsTotp ? emailValue : emailFromForm;
+    const password = needsTotp ? passwordValue : passwordFromForm;
 
     if (!email || !password) {
       setError("أدخل البريد وكلمة المرور");
@@ -59,24 +68,45 @@ function LoginInner() {
       const csrfRes = await fetch("/api/auth/csrf");
       const { csrfToken } = (await csrfRes.json()) as { csrfToken: string };
 
-      const body = new URLSearchParams({
+      const params: Record<string, string> = {
         csrfToken,
         email,
         password,
         callbackUrl: next,
         json: "true",
-      }).toString();
+      };
+      if (needsTotp && totp) params.totp = totp;
+      const body = new URLSearchParams(params).toString();
 
-      // Default redirect mode — fetch follows the 302 silently and the
-      // browser applies any Set-Cookie along the way. We don't try to read
-      // the redirect location (it's opaque cross-fetch in browsers); we
-      // verify success by asking /api/auth/session whether a user is now
-      // signed in.
-      await fetch("/api/auth/callback/credentials", {
+      // With json:"true" the callback returns JSON { url } instead of
+      // redirecting — read the url to detect the TotpRequired error code.
+      const callbackRes = await fetch("/api/auth/callback/credentials", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body,
       });
+      const callbackBody = (await callbackRes
+        .json()
+        .catch(() => ({}))) as { url?: string };
+      const errorCode = callbackBody.url
+        ? new URL(callbackBody.url, window.location.origin).searchParams.get(
+            "error",
+          )
+        : null;
+
+      if (errorCode === "TotpRequired") {
+        setEmailValue(email);
+        setPasswordValue(password);
+        setNeedsTotp(true);
+        return;
+      }
+      if (errorCode === "InvalidTotp") {
+        setEmailValue(email);
+        setPasswordValue(password);
+        setNeedsTotp(true);
+        setError("الرمز غير صحيح");
+        return;
+      }
 
       const sessionRes = await fetch("/api/auth/session", { cache: "no-store" });
       const session = (await sessionRes.json()) as { user?: { id?: string } };
@@ -103,32 +133,69 @@ function LoginInner() {
       </div>
 
       <form onSubmit={onSubmit} className="space-y-4">
-        <Input
-          name="email"
-          type="text"
-          label="البريد أو اسم المستخدم"
-          required
-          autoComplete="username"
-          dir="ltr"
-          spellCheck={false}
-          autoCapitalize="off"
-          autoCorrect="off"
-          placeholder="you@example.com  •  username@yourstore"
-        />
-        <PasswordInput
-          name="password"
-          label="كلمة المرور"
-          required
-          autoComplete="current-password"
-          spellCheck={false}
-          autoCapitalize="off"
-        />
+        {!needsTotp && (
+          <>
+            <Input
+              name="email"
+              type="text"
+              label="البريد أو اسم المستخدم"
+              required
+              autoComplete="username"
+              dir="ltr"
+              spellCheck={false}
+              autoCapitalize="off"
+              autoCorrect="off"
+              placeholder="you@example.com  •  username@yourstore"
+            />
+            <PasswordInput
+              name="password"
+              label="كلمة المرور"
+              required
+              autoComplete="current-password"
+              spellCheck={false}
+              autoCapitalize="off"
+            />
+          </>
+        )}
+
+        {needsTotp && (
+          <div className="space-y-3">
+            <p className="text-sm text-text-secondary">
+              أدخل الرمز المكوّن من 6 أرقام من تطبيق المصادقة، أو رمزاً احتياطياً (xxxxx-xxxxx).
+            </p>
+            <Input
+              value={totp}
+              onChange={(e) => setTotp(e.target.value)}
+              placeholder="123456"
+              dir="ltr"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              autoFocus
+              required
+            />
+          </div>
+        )}
 
         {error && <p className="text-sm text-danger">{error}</p>}
 
         <Button type="submit" className="w-full" loading={busy}>
-          تسجيل الدخول
+          {needsTotp ? "تأكيد الرمز" : "تسجيل الدخول"}
         </Button>
+
+        {needsTotp && (
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full"
+            onClick={() => {
+              setNeedsTotp(false);
+              setTotp("");
+              setError(null);
+            }}
+          >
+            رجوع
+          </Button>
+        )}
 
         <div className="text-center">
           <Link
