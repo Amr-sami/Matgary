@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
+import QRCode from "qrcode";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { PasswordInput } from "@/components/ui/PasswordInput";
@@ -97,6 +98,7 @@ export default function SecurityPage() {
   const { data: session } = useSession();
   const [status, setStatus] = useState<Status>("loading");
   const [preview, setPreview] = useState<EnrollmentPreview | null>(null);
+  const [qrDataUri, setQrDataUri] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
@@ -125,7 +127,21 @@ export default function SecurityPage() {
     try {
       const res = await fetch("/api/account/2fa/start", { method: "POST" });
       if (!res.ok) throw new Error("تعذر بدء التفعيل");
-      setPreview((await res.json()) as EnrollmentPreview);
+      const p = (await res.json()) as EnrollmentPreview;
+      setPreview(p);
+      // Render the otpauth:// URI as a QR data URI so phones can scan it.
+      // 256 px is enough for any reasonable camera; margin=1 keeps the
+      // quiet zone narrow so it fits nicely on a card.
+      try {
+        const dataUri = await QRCode.toDataURL(p.otpauthUri, {
+          width: 256,
+          margin: 1,
+          errorCorrectionLevel: "M",
+        });
+        setQrDataUri(dataUri);
+      } catch {
+        setQrDataUri(null); // fall back to manual paste only
+      }
       setStatus("enrolling");
     } catch (e) {
       setError(e instanceof Error ? e.message : "خطأ غير متوقع");
@@ -251,21 +267,43 @@ export default function SecurityPage() {
       {status === "enrolling" && preview && (
         <div className="bg-white rounded-2xl border border-border p-6 space-y-4">
           <p className="text-sm text-text-secondary">
-            1) افتح تطبيق المصادقة (Google Authenticator / Microsoft Authenticator / Authy)، ثم أضف حساباً يدوياً والصق هذا المفتاح:
+            1) افتح تطبيق المصادقة على هاتفك (Google Authenticator / Microsoft Authenticator / Authy)، ثم اختر "إضافة حساب → مسح الكود":
           </p>
-          <div className="font-mono text-center bg-bg-main rounded-lg p-3 select-all" dir="ltr">
-            {preview.secret.match(/.{1,4}/g)?.join(" ")}
-          </div>
-          <p className="text-sm text-text-secondary">
-            أو على الجوال، اضغط الرابط أدناه لإضافة الحساب مباشرة:
-          </p>
-          <a
-            href={preview.otpauthUri}
-            className="block text-center text-accent underline break-all text-xs"
-            dir="ltr"
-          >
-            {preview.otpauthUri}
-          </a>
+          {qrDataUri && (
+            <div className="flex justify-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={qrDataUri}
+                alt="QR للمصادقة الثنائية"
+                width={256}
+                height={256}
+                className="rounded-lg border border-border bg-white p-2"
+              />
+            </div>
+          )}
+          <details className="text-sm">
+            <summary className="cursor-pointer text-text-secondary hover:text-text-primary">
+              لا يمكنك مسح الكود؟ أدخله يدوياً
+            </summary>
+            <div className="mt-3 space-y-2">
+              <p className="text-xs text-text-secondary">
+                في تطبيق المصادقة، اختر "إضافة حساب → إدخال يدوي" والصق هذا المفتاح:
+              </p>
+              <div className="font-mono text-center bg-bg-main rounded-lg p-3 select-all" dir="ltr">
+                {preview.secret.match(/.{1,4}/g)?.join(" ")}
+              </div>
+              <p className="text-xs text-text-secondary">
+                أو على نفس الجهاز، اضغط الرابط لإضافة الحساب مباشرة:
+              </p>
+              <a
+                href={preview.otpauthUri}
+                className="block text-center text-accent underline break-all text-xs"
+                dir="ltr"
+              >
+                {preview.otpauthUri}
+              </a>
+            </div>
+          </details>
           <p className="text-sm text-text-secondary">
             2) أدخل الرمز المكوّن من 6 أرقام الذي يعرضه التطبيق الآن:
           </p>
