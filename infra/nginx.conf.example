@@ -29,6 +29,13 @@ server {
     # and image uploads (team photos, logos) don't 413.
     client_max_body_size 25m;
 
+    # Liveness + readiness probes. /healthz is a static 200 (no deps), suitable
+    # for an L4 health check. /readyz pings Postgres + Redis with a 1 s timeout
+    # each and returns 503 if either fails — use this for the orchestrator's
+    # upstream/readiness probe and for blue/green flip-over.
+    location = /healthz { proxy_pass http://127.0.0.1:3000; access_log off; }
+    location = /readyz  { proxy_pass http://127.0.0.1:3000; access_log off; }
+
     # Long-lived static assets — the Next build hashes them.
     location /_next/static/ {
         proxy_pass http://127.0.0.1:3000;

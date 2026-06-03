@@ -6,7 +6,11 @@ if (process.env.SENTRY_DSN) {
   Sentry.init({
     dsn: process.env.SENTRY_DSN,
     environment: process.env.SENTRY_ENVIRONMENT ?? process.env.NODE_ENV,
-    tracesSampleRate: Number(process.env.SENTRY_TRACES_RATE ?? 0.1),
+    tracesSampler: (ctx) => {
+      const name = ctx.transactionContext?.name ?? "";
+      if (name.includes("/healthz") || name.includes("/readyz")) return 0;
+      return Number(process.env.SENTRY_TRACES_RATE ?? 0.1);
+    },
     enabled: process.env.NODE_ENV !== "test",
   });
 }

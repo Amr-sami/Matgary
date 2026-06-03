@@ -1,0 +1,89 @@
+name: main
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  full-test-suite:
+    name: typecheck + lint + full vitest (isolation)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: matgary
+          POSTGRES_PASSWORD: matgary
+          POSTGRES_DB: matgary_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U matgary -d matgary_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      NODE_ENV: test
+      # Admin URL — used by migrations + the isolation suite's destructive setup.
+      DATABASE_URL: postgres://matgary:matgary@localhost:5432/matgary_test
+      # App URL — NOSUPERUSER NOBYPASSRLS role so RLS actually fires under test.
+      APP_DATABASE_URL: postgres://matgary_app:matgary_app@localhost:5432/matgary_test
+      REDIS_URL: redis://localhost:6379
+      # Required by the isolation suite's safety gate (URL must also contain
+      # "test" — see tests/isolation.test.ts beforeAll). The DB name above
+      # satisfies the second condition.
+      TEST_DB_WIPE: "1"
+      # Auth.js requires this at module load.
+      AUTH_SECRET: ci-test-secret-do-not-use-in-prod
+      # Per-tenant Green API token encryption key (required by lib/crypto.ts).
+      SECRET_KEY: ci-test-secret-key-do-not-use-in-prod
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Provision matgary_app NOSUPERUSER role
+        # infra/init-postgres.sql is run automatically only on a fresh
+        # Docker volume — in CI the postgres service container is fresh but
+        # the docker-entrypoint init dir is empty, so apply the role + grants
+        # explicitly before migrations create any tables.
+        env:
+          PGPASSWORD: matgary
+        run: |
+          psql -h localhost -U matgary -d matgary_test -v ON_ERROR_STOP=1 -f infra/init-postgres.sql
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      # Lint surfaces the pre-existing 194-error backlog while we work
+      # through it. Marked non-blocking until that backlog is empty
+      # (tracked in task.md §4 "Cleanup pre-existing lint errors").
+      - name: Lint (informational, not gating)
+        continue-on-error: true
+        run: npm run lint
+
+      - name: Run migrations
+        run: npm run db:migrate
+
+      - name: Full vitest (cache + ratelimit + isolation)
+        run: npx vitest run

@@ -52,6 +52,12 @@ proves tenant A cannot see, edit, or delete tenant B's products /
 categories / brands / sales / returns / expenses, and that RLS hides every
 row when `app.tenant_id` is unset.
 
+CI runs typecheck + lint + Redis-gated tests on every PR
+(`.github/workflows/pr.yml`) and the full isolation suite against an
+ephemeral Postgres on every push to `main` (`.github/workflows/main.yml`).
+Branch protection on `main` should require the PR workflow before merge —
+configure once in repo settings.
+
 ## Database commands
 
 | Script | What it does |

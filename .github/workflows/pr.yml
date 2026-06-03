@@ -1,0 +1,52 @@
+name: PR checks
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    name: typecheck + lint + cache tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      NODE_ENV: test
+      REDIS_URL: redis://localhost:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      # Lint surfaces the pre-existing 194-error backlog while we work
+      # through it. Marked non-blocking until that backlog is empty (tracked
+      # in task.md §4 "Cleanup pre-existing lint errors"). Typecheck + tests
+      # remain the gating signals.
+      - name: Lint (informational, not gating)
+        continue-on-error: true
+        run: npm run lint
+
+      - name: Cache + ratelimit tests (Redis-gated)
+        run: npx vitest run tests/cache.test.ts tests/ratelimit.test.ts

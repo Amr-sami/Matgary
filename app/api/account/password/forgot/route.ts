@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { headers } from "next/headers";
@@ -14,6 +15,18 @@ const schema = z.object({
 // button, retry).
 const FORGOT_LIMIT = 5;
 const FORGOT_WINDOW_SEC = 60 * 60;
+
+// Per-email throttle — belt + suspenders on top of the IP one. Prevents a
+// rotating-IP attacker from using this endpoint as a presence oracle by
+// hammering a single email. Identifier is the SHA-256 of the lowercased
+// email so the raw address never lands in Redis. Consumed unconditionally
+// (known + unknown emails) so attempt count doesn't leak existence.
+const FORGOT_EMAIL_LIMIT = 3;
+const FORGOT_EMAIL_WINDOW_SEC = 60 * 60;
+
+function hashEmail(email: string): string {
+  return crypto.createHash("sha256").update(email).digest("hex");
+}
 
 async function clientIp(): Promise<string> {
   const h = await headers();
@@ -35,15 +48,26 @@ export async function POST(req: NextRequest) {
   }
 
   const ip = await clientIp();
-  const rl = await rateLimit("pwd.forgot", ip, {
+  const ipRl = await rateLimit("pwd.forgot", ip, {
     limit: FORGOT_LIMIT,
     windowSec: FORGOT_WINDOW_SEC,
   });
-  if (!rl.ok) {
+  if (!ipRl.ok) {
     return NextResponse.json({ ok: true });
   }
 
   const email = parsed.data.email.trim().toLowerCase();
+
+  // Per-email bucket runs BEFORE the DB lookup so timing is identical for
+  // known and unknown emails.
+  const emailRl = await rateLimit("pwd.forgot.email", hashEmail(email), {
+    limit: FORGOT_EMAIL_LIMIT,
+    windowSec: FORGOT_EMAIL_WINDOW_SEC,
+  });
+  if (!emailRl.ok) {
+    return NextResponse.json({ ok: true });
+  }
+
   const issued = await issueResetToken(email);
 
   if (issued.emailExists) {

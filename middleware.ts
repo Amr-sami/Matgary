@@ -29,6 +29,10 @@ const PUBLIC_PATHS = new Set<string>([
   // stays gated. Meta posts here without our session; the route enforces
   // its own X-Hub-Signature-256 + verify-token checks.
   "/api/whatsapp/webhook",
+  // Health + readiness probes — must be reachable by orchestrator / nginx
+  // upstream check without a session cookie. Both routes are no-tenant.
+  "/healthz",
+  "/readyz",
 ]);
 const PUBLIC_PREFIXES = [
   "/api/auth",

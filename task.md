@@ -94,6 +94,7 @@ Per `lib/permissions.ts`:
 - `pwd.change` 5 / 1 hr / user
 - `pwd.reset` 10 / 1 hr / actor
 - `pwd.forgot` 5 / 1 hr / IP
+- `pwd.forgot.email` 3 / 1 hr / sha256(email) — H10, belt + suspenders on the IP bucket
 - `pwd.reset.token` 20 / 1 hr / IP
 - `signup.ip` 5 / 1 hr / IP
 - `wa.send` 30 / 1 min / tenant (shared between `/send` and `/send-pdf`)
@@ -181,6 +182,24 @@ npm run db:migrate
 ---
 
 ## 2. Changelog
+
+### 2026-06-03 — H02 CI pipeline (GitHub Actions)
+
+- **`.github/workflows/pr.yml`** runs on every PR: `npm ci` → `npx tsc --noEmit` → lint (informational) → Redis-gated vitest specs (`cache.test.ts` + new `ratelimit.test.ts`). Single Redis 7 service container. `cache: npm` for `~/.npm`.
+- **`.github/workflows/main.yml`** runs on push to `main`: above + Postgres 16 service container with `matgary_test` DB → applies `infra/init-postgres.sql` to provision the `matgary_app` NOSUPERUSER NOBYPASSRLS role → `npm run db:migrate` → full `npx vitest run`. Env primes `TEST_DB_WIPE=1` + `DATABASE_URL` ending in `_test` so the isolation suite's double safety gate unlocks.
+- **Pre-existing lint backlog**: `npm run lint` surfaces 194 errors + 970 warnings (mostly `no-explicit-any` + unused-vars). None from the new code. Lint step is `continue-on-error: true` so PR / main checks aren't blocked by the historical backlog. Tracked in §4 backlog "Cleanup pre-existing lint errors" — once empty, remove the `continue-on-error` line and let lint be a real gate.
+- **Manual follow-up**: enable branch protection on `main` requiring the PR workflow green before merge — that's a repo-settings click and is documented in `README.md` "Tests" section.
+
+### 2026-06-03 — H04 (/healthz + /readyz) and H10 (per-email pwd reset throttle)
+
+- **H04** — two App Router routes under `app/healthz/` and `app/readyz/`. `/healthz` is a no-deps static 200 with `{ status, uptime, version }`. `/readyz` races a Postgres `SELECT 1` and Redis `PING` against a 1 s timeout each; reports `db`/`redis` status per component and returns 503 if either required component fails. Redis-disabled (no `REDIS_URL` or `CACHE_DISABLED=1`) is reported as `"disabled"` and stays 200 because cache is opportunistic by design. Both paths added to `middleware.ts` `PUBLIC_PATHS` so they bypass the auth gate. Sentry server + edge configs switched from `tracesSampleRate` to `tracesSampler` so probe traffic returns 0 sample rate. `infra/nginx.conf.example` got `location =` blocks with `access_log off` for both. Smoke: `/healthz` → `{"status":"ok","uptime":2799,"version":"0.1.0"}`, `/readyz` → `{"status":"ready","db":"ok","redis":"ok"}`.
+- **H10** — new `pwd.forgot.email` rate-limit bucket (3 / 1 hr, identifier = `sha256(email_lower)`). Consumed BEFORE the DB lookup in `app/api/account/password/forgot/route.ts` so timing is identical for known + unknown emails; consumed unconditionally so attempt count never leaks email existence. Hashing keeps raw emails out of Redis keys. New `tests/ratelimit.test.ts` (3 tests, all green) verifies the 3-then-block budget and per-hash isolation; mirrors the cache test's Redis-availability gating. Bucket added to the §1.5 rate-limit catalog.
+
+### 2026-06-03 — Launch-readiness specs split + H01 restore drill executed
+
+- **Launch-readiness specs (§7)**: cut the launch backlog into three buckets with concrete acceptance criteria. Hard specs (H01-H12) — in-repo work that must ship before paid launch. Soft specs (S1-S16) — trigger-based, deferred until a real user signal. External specs (E1-E7) — gated on outside parties (hosting, vendor, Paymob, SMS provider, ETA, Meta, mobile companion app). Per-spec files live under `specs/hard/` with status, acceptance checkboxes, implementation plan, and verification log. Index at `specs/README.md`.
+- **H01 — Restore drill executed.** Closed §5's "Restore drill never run" gap. Latest daily dump (`daily-2026-06-01T02-30-00Z.sql.gz`, 31 KB) restored against a throwaway `postgres:16-alpine` container on port 55432 in 1 s wall time. Row counts match source within expected delta (one `activity_logs` row written between dump time and capture). RLS preserved: `relforcerowsecurity = t` on all sampled tables, and a behavioural test as a NOSUPERUSER NOBYPASSRLS role confirmed 0 rows without `app.tenant_id` and tenant-scoped reads with it. Full log: `infra/drills/restore-drill-2026-06-03.log`.
+- **Restore-drill follow-up surfaced (not a launch blocker):** `pg_dump --no-privileges` strips GRANTs, so after a production restore `matgary_app` must be recreated + regranted on every tenant-scoped table. `infra/init-postgres.sql` only covers the fresh-container path. Production restore runbook needs both steps spelled out — added to `specs/hard/H01-restore-drill.md` follow-ups; not blocking launch because today's restore would be operator-initiated.
 
 ### 2026-05-12 — WhatsApp Phase 7 (inbox UI shell)
 
@@ -812,6 +831,7 @@ Ordered roughly by likely impact on retention / conversion. Not committed — re
 
 ### Infrastructure / ops
 
+- **Cleanup pre-existing lint errors** (194 errors, 970 warnings as of 2026-06-03). Mostly `no-explicit-any` + unused-vars. Today's CI runs lint with `continue-on-error: true` so the noise doesn't gate PRs — once the backlog is empty, remove that line and let lint be a true gate. Track via `npm run lint 2>&1 | grep -E "^✖"` regression test.
 - ~~**Insights server-side aggregation**: today the overview tab aggregates client-side from `useSales`. Move to `/api/insights?from=…&to=…` with a 60 s tenant-keyed cache.~~ ✅ done 2026-05-09 — see changelog.
 - **/healthz + /readyz endpoints** for nginx / orchestrator probes.
 - **Structured logging** (pino or similar). Replace `console.log` in repo + API.
@@ -856,7 +876,7 @@ Ordered roughly by likely impact on retention / conversion. Not committed — re
 - ~~**Notifications polling.**~~ ✅ Resolved 2026-05-09 — SSE stream backed by Redis pub/sub. Polling kept as a fallback when EventSource keeps failing.
 - ~~**Recurring expenses don't auto-spawn.**~~ ✅ Resolved 2026-05-09 — `POST /api/cron/recurring-expenses` (bearer-auth, rate-limited) + `cron` sidecar in docker-compose pokes it hourly. Lazy catch-up on `listExpenses` retained as a belt-and-braces second path.
 - ~~**Cache tests skip silently if Redis is unreachable.**~~ ✅ Resolved 2026-05-09 — `beforeAll` pings Redis when configured; ping failure throws with the underlying error.
-- **Restore drill never run.** I documented how, you haven't done it. Do it once before the first customer signs up.
+- ~~**Restore drill never run.**~~ ✅ Resolved 2026-06-03 — drill executed against the latest daily dump on a throwaway Postgres container, row counts + RLS preserved end-to-end. Log: `infra/drills/restore-drill-2026-06-03.log`. Follow-up (production restore runbook needs explicit role + regrant steps) tracked in `specs/hard/H01-restore-drill.md`.
 - **Paymob env keys are empty.** `/billing` shows a clean disabled state until they're provisioned. Until then nothing can actually be charged — explicit by design, but also a launch blocker.
 - **No SaaS-invoice generation for tax purposes.** Paymob emails its own receipt; we don't issue our own VAT invoice for the subscription itself. Add when our own VAT registration is filed.
 - **No retry / dunning on failed payments.** A `past_due` subscription stays past_due until manually retried by the owner. Email reminders on day 1/3/6 of the grace window are still TODO.
@@ -889,6 +909,230 @@ Things we explicitly decided (and the why) so we don't relitigate.
 | Phone normaliser fails open (junk input → null, not rejection) | Phone is optional everywhere; rejecting a sale because of a bad customer phone hurts the cashier more than it helps the owner | 2026-05-07 |
 | Webhook bust user-context cache for every member, not just owner | Staff session may be active during checkout; flipping subscription state for the owner alone leaves staff seeing stale "trial expired" view | 2026-05-07 |
 | Webhook idempotency keyed on `paymobTransactionId` | Paymob occasionally re-delivers; doubling a paid month is worse than skipping a duplicate | 2026-05-07 |
+
+---
+
+## 7. Launch-readiness specs
+
+Three buckets:
+
+- **§7.1 Hard** — in-repo code work that must ship before paid launch.
+- **§7.2 Soft** — can launch without; ship when a real user signal arrives.
+- **§7.3 External** — gated on someone outside the codebase (vendor, account, decision).
+
+Recommended execution order is in §7.4. Each Hard spec has explicit acceptance criteria so "done" is unambiguous. Soft specs only list trigger + rough size. External specs document the in-repo deliverable that's ready to land the moment the blocker clears.
+
+---
+
+### 7.1 Hard specs — must finish before paid launch
+
+#### H1. Restore drill execution
+**Why:** Backups exist but the restore path has never run. Untested backup = no backup.
+**Acceptance:**
+- Spin up throwaway Postgres container (per §1.6 cheatsheet).
+- Run `infra/restore.sh` against the latest `backups/*.sql.gz` with `RESTORE_CONFIRM=1`.
+- Verify a known tenant's row counts match the source (`SELECT count(*) FROM products WHERE tenant_id = '...'`).
+- Append `restore-drill-YYYY-MM-DD.log` to `infra/drills/` with timing + row-count diff.
+**Effort:** 30 min.
+
+#### H2. CI pipeline (GitHub Actions)
+**Why:** Manual `tsc --noEmit` before push is not a safety net. Money-handling SaaS needs automated gates.
+**Acceptance:**
+- `.github/workflows/pr.yml` — on every PR: `npm ci`, `npx tsc --noEmit`, `npm run lint`, `npx vitest run tests/cache.test.ts` (Redis service).
+- `.github/workflows/main.yml` — on push to `main`: above + full isolation suite against an ephemeral Postgres service with `TEST_DB_WIPE=1` and a `DATABASE_URL` containing `test`.
+- Branch protection on `main`: PR workflow must pass.
+**Effort:** 1-2 hrs.
+
+#### H3. 2FA for owners (TOTP + recovery codes)
+**Why:** §5 known gap. Owner credential compromise = full tenant takeover. Pen-tester will flag absence.
+**Acceptance:**
+- Schema: `users.totp_secret`, `users.totp_enabled_at`, `users.recovery_codes_hash` (array of bcrypt'd codes).
+- Enrollment page at `/account/security` — QR code (otpauth URI), verify 6-digit code to commit, show 8 one-time recovery codes once.
+- Login flow: if `totp_enabled_at` set, after password success ask for TOTP or recovery code before issuing JWT.
+- Recovery code consumed on use (removed from array). Regen UX surfaces remaining count.
+- Disable 2FA requires current password + valid TOTP.
+- Owners only for v1 (staff later).
+- Activity log: `account.2fa_enable`, `account.2fa_disable`, `account.recovery_code_used`.
+- Rate-limit: `auth.totp` 5 / 15 min / user.
+**Effort:** 3-4 hrs.
+
+#### H4. /healthz + /readyz endpoints
+**Why:** No deploy probe means a broken container can roll into rotation. Also unblocks E1 (staging) the moment it lands.
+**Acceptance:**
+- `/healthz` returns 200 with `{ status: "ok", uptime, version }` — no DB/Redis hit.
+- `/readyz` returns 200 only when `SELECT 1` on Postgres + `PING` to Redis both succeed; 503 otherwise.
+- Neither route consumes the rate-limiter or hits Sentry on success.
+- Updated nginx template uses `/readyz` for upstream health.
+**Effort:** 30 min.
+
+#### H5. E2E smoke test (Playwright happy path)
+**Why:** 15 tests is not enough. One end-to-end smoke prevents the worst regressions.
+**Acceptance:**
+- `tests/e2e/smoke.spec.ts` — signup → onboarding (Corner Store preset) → add product → record sale (cash) → confirm sale appears in `/sales` → `/insights` overview reflects it.
+- Runs against a dockerized DB; wiped before each run via the same `TEST_DB_WIPE` gate.
+- Wired into `main` workflow.
+**Effort:** 3 hrs.
+
+#### H6. Repo-level unit tests for money math
+**Why:** Discount math, payroll period calc, leave-date overlap — three places a silent bug costs real money.
+**Acceptance:**
+- `tests/repo/sale-discounts.test.ts` — line discount, order discount, both stacked, free-item edge case, rounding direction.
+- `tests/repo/payroll-period.test.ts` — hourly + fixed + hybrid, mid-period rate change (effective-from versioning honoured).
+- `tests/repo/leave-overlap.test.ts` — overlap detection across submitted/approved leaves on the same employee.
+**Effort:** 2 hrs.
+
+#### H7. Pre-pentest security hardening pass
+**Why:** Cheaper to fix obvious issues in-house than to pay vendor time to find them. Frees E2 to spend its calendar on real findings.
+**Acceptance — review + fix on:**
+- All `/api/*` POST routes: confirm CSRF posture (same-site cookies on; double-submit token for any state-changing GET).
+- Every `requireTenant` / `requirePermission` call site: at least one server-side gate per mutation, not relying on client-side hiding.
+- File-upload routes (team photo, settings logo): MIME sniff (not just extension), size cap, extension whitelist, stored outside web root, randomised filename.
+- Rate-limiters: confirm every auth-adjacent endpoint is covered (sign-up, login, password forgot/reset/change, 2FA verify, account export).
+- Secrets in env: zero defaults baked into source for `SECRET_KEY`, `AUTH_SECRET`, `PAYMOB_HMAC_SECRET`, `WHATSAPP_*`. App fails to boot if any are missing.
+- Error responses: confirm no stack traces, no SQL fragments, no internal paths leak through `error.tsx` or API JSON in prod.
+- WhatsApp webhook signature verification: constant-time compare (`crypto.timingSafeEqual`), not `===`.
+- Drizzle queries: grep for raw `sql\`` template usage and audit each for injection paths.
+- `next.config.ts`: `poweredByHeader: false`, security headers (X-Frame-Options, Referrer-Policy, Permissions-Policy) set in addition to CSP.
+- Output findings + fix commit refs in `infra/pre-pentest-audit.md`.
+**Effort:** 4-6 hrs.
+
+#### H8. CSP headers
+**Why:** Cheapest XSS defence-in-depth. Pen-tester will flag absence.
+**Acceptance:**
+- nginx template adds `Content-Security-Policy`: strict `default-src 'self'`, `script-src 'self' 'nonce-...'`, `connect-src 'self' https://sentry.io`, `img-src 'self' data: blob:`, `style-src 'self' 'unsafe-inline'` (relax later when Tailwind nonces land).
+- Next middleware/layout emits per-request nonce, wired into inline scripts.
+- Zero CSP violation reports in browser console after smoke walk: signup → onboarding → /sales → /insights → /settings.
+- Report-only mode on staging for 1 week before enforcing in prod.
+**Effort:** 1-2 hrs.
+
+#### H9. Session revocation ("sign out everywhere")
+**Why:** Today a leaked JWT is valid until expiry. After H3 (2FA) lands, owners will expect this control.
+**Acceptance:**
+- `users.token_version` int default 0.
+- JWT callback includes `tv` claim from current `token_version`.
+- Session callback rejects (forces re-login) if `tv` !== current.
+- `/account/security` exposes "Sign out everywhere" → increments `token_version`, busts user-context cache via `bustUserContextCache(userId)`.
+- Activity log: `account.session_revoke_all`.
+**Effort:** 1-2 hrs.
+
+#### H10. Password reset throttle by email
+**Why:** §5 noted IP-only throttle leaks usage info to a rotating-IP attacker. Always-200 helps; belt + suspenders.
+**Acceptance:**
+- New limit `pwd.forgot.email` 3 / 1 hr / SHA-256(email).
+- Consumed even on unknown emails (so timing doesn't leak existence).
+- Tested with known + unknown email at the same hash — same response shape, same latency band.
+**Effort:** 30 min.
+
+#### H11. PDPL data-export endpoint
+**Why:** Egyptian Law 151/2020 right-of-access. Privacy policy already promises it — must deliver.
+**Acceptance:**
+- `POST /api/account/export` — enqueues a job, returns 202 with a job id.
+- Background worker assembles a zip: JSON dumps of products, sales, returns, expenses, suppliers, purchase orders, customers, attendance, payroll, leave requests, activity log — tenant-scoped via `withTenant`.
+- Emails owner a signed download link (15 min TTL, single-use, served from a short-lived route with HMAC verification).
+- Rate-limited 2 / 24 h / user.
+- Activity log: `account.data_export_requested`, `account.data_export_downloaded`.
+**Effort:** 3-4 hrs.
+
+#### H12. Real account deletion + 30-day grace
+**Why:** PDPL right-to-erasure. Today's "disable" is not erasure.
+**Acceptance:**
+- Owner `/account/security` → "Delete tenant" → confirms by typing tenant slug → sets `tenants.deletion_scheduled_at = now() + 30 days`.
+- Login flow + middleware show banner + "Cancel deletion" button during grace; cancel clears `deletion_scheduled_at`.
+- Cron sidecar at 03:00 UTC: hard-deletes any tenant past `deletion_scheduled_at` → cascade through every tenant-scoped table.
+- Surviving `tenant_deletions` audit table records the deletion event (tenant id, slug snapshot, owner email, scheduled-at, deleted-at).
+- Activity log: `tenant.deletion_scheduled`, `tenant.deletion_cancelled`, `tenant.deleted`.
+**Effort:** 4-5 hrs.
+
+---
+
+### 7.2 Soft specs — defer past first paying customer
+
+Trigger: real user complaint OR retention signal. Do NOT pre-build.
+
+| ID | Spec | Trigger | Effort |
+|---|---|---|---|
+| S1 | Barcode scanner mode at POS (auto-focus, Enter = submit, SKU fast lookup) | First cashier asks | 4 hrs |
+| S2 | Forgot-username flow for sub-accounts | First support ticket | 2 hrs |
+| S3 | Inter-branch stock transfers (move qty A → B with audit) | Second branch added by any tenant | 1 day |
+| S4 | Offline outbox per-row discard/retry UI | First failed sync drain | 4 hrs |
+| S5 | Native `.xlsx` parser for bulk import | First import support ticket | 4 hrs |
+| S6 | Loyalty points expiry cron + "refund as credit" toggle in returns | First loyalty programme query | 4 hrs each |
+| S7 | Per-branch cash drawer reconciliation | First multi-branch tenant | 1 day |
+| S8 | Structured logging migration (pino) | First incident where `console.log` grep is too slow | 1 day |
+| S9 | Metrics endpoint (Prom exposition or push to Grafana Cloud free) | Same as S8 | 4 hrs |
+| S10 | Object storage for uploads (S3-compatible) | Disk pressure on app server | 1 day |
+| S11 | Audit-log monthly partitioning | Any tenant table crosses ~100 GB | 1 day |
+| S12 | SaaS-side VAT invoice for the subscription itself | Our own VAT registration filed | 1 day |
+| S13 | Annual / multi-month plans | First customer asks | 4 hrs |
+| S14 | Dunning emails (day 1/3/6 of grace) on failed payments | First failed-payment churn | 4 hrs |
+| S15 | Staff performance leaderboard (commissions, targets, bonus calcs) | Owner asks for commission view | 1 day |
+| S16 | Cart's product picker falls back to offline snapshot | Offline POS user reports missing picker | 2 hrs |
+
+---
+
+### 7.3 External-dependency specs — blocked on someone else
+
+In-repo work that's gated on an outside party. Document the trigger so we move the moment it's unblocked.
+
+#### E1. Staging environment provisioning
+**Blocked on:** Hosting decision (Hetzner / DigitalOcean / similar) + box provisioning.
+**In-repo deliverable when unblocked:** `docker-compose.staging.yml`, `infra/deploy-staging.md` runbook, GitHub Actions workflow that auto-deploys `main` → staging on green.
+**Pre-requisite from §7.1:** H4 (/healthz + /readyz) so the deploy has a probe to flip rotation on.
+**Effort once unblocked:** 1 day.
+
+#### E2. Penetration test
+**Blocked on:** Vendor selection + budget.
+**Recommended scope:** external + authenticated app pentest, RLS bypass attempts (cross-tenant via crafted JWT / URL tampering), file-upload abuse, payment-flow review (after E3 is live), WhatsApp webhook spoofing.
+**Pre-work in §7.1:** H7 (hardening pass) — done last so all prior in-house work is in scope.
+**In-repo deliverable:** `infra/pentest-scope.md` (scope-of-work draft, ready to send to vendors), `infra/pentest-findings.md` (post-engagement remediation log).
+**Effort:** ~1 week vendor calendar + 2-3 days to fix findings.
+
+#### E3. Paymob go-live
+**Blocked on:** Merchant account approval + credential issue. Per memory: skip until provider is ready.
+**Trigger checklist (already in §3 Week 3.5):** fill 4 env keys → set callback + redirect URLs → 1-EGP test charge → failure-path test → idempotency replay test.
+**Effort once unblocked:** half-day end-to-end test.
+
+#### E4. SMS fallback (Vodafone Egypt Gateway / EgyptSMS)
+**Blocked on:** Local SMS provider signup. Twilio is unreliable in Egypt — do not use.
+**In-repo deliverable when unblocked:** `lib/sms/<provider>.ts` adapter mirroring the WhatsApp send interface, fallback logic in `lib/notifications.ts` (try WhatsApp → SMS on failure with shared rate-limit).
+**Effort once unblocked:** 1 day.
+
+#### E5. ETA e-invoicing (Path A — real integration with مصلحة الضرائب)
+**Blocked on:** First VAT-registered paying customer asking. v1 ships Path B (disclaimer) per §6 decision log.
+**Effort once unblocked:** 2 weeks.
+
+#### E6. WhatsApp Cloud template approvals
+**Blocked on:** Meta business verification + per-template review (24-48 hr each).
+**Already done in repo:** template sync + cache (Phase 5).
+**What's blocked:** every new operational template needs Meta approval before send.
+**Effort:** ongoing operational, not code.
+
+#### E7. Smart Payment Tracking (VF Cash / InstaPay auto-detect)
+**Blocked on:** Mobile SMS-forwarder companion app (does not exist yet). Per memory: deferred.
+**Effort once unblocked:** 1 week server + 2-3 days mobile companion.
+
+---
+
+### 7.4 Recommended execution order
+
+Pure-code, sequential. Optimised for "ship → safe to charge → pen-test ready":
+
+1. **H1** restore drill (30 min) — closes a known-unknown.
+2. **H4** /healthz + /readyz (30 min) — unblocks E1 the moment it lands.
+3. **H10** password reset email throttle (30 min) — free win.
+4. **H2** CI pipeline (1-2 hrs) — every subsequent change is now safer.
+5. **H6** money-math unit tests (2 hrs).
+6. **H5** E2E Playwright smoke (3 hrs) — runs in CI from now on.
+7. **H3** 2FA for owners (3-4 hrs).
+8. **H9** session revocation (1-2 hrs) — pairs with H3.
+9. **H8** CSP headers (1-2 hrs).
+10. **H11** PDPL data export (3-4 hrs).
+11. **H12** account deletion + grace (4-5 hrs).
+12. **H7** pre-pentest hardening pass (4-6 hrs) — done last so all prior work is in scope.
+13. **E2** penetration test (external; H7 makes the engagement productive).
+14. **E3** Paymob 1-EGP test, **E1** staging cut-over (parallelisable with E2).
+
+**Total in-house:** ~25-35 hrs of focused work, then pen test, then charge.
 
 ---
 

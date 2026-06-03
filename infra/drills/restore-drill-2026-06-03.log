@@ -1,0 +1,98 @@
+matgary restore drill — 2026-06-03
+
+Operator:           amrelwany
+Spec:               specs/hard/H01-restore-drill.md
+Source dump:        backups/daily-2026-06-01T02-30-00Z.sql.gz (31,421 bytes)
+Throwaway:          docker container pg-restore-test (postgres:16-alpine, host port 55432)
+Restore wall time:  1 s
+Restore script:     infra/restore.sh, unmodified, RESTORE_CONFIRM=1
+
+================================================================================
+1. Row count parity
+================================================================================
+
+Snapshot from the live matgary-postgres BEFORE the drill vs the restored DB:
+
+  table             live (2026-06-03)   restored (from 2026-06-01 dump)   diff
+  activity_logs                    85                                84     -1
+  products                         17                                17      0
+  sales                            19                                19      0
+  tenants                           5                                 5      0
+  users                             9                                 9      0
+
+  -1 on activity_logs is expected: the dump is from 02:30 UTC on 2026-06-01;
+  one additional activity_log row was written between dump time and the
+  drill measurement. Not a defect.
+
+================================================================================
+2. Schema / RLS preservation (pg_class metadata)
+================================================================================
+
+  table             relrowsecurity     relforcerowsecurity
+  products                       t                       t
+  sales                          t                       t
+  expenses                       t                       t
+  suppliers                      t                       t
+  activity_logs                  t                       t
+
+================================================================================
+3. RLS behavioural verification (as NOSUPERUSER NOBYPASSRLS role)
+================================================================================
+
+  Created locally in the throwaway because `--no-privileges` strips GRANTs:
+    CREATE ROLE rls_test_role NOSUPERUSER NOBYPASSRLS LOGIN;
+    GRANT SELECT ON products, sales, tenants TO rls_test_role;
+
+  As rls_test_role, NO `app.tenant_id` set:
+    SELECT count(*) FROM products  →  0  ✅ (RLS hides every row)
+
+  As rls_test_role, `app.tenant_id` set to tenant e8335de6-0a2a-4ad9-a32e-0c9f49b56c15:
+    SELECT count(*) FROM products  →  1  ✅ (tenant-scoped reads work)
+
+================================================================================
+4. Conclusions
+================================================================================
+
+  ✅ Backup format is valid; restore script runs unmodified against a fresh DB.
+  ✅ Schema, data, and RLS policies all survive the dump → restore round trip.
+  ✅ End-to-end drill (start throwaway → restore → verify → tear down) is
+     repeatable in < 2 min wall time.
+
+================================================================================
+5. Caveats / follow-ups (NOT failures of this drill, but real ops notes)
+================================================================================
+
+  - `pg_dump --no-privileges` strips GRANT statements. On a production
+    restore, the `matgary_app` NOSUPERUSER role must be recreated AND
+    granted SELECT/INSERT/UPDATE/DELETE on every tenant-scoped table BEFORE
+    the app can connect. `infra/init-postgres.sql` creates the role on a
+    FRESH container boot but does NOT regrant after a restore — the
+    production restore runbook needs both steps explicitly.
+  - This drill targeted the latest daily dump. weekly-*.sql.gz dumps were
+    not exercised. Same format, expected to behave identically — but a
+    follow-up drill should cover both rotations once per quarter.
+  - Off-site shipping path (`BACKUP_REMOTE_HOOK`) is not configured and is
+    out of scope for this drill.
+  - The throwaway container had no persistent volume; everything was wiped
+    on `docker rm -f`. No risk of cross-contamination with the live DB.
+
+================================================================================
+6. Reproduction commands (exact)
+================================================================================
+
+  docker run --rm -d --name pg-restore-test \
+    -e POSTGRES_PASSWORD=test \
+    -p 55432:5432 \
+    -v $PWD/backups:/backups:ro \
+    -v $PWD/infra/restore.sh:/usr/local/bin/restore.sh:ro \
+    postgres:16-alpine
+
+  docker exec pg-restore-test psql -U postgres -c "CREATE DATABASE matgary_restore;"
+
+  docker exec \
+    -e PGHOST=localhost -e PGUSER=postgres -e PGPASSWORD=test \
+    -e PGDATABASE=matgary_restore -e RESTORE_CONFIRM=1 \
+    pg-restore-test sh /usr/local/bin/restore.sh \
+    /backups/daily-2026-06-01T02-30-00Z.sql.gz
+
+  docker rm -f pg-restore-test
