@@ -183,6 +183,14 @@ npm run db:migrate
 
 ## 2. Changelog
 
+### 2026-06-03 — H05 Playwright E2E smoke (happy path)
+
+- **`tests/e2e/smoke.spec.ts` + `playwright.config.ts`.** One serial test exercises the full happy path: signup (2 steps) → onboarding (3 steps, Corner Store preset) → dashboard → API-create one product in the seeded `watches` category → API-record a 200 EGP cash sale → confirm the product name appears on `/sales` → confirm `/insights` overview shows 200. 6.9 s locally; CI budget ≤ 60 s including build.
+- **Scope deviation, documented in spec:** product creation + sale recording use `page.request` (session cookie travels) rather than the multi-step add-product picker UI. Same HTTP boundary the UI hits, far less brittle to category/picker churn. Signup + onboarding stay browser-driven where the regression risk is real (auth, Arabic RTL multi-step nav).
+- **Production-build alignment:** `next.config.ts` gets `eslint: { ignoreDuringBuilds: true }` so the build doesn't block on the §4 lint backlog (consistent with the H02 "lint informational, not gating" policy). Flag flips off when the backlog clears.
+- **CI:** `main.yml` gets two new steps after isolation vitest — `Install Playwright browsers` (chromium + deps) and `E2E smoke test` (runs `npm run test:e2e` which triggers the build via webServer).
+- **Local iteration:** `PLAYWRIGHT_NO_WEBSERVER=1 PLAYWRIGHT_BASE_URL=http://localhost:3001 npm run test:e2e` skips build + reuses a running `next dev`.
+
 ### 2026-06-03 — H06 money math unit tests
 
 - **Extracted pure discount math** out of `lib/repo/operations.ts` into `lib/repo/sale-discounts.ts`: `calcLineDiscount`, `calcOrderDiscount`, `calcCartTotals`. Production code now delegates to them; behaviour byte-identical (same `Math.round` half-up rounding, same `min(discount, subtotal)` cap, same `"fixed" | "percentage"` discriminator). 13 unit tests cover line / order / stacked / free-item edge / negative-input / rounding direction.

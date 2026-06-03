@@ -87,3 +87,9 @@ jobs:
 
       - name: Full vitest (cache + ratelimit + isolation)
         run: npx vitest run
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: E2E smoke test (production build, port 3100)
+        run: npm run test:e2e
