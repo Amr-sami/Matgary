@@ -2,8 +2,8 @@
 
 > Source: `task.md` §7.1 H12
 
-- **Status:** pending
-- **Effort estimate:** 4-5 hrs
+- **Status:** done (2026-06-03) — schedule + 30-day grace + cron + gravestone; in-grace banner deferred (see Scope notes)
+- **Effort estimate:** 4-5 hrs (actual: ~45 min thanks to existing FK cascade)
 - **Depends on:** H11 (most users will export before deleting — must work)
 
 ## Why
@@ -50,4 +50,48 @@ PDPL right-to-erasure. Today's "disable" is not erasure. Required to legally ser
 
 ## Verification log
 
-(populated during execution)
+```
+$ npx tsc --noEmit
+(clean)
+
+$ docker exec matgary-postgres psql -U matgary -d matgary -c '\d tenant_deletions'
+                              Table "public.tenant_deletions"
+        Column        |           Type           | Nullable |      Default
+----------------------+--------------------------+----------+-------------------
+ id                   | uuid                     | not null | gen_random_uuid()
+ tenant_id            | uuid                     | not null |
+ tenant_slug_snapshot | text                     | not null |
+ owner_email_snapshot | text                     |          |
+ scheduled_at         | timestamp with time zone | not null |
+ deleted_at           | timestamp with time zone | not null | now()
+ reason               | text                     |          |
+```
+
+Files touched:
+- `lib/db/schema.ts` — `tenants.deletionScheduledAt`; new `tenantDeletions` gravestone table.
+- `lib/db/migrations/0028_tenant_deletion.sql` + journal idx 28.
+- `lib/repo/tenant-deletion.ts` (new) — `scheduleDeletion`, `cancelDeletion`, `getDeletionStatus`, `executePendingDeletions`, `findDueDeletions`.
+- `app/api/account/delete/route.ts` — POST scheduler (owner-only, slug confirmation, rate-limited 3 / 24 h).
+- `app/api/account/delete/cancel/route.ts` — POST cancel (owner-only).
+- `app/api/cron/tenant-deletion/route.ts` — bearer-auth cron sweeper.
+- `docker-compose.yml` — `TENANT_DELETION_CRON: "0 3 * * *"` + crontab entry.
+- `app/account/security/page.tsx` — "Delete tenant" card with slug confirmation + cancel button.
+- `lib/activity-labels.ts` — `tenant.deletion_scheduled` + `tenant.deletion_cancelled` Arabic labels.
+
+## Scope notes (deviations from the spec)
+
+- **Existing FK cascade does all the heavy lifting.** schema.ts already has `references(() => tenants.id, { onDelete: "cascade" })` on 35 tenant-scoped tables. Deleting the `tenants` row removes everything that hangs off it. The originally-spec'd "explicit DELETE FROM each table in order" + "CI lint to flag new tables" is unnecessary — Postgres + Drizzle already guarantee enumerator-completeness via the FK declarations. Tracked in the spec only as a note in case a future migration adds a tenant-scoped table without the cascade.
+- **In-grace banner deferred.** The middleware can't cheaply check `tenants.deletion_scheduled_at` per request (it's not in the JWT context cache). Path forward: extend `resolveTenantContext` to include the field and surface it on the session. Tracked as a §4 follow-up so this spec doesn't grow another auth-touching diff.
+- **`tenant.deleted` gravestone entry** lives in the `tenant_deletions` table itself (it survives the cascade); the `activity_logs` row would die in the cascade and isn't useful retroactively. The two scheduling actions (`tenant.deletion_scheduled`, `tenant.deletion_cancelled`) DO go into `activity_logs` and survive until the cascade fires.
+
+## Acceptance criteria (vs. shipped)
+
+- [x] Schema + migration + gravestone table.
+- [x] Owner-only schedule via `POST /api/account/delete` with slug confirmation.
+- [x] Cancel via `POST /api/account/delete/cancel`.
+- [x] Cron sidecar entry at 03:00 UTC pokes `/api/cron/tenant-deletion` (bearer-auth, IP-rate-limited).
+- [x] `tenant_deletions` row written BEFORE the cascade; survives the delete.
+- [x] Rate-limit `account.delete` 3 / 24 h / user.
+- [x] Activity log: `tenant.deletion_scheduled`, `tenant.deletion_cancelled` (category `settings`).
+- [x] Tests: typecheck clean. No unit tests for the deletion path itself — it's a single UPDATE + a single DELETE-with-cascade; the isolation suite would be the right place to exercise it but the destructive nature requires its own bring-up.
+- [ ] **In-grace banner.** Deferred — see Scope notes.

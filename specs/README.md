@@ -20,7 +20,7 @@ Working surface for the launch-readiness work. Each spec lives in its own file s
 | [H09](hard/H09-session-revocation.md) | Session revocation ("sign out everywhere") | ✅ done 2026-06-03 | 1-2 hrs |
 | [H10](hard/H10-pwd-reset-throttle.md) | Password reset throttle by email | ✅ done 2026-06-03 | 30 min |
 | [H11](hard/H11-pdpl-export.md) | PDPL data-export endpoint | ✅ done 2026-06-03 (synchronous JSON; zip+email deferred) | 3-4 hrs |
-| [H12](hard/H12-account-deletion.md) | Real account deletion + 30-day grace | pending | 4-5 hrs |
+| [H12](hard/H12-account-deletion.md) | Real account deletion + 30-day grace | ✅ done 2026-06-03 (in-grace banner deferred) | 4-5 hrs |
 
 Execution order is `task.md` §7.4 (H1 → H4 → H10 → H2 → H6 → H5 → H3 → H9 → H8 → H11 → H12 → H7).
 

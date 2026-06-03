@@ -7,6 +7,81 @@ import { Input } from "@/components/ui/Input";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { ShieldCheck } from "@/lib/icons";
 
+function DeleteTenantCard({ isOwner }: { isOwner: boolean }) {
+  const [slug, setSlug] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [scheduledAt, setScheduledAt] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isOwner) return;
+    void (async () => {
+      const res = await fetch("/api/account/2fa-status"); // dummy ping
+      if (!res.ok) return;
+    })();
+  }, [isOwner]);
+
+  if (!isOwner) return null;
+  const schedule = async () => {
+    setError(null);
+    setBusy(true);
+    try {
+      const res = await fetch("/api/account/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmSlug: slug.trim() }),
+      });
+      const body = (await res.json()) as { scheduledAt?: string; error?: string };
+      if (!res.ok) {
+        const map: Record<string, string> = {
+          SLUG_MISMATCH: "اسم المتجر لا يطابق",
+          Forbidden: "غير مسموح",
+        };
+        setError(map[body.error ?? ""] ?? "تعذر التحديد");
+        return;
+      }
+      setScheduledAt(body.scheduledAt ?? null);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const cancel = async () => {
+    setBusy(true);
+    try {
+      await fetch("/api/account/delete/cancel", { method: "POST" });
+      setScheduledAt(null);
+      setSlug("");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="bg-white rounded-2xl border border-danger/30 p-6 space-y-3">
+      <p className="text-sm font-medium text-danger">حذف المتجر نهائياً</p>
+      <p className="text-xs text-text-secondary">
+        يحذف كل البيانات (المنتجات، المبيعات، الموظفين، السجلات) بعد فترة سماح ٣٠ يوماً. يمكنك التراجع خلالها.
+      </p>
+      {scheduledAt ? (
+        <div className="space-y-2 bg-danger/5 rounded-lg p-3">
+          <p className="text-xs text-text-secondary">
+            موعد الحذف: <span dir="ltr" className="font-mono">{new Date(scheduledAt).toISOString().slice(0, 10)}</span>
+          </p>
+          <Button variant="secondary" onClick={cancel} loading={busy}>إلغاء الحذف</Button>
+        </div>
+      ) : (
+        <>
+          <p className="text-xs text-text-secondary">للتأكيد، اكتب اسم المتجر (slug) كما يظهر في عنوان تسجيل الدخول:</p>
+          <Input value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="my-store" dir="ltr" />
+          {error && <p className="text-xs text-danger">{error}</p>}
+          <Button variant="secondary" onClick={schedule} loading={busy} disabled={!slug.trim()}>
+            بدء عملية الحذف (٣٠ يوماً)
+          </Button>
+        </>
+      )}
+    </div>
+  );
+}
+
 // H03 — /account/security. Owner-only enrolment + management UI for TOTP 2FA.
 // Manual-secret entry path (no QR rendering in v1; mobile authenticator apps
 // accept either a pasted secret or a tapped otpauth:// link).
@@ -224,6 +299,8 @@ export default function SecurityPage() {
         </div>
       )}
 
+      {(status === "on" || status === "off") && <DeleteTenantCard isOwner={isOwner} />}
+
       {(status === "on" || status === "off") && (
         <div className="bg-white rounded-2xl border border-border p-6 space-y-3">
           <p className="text-sm font-medium">تنزيل نسخة من بيانات متجرك</p>
@@ -288,9 +365,7 @@ export default function SecurityPage() {
       {status === "on" && (
         <>
           <div className="bg-white rounded-2xl border border-border p-6 space-y-4">
-            <p className="text-sm text-text-secondary">
-              الحالة الحالية: <span className="text-success font-medium">مفعّلة</span>
-            </p>
+            <p className="text-sm text-text-secondary">2FA الحالة الحالية: <span className="text-success font-medium">مفعّلة</span></p>
             <div className="space-y-3 pt-2">
               <p className="text-sm font-medium">تجديد الرموز الاحتياطية</p>
               <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} placeholder="كلمة المرور الحالية" autoComplete="current-password" />

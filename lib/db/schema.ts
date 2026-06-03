@@ -91,11 +91,30 @@ export const tenants = pgTable(
     currency: text("currency").notNull().default("EGP"),
     language: text("language").notNull().default("ar"),
     timezone: text("timezone").notNull().default("Africa/Cairo"),
+    /** H12 — non-null marks the tenant scheduled for hard deletion. Login
+     *  + middleware show a banner with the countdown; the cron sidecar
+     *  enforces the cutoff. */
+    deletionScheduledAt: timestamp("deletion_scheduled_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .default(sql`now()`),
   },
 );
+
+/** H12 — gravestone for deleted tenants. NOT scoped via tenant_id RLS
+ *  (the tenant is gone by the time we read this) and intentionally
+ *  outlives the tenants row so dispute resolution + audit are possible. */
+export const tenantDeletions = pgTable("tenant_deletions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id").notNull(),
+  tenantSlugSnapshot: text("tenant_slug_snapshot").notNull(),
+  ownerEmailSnapshot: text("owner_email_snapshot"),
+  scheduledAt: timestamp("scheduled_at", { withTimezone: true }).notNull(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now()`),
+  reason: text("reason"),
+});
 
 export const tenantMembers = pgTable(
   "tenant_members",

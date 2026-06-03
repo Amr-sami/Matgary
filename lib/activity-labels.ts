@@ -38,6 +38,8 @@ export const ACTION_LABELS: Record<string, string> = {
   "auth.recovery_codes_regenerated": "تجديد الرموز الاحتياطية",
   "auth.session_revoke_all": "تسجيل خروج من جميع الأجهزة",
   "auth.data_export": "تنزيل نسخة من بيانات المتجر",
+  "tenant.deletion_scheduled": "تحديد موعد حذف المتجر",
+  "tenant.deletion_cancelled": "إلغاء حذف المتجر",
   "auth.logout": "تسجيل الخروج",
   "auth.password_change": "تغيير كلمة المرور",
   "team.add": "إضافة موظف",

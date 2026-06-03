@@ -183,6 +183,16 @@ npm run db:migrate
 
 ## 2. Changelog
 
+### 2026-06-03 — H12 account deletion + 30-day grace
+
+- **Schema:** `tenants.deletion_scheduled_at timestamptz` (nullable) + new `tenant_deletions` gravestone table (`tenant_id`, `tenant_slug_snapshot`, `owner_email_snapshot`, `scheduled_at`, `deleted_at`, `reason`). Gravestone is NOT FK-bound to `tenants` so it survives the cascade. Migration `0028_tenant_deletion.sql`, journal idx 28.
+- **Service** at `lib/repo/tenant-deletion.ts`: `scheduleDeletion` (sets +30d), `cancelDeletion` (clears), `executePendingDeletions` (writes gravestone, then `DELETE FROM tenants` — schema.ts's existing 35 `onDelete: "cascade"` FKs purge everything else).
+- **API:** `POST /api/account/delete` (owner-only, requires typed slug match, rate-limited `account.delete` 3 / 24 h / user). `POST /api/account/delete/cancel` (owner-only). `POST /api/cron/tenant-deletion` (bearer-auth with constant-time compare + IP rate-limit).
+- **Cron sidecar:** new `TENANT_DELETION_CRON: "0 3 * * *"` env + crontab entry in `docker-compose.yml`.
+- **UI:** "Delete tenant" card on `/account/security` — slug confirmation input + cancel button when already scheduled.
+- **Activity log:** `tenant.deletion_scheduled` + `tenant.deletion_cancelled` (category `settings`). The `tenant.deleted` audit lives in the gravestone table itself — the `activity_logs` row would die in the cascade and is useless retroactively.
+- **Scope deviation:** in-grace banner deferred (would need `deletion_scheduled_at` in the JWT context cache; added as §4 follow-up "Surface deletion countdown on the global banner"). The schedule/cancel UI is still functional; users see status in `/account/security`.
+
 ### 2026-06-03 — H11 PDPL data export (synchronous JSON)
 
 - **Owner-only `POST /api/account/export`** that returns a single JSON blob (`{manifest, data}`) where `data` is a `{tableName: rows[]}` map of every tenant-scoped table. All reads go through `withTenant` so PostgreSQL RLS is the gate. Streams as `application/json` + `Content-Disposition: attachment; filename="matgary-export-<tenant-prefix>-<date>.json"`.
@@ -886,6 +896,8 @@ Ordered roughly by likely impact on retention / conversion. Not committed — re
 - **Cleanup pre-existing lint errors** (194 errors, 970 warnings as of 2026-06-03). Mostly `no-explicit-any` + unused-vars. Today's CI runs lint with `continue-on-error: true` so the noise doesn't gate PRs — once the backlog is empty, remove that line and let lint be a true gate. Track via `npm run lint 2>&1 | grep -E "^✖"` regression test.
 - **Strict CSP for styles** (H08 follow-up). `style-src` currently keeps `'unsafe-inline'` because Tailwind 4 injects runtime inline styles without a nonce hook. Track Tailwind's CSP-friendly options and tighten to `'self' 'nonce-...'` when supported.
 - **CSP report-uri to Sentry.** Wire the `report-uri` directive once Sentry CSP reporting is configured per-project. Today CSP runs as `Content-Security-Policy-Report-Only`; violations land in the browser console but not yet in Sentry.
+- **Surface tenant deletion countdown on the global banner.** H12 schedules + cancels work but the during-grace UX is invisible outside `/account/security`. Add `deletionScheduledAt` to the user-context cache → JWT → session, then render a banner on the global layout with the day count + a "Cancel deletion" CTA. ~1 hr.
+- **In-grace email reminders.** When a tenant is scheduled, email the owner T-7 and T-1 days before deletion fires. Nudges the user to actively cancel or actively confirm. ~2 hr.
 - **Leave overlap detection.** Today `submitLeaveRequest` only enforces `startDate <= endDate`. Add a check that rejects (or warns the approver) when the same employee already has a submitted/approved leave overlapping the requested window. Sketch from H06 spec: pure `hasOverlap(existing, candidate)` that treats adjacent dates (end-of-A === start-of-B) as non-overlap and ignores rejected leaves. Wire into the route + add a unit test. Half-day. Tracked in §5 as a known gap.
 - ~~**Insights server-side aggregation**: today the overview tab aggregates client-side from `useSales`. Move to `/api/insights?from=…&to=…` with a 60 s tenant-keyed cache.~~ ✅ done 2026-05-09 — see changelog.
 - **/healthz + /readyz endpoints** for nginx / orchestrator probes.

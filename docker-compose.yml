@@ -88,6 +88,44 @@ services:
         # crond -f keeps the container in the foreground; -d 8 = info-level.
         exec crond -f -d 8
 
+  # The Next.js app itself. Opt-in via `--profile app` so the default
+  # `docker compose up -d` stays lightweight (infra only) for host-based dev,
+  # where `npm run dev` on the host gives faster HMR than a bind-mounted
+  # container on macOS. Bring the full stack up with:
+  #
+  #   docker compose --profile app up -d --build
+  #
+  # The build uses the multi-stage Dockerfile (standalone output, runs as
+  # non-root). All host-targeted URLs from .env (DATABASE_URL pointing at
+  # localhost:5434, REDIS_URL at localhost:6381) are overridden below to use
+  # the compose-network DNS names instead — inside the container, `postgres`
+  # and `redis` resolve to the sibling services on their internal ports.
+  app:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: matgary-app:latest
+    container_name: matgary-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+      # Override host-targeted URLs from .env with compose-network DNS.
+      DATABASE_URL: postgres://matgary:matgary@postgres:5432/matgary
+      APP_DATABASE_URL: postgres://matgary_app:matgary_app@postgres:5432/matgary
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "3000:3000"
+
   # Periodic application cron — pokes the app's internal cron routes on a
   # schedule. Today: hourly recurring-expense materialisation. Container holds
   # nothing but BusyBox (curl + crond), so no app code, no DB creds, no
@@ -112,6 +150,7 @@ services:
       CRON_TARGET_URL: "${CRON_TARGET_URL:-http://host.docker.internal:3000}"
       RECURRING_EXPENSES_CRON: "0 * * * *"
       ACTIVITY_CLEANUP_CRON: "30 3 * * *"
+      TENANT_DELETION_CRON: "0 3 * * *"
     entrypoint:
       - sh
       - -c
@@ -143,9 +182,11 @@ services:
         {
           echo "$$RECURRING_EXPENSES_CRON /usr/local/bin/poke-cron.sh /api/cron/recurring-expenses recurring-expenses >> /var/log/cron.log 2>&1"
           echo "$$ACTIVITY_CLEANUP_CRON /usr/local/bin/poke-cron.sh /api/cron/activity-log-cleanup activity-cleanup >> /var/log/cron.log 2>&1"
+          echo "$$TENANT_DELETION_CRON /usr/local/bin/poke-cron.sh /api/cron/tenant-deletion tenant-deletion >> /var/log/cron.log 2>&1"
         } > /etc/crontabs/root
         echo "[cron] recurring-expenses schedule: $$RECURRING_EXPENSES_CRON"
         echo "[cron] activity-cleanup   schedule: $$ACTIVITY_CLEANUP_CRON"
+        echo "[cron] tenant-deletion    schedule: $$TENANT_DELETION_CRON"
         echo "[cron] target: $$CRON_TARGET_URL"
         # `tini` reaps zombies; crond -f keeps the container alive.
         exec tini -- crond -f -d 8
