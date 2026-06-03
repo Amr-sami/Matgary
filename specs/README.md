@@ -14,7 +14,7 @@ Working surface for the launch-readiness work. Each spec lives in its own file s
 | [H03](hard/H03-2fa.md) | 2FA for owners (TOTP + recovery codes) | pending | 3-4 hrs |
 | [H04](hard/H04-health-endpoints.md) | /healthz + /readyz endpoints | ✅ done 2026-06-03 | 30 min |
 | [H05](hard/H05-e2e-smoke.md) | E2E smoke test (Playwright) | pending | 3 hrs |
-| [H06](hard/H06-money-math-tests.md) | Repo-level unit tests for money math | pending | 2 hrs |
+| [H06](hard/H06-money-math-tests.md) | Repo-level unit tests for money math | ✅ done 2026-06-03 (leave-overlap dropped) | 2 hrs |
 | [H07](hard/H07-pre-pentest-hardening.md) | Pre-pentest security hardening pass | pending | 4-6 hrs |
 | [H08](hard/H08-csp.md) | CSP headers | pending | 1-2 hrs |
 | [H09](hard/H09-session-revocation.md) | Session revocation ("sign out everywhere") | pending | 1-2 hrs |

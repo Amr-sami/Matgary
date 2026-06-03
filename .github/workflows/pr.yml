@@ -48,5 +48,5 @@ jobs:
         continue-on-error: true
         run: npm run lint
 
-      - name: Cache + ratelimit tests (Redis-gated)
-        run: npx vitest run tests/cache.test.ts tests/ratelimit.test.ts
+      - name: Unit tests (cache + ratelimit + pure repo math)
+        run: npx vitest run tests/cache.test.ts tests/ratelimit.test.ts tests/repo/

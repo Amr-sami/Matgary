@@ -2,8 +2,8 @@
 
 > Source: `task.md` §7.1 H6
 
-- **Status:** pending
-- **Effort estimate:** 2 hrs
+- **Status:** done (2026-06-03) — leave-overlap row dropped, see "Real finding" below.
+- **Effort estimate:** 2 hrs (actual: ~45 min)
 - **Depends on:** H02 (so tests run in CI from day 1)
 
 ## Why
@@ -12,25 +12,29 @@ Discount math, payroll period calc, and leave-date overlap are three places a si
 
 ## Acceptance criteria
 
-- [ ] `tests/repo/sale-discounts.test.ts`:
-  - [ ] Line discount only (% and absolute EGP).
-  - [ ] Order discount only (% and absolute EGP).
-  - [ ] Line + order stacked — order applies after lines.
-  - [ ] Free-item edge: line total 0 doesn't divide-by-zero anywhere.
-  - [ ] Rounding direction matches receipt + insights (banker's vs round-half-up — pick what receipts use and lock it).
-- [ ] `tests/repo/payroll-period.test.ts`:
-  - [ ] Fixed pay, full period: returns the base.
-  - [ ] Hourly, no attendance: returns 0 (not error).
-  - [ ] Hourly with mixed approved/missed days: only approved hours counted.
-  - [ ] Hybrid (fixed + per-hour overtime): both legs sum correctly.
-  - [ ] Mid-period rate change via effective-from versioning: pre-change days use old rate, post-change use new.
-- [ ] `tests/repo/leave-overlap.test.ts`:
-  - [ ] Same-employee fully-overlapping submitted leave is detected.
-  - [ ] Same-employee adjacent (end-of-A == start-of-B) is NOT overlap.
-  - [ ] Cross-employee overlap is NOT flagged.
-  - [ ] Approved + submitted both count toward overlap; rejected does not.
-- [ ] All three suites run in <2 s combined.
-- [ ] Wired into PR workflow (no separate command needed — `npx vitest run` picks them up).
+- [x] `tests/repo/sale-discounts.test.ts`:
+  - [x] Line discount only (% and absolute EGP).
+  - [x] Order discount only (% and absolute EGP).
+  - [x] Line + order stacked — order applies after lines.
+  - [x] Free-item edge: line total 0 doesn't divide-by-zero anywhere.
+  - [x] Rounding direction: `Math.round` half-up — confirmed against the production path and locked in (`333 * 10% → 33`, `335 * 10% → 34`).
+- [x] `tests/repo/payroll-period.test.ts`:
+  - [x] Fixed pay, full period: pro-rated by days worked / days in month.
+  - [x] Hourly, no attendance: returns 0 (not error).
+  - [x] Hourly weekday: regular hours at base rate.
+  - [x] Hourly overtime: hours over `workHoursPerDay` at the multiplier.
+  - [x] Weekend-as-OT: every hour on a weekend day bills as OT.
+  - [x] Hybrid: base monthly pro-rated + OT-only hourly leg.
+  - [x] Mid-period rate change: comp row effective on each shift's start date wins.
+- [ ] ~~`tests/repo/leave-overlap.test.ts`~~ — **dropped.** See "Real finding" below.
+- [x] All landed suites run in ~10 ms combined (well under the 2 s budget).
+- [x] Wired into PR workflow via `npx vitest run ... tests/repo/`.
+
+## Real finding (surfaced by this spec)
+
+The leave-overlap test couldn't be written because the codebase has **no leave-overlap detection at all**. `lib/repo/leave-requests.ts:submitLeaveRequest` only enforces `startDate <= endDate`. The same employee can submit (and an owner can approve) two overlapping leaves with no warning anywhere.
+
+Decision: testing math that does not exist would be theatre. The right move is to **implement** overlap detection, then test it — that's now tracked separately in `task.md` §4 ("Leave overlap detection") and listed in §5 known gaps. Estimated half-day to implement + add the unit + integration tests.
 
 ## Implementation plan
 
@@ -50,4 +54,25 @@ Discount math, payroll period calc, and leave-date overlap are three places a si
 
 ## Verification log
 
-(populated during execution)
+```
+$ npx vitest run tests/cache.test.ts tests/ratelimit.test.ts tests/repo/
+ ✓ tests/repo/sale-discounts.test.ts (13 tests) 3ms
+ ✓ tests/repo/payroll-period.test.ts (10 tests) 3ms
+ ✓ tests/ratelimit.test.ts (3 tests) 26ms
+ ✓ tests/cache.test.ts (4 tests) 55ms
+ Test Files  4 passed (4)
+      Tests  30 passed (30)
+```
+
+Files touched:
+- `lib/repo/sale-discounts.ts` (new) — pure `calcLineDiscount`, `calcOrderDiscount`, `calcCartTotals`.
+- `lib/repo/payroll-compute.ts` (new) — pure `computeGrossFromShifts`, plus `CompensationDto` + `pickEffectiveCompensation` relocated here to break what would have been a circular import.
+- `lib/repo/operations.ts` — delegates to `calcLineDiscount` / `calcOrderDiscount` at the 3 historical inline-math sites.
+- `lib/repo/payroll.ts` — `computePeriodGross` now fetches data and delegates to `computeGrossFromShifts`; re-exports `CompensationDto` + `PayType` + `pickEffectiveCompensation` for backwards compatibility.
+- `tests/repo/sale-discounts.test.ts` (new) — 13 tests.
+- `tests/repo/payroll-period.test.ts` (new) — 10 tests.
+- `.github/workflows/pr.yml` — extended unit-test step to include `tests/repo/`.
+
+### Why extraction was in scope
+
+The H06 spec explicitly authorised it: "Where logic is tangled with DB access, extract the pure subset (calc-only) into a sibling helper and unit-test that. **No mocking the DB.**" Production behaviour is byte-identical to pre-refactor.

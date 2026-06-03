@@ -13,20 +13,20 @@ import {
   getAttendanceSettings,
   type AttendanceSettingsDto,
 } from "@/lib/repo/attendance";
+import {
+  computeGrossFromShifts,
+  pickEffectiveCompensation,
+  type CompensationDto,
+  type PayType,
+} from "@/lib/repo/payroll-compute";
 
-export type PayType = "fixed" | "hourly" | "hybrid";
-
-export interface CompensationDto {
-  id: string;
-  employeeId: string;
-  payType: PayType;
-  baseSalaryMonthly: number | null;
-  hourlyRate: number | null;
-  standardMonthlyHours: number | null;
-  effectiveFrom: Date;
-  createdByUserId: string;
-  createdAt: Date;
-}
+// Re-export the DTO + the pure picker so existing call sites keep importing
+// from @/lib/repo/payroll. The canonical source is now payroll-compute.
+export {
+  pickEffectiveCompensation,
+  type CompensationDto,
+  type PayType,
+};
 
 function rowToDto(row: EmployeeCompensationRow): CompensationDto {
   return {
@@ -74,18 +74,6 @@ export interface CreateCompensationInput {
   standardMonthlyHours: number | null;
   effectiveFrom: Date;
   createdByUserId: string;
-}
-
-/** Pick the compensation row that was effective on the given date. */
-export function pickEffectiveCompensation(
-  history: CompensationDto[],
-  on: Date,
-): CompensationDto | null {
-  // history is already newest-first
-  for (const c of history) {
-    if (c.effectiveFrom.getTime() <= on.getTime()) return c;
-  }
-  return null;
 }
 
 export async function createCompensation(
@@ -162,94 +150,27 @@ export async function computePeriodGross(
     getAttendanceSettings(tenantId),
   ]);
   const shifts = pairShifts(events);
-
-  const dailyHours = new Map<string, number>();
-  for (const s of shifts) {
-    if (s.end == null) continue; // open shift — counted as 0 until closed
-    const dayKey = s.start.toISOString().slice(0, 10);
-    dailyHours.set(dayKey, (dailyHours.get(dayKey) ?? 0) + s.hours);
-  }
-
-  let regularHours = 0;
-  let overtimeHours = 0;
-  let totalHourlyEarnings = 0;
-  let totalBaseDays = 0; // number of days a "fixed/hybrid" base salary should accrue
-  const baseDaysByMonth = new Map<string, number>();
-
-  for (const [dayKey, hours] of dailyHours) {
-    const day = new Date(dayKey);
-    const isoDow = ((day.getDay() + 6) % 7) + 1; // JS 0(Sun)..6(Sat) → ISO 1(Mon)..7(Sun)
-    const isWeekend = settings.weekendDays.includes(isoDow);
-    const cap = settings.workHoursPerDay;
-    const dayRegular = isWeekend ? 0 : Math.min(hours, cap);
-    const dayOvertime = isWeekend ? hours : Math.max(0, hours - cap);
-    regularHours += dayRegular;
-    overtimeHours += dayOvertime;
-
-    const comp = pickEffectiveCompensation(history, day);
-    if (!comp) continue;
-
-    if (comp.payType === "hourly") {
-      const rate = comp.hourlyRate ?? 0;
-      totalHourlyEarnings +=
-        dayRegular * rate + dayOvertime * rate * settings.overtimeMultiplier;
-    } else if (comp.payType === "hybrid") {
-      const rate = comp.hourlyRate ?? 0;
-      // base salary covers hours up to cap on weekdays; OT and weekend hours billed hourly
-      totalHourlyEarnings +=
-        dayOvertime * rate * settings.overtimeMultiplier;
-      totalBaseDays += 1;
-      const monthKey = dayKey.slice(0, 7);
-      baseDaysByMonth.set(monthKey, (baseDaysByMonth.get(monthKey) ?? 0) + 1);
-    } else {
-      // fixed: base only
-      totalBaseDays += 1;
-      const monthKey = dayKey.slice(0, 7);
-      baseDaysByMonth.set(monthKey, (baseDaysByMonth.get(monthKey) ?? 0) + 1);
-    }
-  }
-
-  // Pro-rate base salary by days actually worked vs. days in the month.
-  let baseEarnings = 0;
-  for (const [monthKey, daysWorked] of baseDaysByMonth) {
-    const [yyyy, mm] = monthKey.split("-").map(Number);
-    const daysInMonth = new Date(yyyy, mm, 0).getDate();
-    // Use the comp row effective on the 15th of that month as a stable proxy.
-    const probe = new Date(yyyy, mm - 1, 15);
-    const comp = pickEffectiveCompensation(history, probe);
-    if (!comp || (comp.payType !== "fixed" && comp.payType !== "hybrid")) {
-      continue;
-    }
-    const monthly = comp.baseSalaryMonthly ?? 0;
-    baseEarnings += (monthly * daysWorked) / daysInMonth;
-  }
-
-  const grossAmount = baseEarnings + totalHourlyEarnings;
-  const reviewCount = shifts.filter((s) => s.requiresReview).length;
+  const gross = computeGrossFromShifts(shifts, history, settings);
 
   const notes: string[] = [];
-  if (baseEarnings > 0) {
-    notes.push(`راتب أساسي محسوب نسبياً: ${roundTo2(baseEarnings)} ج.م`);
+  if (gross.baseEarnings > 0) {
+    notes.push(`راتب أساسي محسوب نسبياً: ${gross.baseEarnings} ج.م`);
   }
-  if (totalHourlyEarnings > 0) {
-    notes.push(`أجر بالساعة: ${roundTo2(totalHourlyEarnings)} ج.م`);
+  if (gross.hourlyEarnings > 0) {
+    notes.push(`أجر بالساعة: ${gross.hourlyEarnings} ج.م`);
   }
-  if (reviewCount > 0) {
-    notes.push(`تنبيه: ${reviewCount} فترة تحتاج مراجعة`);
+  if (gross.reviewCount > 0) {
+    notes.push(`تنبيه: ${gross.reviewCount} فترة تحتاج مراجعة`);
   }
 
   return {
     periodStart,
     periodEnd,
     shifts,
-    regularHours: roundTo2(regularHours),
-    overtimeHours: roundTo2(overtimeHours),
-    reviewCount,
-    grossAmount: roundTo2(grossAmount),
+    regularHours: gross.regularHours,
+    overtimeHours: gross.overtimeHours,
+    reviewCount: gross.reviewCount,
+    grossAmount: gross.grossAmount,
     notes,
   };
-}
-
-function roundTo2(n: number): number {
-  return Math.round(n * 100) / 100;
 }

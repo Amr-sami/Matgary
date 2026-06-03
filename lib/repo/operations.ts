@@ -18,6 +18,7 @@ import type {
   PaymentMethod,
   ExpenseCategory,
 } from "@/lib/types";
+import { calcLineDiscount, calcOrderDiscount } from "@/lib/repo/sale-discounts";
 import { bustInsightsCache } from "@/lib/repo/insights";
 import {
   applyCredit as walletApplyCredit,
@@ -241,14 +242,11 @@ export async function recordSale(
     if (!product) throw new Error("المنتج غير موجود");
 
     const subtotal = input.quantitySold * input.pricePerUnit;
-    let discountAmount = 0;
-    if (input.discountType && input.discountValue && input.discountValue > 0) {
-      discountAmount =
-        input.discountType === "percentage"
-          ? Math.round((subtotal * input.discountValue) / 100)
-          : input.discountValue;
-    }
-    discountAmount = Math.min(discountAmount, subtotal);
+    const discountAmount = calcLineDiscount(
+      subtotal,
+      input.discountType,
+      input.discountValue,
+    );
     const totalPrice = subtotal - discountAmount;
 
     // Multi-store inventory: products carry their own per-branch qty. The
@@ -423,37 +421,25 @@ export async function recordCartSale(
       }
 
       const lineSubtotal = line.quantity * line.pricePerUnit;
-      let lineDiscount = 0;
-      if (
-        line.lineDiscountType &&
-        line.lineDiscountValue &&
-        line.lineDiscountValue > 0
-      ) {
-        lineDiscount =
-          line.lineDiscountType === "percentage"
-            ? Math.round((lineSubtotal * line.lineDiscountValue) / 100)
-            : line.lineDiscountValue;
-      }
-      lineDiscount = Math.min(lineDiscount, lineSubtotal);
+      const lineDiscount = calcLineDiscount(
+        lineSubtotal,
+        line.lineDiscountType,
+        line.lineDiscountValue,
+      );
       cartGross += lineSubtotal - lineDiscount;
 
       const attrs = await loadAttributeSnapshot(tx, tenantId, line.productId);
       pre.push({ line, product: p, attrs, lineSubtotal, lineDiscount });
     }
 
-    let orderDiscountTotal = 0;
-    if (
-      options.orderDiscountType &&
-      typeof options.orderDiscountValue === "number" &&
-      options.orderDiscountValue > 0 &&
-      cartGross > 0
-    ) {
-      orderDiscountTotal =
-        options.orderDiscountType === "percentage"
-          ? Math.round((cartGross * options.orderDiscountValue) / 100)
-          : options.orderDiscountValue;
-      orderDiscountTotal = Math.min(orderDiscountTotal, cartGross);
-    }
+    // Order-level discount needs to remain mutable — the loyalty step below
+    // layers redeemed points + applied credit on top before the per-line
+    // proportional allocation runs.
+    let orderDiscountTotal = calcOrderDiscount(
+      cartGross,
+      options.orderDiscountType,
+      options.orderDiscountValue,
+    );
 
     // ── Loyalty redemption pre-check ───────────────────────────────────
     // We resolve points + credit redemption BEFORE the per-line allocation

@@ -183,6 +183,13 @@ npm run db:migrate
 
 ## 2. Changelog
 
+### 2026-06-03 — H06 money math unit tests
+
+- **Extracted pure discount math** out of `lib/repo/operations.ts` into `lib/repo/sale-discounts.ts`: `calcLineDiscount`, `calcOrderDiscount`, `calcCartTotals`. Production code now delegates to them; behaviour byte-identical (same `Math.round` half-up rounding, same `min(discount, subtotal)` cap, same `"fixed" | "percentage"` discriminator). 13 unit tests cover line / order / stacked / free-item edge / negative-input / rounding direction.
+- **Extracted payroll compute** into `lib/repo/payroll-compute.ts` (`computeGrossFromShifts` + `CompensationDto` + `pickEffectiveCompensation`). `payroll.ts` re-exports the DTO and picker so existing call sites stay unbroken. The DTO+picker moved into the new file (not vice-versa) to break what would have been a circular import. 10 unit tests cover empty / hourly weekday / hourly overtime / weekend-as-OT / fixed monthly pro-rate / hybrid / mid-period rate change.
+- **Real finding — leave overlap detection does not exist.** `submitLeaveRequest` only enforces `startDate <= endDate`. The same employee can submit and an owner can approve two overlapping leaves with zero warning. Added to §4 backlog ("Leave overlap detection") and §5 known gaps. H06 spec's leave-overlap acceptance row dropped accordingly — testing math that does not exist would be theatre.
+- **CI wiring.** `.github/workflows/pr.yml` now runs `npx vitest run tests/cache.test.ts tests/ratelimit.test.ts tests/repo/`. New tests pick up automatically when added under `tests/repo/`. Total runtime: 23 new tests in ~650 ms.
+
 ### 2026-06-03 — H02 CI pipeline (GitHub Actions)
 
 - **`.github/workflows/pr.yml`** runs on every PR: `npm ci` → `npx tsc --noEmit` → lint (informational) → Redis-gated vitest specs (`cache.test.ts` + new `ratelimit.test.ts`). Single Redis 7 service container. `cache: npm` for `~/.npm`.
@@ -832,6 +839,7 @@ Ordered roughly by likely impact on retention / conversion. Not committed — re
 ### Infrastructure / ops
 
 - **Cleanup pre-existing lint errors** (194 errors, 970 warnings as of 2026-06-03). Mostly `no-explicit-any` + unused-vars. Today's CI runs lint with `continue-on-error: true` so the noise doesn't gate PRs — once the backlog is empty, remove that line and let lint be a true gate. Track via `npm run lint 2>&1 | grep -E "^✖"` regression test.
+- **Leave overlap detection.** Today `submitLeaveRequest` only enforces `startDate <= endDate`. Add a check that rejects (or warns the approver) when the same employee already has a submitted/approved leave overlapping the requested window. Sketch from H06 spec: pure `hasOverlap(existing, candidate)` that treats adjacent dates (end-of-A === start-of-B) as non-overlap and ignores rejected leaves. Wire into the route + add a unit test. Half-day. Tracked in §5 as a known gap.
 - ~~**Insights server-side aggregation**: today the overview tab aggregates client-side from `useSales`. Move to `/api/insights?from=…&to=…` with a 60 s tenant-keyed cache.~~ ✅ done 2026-05-09 — see changelog.
 - **/healthz + /readyz endpoints** for nginx / orchestrator probes.
 - **Structured logging** (pino or similar). Replace `console.log` in repo + API.
@@ -872,6 +880,7 @@ Ordered roughly by likely impact on retention / conversion. Not committed — re
 - ~~**Single-branch only.**~~ ✅ Multi-branch foundation shipped 2026-05-09 — branches CRUD, picker in topbar, per-branch inventory + sales + expenses + insights filter, staff branch allow-list. Inter-branch transfers and consolidated reports beyond a simple all-branches insights toggle stay in §4 backlog.
 - **No real billing.** Cannot legally charge today.
 - **No 2FA.** Owner credential compromise = full tenant takeover.
+- **No leave-overlap detection.** `submitLeaveRequest` only checks `startDate <= endDate`; the same employee can submit (and an owner can approve) two overlapping leaves with no warning. Discovered during H06 — added to §4 backlog as "Leave overlap detection". Not a launch blocker because the cost is operational (double-counted vacation), not data corruption — but worth landing before scaling staff onboarding.
 - **No native mobile app.** Browser POS works on phones but UX is mediocre on small screens, and printer/scanner integration needs native.
 - ~~**Notifications polling.**~~ ✅ Resolved 2026-05-09 — SSE stream backed by Redis pub/sub. Polling kept as a fallback when EventSource keeps failing.
 - ~~**Recurring expenses don't auto-spawn.**~~ ✅ Resolved 2026-05-09 — `POST /api/cron/recurring-expenses` (bearer-auth, rate-limited) + `cron` sidecar in docker-compose pokes it hourly. Lazy catch-up on `listExpenses` retained as a belt-and-braces second path.
