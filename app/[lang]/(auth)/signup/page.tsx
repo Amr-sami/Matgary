@@ -35,12 +35,23 @@ export default function SignupPage() {
   const [handleStatus, setHandleStatus] = useState<
     "idle" | "checking" | "available" | "taken" | "invalid"
   >("idle");
+  // Live email availability: same shape as handleStatus. Without this, users
+  // only found out a duplicate email at step-2 submit, after filling in store
+  // name + handle.
+  const [emailStatus, setEmailStatus] = useState<
+    "idle" | "checking" | "available" | "taken" | "invalid"
+  >("idle");
 
   const goToStep2 = () => {
     setError(null);
     setErrorField(null);
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setError(t.errors.badEmail);
+      setErrorField("email");
+      return;
+    }
+    if (emailStatus === "taken") {
+      setError(t.emailTaken);
       setErrorField("email");
       return;
     }
@@ -57,6 +68,37 @@ export default function SignupPage() {
       setStoreHandle(suggestHandle(email));
     }
   }, [email, handleEdited]);
+
+  useEffect(() => {
+    const trimmed = email.trim().toLowerCase();
+    if (!trimmed) {
+      setEmailStatus("idle");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setEmailStatus("invalid");
+      return;
+    }
+    setEmailStatus("checking");
+    const ctrl = new AbortController();
+    const tm = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/account/email/check?email=${encodeURIComponent(trimmed)}`,
+          { signal: ctrl.signal },
+        );
+        const json = await res.json();
+        if (json.reason === "invalid") setEmailStatus("invalid");
+        else setEmailStatus(json.available ? "available" : "taken");
+      } catch {
+        // ignore — likely the next keystroke aborted us
+      }
+    }, 350);
+    return () => {
+      clearTimeout(tm);
+      ctrl.abort();
+    };
+  }, [email]);
 
   useEffect(() => {
     if (!storeHandle || storeHandle.length < 2) {
@@ -126,18 +168,26 @@ export default function SignupPage() {
 
       <form onSubmit={onSubmit} className="space-y-4">
         <div className={step === 1 ? "space-y-4" : "hidden"}>
-          <Input
-            name="email"
-            type="email"
-            label={t.emailLabel}
-            placeholder={t.emailPlaceholder}
-            required
-            autoComplete="email"
-            dir="ltr"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            error={errorField === "email" ? error ?? undefined : undefined}
-          />
+          <div>
+            <Input
+              name="email"
+              type="email"
+              label={t.emailLabel}
+              placeholder={t.emailPlaceholder}
+              required
+              autoComplete="email"
+              dir="ltr"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              error={errorField === "email" ? error ?? undefined : undefined}
+            />
+            {emailStatus === "available" && (
+              <p className="mt-1 text-xs text-success">{t.emailAvailable}</p>
+            )}
+            {emailStatus === "taken" && (
+              <p className="mt-1 text-xs text-danger">{t.emailTaken}</p>
+            )}
+          </div>
           <PasswordInput
             name="password"
             label={t.passwordLabel}
@@ -153,7 +203,12 @@ export default function SignupPage() {
             <p className="text-sm text-danger">{error}</p>
           )}
 
-          <Button type="button" className="w-full" onClick={goToStep2}>
+          <Button
+            type="button"
+            className="w-full"
+            onClick={goToStep2}
+            disabled={emailStatus === "checking" || emailStatus === "taken"}
+          >
             {t.next}
           </Button>
         </div>

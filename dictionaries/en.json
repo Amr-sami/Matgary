@@ -263,6 +263,8 @@
       "handleInvalid": "Lowercase letters, digits, and hyphens only; must start and end with a letter or digit",
       "haveAccountQ": "Already have an account?",
       "signIn": "Sign in",
+      "emailAvailable": "Available ✓",
+      "emailTaken": "This email is already registered — use sign in instead",
       "errors": {
         "badEmail": "Enter a valid email address",
         "shortPassword": "Password must be at least 8 characters"

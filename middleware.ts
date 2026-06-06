@@ -98,8 +98,11 @@ const PUBLIC_PATHS = new Set<string>([
   "/status",
   "/terms",
   "/privacy",
-  // Live slug availability check is hit from the unauthed signup form.
+  // Live availability checks hit from the unauthed signup form (step 1
+  // and step 2 of the wizard). Both surface "taken vs free" without
+  // leaking anything beyond what signupAction already returns.
   "/api/account/store-handle/check",
+  "/api/account/email/check",
   // Password reset endpoints — they don't need an active session.
   "/api/account/password/forgot",
   "/api/account/password/reset",
