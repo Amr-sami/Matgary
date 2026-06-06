@@ -40,9 +40,7 @@
   box-sizing: border-box;
 }
 
-html {
-  direction: rtl;
-}
+/* `dir` attribute drives direction now (set per-locale in the root layout). */
 
 body {
   font-family: var(--font-cairo), sans-serif;
@@ -80,7 +78,7 @@ input,
 select,
 textarea {
   font-family: var(--font-cairo), sans-serif;
-  text-align: right;
+  text-align: start;
 }
 
 ::-webkit-scrollbar {
@@ -183,6 +181,15 @@ textarea {
     font-family: var(--font-cairo), 'Arial', sans-serif;
     direction: rtl;
     white-space: pre-wrap;
+    line-height: 1.5;
+  }
+
+  /* Owner-defined custom block. Alignment + direction come from inline
+     style + dir=auto on the element itself, so this rule is just sizing. */
+  .receipt-custom-block {
+    font-size: 11px;
+    margin: 4px 0;
+    font-family: var(--font-cairo), 'Arial', sans-serif;
     line-height: 1.5;
   }
 

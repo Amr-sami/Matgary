@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { DollarSign, LogOut, ShieldCheck, User } from "@/lib/icons";
 import { cn } from "@/lib/utils";
-import { logoutAction } from "@/app/(auth)/actions";
+import { logoutAction } from "@/app/[lang]/(auth)/actions";
 
 interface Props {
   collapsed: boolean;

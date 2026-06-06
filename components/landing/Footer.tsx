@@ -1,41 +1,47 @@
+"use client";
+
 import Link from "next/link";
 import { Logo } from "@/components/brand/Logo";
-
-const COLUMNS = [
-  {
-    heading: "المنتج",
-    links: [
-      { href: "/welcome#features", label: "المميزات" },
-      { href: "/welcome#how", label: "كيف يعمل" },
-      { href: "/signup", label: "ابدأ مجاناً" },
-    ],
-  },
-  {
-    heading: "الشركة",
-    links: [
-      { href: "/about", label: "من نحن" },
-      { href: "/contact", label: "تواصل معنا" },
-      { href: "/blog", label: "المدونة" },
-    ],
-  },
-  {
-    heading: "الدعم",
-    links: [
-      { href: "/help", label: "مركز المساعدة" },
-      { href: "/welcome#faq", label: "الأسئلة الشائعة" },
-      { href: "/status", label: "حالة الخدمة" },
-    ],
-  },
-  {
-    heading: "قانوني",
-    links: [
-      { href: "/terms", label: "الشروط والأحكام" },
-      { href: "/privacy", label: "سياسة الخصوصية" },
-    ],
-  },
-];
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
 
 export function LandingFooter() {
+  const dict = useDictionary();
+  const locale = useLocale();
+  const base = `/${locale}`;
+  const COLUMNS = [
+    {
+      heading: dict.footer.columns.product.heading,
+      links: [
+        { href: `${base}/welcome#features`, label: dict.footer.columns.product.links.features },
+        { href: `${base}/welcome#how`, label: dict.footer.columns.product.links.how },
+        { href: `${base}/signup`, label: dict.footer.columns.product.links.startFree },
+      ],
+    },
+    {
+      heading: dict.footer.columns.company.heading,
+      links: [
+        { href: `${base}/about`, label: dict.footer.columns.company.links.about },
+        { href: `${base}/contact`, label: dict.footer.columns.company.links.contact },
+        { href: `${base}/blog`, label: dict.footer.columns.company.links.blog },
+      ],
+    },
+    {
+      heading: dict.footer.columns.support.heading,
+      links: [
+        { href: `${base}/help`, label: dict.footer.columns.support.links.help },
+        { href: `${base}/welcome#faq`, label: dict.footer.columns.support.links.faq },
+        { href: `${base}/status`, label: dict.footer.columns.support.links.status },
+      ],
+    },
+    {
+      heading: dict.footer.columns.legal.heading,
+      links: [
+        { href: `${base}/terms`, label: dict.footer.columns.legal.links.terms },
+        { href: `${base}/privacy`, label: dict.footer.columns.legal.links.privacy },
+      ],
+    },
+  ];
+
   return (
     <footer className="bg-bg-card border-t border-border">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-14">
@@ -44,8 +50,7 @@ export function LandingFooter() {
           <div className="md:col-span-4 space-y-4">
             <Logo size="md" />
             <p className="text-sm text-text-secondary leading-relaxed max-w-xs">
-              نظام إدارة المتاجر — كل ما يحتاجه متجرك ليعمل بسلاسة ويكبر
-              بثقة.
+              {dict.footer.tagline}
             </p>
             <div className="flex items-center gap-2 pt-1">
               <span className="h-[2px] w-8 bg-accent rounded-full" />
@@ -79,14 +84,11 @@ export function LandingFooter() {
 
         <div className="mt-12 pt-6 border-t border-border flex flex-col gap-3">
           <p className="text-[11px] text-text-secondary leading-relaxed max-w-3xl">
-            متجري نظام تشغيلي لإدارة المتاجر. الإيصالات الصادرة عنه لأغراض
-            تشغيلية وليست بديلاً عن منظومة الفاتورة الإلكترونية المعتمدة من
-            مصلحة الضرائب المصرية (ETA). على التجار المسجَّلين ضريبياً إصدار
-            فواتيرهم الضريبية عبر بوابة ETA منفصلةً.
+            {dict.footer.disclaimer}
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
             <p className="text-xs text-text-secondary">
-              © {new Date().getFullYear()} متجري. جميع الحقوق محفوظة.
+              © {new Date().getFullYear()} {dict.common.brand}. {dict.footer.copyright}
             </p>
             <p className="text-xs text-text-secondary" dir="ltr">
               Crafted with care · v1.0.0

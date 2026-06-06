@@ -3,6 +3,7 @@
 import { InputHTMLAttributes, forwardRef, useState } from "react";
 import { Eye, EyeOff } from "@/lib/icons";
 import { cn } from "@/lib/utils";
+import { useOptionalDictionary } from "@/components/i18n/DictionaryProvider";
 
 interface PasswordInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "type"> {
   label?: string;
@@ -16,6 +17,16 @@ interface PasswordInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>,
 const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
   ({ className, label, error, ...props }, ref) => {
     const [visible, setVisible] = useState(false);
+    // PasswordInput is also used on logged-in /account/security which sits
+    // outside the [lang] tree (no DictionaryProvider). Fall back to Arabic
+    // there to keep parity with the rest of the logged-in surface.
+    const dict = useOptionalDictionary();
+    const t = dict?.common ?? {
+      showPassword: "إظهار كلمة السر",
+      hidePassword: "إخفاء كلمة السر",
+      show: "إظهار",
+      hide: "إخفاء",
+    };
     return (
       <div className="w-full">
         {label && (
@@ -31,7 +42,6 @@ const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
         >
           <input
             ref={ref}
-            dir="ltr"
             type={visible ? "text" : "password"}
             className={cn(
               "flex-1 px-4 py-2.5 bg-transparent text-text-primary placeholder:text-text-secondary focus:outline-none",
@@ -44,8 +54,8 @@ const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
             onClick={() => setVisible((v) => !v)}
             className="px-3 py-2.5 text-text-secondary hover:text-accent transition-colors"
             tabIndex={-1}
-            aria-label={visible ? "إخفاء كلمة السر" : "إظهار كلمة السر"}
-            title={visible ? "إخفاء" : "إظهار"}
+            aria-label={visible ? t.hidePassword : t.showPassword}
+            title={visible ? t.hide : t.show}
           >
             {visible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>

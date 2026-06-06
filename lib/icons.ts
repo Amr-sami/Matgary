@@ -36,6 +36,7 @@ export {
   IdentificationCard,
   Info,
   Key as KeyRound,
+  Globe,
   GridFour as LayoutDashboard,
   SquaresFour as LayoutGrid,
   ListChecks,

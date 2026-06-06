@@ -3,9 +3,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ChevronLeft, CheckCircle } from "@/lib/icons";
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
 import { Reveal } from "./Reveal";
 
 export function CTASection() {
+  const { cta, common } = useDictionary();
+  const locale = useLocale();
   return (
     <section id="cta" className="relative py-20 md:py-28">
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
@@ -17,7 +20,6 @@ export function CTASection() {
                 "linear-gradient(135deg, #1203E3 0%, #3922F0 55%, #5841F5 100%)",
             }}
           >
-            {/* Decorative ambient shapes */}
             <div
               aria-hidden
               className="absolute -top-24 -end-24 w-72 h-72 rounded-full bg-white/10 blur-2xl"
@@ -37,15 +39,13 @@ export function CTASection() {
             />
 
             <div className="relative grid md:grid-cols-[1.15fr_1fr] gap-10 md:gap-12 items-center">
-              {/* ── Text column ─────────────────────────────── */}
               <div className="space-y-6 text-center md:text-start">
                 <h2 className="font-display font-black text-4xl md:text-5xl lg:text-[58px] text-white leading-[1.05] tracking-tight">
-                  انطلق بـ
+                  {cta.headlineA}
                   <span className="relative inline-block">
                     <span className="font-catchy text-white relative z-10">
-                      متجرك
+                      {cta.headlineB}
                     </span>
-                    {/* white brush highlight beneath the keyword */}
                     <svg
                       viewBox="0 0 200 28"
                       preserveAspectRatio="none"
@@ -68,39 +68,35 @@ export function CTASection() {
                     </svg>
                   </span>
                   <br />
-                  اليوم.
+                  {cta.headlineC}
                 </h2>
 
                 <p className="text-white/85 text-lg max-w-md mx-auto md:mx-0 leading-relaxed">
-                  إعداد كامل في أقل من دقيقة. مجاناً، بدون التزام.
+                  {cta.subhead}
                 </p>
 
                 <div className="flex flex-col sm:flex-row items-center md:items-start justify-center md:justify-start gap-3 pt-2">
-                  <Link href="/signup" className="w-full sm:w-auto">
+                  <Link href={`/${locale}/signup`} className="w-full sm:w-auto">
                     <button
                       type="button"
                       className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl bg-white text-accent font-bold text-base shadow-[0_10px_24px_-8px_rgba(0,0,0,0.35)] ring-1 ring-white/40"
                     >
-                      <span>إنشاء حساب</span>
+                      <span>{common.createAccount}</span>
                       <ChevronLeft className="w-4 h-4" />
                     </button>
                   </Link>
-                  <Link href="/login" className="w-full sm:w-auto">
+                  <Link href={`/${locale}/login`} className="w-full sm:w-auto">
                     <button
                       type="button"
                       className="w-full sm:w-auto inline-flex items-center justify-center px-7 py-3.5 rounded-xl bg-white/10 text-white font-bold text-base ring-1 ring-white/45 backdrop-blur-sm"
                     >
-                      لديّ حساب
+                      {common.haveAccount}
                     </button>
                   </Link>
                 </div>
 
                 <ul className="flex flex-wrap items-center justify-center md:justify-start gap-x-6 gap-y-2 pt-4">
-                  {[
-                    "بدون بطاقة ائتمان",
-                    "إعداد في دقيقة",
-                    "إلغاء في أي وقت",
-                  ].map((t) => (
+                  {cta.badges.map((t) => (
                     <li
                       key={t}
                       className="flex items-center gap-1.5 text-white/80 text-xs"
@@ -112,7 +108,6 @@ export function CTASection() {
                 </ul>
               </div>
 
-              {/* ── Illustration column — tilted polaroid card with sticker badge ─── */}
               <div className="relative hidden md:block">
                 <div
                   className="relative bg-white rounded-2xl p-6 shadow-2xl"
@@ -130,14 +125,12 @@ export function CTASection() {
                     className="w-full h-auto select-none"
                   />
                 </div>
-                {/* Sticker badge */}
                 <div
                   className="absolute -top-3 -end-3 bg-white text-accent font-display font-extrabold text-sm px-4 py-2 rounded-full shadow-xl"
                   style={{ transform: "rotate(-12deg)" }}
                 >
-                  مجاناً للبدء
+                  {cta.freeSticker}
                 </div>
-                {/* Floating dot accents */}
                 <span
                   aria-hidden
                   className="absolute -bottom-4 start-8 w-3 h-3 rounded-full bg-white/40"

@@ -3,6 +3,7 @@
 import Image from "next/image";
 import type { ReactNode } from "react";
 import { Check } from "@/lib/icons";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 import { Reveal } from "./Reveal";
 
 interface Row {
@@ -11,74 +12,57 @@ interface Row {
   body: string;
   bullets: string[];
   art: ReactNode;
-  /** "start" → illustration on the page-start side (right in RTL). "end" → opposite. */
+  /** "start" → illustration on the page-start side. "end" → opposite. */
   side: "start" | "end";
 }
 
-const ROWS: Row[] = [
-  {
-    eyebrow: "المخزن",
-    title: "إدارة المخزون بدون أخطاء",
-    body: "تتبع كل قطعة في متجرك من لحظة وصولها حتى بيعها. الجرد التلقائي يكتشف الناقص قبل أن يصبح مشكلة.",
-    bullets: [
-      "تنبيهات عند نفاد الكمية",
-      "أصناف فرعية وخصائص مرنة",
-      "استيراد قوائم المنتجات بـCSV",
-    ],
-    art: (
-      <Image
-        src="/illustrations/landing/unboxing.svg"
-        alt="إدارة المخزون"
-        width={520}
-        height={420}
-        className="w-full max-w-md h-auto select-none drop-shadow-sm"
-      />
-    ),
-    side: "start",
-  },
-  {
-    eyebrow: "نقطة البيع",
-    title: "نقطة بيع تواكب سرعة عملك",
-    body: "افتح الفاتورة، امسح الباركود، اطبع الإيصال — كل ذلك في ثوانٍ. تعمل من أي جهاز، حتى بدون إنترنت مؤقتاً.",
-    bullets: [
-      "دعم كامل للباركود والقارئات",
-      "دفع نقدي، شبكة، أو آجل",
-      "إيصالات حرارية وPDF",
-    ],
-    art: (
-      <Image
-        src="/illustrations/landing/sleek.svg"
-        alt="نقطة بيع سريعة"
-        width={520}
-        height={420}
-        className="w-full max-w-md h-auto select-none drop-shadow-sm"
-      />
-    ),
-    side: "end",
-  },
-  {
-    eyebrow: "التقارير",
-    title: "تقارير تفهم متجرك",
-    body: "ليست أرقاماً جامدة. تحليلات ذكية تخبرك أي صنف يجلب الربح، أي ساعة هي الأكثر ازدحاماً، وأي عميل عاد آخر مرة.",
-    bullets: [
-      "خرائط حرارية للمبيعات بالساعة",
-      "أفضل المنتجات والعملاء",
-      "مقارنات يومية وشهرية",
-    ],
-    art: (
-      <Image
-        src="/illustrations/landing/sitting-reading.svg"
-        alt="تحليل التقارير"
-        width={520}
-        height={420}
-        className="w-full max-w-md h-auto select-none drop-shadow-sm"
-      />
-    ),
-    side: "start",
-  },
-];
-
 export function Showcase() {
+  const { showcase } = useDictionary();
+  const ROWS: Row[] = [
+    {
+      ...showcase.inventory,
+      bullets: showcase.inventory.bullets,
+      art: (
+        <Image
+          src="/illustrations/landing/unboxing.svg"
+          alt={showcase.inventory.imageAlt}
+          width={520}
+          height={420}
+          className="w-full max-w-md h-auto select-none drop-shadow-sm"
+        />
+      ),
+      side: "start",
+    },
+    {
+      ...showcase.pos,
+      bullets: showcase.pos.bullets,
+      art: (
+        <Image
+          src="/illustrations/landing/sleek.svg"
+          alt={showcase.pos.imageAlt}
+          width={520}
+          height={420}
+          className="w-full max-w-md h-auto select-none drop-shadow-sm"
+        />
+      ),
+      side: "end",
+    },
+    {
+      ...showcase.reports,
+      bullets: showcase.reports.bullets,
+      art: (
+        <Image
+          src="/illustrations/landing/sitting-reading.svg"
+          alt={showcase.reports.imageAlt}
+          width={520}
+          height={420}
+          className="w-full max-w-md h-auto select-none drop-shadow-sm"
+        />
+      ),
+      side: "start",
+    },
+  ];
+
   return (
     <section className="relative py-20 md:py-28">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-24 md:space-y-32">

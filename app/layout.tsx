@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { Cairo, Tajawal, Lemonada } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
 import { IconProvider } from "@/components/IconProvider";
+import { defaultLocale, dirOf, isLocale } from "@/lib/i18n/config";
 import "./globals.css";
 
 const cairo = Cairo({
-  subsets: ["arabic"],
+  subsets: ["arabic", "latin"],
   weight: ["400", "500", "600", "700"],
   variable: "--font-cairo",
   display: "swap",
@@ -14,7 +16,7 @@ const cairo = Cairo({
 // Display font for impressive headlines on the auth brand panel.
 // Tajawal is a polished modern Arabic display family with multiple weights.
 const tajawal = Tajawal({
-  subsets: ["arabic"],
+  subsets: ["arabic", "latin"],
   weight: ["500", "700", "800", "900"],
   variable: "--font-display",
   display: "swap",
@@ -23,7 +25,7 @@ const tajawal = Tajawal({
 // Catchy / accent display font — soft rounded display, used for single
 // emphasized words inside a Tajawal headline. Friendly + memorable.
 const lemonada = Lemonada({
-  subsets: ["arabic"],
+  subsets: ["arabic", "latin"],
   weight: ["500", "600", "700"],
   variable: "--font-catchy",
   display: "swap",
@@ -34,13 +36,19 @@ export const metadata: Metadata = {
   description: "نظام نقطة البيع وإدارة المخزن لمتجر الساعات والبرفانات والنظارات",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Middleware writes x-locale on every request based on the URL path
+  // (`/ar/*` → ar, `/en/*` → en, anything else → defaultLocale).
+  const hdrs = await headers();
+  const raw = hdrs.get("x-locale");
+  const locale = raw && isLocale(raw) ? raw : defaultLocale;
+  const dir = dirOf(locale);
   return (
-    <html lang="ar" dir="rtl" className={`${cairo.variable} ${tajawal.variable} ${lemonada.variable}`}>
+    <html lang={locale} dir={dir} className={`${cairo.variable} ${tajawal.variable} ${lemonada.variable}`}>
       <body className="min-h-screen flex flex-col antialiased">
         <SessionProvider>
           <IconProvider>{children}</IconProvider>

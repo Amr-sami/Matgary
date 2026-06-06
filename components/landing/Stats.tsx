@@ -1,13 +1,16 @@
+"use client";
+
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 import { Reveal } from "./Reveal";
 
-const STATS = [
-  { value: "‎99.9%", label: "وقت التشغيل" },
-  { value: "‎<1s", label: "زمن تسجيل البيع" },
-  { value: "‎24/7", label: "دعم بالعربية" },
-  { value: "‎ ∞ ", label: "أصناف بدون حد" },
-];
-
 export function Stats() {
+  const dict = useDictionary();
+  const STATS = [
+    { value: "‎99.9%", label: dict.stats.uptime },
+    { value: "‎<1s", label: dict.stats.saleSpeed },
+    { value: "‎24/7", label: dict.stats.support },
+    { value: "‎ ∞ ", label: dict.stats.unlimited },
+  ];
   return (
     <section className="py-12 md:py-16 border-y border-border bg-bg-card/60">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">

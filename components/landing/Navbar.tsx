@@ -6,16 +6,20 @@ import { Logo } from "@/components/brand/Logo";
 import { Button } from "@/components/ui/Button";
 import { ChevronLeft } from "@/lib/icons";
 import { cn } from "@/lib/utils";
-
-const NAV_LINKS = [
-  { href: "#features", label: "المميزات" },
-  { href: "#how", label: "كيف يعمل" },
-  { href: "#pricing", label: "الأسعار" },
-];
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
+import { LangSwitcher } from "@/components/i18n/LangSwitcher";
 
 export function LandingNavbar() {
+  const dict = useDictionary();
+  const locale = useLocale();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+
+  const NAV_LINKS = [
+    { href: "#features", label: dict.nav.features },
+    { href: "#how", label: dict.nav.how },
+    { href: "#pricing", label: dict.nav.pricing },
+  ];
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -54,9 +58,9 @@ export function LandingNavbar() {
     >
       <nav className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
         <Link
-          href="/welcome"
+          href={`/${locale}/welcome`}
           className="flex items-center shrink-0"
-          aria-label="متجري"
+          aria-label={dict.common.brand}
         >
           <Logo size="sm" />
         </Link>
@@ -78,52 +82,56 @@ export function LandingNavbar() {
         </div>
 
         <div className="hidden md:flex items-center gap-1">
+          <LangSwitcher className="me-1" />
           <Link
-            href="/login"
+            href={`/${locale}/login`}
             className="px-3 py-2 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
           >
-            تسجيل الدخول
+            {dict.common.signIn}
           </Link>
           <span aria-hidden className="mx-1 h-5 w-px bg-border" />
-          <Link href="/signup">
+          <Link href={`/${locale}/signup`}>
             <Button className="group gap-1.5 px-4 py-2 text-sm">
-              <span>ابدأ مجاناً</span>
-              <ChevronLeft className="w-4 h-4 transition-transform duration-200 group-hover:-translate-x-0.5" />
+              <span>{dict.common.startFree}</span>
+              <ChevronLeft className="w-4 h-4 transition-transform duration-200 group-hover:-translate-x-0.5 rtl:rotate-0 ltr:rotate-180" />
             </Button>
           </Link>
         </div>
 
-        <button
-          type="button"
-          className="md:hidden relative w-10 h-10 -me-2 inline-flex items-center justify-center text-text-primary"
-          onClick={() => setOpen((v) => !v)}
-          aria-label={open ? "إغلاق القائمة" : "فتح القائمة"}
-          aria-expanded={open}
-        >
-          <span className="sr-only">القائمة</span>
-          <span aria-hidden className="relative block w-5 h-4">
-            <span
-              className={cn(
-                "absolute left-0 right-0 h-[2px] bg-current rounded-full transition-all duration-300",
-                open ? "top-1/2 -translate-y-1/2 rotate-45" : "top-0",
-              )}
-            />
-            <span
-              className={cn(
-                "absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[2px] bg-current rounded-full transition-opacity duration-200",
-                open ? "opacity-0" : "opacity-100",
-              )}
-            />
-            <span
-              className={cn(
-                "absolute left-0 right-0 h-[2px] bg-current rounded-full transition-all duration-300",
-                open
-                  ? "bottom-1/2 translate-y-1/2 -rotate-45"
-                  : "bottom-0",
-              )}
-            />
-          </span>
-        </button>
+        <div className="md:hidden flex items-center gap-1">
+          <LangSwitcher variant="bare" />
+          <button
+            type="button"
+            className="relative w-10 h-10 -me-2 inline-flex items-center justify-center text-text-primary"
+            onClick={() => setOpen((v) => !v)}
+            aria-label={open ? dict.common.closeMenu : dict.common.openMenu}
+            aria-expanded={open}
+          >
+            <span className="sr-only">{dict.common.menu}</span>
+            <span aria-hidden className="relative block w-5 h-4">
+              <span
+                className={cn(
+                  "absolute left-0 right-0 h-[2px] bg-current rounded-full transition-all duration-300",
+                  open ? "top-1/2 -translate-y-1/2 rotate-45" : "top-0",
+                )}
+              />
+              <span
+                className={cn(
+                  "absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[2px] bg-current rounded-full transition-opacity duration-200",
+                  open ? "opacity-0" : "opacity-100",
+                )}
+              />
+              <span
+                className={cn(
+                  "absolute left-0 right-0 h-[2px] bg-current rounded-full transition-all duration-300",
+                  open
+                    ? "bottom-1/2 translate-y-1/2 -rotate-45"
+                    : "bottom-0",
+                )}
+              />
+            </span>
+          </button>
+        </div>
       </nav>
 
       {/* Mobile scrim */}
@@ -161,14 +169,14 @@ export function LandingNavbar() {
             ))}
           </ul>
           <div className="grid grid-cols-1 gap-2 pt-4 mt-2 border-t border-border">
-            <Link href="/login" onClick={() => setOpen(false)}>
+            <Link href={`/${locale}/login`} onClick={() => setOpen(false)}>
               <Button variant="secondary" className="w-full py-2.5">
-                تسجيل الدخول
+                {dict.common.signIn}
               </Button>
             </Link>
-            <Link href="/signup" onClick={() => setOpen(false)}>
+            <Link href={`/${locale}/signup`} onClick={() => setOpen(false)}>
               <Button className="w-full py-2.5 gap-1.5">
-                <span>ابدأ مجاناً</span>
+                <span>{dict.common.startFree}</span>
                 <ChevronLeft className="w-4 h-4" />
               </Button>
             </Link>

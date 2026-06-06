@@ -1,8 +1,38 @@
 import NextAuth from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { authConfig } from "@/lib/auth.config";
+import { LOCALE_COOKIE, defaultLocale, isLocale, locales } from "@/lib/i18n/config";
+import { detectLocale, pathLocale } from "@/lib/i18n/detect";
 
 const { auth } = NextAuth(authConfig);
+
+// Pre-login HTML routes that live under app/[lang]/*. Bare visits (e.g. /welcome)
+// get redirected to /{locale}/welcome; visits already prefixed (/ar/..., /en/...)
+// are normalized for the PUBLIC_PATHS check below.
+const LOCALIZED_HTML_SLUGS = new Set<string>([
+  "/welcome",
+  "/about",
+  "/contact",
+  "/blog",
+  "/help",
+  "/status",
+  "/terms",
+  "/privacy",
+  "/login",
+  "/signup",
+  "/forgot-password",
+  "/reset-password",
+  "/onboarding",
+]);
+
+function stripLocalePrefix(pathname: string): string {
+  const seg = pathname.split("/")[1];
+  if (seg && isLocale(seg)) {
+    const rest = pathname.slice(seg.length + 1);
+    return rest === "" ? "/" : rest;
+  }
+  return pathname;
+}
 
 // H08 — Content Security Policy. Per-request nonce so we don't have to ship
 // 'unsafe-inline' for scripts. Report-Only by default until staging proves
@@ -113,16 +143,49 @@ export default auth((req) => {
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set("x-nonce", nonce);
-  const passThrough = () =>
-    applyCsp(
+
+  const localeInPath = pathLocale(pathname);
+  const activeLocale = localeInPath ?? defaultLocale;
+  requestHeaders.set("x-locale", activeLocale);
+
+  const passThrough = () => {
+    const res = applyCsp(
       req,
       nonce,
       NextResponse.next({ request: { headers: requestHeaders } }),
     );
+    if (localeInPath) {
+      const existing = req.cookies.get(LOCALE_COOKIE)?.value;
+      if (existing !== localeInPath) {
+        res.cookies.set(LOCALE_COOKIE, localeInPath, {
+          path: "/",
+          maxAge: 60 * 60 * 24 * 365,
+          sameSite: "lax",
+        });
+      }
+    }
+    return res;
+  };
+
+  // Bare pre-login slug → redirect to /{detected}/{slug}. Detection order:
+  // cookie → Accept-Language → default (ar).
+  if (
+    !localeInPath &&
+    (LOCALIZED_HTML_SLUGS.has(pathname) ||
+      [...LOCALIZED_HTML_SLUGS].some(
+        (slug) => slug !== "/" && pathname.startsWith(`${slug}/`),
+      ))
+  ) {
+    const target = detectLocale(req);
+    const url = new URL(`/${target}${pathname}${nextUrl.search}`, nextUrl);
+    return applyCsp(req, nonce, NextResponse.redirect(url));
+  }
+
+  const normalizedPath = localeInPath ? stripLocalePrefix(pathname) : pathname;
 
   if (
-    PUBLIC_PATHS.has(pathname) ||
-    PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))
+    PUBLIC_PATHS.has(normalizedPath) ||
+    PUBLIC_PREFIXES.some((p) => normalizedPath.startsWith(p))
   ) {
     return passThrough();
   }
@@ -133,11 +196,15 @@ export default auth((req) => {
     if (pathname.startsWith("/api/")) {
       return applyCsp(req, nonce, NextResponse.json({ error: "Unauthorized" }, { status: 401 }));
     }
-    // Anonymous "/" → marketing landing, not the login wall.
+    // Anonymous "/" → marketing landing in detected locale.
     if (pathname === "/") {
-      return applyCsp(req, nonce, NextResponse.redirect(new URL("/welcome", nextUrl)));
+      return applyCsp(
+        req,
+        nonce,
+        NextResponse.redirect(new URL(`/${activeLocale}/welcome`, nextUrl)),
+      );
     }
-    const loginUrl = new URL("/login", nextUrl);
+    const loginUrl = new URL(`/${activeLocale}/login`, nextUrl);
     loginUrl.searchParams.set("next", pathname);
     return applyCsp(req, nonce, NextResponse.redirect(loginUrl));
   }

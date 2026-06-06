@@ -1,9 +1,14 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
 import { Reveal } from "./Reveal";
 
 export function Hero() {
+  const dict = useDictionary();
+  const locale = useLocale();
   return (
     <section className="relative overflow-hidden pt-10 pb-20 md:pt-16 md:pb-28">
       {/* Soft brand glow behind the illustration column */}
@@ -20,11 +25,11 @@ export function Hero() {
         <Reveal>
           <div className="space-y-6 text-center md:text-start">
             <h1 className="font-display font-black text-4xl sm:text-5xl lg:text-[58px] text-text-primary leading-[1.05] tracking-tight">
-              نقطة بيع، مخزون، تقارير
+              {dict.hero.headlineA}
               <br />
               <span className="relative inline-block">
                 <span className="font-catchy text-accent relative z-10">
-                  في مكان واحد
+                  {dict.hero.headlineB}
                 </span>
                 <svg
                   viewBox="0 0 280 28"
@@ -57,36 +62,35 @@ export function Hero() {
               </span>
             </h1>
             <p className="text-lg text-text-secondary leading-relaxed max-w-lg mx-auto md:mx-0">
-              متجري نظام موحد لإدارة كل ما يحتاجه متجرك يومياً — من المبيعات
-              والمخزون إلى الموظفين والتقارير اللحظية.
+              {dict.hero.subhead}
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center md:justify-start gap-3 pt-2">
-              <Link href="/signup">
+              <Link href={`/${locale}/signup`}>
                 <Button className="px-7 py-3 text-base w-full sm:w-auto">
-                  ابدأ مجاناً
+                  {dict.common.startFree}
                 </Button>
               </Link>
-              <Link href="/login">
+              <Link href={`/${locale}/login`}>
                 <Button
                   variant="secondary"
                   className="px-7 py-3 text-base w-full sm:w-auto"
                 >
-                  تسجيل الدخول
+                  {dict.common.signIn}
                 </Button>
               </Link>
             </div>
             <div className="flex items-center justify-center md:justify-start gap-6 pt-4 text-xs text-text-secondary">
               <span className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-success" />
-                مجاناً للبدء
+                {dict.hero.badgeFree}
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-success" />
-                بدون بطاقة ائتمان
+                {dict.hero.badgeNoCard}
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-success" />
-                دعم متخصص
+                {dict.hero.badgeSupport}
               </span>
             </div>
           </div>
@@ -96,7 +100,7 @@ export function Hero() {
           <div className="relative">
             <Image
               src="/market-launch.svg"
-              alt="إطلاق متجرك"
+              alt={dict.hero.imageAlt}
               width={560}
               height={400}
               priority

@@ -3,36 +3,12 @@
 import { useState } from "react";
 import { Plus } from "@/lib/icons";
 import { cn } from "@/lib/utils";
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
 import { Reveal } from "./Reveal";
 
-const FAQS = [
-  {
-    q: "هل أحتاج بطاقة ائتمان للبدء؟",
-    a: "لا. يمكنك إنشاء حسابك وتجربة كل المميزات مجاناً بدون أي بطاقة دفع.",
-  },
-  {
-    q: "هل يعمل النظام على الموبايل؟",
-    a: "نعم — كل الواجهات مصممة للعمل على الهاتف والتابلت بنفس سلاسة الكمبيوتر، بما فيها نقطة البيع.",
-  },
-  {
-    q: "هل أستطيع إضافة موظفين بصلاحيات محددة؟",
-    a: "بالطبع. أنشئ حسابات للموظفين وحدد ما يستطيعون رؤيته (المخزن، التقارير، الإعدادات…) وما يستطيعون فعله، كل ذلك بضغطة زر.",
-  },
-  {
-    q: "هل بياناتي آمنة؟",
-    a: "نعم. كل متجر يعمل في عزل تام عن المتاجر الأخرى على مستوى قاعدة البيانات (Row-Level Security)، وكل البيانات الحساسة مشفّرة.",
-  },
-  {
-    q: "ماذا يحدث إذا انقطع الإنترنت؟",
-    a: "نقطة البيع تستمر بالعمل وتسجل العمليات محلياً، ثم تتزامن تلقائياً عند عودة الاتصال — لن تخسر أي بيع.",
-  },
-  {
-    q: "هل أستطيع استيراد منتجاتي القديمة؟",
-    a: "نعم. ندعم الاستيراد عبر ملفات CSV، وفريق الدعم يساعدك في النقل من أي نظام آخر.",
-  },
-];
-
 export function FAQ() {
+  const { faq, common } = useDictionary();
+  const locale = useLocale();
   const [open, setOpen] = useState<number | null>(0);
 
   return (
@@ -41,16 +17,16 @@ export function FAQ() {
         <Reveal>
           <div className="max-w-2xl mx-auto text-center mb-14">
             <span className="font-catchy inline-block text-accent text-base font-bold mb-3 tracking-wide">
-              الأسئلة الشائعة
+              {faq.eyebrow}
             </span>
             <h2 className="font-display font-black text-3xl md:text-4xl text-text-primary leading-tight tracking-tight">
-              إجابات على أكثر ما يُسأل
+              {faq.title}
             </h2>
           </div>
         </Reveal>
 
         <div className="border-t border-border">
-          {FAQS.map((item, i) => {
+          {faq.items.map((item, i) => {
             const isOpen = open === i;
             return (
               <Reveal key={item.q} delay={i * 40}>
@@ -105,12 +81,12 @@ export function FAQ() {
 
         <Reveal delay={150}>
           <p className="text-center text-sm text-text-secondary mt-10">
-            عندك سؤال آخر؟{" "}
+            {faq.moreQuestion}{" "}
             <a
-              href="#"
+              href={`/${locale}/contact`}
               className="font-bold text-accent hover:underline underline-offset-4"
             >
-              تواصل معنا
+              {common.contactUs}
             </a>
             .
           </p>

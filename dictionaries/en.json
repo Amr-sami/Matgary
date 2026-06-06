@@ -1,0 +1,479 @@
+{
+  "meta": {
+    "title": "Matgary — All-in-one shop management",
+    "description": "Point of sale, inventory, reports, team — everything your store needs in one system. Free to start."
+  },
+  "common": {
+    "brand": "Matgary",
+    "startFree": "Start free",
+    "signIn": "Sign in",
+    "haveAccount": "I have an account",
+    "createAccount": "Create account",
+    "contactUs": "Contact us",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "menu": "Menu",
+    "yes": "Yes",
+    "no": "No",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "show": "Show",
+    "hide": "Hide"
+  },
+  "nav": {
+    "features": "Features",
+    "how": "How it works",
+    "pricing": "Pricing"
+  },
+  "hero": {
+    "headlineA": "POS, inventory, reports",
+    "headlineB": "in one place",
+    "subhead": "Matgary is a unified system for everything your shop needs daily — from sales and inventory to staff and real-time reports.",
+    "badgeFree": "Free to start",
+    "badgeNoCard": "No credit card",
+    "badgeSupport": "Dedicated support",
+    "imageAlt": "Launch your store"
+  },
+  "stats": {
+    "uptime": "Uptime",
+    "saleSpeed": "Sale ring-up time",
+    "support": "Arabic support",
+    "unlimited": "Unlimited items"
+  },
+  "features": {
+    "eyebrow": "Features",
+    "title": "Tools built to work together",
+    "body": "Not a tangle of separate apps — every piece is designed to feed the next and save you time and mistakes.",
+    "team": {
+      "eyebrow": "Team",
+      "title": "Permissions sized to each role",
+      "body": "The cashier doesn't see reports. The warehouse manager can't reach settings. You set the boundaries — the system enforces them.",
+      "members": {
+        "manager": { "name": "Ahmed", "initial": "A", "role": "Manager" },
+        "cashier": { "name": "Sarah", "initial": "S", "role": "Cashier" },
+        "warehouse": { "name": "Khaled", "initial": "K", "role": "Warehouse" }
+      }
+    },
+    "unlimited": {
+      "eyebrow": "No limits",
+      "title": "Unlimited inventory",
+      "body": "No item caps between plans. Create whatever you need."
+    },
+    "whatsapp": {
+      "eyebrow": "Reach",
+      "title": "Receipt on WhatsApp",
+      "body": "After every sale, the receipt reaches the customer directly.",
+      "saleReceiptLine": "Sale receipt #1234",
+      "thanks": "Thanks 🙏"
+    },
+    "customers": {
+      "eyebrow": "Customers",
+      "title": "Know your customers — bring them back",
+      "body": "Track each customer's last visit, spot who's been away, then reach out with a bulk WhatsApp message in one tap.",
+      "rows": [
+        { "name": "Ahmed Ali", "spend": "EGP 2,300", "last": "3 days ago" },
+        { "name": "Sarah Mohamed", "spend": "EGP 1,850", "last": "1 week ago" },
+        { "name": "Khaled Ibrahim", "spend": "EGP 4,200", "last": "2 months ago" }
+      ]
+    }
+  },
+  "showcase": {
+    "inventory": {
+      "eyebrow": "Inventory",
+      "title": "Stock control without mistakes",
+      "body": "Track every item from arrival to sale. Automatic stocktake catches what's missing before it becomes a problem.",
+      "bullets": [
+        "Low-stock alerts",
+        "Variants and flexible attributes",
+        "Import product lists from CSV"
+      ],
+      "imageAlt": "Inventory management"
+    },
+    "pos": {
+      "eyebrow": "Point of sale",
+      "title": "A POS that keeps your pace",
+      "body": "Open the invoice, scan the barcode, print the receipt — all in seconds. Works on any device, even with no internet temporarily.",
+      "bullets": [
+        "Full barcode and scanner support",
+        "Cash, card, or on-account payments",
+        "Thermal and PDF receipts"
+      ],
+      "imageAlt": "Fast point of sale"
+    },
+    "reports": {
+      "eyebrow": "Reports",
+      "title": "Reports that understand your store",
+      "body": "Not raw numbers. Smart analytics tell you which item drives profit, which hour is busiest, and which customer last walked in.",
+      "bullets": [
+        "Hourly sales heat maps",
+        "Top products and customers",
+        "Day-over-day and month-over-month comparisons"
+      ],
+      "imageAlt": "Report analysis"
+    }
+  },
+  "how": {
+    "eyebrow": "How it works",
+    "title": "From a fresh account to your first sale",
+    "subhead": "Three easy steps — and you're ready to run your shop from any device.",
+    "steps": [
+      { "n": "1", "title": "Create your account", "body": "Quick signup — shop name, your email, a password. Under a minute." },
+      { "n": "2", "title": "Add your products", "body": "Import your product list from CSV or add them by hand with categories and prices." },
+      { "n": "3", "title": "Start selling", "body": "Open the POS and ring up your first sale. Inventory and reports update automatically." }
+    ]
+  },
+  "pricing": {
+    "eyebrow": "Pricing",
+    "title": "One plan. Choose your billing.",
+    "subhead": "Same features in every plan — the only difference is the term and the total price.",
+    "recommended": "Recommended",
+    "currency": "EGP",
+    "plans": {
+      "monthly": { "name": "Monthly", "price": "300", "period": "/mo", "cta": "Choose monthly" },
+      "yearly":  { "name": "Yearly", "price": "2,500", "period": "/yr", "effective": "EGP 208 /mo effective", "cta": "Choose yearly" },
+      "threeYear": { "name": "3 years", "price": "6,000", "period": " total", "effective": "EGP 167 /mo effective", "cta": "Choose 3 years" }
+    },
+    "includedEyebrow": "What's included",
+    "includedTitle": "Every feature in every plan",
+    "includedBody": "There's no \"basic\" plan with features cut. Everyone gets the full system.",
+    "included": [
+      "Full point of sale",
+      "Unlimited inventory",
+      "Real-time reports and analytics",
+      "Team and permissions",
+      "WhatsApp receipts",
+      "Public catalog on a custom domain"
+    ],
+    "disclaimer": "Prices in Egyptian pounds — cancel any time."
+  },
+  "faq": {
+    "eyebrow": "FAQ",
+    "title": "Answers to the most-asked questions",
+    "moreQuestion": "Got another question?",
+    "items": [
+      { "q": "Do I need a credit card to start?", "a": "No. You can create your account and try every feature free, with no payment card." },
+      { "q": "Does it work on mobile?", "a": "Yes — every screen is designed to work on phone and tablet as smoothly as desktop, including the POS." },
+      { "q": "Can I add staff with specific permissions?", "a": "Absolutely. Create staff accounts and decide what they can see (inventory, reports, settings…) and what they can do, all in a click." },
+      { "q": "Is my data safe?", "a": "Yes. Every shop runs fully isolated from other shops at the database level (Row-Level Security), and all sensitive data is encrypted." },
+      { "q": "What happens if the internet drops?", "a": "The POS keeps working and records sales locally, then syncs automatically when the connection returns — you won't lose a sale." },
+      { "q": "Can I import my existing products?", "a": "Yes. We support CSV import, and our support team helps you migrate from any other system." }
+    ]
+  },
+  "cta": {
+    "headlineA": "Launch your",
+    "headlineB": "store",
+    "headlineC": "today.",
+    "subhead": "Full setup in under a minute. Free, no strings.",
+    "badges": ["No credit card", "Setup in a minute", "Cancel any time"],
+    "freeSticker": "Free to start"
+  },
+  "footer": {
+    "tagline": "Shop management — everything your store needs to run smoothly and grow with confidence.",
+    "columns": {
+      "product": {
+        "heading": "Product",
+        "links": {
+          "features": "Features",
+          "how": "How it works",
+          "startFree": "Start free"
+        }
+      },
+      "company": {
+        "heading": "Company",
+        "links": {
+          "about": "About",
+          "contact": "Contact",
+          "blog": "Blog"
+        }
+      },
+      "support": {
+        "heading": "Support",
+        "links": {
+          "help": "Help center",
+          "faq": "FAQ",
+          "status": "Service status"
+        }
+      },
+      "legal": {
+        "heading": "Legal",
+        "links": {
+          "terms": "Terms",
+          "privacy": "Privacy"
+        }
+      }
+    },
+    "disclaimer": "Matgary is an operational shop-management system. Receipts it issues are for operational use and are not a substitute for the Egyptian Tax Authority (ETA) e-invoicing system. Tax-registered merchants must issue their tax invoices through the ETA portal separately.",
+    "copyright": "All rights reserved."
+  },
+  "auth": {
+    "showcase": {
+      "imageAlt": "Launch your store",
+      "headlineA": "Launch",
+      "headlineB": "your store",
+      "headlineC": "to the sky",
+      "lead": "Your complete system for sales and inventory — built for Arabic-speaking shops to grow with confidence and speed."
+    },
+    "login": {
+      "meta": {
+        "title": "Sign in — Matgary",
+        "description": "Sign in to your Matgary account to run your shop."
+      },
+      "title": "Sign in",
+      "subhead": "Welcome back",
+      "identifierLabel": "Email or username",
+      "identifierPlaceholder": "you@example.com  •  username@yourstore",
+      "passwordLabel": "Password",
+      "submit": "Sign in",
+      "confirmCode": "Confirm code",
+      "back": "Back",
+      "forgot": "Forgot your password?",
+      "noAccount": "Don't have an account?",
+      "createAccount": "Create a new account",
+      "totpPrompt": "Enter the 6-digit code from your authenticator app, or a recovery code (xxxxx-xxxxx).",
+      "totpPlaceholder": "123456",
+      "errors": {
+        "missing": "Enter both email and password",
+        "badCreds": "Email or password is incorrect",
+        "badCredsOrTotp": "Password or code is incorrect",
+        "generic": "Sign-in failed"
+      }
+    },
+    "signup": {
+      "meta": {
+        "title": "Create account — Matgary",
+        "description": "Create your Matgary account and start running your shop in a minute."
+      },
+      "title": "Create a new account",
+      "step1Sub": "Start by creating your account",
+      "step2Sub": "Tell us about your store",
+      "emailLabel": "Your email",
+      "emailPlaceholder": "you@example.com",
+      "passwordLabel": "Password",
+      "passwordPlaceholder": "At least 8 characters",
+      "next": "Next",
+      "previous": "Previous",
+      "submit": "Create account",
+      "storeNameLabel": "Store name (shown to customers)",
+      "storeNamePlaceholder": "Happy Store",
+      "handleLabel": "Store sign-in handle",
+      "handlePlaceholder": "elhenawystore",
+      "handleHint": "Your staff use this to sign in, e.g.",
+      "handleAvailable": "Available ✓",
+      "handleTaken": "This handle is already used by another store — pick a different one",
+      "handleInvalid": "Lowercase letters, digits, and hyphens only; must start and end with a letter or digit",
+      "haveAccountQ": "Already have an account?",
+      "signIn": "Sign in",
+      "errors": {
+        "badEmail": "Enter a valid email address",
+        "shortPassword": "Password must be at least 8 characters"
+      }
+    },
+    "forgot": {
+      "meta": {
+        "title": "Forgot password — Matgary",
+        "description": "Request a password reset link for your account."
+      },
+      "title": "Forgot your password?",
+      "subhead": "Enter your email and we'll send you a reset link.",
+      "emailLabel": "Email",
+      "emailPlaceholder": "you@example.com",
+      "submit": "Send reset link",
+      "backToLogin": "Back to sign in",
+      "successTitle": "If the email is registered with us, you'll find a reset link in your inbox within minutes.",
+      "successNote": "The link is valid for 30 minutes. Remember to check your spam folder.",
+      "errors": {
+        "generic": "Couldn't send the request"
+      }
+    },
+    "reset": {
+      "meta": {
+        "title": "New password — Matgary",
+        "description": "Choose a new password for your account."
+      },
+      "title": "New password",
+      "subhead": "Choose a new password for your account.",
+      "newPasswordLabel": "New password",
+      "confirmLabel": "Confirm password",
+      "submit": "Change password",
+      "successMsg": "Password changed successfully ✓",
+      "redirecting": "Redirecting you to sign in…",
+      "invalidLinkPrefix": "Invalid link. Request a new one from",
+      "invalidLinkAction": "Forgot password",
+      "errors": {
+        "short": "Password must be at least 8 characters",
+        "mismatch": "Passwords do not match",
+        "generic": "Couldn't reset"
+      }
+    },
+    "onboarding": {
+      "meta": {
+        "title": "Set up your store — Matgary",
+        "description": "Quick steps to finish setting up your store."
+      },
+      "step1": {
+        "title": "Tell us about your store",
+        "subhead": "A few quick details to get started",
+        "shopNameLabel": "Store name",
+        "shopNamePlaceholder": "Happy Store",
+        "shopPhoneLabel": "Phone (optional)",
+        "shopPhonePlaceholder": "01xxxxxxxxx",
+        "next": "Next"
+      },
+      "step2": {
+        "title": "Pick a starting point",
+        "subhead": "You can change everything later from settings",
+        "cornerstoreTitle": "Full Corner Store experience",
+        "cornerstoreBody": "Start with ready-made categories: watches, perfumes, eyewear — with types and brands.",
+        "blankTitle": "Start from scratch",
+        "blankBody": "Define your categories and attributes yourself from settings.",
+        "back": "Back",
+        "next": "Next"
+      },
+      "step3": {
+        "title": "Ready to launch",
+        "subheadCornerstore": "You'll find the categories ready in your dashboard.",
+        "subheadBlank": "Start by adding your first category from settings.",
+        "tips": [
+          { "before": "✓ Add your products from ", "link": "Add product", "after": "" },
+          { "before": "✓ Ring up your first sale from ", "link": "Sales", "after": "" },
+          { "before": "✓ Customize settings and WhatsApp later", "link": "", "after": "" }
+        ],
+        "back": "Back",
+        "start": "Start"
+      }
+    }
+  },
+  "marketing": {
+    "about": {
+      "meta": {
+        "title": "About — Matgary",
+        "description": "Matgary is a shop-management system built for Arabic-speaking merchants — our story, mission, and values."
+      },
+      "eyebrow": "About",
+      "title": "We build the tool we wished we had",
+      "lead": "We started Matgary because shop owners were stuck with complex systems, spreadsheets, or paper ledgers — each costing them time or money. We set out to build one system: Arabic-first, simple, and reliable.",
+      "p1": "Matgary is a complete shop-management system — point of sale, inventory, reports, team and permissions — all in one place. We serve small and medium retailers across Egypt and the Arab region, and we treat every shop as a personal project, not a number.",
+      "p2": "Our philosophy is simple: shops don't need more than they need. They need one working tool that understands what's happening in the store and helps the owner decide right. For every feature we build, we ask first: will the merchant use this every day? If the answer is no, we don't build it.",
+      "values": [
+        { "title": "Simplicity first", "body": "A system any merchant can open and use from minute one — no long training, no tangled screens." },
+        { "title": "Your data is yours", "body": "Your shop is fully isolated from every other shop at the database level. What's yours stays with you." },
+        { "title": "Designed in Arabic", "body": "Every screen, every button, every report — written natively in Arabic by people who understand the market." }
+      ],
+      "tryCta": "Try Matgary"
+    },
+    "blog": {
+      "meta": {
+        "title": "Blog — Matgary",
+        "description": "Short, practical articles for shop owners — coming soon."
+      },
+      "eyebrow": "Blog",
+      "title": "Coming soon — articles for shop owners",
+      "lead": "We're working on short, practical content: selling tips, inventory tactics, reports you can read in seconds, and stories from real stores.",
+      "badge": "In preparation",
+      "body": "We're putting together the first batch of articles. If you'd like a heads-up when the first piece lands, reach out and we'll let you know."
+    },
+    "contact": {
+      "meta": {
+        "title": "Contact — Matgary",
+        "description": "Ways to reach the Matgary team — email, WhatsApp, and technical support."
+      },
+      "eyebrow": "Contact us",
+      "title": "Our team is ready to listen",
+      "lead": "Got a question, a suggestion, or need help setting up your shop? Pick the channel that works for you and we'll get back.",
+      "channels": {
+        "email":    { "title": "Email",          "detail": "hello@matjari.app",   "note": "Reply within 24 hours on business days." },
+        "whatsapp": { "title": "WhatsApp",       "detail": "+20 100 000 0000",     "note": "For quick questions and support requests." },
+        "phone":    { "title": "Phone",          "detail": "+20 2 0000 0000",      "note": "During official business hours." },
+        "hours":    { "title": "Business hours", "detail": "Sun – Thu",            "note": "9 AM to 6 PM (Cairo time)." }
+      },
+      "faqHint": "For common questions, you can visit",
+      "faqLink": "the FAQ page"
+    },
+    "help": {
+      "meta": {
+        "title": "Help center — Matgary",
+        "description": "Quick answers and guides for everything Matgary."
+      },
+      "eyebrow": "Help center",
+      "title": "Find a quick answer",
+      "lead": "Pick the topic that matches your question — or check the FAQ, or reach out directly.",
+      "topics": {
+        "pos":       { "title": "Getting started & POS",   "body": "Account setup, your first sale, printing, and receipts." },
+        "inventory": { "title": "Inventory & products",    "body": "Adding products, barcodes, categories, and low-stock alerts." },
+        "team":      { "title": "Team & permissions",      "body": "Create staff accounts and define what they can see and do." },
+        "reports":   { "title": "Reports & finance",       "body": "Reading daily reports, expenses, and returns." }
+      },
+      "noAnswerTitle": "Didn't find your answer?",
+      "noAnswerBody": "Our support team replies within 24 hours on business days.",
+      "browseFaq": "Browse the FAQ",
+      "contactSupport": "Contact support"
+    },
+    "status": {
+      "meta": {
+        "title": "Service status — Matgary",
+        "description": "Status of every Matgary service — updated in real time."
+      },
+      "eyebrow": "Service status",
+      "title": "All systems operational",
+      "allOperational": "All systems operational",
+      "lastUpdated": "Last updated: minutes ago",
+      "operationalLabel": "Operational",
+      "services": [
+        "Point of sale (POS)",
+        "Inventory & products",
+        "Reports & analytics",
+        "Sign-in & permissions",
+        "Public catalog",
+        "WhatsApp receipts"
+      ],
+      "reportHint": "To report an issue, reach out via",
+      "reportLink": "the contact page"
+    },
+    "privacy": {
+      "meta": {
+        "title": "Privacy policy — Matgary",
+        "description": "How we handle your data in Matgary, in line with the Egyptian Personal Data Protection Law."
+      },
+      "eyebrow": "Privacy policy",
+      "title": "Your data belongs to you",
+      "lead": "Last updated: 7 May 2026 — compliant with Law No. 151 of 2020 on Personal Data Protection.",
+      "sections": [
+        { "title": "1. Who controls your data", "body": "Matgary (the \"Platform\") is the data controller within the meaning of the Egyptian Personal Data Protection Law (Law No. 151 of 2020). For any matter relating to your data, use the contact page below." },
+        { "title": "2. Data we collect", "body": "We collect: (a) account data you provide — name, email, phone, shop name, national ID when attendance is enabled, employee photos when uploaded. (b) operational data your shop creates — products, sales, expenses, leave requests, attendance log. (c) limited technical data — IP address, browser type, sign-in time, for security and troubleshooting." },
+        { "title": "3. Legal basis and purposes", "body": "We process your data under: performance of the contract with you (running the platform), legal obligations (such as tax invoice records), and legitimate interest in securing the service and preventing abuse. We do not use your data for advertising and do not sell it to any third party." },
+        { "title": "4. Your rights under Law 151/2020", "body": "At any time you may: access your data, correct it, delete it, restrict its processing, or withdraw consent. You also have the right to data portability in a machine-readable format, and the right to lodge a complaint with the Personal Data Protection Centre. We commit to responding within 30 days of your request." },
+        { "title": "5. Cross-shop data isolation", "body": "Every shop runs in database-level isolation (Row-Level Security) — staff of any other shop, and our internal systems, cannot access your data without explicit authorization. We test this isolation automatically on every release." },
+        { "title": "6. Encryption and technical protection", "body": "All connections use TLS. Passwords are stored hashed (bcrypt). Sensitive credentials (e.g. WhatsApp Green API tokens) are stored encrypted in the database. Daily backups run automatically and are protected to the same standard." },
+        { "title": "7. Retention period", "body": "We retain your data for the duration of your use of the service. When your account is deleted, we delete the data within 30 days, except where retention is required by law (tax invoice records are kept for 5 years per the Unified Tax Procedures Law)." },
+        { "title": "8. Transfers outside Egypt", "body": "We run our servers in jurisdictions that meet comparable protection standards. Where an external provider is needed, we ensure contractual or legal safeguards protect your data to the same level required by Egyptian law." },
+        { "title": "9. Cookies", "body": "We use only the cookies strictly necessary for sign-in and CSRF protection. We do not use any tracking cookies for advertising, and we do not share your data with ad networks." },
+        { "title": "10. Children's data", "body": "The service is intended for adult shop owners and staff. We do not knowingly collect data from anyone under 14. If we discover that an account belongs to a minor, we delete it as soon as verified." },
+        { "title": "11. Incident notification", "body": "If a breach affects your personal data, we commit to notifying the Personal Data Protection Centre and you within 72 hours of discovery, where practicable, including the nature of the breach and the steps taken." },
+        { "title": "12. Updates to this policy", "body": "We may update this policy from time to time. For any material change, we'll notify you via your registered email or in-app notice a reasonable time before it takes effect." }
+      ]
+    },
+    "terms": {
+      "meta": {
+        "title": "Terms of use — Matgary",
+        "description": "Terms of use for the Matgary platform."
+      },
+      "eyebrow": "Terms of use",
+      "title": "Matgary terms of use",
+      "lead": "Last updated: 7 May 2026.",
+      "sections": [
+        { "title": "1. Acceptance of terms", "body": "By using the Matgary platform (the \"Service\") you confirm you are of legal age (18+) and have full capacity to contract, and you agree to be bound by these terms and the privacy policy. If you do not agree to any clause, please do not use the Service." },
+        { "title": "2. Service description", "body": "Matgary is a software-as-a-service (SaaS) platform for managing retail stores: point of sale, inventory, invoices, staff, reports, and related features. The Service is provided online without local software installation. We aim to keep it available with reasonable uptime (with no 99.9% contractual SLA on the base plans)." },
+        { "title": "3. Account and responsibility", "body": "You are responsible for the confidentiality of your sign-in details and for all activity on your account. If you suspect unauthorized access, you must notify us immediately and change your password. The data you provide (name, email, phone, shop name, national ID where required) must be accurate and up to date." },
+        { "title": "4. Acceptable use", "body": "You may use Matgary only to manage lawful commercial activity. It is prohibited to: (a) carry out any activity contrary to Egyptian law or public morals, (b) attempt to breach the Platform or access another shop's data, (c) misuse the APIs or overload the infrastructure with excessive requests, (d) use the Service to send unsolicited promotional messages (spam) over WhatsApp or otherwise." },
+        { "title": "5. Payment and subscriptions", "body": "During the trial period the Service may be free or available at reduced prices announced on the pricing page. After that, subscription fees are billed in advance through an approved payment gateway. You may cancel at any time, and the Service remains active until the end of the paid period. If a payment fails, you get a 7-day grace period before account suspension." },
+        { "title": "6. E-invoices and taxes", "body": "If you are a merchant registered with the Egyptian Tax Authority, you alone are responsible for issuing your electronic tax invoices via the ETA system. Matgary's invoicing features in the current version are for internal operational purposes and may not substitute for the official e-invoicing system. Check the features page for updates." },
+        { "title": "7. Data ownership", "body": "You retain full ownership of your shop's data. We process it strictly as a service provider and do not share it with any third party. On termination, you may export your data within 30 days before final deletion." },
+        { "title": "8. Downtime and maintenance", "body": "We perform periodic maintenance, scheduled at low-traffic times where possible with prior notice when feasible. Short unscheduled outages may occur due to unexpected faults; we work to restore the Service as quickly as possible." },
+        { "title": "9. Limits of liability", "body": "The Service is provided \"as is\" without express or implied warranties beyond what the law requires. In any case, our cumulative liability for any damage related to the Service is limited to what you actually paid in the 12 months preceding the damage. We are not liable for indirect or consequential losses such as lost profits or reputation." },
+        { "title": "10. Account suspension and termination", "body": "We may suspend or terminate your account if these terms are breached or the Platform is misused, with prior notice of the reason whenever possible. You may terminate your subscription at any time from your account settings." },
+        { "title": "11. Changes to the terms", "body": "We may update these terms from time to time. For any material change, we'll notify you via your registered email or in-app notice at least 14 days before it takes effect. Continued use after the change constitutes acceptance." },
+        { "title": "12. Governing law and jurisdiction", "body": "These terms are governed by the laws of the Arab Republic of Egypt, and any dispute arising from them falls under the exclusive jurisdiction of the courts of Cairo." }
+      ]
+    }
+  }
+}

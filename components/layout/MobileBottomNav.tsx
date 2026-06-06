@@ -24,7 +24,7 @@ import {
   X,
 } from "@/lib/icons";
 import { cn } from "@/lib/utils";
-import { logoutAction } from "@/app/(auth)/actions";
+import { logoutAction } from "@/app/[lang]/(auth)/actions";
 import { can, canAny, type Permission } from "@/lib/permissions";
 import { useUnreadTaskCount } from "@/hooks/useUnreadTaskCount";
 import { useLeaveUnread } from "@/hooks/useLeaveUnread";
