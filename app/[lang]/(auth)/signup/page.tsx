@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
-import { signupAction } from "../actions";
+import { signupAction, type SignupErrorCode, type SignupField } from "../actions";
 
 // Suggest a store handle from the email's local part.
 function suggestHandle(email: string): string {
@@ -26,6 +26,35 @@ export default function SignupPage() {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [errorField, setErrorField] = useState<string | null>(null);
+  // Surfaced when signupAction succeeds at DB level but auto-signIn fails.
+  // The tenant + user exist; the user just needs to sign in manually.
+  const [accountReady, setAccountReady] = useState(false);
+
+  // Codes come back from the server action; map them to localized strings
+  // here. Single source of truth for "what does this code mean to the user".
+  function messageFor(code: SignupErrorCode): string {
+    switch (code) {
+      case "BAD_EMAIL_FORMAT":
+        return t.errors.badEmail;
+      case "WEAK_PASSWORD":
+        return t.errors.shortPassword;
+      case "STORE_NAME_REQUIRED":
+        return t.errors.storeNameRequired;
+      case "HANDLE_INVALID":
+        return t.errors.handleInvalid;
+      case "EMAIL_TAKEN":
+        return t.emailTaken;
+      case "HANDLE_TAKEN":
+        return t.handleTaken;
+      case "RATE_LIMITED":
+        return t.errors.rateLimited;
+      case "AUTO_LOGIN_FAILED":
+        return t.errors.autoLoginFailed;
+      case "INTERNAL":
+      default:
+        return t.errors.internal;
+    }
+  }
 
   const [step, setStep] = useState<1 | 2>(1);
   const [email, setEmail] = useState("");
@@ -138,8 +167,15 @@ export default function SignupPage() {
     startTransition(async () => {
       const res = await signupAction(formData);
       if (!res.ok) {
-        setError(res.error);
-        setErrorField(res.field ?? null);
+        // AUTO_LOGIN_FAILED is a "soft" failure — the tenant + user exist,
+        // we just need the user to sign in manually. Render a dedicated
+        // panel instead of a generic field error.
+        if (res.code === "AUTO_LOGIN_FAILED") {
+          setAccountReady(true);
+          return;
+        }
+        setError(messageFor(res.code));
+        setErrorField((res.field as SignupField | undefined) ?? null);
         return;
       }
       // Full reload defeats Next's router cache, which can otherwise show
@@ -148,6 +184,24 @@ export default function SignupPage() {
       window.location.href = `/${locale}/onboarding`;
     });
   };
+
+  // "Account ready, please sign in" state — shown when signup succeeded at
+  // DB level but auto-signIn failed (rare, transient).
+  if (accountReady) {
+    return (
+      <div className="w-full bg-white p-4 lg:p-8 lg:rounded-2xl lg:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.18)] text-center space-y-4">
+        <h1 className="text-2xl font-bold text-text-primary">
+          {t.accountReadyTitle}
+        </h1>
+        <p className="text-sm text-text-secondary leading-relaxed">
+          {t.accountReadyBody}
+        </p>
+        <Link href={`/${locale}/login`} className="block">
+          <Button className="w-full">{t.goToLogin}</Button>
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full bg-white p-4 lg:p-8 lg:rounded-2xl lg:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.18)]">
@@ -207,7 +261,11 @@ export default function SignupPage() {
             type="button"
             className="w-full"
             onClick={goToStep2}
-            disabled={emailStatus === "checking" || emailStatus === "taken"}
+            disabled={
+              emailStatus === "checking" ||
+              emailStatus === "taken" ||
+              emailStatus === "invalid"
+            }
           >
             {t.next}
           </Button>
@@ -261,7 +319,9 @@ export default function SignupPage() {
             <p className="mt-1 text-xs text-text-secondary">
               {t.handleHint}{" "}
               <span dir="ltr" className="font-mono text-text-primary">
-                ahmed@{storeHandle || "yourstore"}
+                ahmed@{handleStatus === "invalid" || !storeHandle
+                  ? "yourstore"
+                  : storeHandle}
               </span>
             </p>
             {handleStatus === "available" && (

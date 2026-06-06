@@ -265,9 +265,17 @@
       "signIn": "Sign in",
       "emailAvailable": "Available ✓",
       "emailTaken": "This email is already registered — use sign in instead",
+      "accountReadyTitle": "Account created ✓",
+      "accountReadyBody": "We created your account but couldn't sign you in automatically. Please sign in to continue.",
+      "goToLogin": "Go to sign in",
       "errors": {
         "badEmail": "Enter a valid email address",
-        "shortPassword": "Password must be at least 8 characters"
+        "shortPassword": "Password must be at least 8 characters",
+        "storeNameRequired": "Store name is required",
+        "handleInvalid": "Lowercase letters, digits, and hyphens only; must start and end with a letter or digit",
+        "rateLimited": "Too many attempts. Please try again in a bit.",
+        "autoLoginFailed": "Your account was created but we couldn't sign you in. Please sign in from the login page.",
+        "internal": "Something went wrong. Please try again."
       }
     },
     "forgot": {
@@ -281,6 +289,7 @@
       "emailPlaceholder": "you@example.com",
       "submit": "Send reset link",
       "backToLogin": "Back to sign in",
+      "successTitleWithEmail": "If {email} is registered with us, you'll find a reset link in your inbox within minutes.",
       "successTitle": "If the email is registered with us, you'll find a reset link in your inbox within minutes.",
       "successNote": "The link is valid for 30 minutes. Remember to check your spam folder.",
       "errors": {
@@ -312,6 +321,13 @@
         "title": "Set up your store — Matgary",
         "description": "Quick steps to finish setting up your store."
       },
+      "errors": {
+        "unauthorized": "Your session expired. Please sign in again.",
+        "shopNameRequired": "Store name is required",
+        "invalidInput": "Some fields are invalid",
+        "primaryBranchMissing": "Primary branch is missing — please contact support.",
+        "internal": "Couldn't finish setup. Please try again."
+      },
       "step1": {
         "title": "Tell us about your store",
         "subhead": "A few quick details to get started",
@@ -335,11 +351,18 @@
         "title": "Ready to launch",
         "subheadCornerstore": "You'll find the categories ready in your dashboard.",
         "subheadBlank": "Start by adding your first category from settings.",
-        "tips": [
-          { "before": "✓ Add your products from ", "link": "Add product", "after": "" },
-          { "before": "✓ Ring up your first sale from ", "link": "Sales", "after": "" },
-          { "before": "✓ Customize settings and WhatsApp later", "link": "", "after": "" }
-        ],
+        "tips": {
+          "cornerstore": [
+            { "before": "✓ Add your products from ", "link": "Add product", "after": "" },
+            { "before": "✓ Ring up your first sale from ", "link": "Sales", "after": "" },
+            { "before": "✓ Customize settings and WhatsApp from ", "link": "Settings", "after": "" }
+          ],
+          "blank": [
+            { "before": "✓ Define categories and attributes from ", "link": "Settings", "after": "" },
+            { "before": "✓ Add your products from ", "link": "Add product", "after": "" },
+            { "before": "✓ Ring up your first sale from ", "link": "Sales", "after": "" }
+          ]
+        },
         "back": "Back",
         "start": "Start"
       }

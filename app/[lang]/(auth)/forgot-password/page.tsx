@@ -12,6 +12,10 @@ export default function ForgotPasswordPage() {
   const t = auth.forgot;
   const [busy, setBusy] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  // Echoed back into the success message so the user can tell whether they
+  // typed the right address (#18). The form input is uncontrolled, so we
+  // capture the submitted value separately.
+  const [submittedEmail, setSubmittedEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -31,11 +35,26 @@ export default function ForgotPasswordPage() {
         setError(json.error || t.errors.generic);
         return;
       }
+      setSubmittedEmail(email);
       setSubmitted(true);
     } finally {
       setBusy(false);
     }
   };
+
+  // Replace {email} in the localized template, but render the email as a
+  // separate styled span so it stays clearly LTR even on Arabic pages.
+  const successMessage = (() => {
+    const tmpl = t.successTitleWithEmail || t.successTitle;
+    const [before, after] = tmpl.split("{email}");
+    return (
+      <>
+        {before}
+        <span dir="ltr" className="font-medium text-text-primary">{submittedEmail}</span>
+        {after ?? ""}
+      </>
+    );
+  })();
 
   return (
     <div className="w-full bg-white p-4 lg:p-8 lg:rounded-2xl lg:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.18)]">
@@ -46,7 +65,7 @@ export default function ForgotPasswordPage() {
 
       {submitted ? (
         <div className="space-y-4 text-center">
-          <p className="text-sm text-text-primary">{t.successTitle}</p>
+          <p className="text-sm text-text-primary">{successMessage}</p>
           <p className="text-xs text-text-secondary">{t.successNote}</p>
           <Link href={`/${locale}/login`} className="block">
             <Button variant="secondary" className="w-full" type="button">

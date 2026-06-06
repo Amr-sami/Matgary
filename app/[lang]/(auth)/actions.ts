@@ -32,31 +32,55 @@ async function clientIp(): Promise<string> {
   return h.get("x-real-ip")?.trim() ?? "unknown";
 }
 
+// All Zod messages here are stable IDENTIFIERS, not user-facing strings.
+// The action returns a discriminated `code` and the client maps it to a
+// localized message via the dictionary. Server stays locale-agnostic.
 const signupSchema = z.object({
   email: z.string().email().toLowerCase().trim(),
-  password: z.string().min(8, "كلمة المرور 8 أحرف على الأقل").max(128),
-  storeName: z.string().min(1, "اسم المتجر مطلوب").max(80),
+  password: z.string().min(8).max(128),
+  storeName: z.string().min(1).max(80),
   // The store handle becomes the @-suffix of every staff login (ahmed@<handle>).
   // Owner-chosen and editable so they end up with something they can actually
   // dictate to their cashier — auto-derived slugs from Arabic names produce
   // unusable random strings.
   storeHandle: z
     .string()
-    .min(2, "اسم تسجيل الدخول للمتجر مطلوب")
+    .min(2)
     .max(40)
-    .regex(
-      /^[a-z0-9][a-z0-9-]*[a-z0-9]$/,
-      "حروف إنجليزية صغيرة وأرقام و - فقط (يبدأ وينتهي بحرف أو رقم)",
-    ),
+    .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/),
 });
+
+export type SignupErrorCode =
+  | "RATE_LIMITED"
+  | "BAD_EMAIL_FORMAT"
+  | "WEAK_PASSWORD"
+  | "STORE_NAME_REQUIRED"
+  | "HANDLE_INVALID"
+  | "EMAIL_TAKEN"
+  | "HANDLE_TAKEN"
+  | "AUTO_LOGIN_FAILED"
+  | "INTERNAL";
+
+export type SignupField = "email" | "password" | "storeName" | "storeHandle";
 
 export type SignupResult =
   | { ok: true }
-  | {
-      ok: false;
-      error: string;
-      field?: "email" | "password" | "storeName" | "storeHandle";
-    };
+  | { ok: false; code: SignupErrorCode; field?: SignupField };
+
+// Map zod path → code so the per-field validation message is locale-agnostic.
+function signupCodeForField(field: SignupField | undefined): SignupErrorCode {
+  switch (field) {
+    case "email":
+      return "BAD_EMAIL_FORMAT";
+    case "password":
+      return "WEAK_PASSWORD";
+    case "storeName":
+      return "STORE_NAME_REQUIRED";
+    case "storeHandle":
+    default:
+      return "HANDLE_INVALID";
+  }
+}
 
 export async function signupAction(formData: FormData): Promise<SignupResult> {
   const ip = await clientIp();
@@ -65,10 +89,7 @@ export async function signupAction(formData: FormData): Promise<SignupResult> {
     windowSec: SIGNUP_WINDOW_SEC,
   });
   if (!limit.ok) {
-    return {
-      ok: false,
-      error: "محاولات كثيرة، حاول مرة أخرى بعد قليل",
-    };
+    return { ok: false, code: "RATE_LIMITED" };
   }
 
   const parsed = signupSchema.safeParse({
@@ -80,16 +101,8 @@ export async function signupAction(formData: FormData): Promise<SignupResult> {
 
   if (!parsed.success) {
     const first = parsed.error.issues[0];
-    return {
-      ok: false,
-      error: first.message,
-      field: first.path[0] as
-        | "email"
-        | "password"
-        | "storeName"
-        | "storeHandle"
-        | undefined,
-    };
+    const field = first.path[0] as SignupField | undefined;
+    return { ok: false, code: signupCodeForField(field), field };
   }
 
   const { email, password, storeName, storeHandle } = parsed.data;
@@ -100,7 +113,7 @@ export async function signupAction(formData: FormData): Promise<SignupResult> {
     .where(eq(users.email, email))
     .limit(1);
   if (existing) {
-    return { ok: false, error: "هذا البريد مسجّل بالفعل", field: "email" };
+    return { ok: false, code: "EMAIL_TAKEN", field: "email" };
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
@@ -115,11 +128,7 @@ export async function signupAction(formData: FormData): Promise<SignupResult> {
     .where(eq(tenants.slug, slug))
     .limit(1);
   if (slugClash) {
-    return {
-      ok: false,
-      error: "اسم تسجيل الدخول للمتجر مستخدم بالفعل، اختر اسماً آخر",
-      field: "storeHandle",
-    };
+    return { ok: false, code: "HANDLE_TAKEN", field: "storeHandle" };
   }
 
   await db.transaction(async (tx) => {
@@ -185,12 +194,17 @@ export async function signupAction(formData: FormData): Promise<SignupResult> {
     console.warn("[signup] ensureSubscription failed (non-fatal):", err);
   }
 
-  // Auto sign-in after signup.
-  await signIn("credentials", {
-    email,
-    password,
-    redirect: false,
-  });
+  // Auto sign-in after signup. If this fails the tenant is already created
+  // — we surface AUTO_LOGIN_FAILED so the client can show "Account ready,
+  // please log in" instead of pretending everything's fine and dropping the
+  // user on /onboarding with no session (which then bounces to /login with
+  // no explanation).
+  try {
+    await signIn("credentials", { email, password, redirect: false });
+  } catch (err) {
+    console.warn("[signup] auto-signIn failed:", err);
+    return { ok: false, code: "AUTO_LOGIN_FAILED" };
+  }
 
   return { ok: true };
 }
@@ -234,19 +248,48 @@ export async function loginAction(formData: FormData): Promise<LoginResult> {
 }
 
 const onboardingSchema = z.object({
-  shopName: z.string().min(1, "اسم المتجر مطلوب").max(80),
+  shopName: z.string().min(1).max(80),
   shopPhone: z.string().max(40).optional().or(z.literal("")),
   preset: z.enum(["cornerstore", "blank"]),
 });
 
-export type OnboardingResult = { ok: true } | { ok: false; error: string };
+export type OnboardingErrorCode =
+  | "UNAUTHORIZED"
+  | "SHOP_NAME_REQUIRED"
+  | "INVALID_INPUT"
+  | "PRIMARY_BRANCH_MISSING"
+  | "INTERNAL";
+
+export type OnboardingResult =
+  | { ok: true }
+  | { ok: false; code: OnboardingErrorCode };
+
+// Snapshot of the tenant the wizard pre-fills from. Returned by
+// `getOnboardingDefaults()` so the page can render the values the user
+// supplied at signup instead of asking again from scratch.
+export interface OnboardingDefaults {
+  shopName: string;
+  shopPhone: string;
+}
+
+export async function getOnboardingDefaults(): Promise<OnboardingDefaults> {
+  const session = await auth();
+  if (!session?.user?.tenantId) return { shopName: "", shopPhone: "" };
+  const tenantId = session.user.tenantId;
+  const [tenant] = await db
+    .select({ name: tenants.name })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+  return { shopName: tenant?.name ?? "", shopPhone: "" };
+}
 
 export async function completeOnboardingAction(
   formData: FormData,
 ): Promise<OnboardingResult> {
   const session = await auth();
   if (!session?.user?.tenantId) {
-    return { ok: false, error: "غير مسجّل الدخول" };
+    return { ok: false, code: "UNAUTHORIZED" };
   }
 
   const parsed = onboardingSchema.safeParse({
@@ -255,7 +298,12 @@ export async function completeOnboardingAction(
     preset: formData.get("preset"),
   });
   if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0].message };
+    const first = parsed.error.issues[0];
+    const path = String(first.path[0] ?? "");
+    return {
+      ok: false,
+      code: path === "shopName" ? "SHOP_NAME_REQUIRED" : "INVALID_INPUT",
+    };
   }
 
   const tenantId = session.user.tenantId;
@@ -272,7 +320,14 @@ export async function completeOnboardingAction(
           and(eq(branches.tenantId, tenantId), eq(branches.isPrimary, true)),
         )
         .limit(1);
-      if (!primary) throw new Error("الفرع الرئيسي غير موجود");
+      if (!primary) {
+        // Sentinel so the catch below can return the typed code instead of
+        // a generic INTERNAL — primary-branch-missing is recoverable
+        // (admin can fix) and worth surfacing distinctly.
+        throw Object.assign(new Error("PRIMARY_BRANCH_MISSING"), {
+          code: "PRIMARY_BRANCH_MISSING",
+        });
+      }
 
       await tx
         .update(shopSettings)
@@ -298,10 +353,10 @@ export async function completeOnboardingAction(
     await bustUserContextCache(session.user.id!);
   } catch (err) {
     console.error("[onboarding] failed", err);
-    return {
-      ok: false,
-      error: err instanceof Error ? err.message : "تعذر إكمال الإعداد",
-    };
+    if ((err as { code?: string } | null)?.code === "PRIMARY_BRANCH_MISSING") {
+      return { ok: false, code: "PRIMARY_BRANCH_MISSING" };
+    }
+    return { ok: false, code: "INTERNAL" };
   }
 
   return { ok: true };
