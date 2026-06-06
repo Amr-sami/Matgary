@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/Input";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
 import { safeNext } from "@/lib/url-safe";
+import { AuthSuspenseCard } from "../SuspenseCard";
 
 function cleanIdentifier(v: string): string {
   return v
@@ -19,13 +20,7 @@ function cleanIdentifier(v: string): string {
 
 export default function LoginPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="bg-white p-4 lg:p-8 text-center text-text-secondary lg:rounded-2xl lg:shadow-sm lg:border lg:border-border">
-          …
-        </div>
-      }
-    >
+    <Suspense fallback={<AuthSuspenseCard />}>
       <LoginInner />
     </Suspense>
   );

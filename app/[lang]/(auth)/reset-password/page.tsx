@@ -6,16 +6,11 @@ import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
+import { AuthSuspenseCard } from "../SuspenseCard";
 
 export default function ResetPasswordPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="bg-white p-4 lg:p-8 text-center text-text-secondary lg:rounded-2xl lg:shadow-sm lg:border lg:border-border">
-          …
-        </div>
-      }
-    >
+    <Suspense fallback={<AuthSuspenseCard />}>
       <ResetInner />
     </Suspense>
   );

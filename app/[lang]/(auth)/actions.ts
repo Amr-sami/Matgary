@@ -20,6 +20,7 @@ import { logActivity } from "@/lib/repo/activity";
 import { rateLimit } from "@/lib/ratelimit";
 import { ensureSubscription } from "@/lib/repo/subscriptions";
 import { defaultLocale, isLocale, type Locale } from "@/lib/i18n/config";
+import { normalizeEgyptPhoneAny } from "@/lib/validators/egypt";
 
 // Public signup is wide open — cap it so a script can't churn out tenants.
 // 5 / hour / IP is generous enough for legitimate retries on a flaky form.
@@ -267,6 +268,7 @@ const onboardingSchema = z.object({
 export type OnboardingErrorCode =
   | "UNAUTHORIZED"
   | "SHOP_NAME_REQUIRED"
+  | "INVALID_PHONE"
   | "INVALID_INPUT"
   | "PRIMARY_BRANCH_MISSING"
   | "INTERNAL";
@@ -317,6 +319,18 @@ export async function completeOnboardingAction(
     };
   }
 
+  // Normalize the phone to canonical `+201XXXXXXXXX` (or landline) so the
+  // DB never stores free-form digit soup. Empty phone is allowed (optional
+  // field); a typed-but-invalid phone trips INVALID_PHONE.
+  let normalizedPhone: string | null = null;
+  const rawPhone = (parsed.data.shopPhone ?? "").trim();
+  if (rawPhone.length > 0) {
+    normalizedPhone = normalizeEgyptPhoneAny(rawPhone);
+    if (!normalizedPhone) {
+      return { ok: false, code: "INVALID_PHONE" };
+    }
+  }
+
   const tenantId = session.user.tenantId;
 
   try {
@@ -344,7 +358,7 @@ export async function completeOnboardingAction(
         .update(shopSettings)
         .set({
           shopName: parsed.data.shopName,
-          shopPhone: parsed.data.shopPhone || null,
+          shopPhone: normalizedPhone,
           onboardingCompletedAt: new Date(),
           updatedAt: new Date(),
         })

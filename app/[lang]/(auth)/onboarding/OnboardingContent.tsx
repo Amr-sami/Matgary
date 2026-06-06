@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useDictionary } from "@/components/i18n/DictionaryProvider";
+import { isValidEgyptPhoneAny } from "@/lib/validators/egypt";
 import {
   completeOnboardingAction,
   type OnboardingErrorCode,
@@ -40,6 +41,8 @@ export function OnboardingContent({ initialShopName }: Props) {
         return t.errors.unauthorized;
       case "SHOP_NAME_REQUIRED":
         return t.errors.shopNameRequired;
+      case "INVALID_PHONE":
+        return t.errors.invalidPhone;
       case "INVALID_INPUT":
         return t.errors.invalidInput;
       case "PRIMARY_BRANCH_MISSING":
@@ -49,6 +52,20 @@ export function OnboardingContent({ initialShopName }: Props) {
         return t.errors.internal;
     }
   }
+
+  // Empty phone is allowed (optional field); a typed-but-invalid one blocks
+  // step 1 so users don't carry a bad number all the way to the server.
+  const phoneValid =
+    shopPhone.trim().length === 0 || isValidEgyptPhoneAny(shopPhone);
+
+  // "Step N of total · Label" — combines two dictionary strings into one
+  // readable header. `stepCounter` uses {n} / {total} placeholders.
+  const stepHeader = (() => {
+    const counter = t.stepCounter
+      .replace("{n}", String(step))
+      .replace("{total}", String(t.stepLabels.length));
+    return `${counter} · ${t.stepLabels[step - 1] ?? ""}`;
+  })();
 
   const submit = () => {
     setError(null);
@@ -82,15 +99,18 @@ export function OnboardingContent({ initialShopName }: Props) {
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-border p-8">
-      <div className="flex items-center justify-center gap-2 mb-6">
-        {[1, 2, 3].map((n) => (
-          <div
-            key={n}
-            className={`h-2 w-8 rounded-full transition-colors ${
-              step >= n ? "bg-accent" : "bg-border"
-            }`}
-          />
-        ))}
+      <div className="flex flex-col items-center gap-2 mb-6">
+        <div className="flex items-center justify-center gap-2">
+          {[1, 2, 3].map((n) => (
+            <div
+              key={n}
+              className={`h-2 w-8 rounded-full transition-colors ${
+                step >= n ? "bg-accent" : "bg-border"
+              }`}
+            />
+          ))}
+        </div>
+        <p className="text-xs text-text-secondary">{stepHeader}</p>
       </div>
 
       {step === 1 && (
@@ -110,16 +130,19 @@ export function OnboardingContent({ initialShopName }: Props) {
             onChange={(e) => setShopName(e.target.value)}
             required
           />
-          <Input
-            label={t.step1.shopPhoneLabel}
-            placeholder={t.step1.shopPhonePlaceholder}
-            value={shopPhone}
-            onChange={(e) => setShopPhone(e.target.value)}
-            dir="ltr"
-          />
+          <div>
+            <Input
+              label={t.step1.shopPhoneLabel}
+              placeholder={t.step1.shopPhonePlaceholder}
+              value={shopPhone}
+              onChange={(e) => setShopPhone(e.target.value)}
+              dir="ltr"
+              error={!phoneValid ? t.errors.invalidPhone : undefined}
+            />
+          </div>
           <Button
             className="w-full"
-            disabled={!shopName.trim()}
+            disabled={!shopName.trim() || !phoneValid}
             onClick={() => setStep(2)}
           >
             {t.step1.next}

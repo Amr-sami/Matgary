@@ -327,10 +327,13 @@
       "errors": {
         "unauthorized": "Your session expired. Please sign in again.",
         "shopNameRequired": "Store name is required",
+        "invalidPhone": "Enter a valid Egyptian phone number (e.g. 01001234567)",
         "invalidInput": "Some fields are invalid",
         "primaryBranchMissing": "Primary branch is missing — please contact support.",
         "internal": "Couldn't finish setup. Please try again."
       },
+      "stepLabels": ["Shop info", "Pick a start", "Review"],
+      "stepCounter": "Step {n} of {total}",
       "step1": {
         "title": "Tell us about your store",
         "subhead": "A few quick details to get started",
