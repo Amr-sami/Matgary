@@ -128,12 +128,12 @@ const PUBLIC_PREFIXES = [
   "/fonts",
 ];
 
-// NOTE on onboarding gating: middleware runs in the Edge runtime and reads the
-// JWT cookie directly — it does NOT re-run the jwt callback that hits the DB,
-// so onboardingComplete in the cookie can be stale right after a user finishes
-// onboarding. Gating on it here causes a redirect loop. Onboarding is enforced
-// instead by the signup action (always sends new users to /onboarding) and the
-// onboarding page checks server-side via auth() if needed.
+// Onboarding gating: enforced below. The jwt callback in lib/auth.ts re-reads
+// onboardingComplete from the DB on every navigation (the cache is busted by
+// completeOnboardingAction → bustUserContextCache), so the next request after
+// the wizard finishes carries the fresh claim and the user proceeds without a
+// loop. The previous incarnation of this middleware deliberately skipped this
+// gate; users could then type any URL after signup and slip past onboarding.
 export default auth((req) => {
   const { nextUrl } = req;
   const pathname = nextUrl.pathname;
@@ -231,6 +231,34 @@ export default auth((req) => {
       req,
       nonce,
       NextResponse.redirect(new URL("/account/change-password", nextUrl)),
+    );
+  }
+
+  // Onboarding gate. New signups carry onboardingComplete=false until they
+  // finish the 3-step wizard at /onboarding. Without this guard, the signup
+  // action's redirect to /onboarding was the ONLY thing keeping users in
+  // the wizard — typing "/" or "/dashboard" let them sail past it.
+  // Allowed while incomplete: the wizard page itself (server action POSTs
+  // hit the same path), sign-out, and account/password endpoints.
+  const onboardingAllowed =
+    normalizedPath === "/onboarding" ||
+    normalizedPath === "/account/change-password" ||
+    normalizedPath.startsWith("/api/account/") ||
+    normalizedPath.startsWith("/api/auth/");
+  if (session.user.onboardingComplete === false && !onboardingAllowed) {
+    if (pathname.startsWith("/api/")) {
+      return applyCsp(
+        req,
+        nonce,
+        NextResponse.json({ error: "ONBOARDING_REQUIRED" }, { status: 403 }),
+      );
+    }
+    return applyCsp(
+      req,
+      nonce,
+      NextResponse.redirect(
+        new URL(`/${activeLocale}/onboarding`, nextUrl),
+      ),
     );
   }
 
