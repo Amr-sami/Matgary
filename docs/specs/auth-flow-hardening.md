@@ -200,3 +200,42 @@ This iteration's commits, in order:
    email echo, middleware `next` keeps query.
 
 Each is small and independently revertable.
+
+---
+
+## Closure (2026-06-07)
+
+Audit closed by Amr. 26 of 30 items shipped across five commits:
+
+- Phase 1 — `9ecdbb4`, `4751201`
+- Phase 2 — `df423db`
+- Phase 3 — `ea46ca2`
+- Phase 3.5 — `e2190d5`
+
+Plus #14 verified safe without a code change (TOTP enforcement lives in
+the credentials provider at `lib/auth.ts:303-331`; the precheck endpoint
+is purely a UX optimization).
+
+### Carried forward as deliberate decisions
+
+The four remaining items are **not** open bugs — each is an explicit
+product / design call, deferred with reasoning:
+
+- **#25 English display font** — Tajawal renders Latin acceptably; a
+  swap to a Latin-first display family (Inter/Sora) is a brand-identity
+  change. Park until the next design pass. Not launch-blocking.
+- **#27 Post-auth locale-prefixed routes** — auto-resolves when the
+  logged-in app is localized in a future phase. No action required now.
+- **#28 CAPTCHA on signup / forgot** — current rate limits
+  (5/h/IP signup, 5/h/IP + 3/h/email forgot, 60/m/IP email-check,
+  30/m/IP 2fa-needed) are adequate for today's scale. Revisit if
+  we see real abuse patterns in production.
+- **#29 Email verification before tenant creation** — intentionally
+  kept as-is. Owner verification is already enforced via
+  authenticator-based controls (TOTP, password requirements, session
+  revocation) AFTER signup. Adding a pre-tenant verification step would
+  trade friction at a known-to-be-fragile moment (first impression /
+  account creation) for protection we already get downstream. Status:
+  **deliberately not implementing**, not "todo".
+
+Auth flow is shippable. Audit closed.
