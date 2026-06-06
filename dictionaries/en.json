@@ -231,6 +231,7 @@
       "createAccount": "Create a new account",
       "totpPrompt": "Enter the 6-digit code from your authenticator app, or a recovery code (xxxxx-xxxxx).",
       "totpPlaceholder": "123456",
+      "noAccountHint": "We don't have an account for this email.",
       "errors": {
         "missing": "Enter both email and password",
         "badCreds": "Email or password is incorrect",

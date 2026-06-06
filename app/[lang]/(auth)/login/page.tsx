@@ -43,6 +43,11 @@ function LoginInner() {
   const [emailValue, setEmailValue] = useState("");
   const [passwordValue, setPasswordValue] = useState("");
   const [totp, setTotp] = useState("");
+  // Surfaces a "no account for this email — sign up?" hint AFTER a failed
+  // sign-in only. We don't probe pre-submit because that would add a new
+  // enumeration vector; on a failure the user already paid the credential
+  // round-trip, so the marginal information leak is negligible.
+  const [noAccount, setNoAccount] = useState(false);
 
   // Read the form values straight from the DOM at submit time. This is the
   // bulletproof path: browser password managers / autofill can populate
@@ -52,6 +57,7 @@ function LoginInner() {
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
+    setNoAccount(false);
     setBusy(true);
 
     const formData = new FormData(e.currentTarget);
@@ -108,6 +114,19 @@ function LoginInner() {
 
       if (!session?.user?.id) {
         setError(needsTotp ? t.errors.badCredsOrTotp : t.errors.badCreds);
+        // Best-effort probe: if the email isn't registered AT ALL, gently
+        // surface a "sign up?" hint. We keep the generic error above so the
+        // legitimate user-with-wrong-password case stays opaque.
+        try {
+          const probe = await fetch(
+            `/api/account/email/check?email=${encodeURIComponent(email)}`,
+            { cache: "no-store" },
+          );
+          const json = (await probe.json()) as { available?: boolean };
+          if (json.available === true) setNoAccount(true);
+        } catch {
+          // ignore — hint is non-essential, the generic error is enough.
+        }
         return;
       }
 
@@ -170,6 +189,17 @@ function LoginInner() {
         )}
 
         {error && <p className="text-sm text-danger">{error}</p>}
+        {noAccount && (
+          <p className="text-xs text-text-secondary">
+            {t.noAccountHint}{" "}
+            <Link
+              href={`/${locale}/signup`}
+              className="text-accent font-medium hover:underline underline-offset-4"
+            >
+              {t.createAccount}
+            </Link>
+          </p>
+        )}
 
         <Button type="submit" className="w-full" loading={busy}>
           {needsTotp ? t.confirmCode : t.submit}
