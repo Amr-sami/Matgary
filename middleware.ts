@@ -208,7 +208,9 @@ export default auth((req) => {
       );
     }
     const loginUrl = new URL(`/${activeLocale}/login`, nextUrl);
-    loginUrl.searchParams.set("next", pathname);
+    // Preserve query string + hash so e.g. /reports?from=yesterday → after
+    // login the user is dropped back on /reports?from=yesterday, not /reports.
+    loginUrl.searchParams.set("next", pathname + (nextUrl.search ?? ""));
     return applyCsp(req, nonce, NextResponse.redirect(loginUrl));
   }
 

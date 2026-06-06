@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
+import { safeNext } from "@/lib/url-safe";
 
 function cleanIdentifier(v: string): string {
   return v
@@ -35,7 +36,9 @@ function LoginInner() {
   const locale = useLocale();
   const t = auth.login;
   const search = useSearchParams();
-  const next = search.get("next") || "/";
+  // safeNext keeps an attacker from turning ?next=https://evil.com into an
+  // open redirect after sign-in. Only same-origin relative paths survive.
+  const next = safeNext(search.get("next"));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // H03 — 2FA step is shown after a first-pass submit returns TotpRequired.
@@ -186,6 +189,11 @@ function LoginInner() {
               setNeedsTotp(false);
               setTotp("");
               setError(null);
+              // Drop the cached values so the next submit re-reads the form.
+              // Otherwise if the user edited the email/password inputs before
+              // re-submitting, those edits would be ignored.
+              setEmailValue("");
+              setPasswordValue("");
             }}
           >
             {t.back}
