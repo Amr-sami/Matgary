@@ -106,6 +106,9 @@ const PUBLIC_PATHS = new Set<string>([
   // Password reset endpoints — they don't need an active session.
   "/api/account/password/forgot",
   "/api/account/password/reset",
+  // Lightweight token validation the reset page calls on mount so the
+  // user finds out about an expired link without filling the form first.
+  "/api/account/password/reset/validate",
   // Login form pre-checks whether a given email has 2FA enabled BEFORE the
   // password POST so the UI knows whether to ask for a TOTP code. No
   // password handled here; rate-limited per IP.

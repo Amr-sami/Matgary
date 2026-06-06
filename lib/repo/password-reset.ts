@@ -35,6 +35,10 @@ export interface IssuedToken {
   raw: string;
   /** Always present, even when the email doesn't exist (caller can no-op). */
   emailExists: boolean;
+  /** Preferred UI language at signup. Used by the forgot-password route to
+   *  pick the email template + link locale. Always present so the caller
+   *  has a constant return shape regardless of whether the email exists. */
+  locale: "ar" | "en";
 }
 
 /**
@@ -45,14 +49,16 @@ export interface IssuedToken {
 export async function issueResetToken(email: string): Promise<IssuedToken> {
   const normalised = email.trim().toLowerCase();
   const [user] = await db
-    .select({ id: users.id })
+    .select({ id: users.id, locale: users.locale })
     .from(users)
     .where(eq(users.email, normalised))
     .limit(1);
 
   const raw = randomBytes(TOKEN_BYTES).toString("hex");
+  const userLocale: "ar" | "en" =
+    user?.locale === "en" ? "en" : "ar";
   if (!user) {
-    return { raw, emailExists: false };
+    return { raw, emailExists: false, locale: userLocale };
   }
 
   if (redis) {
@@ -66,16 +72,34 @@ export async function issueResetToken(email: string): Promise<IssuedToken> {
     } catch (err) {
       console.warn("[pwreset] failed to store token:", err);
       // Without Redis we cannot validate later, so refuse to claim success.
-      return { raw, emailExists: false };
+      return { raw, emailExists: false, locale: userLocale };
     }
   } else {
     // Without Redis the flow simply doesn't work — return as if the email
     // didn't exist, log so the operator notices.
     console.warn("[pwreset] cannot issue token: REDIS_URL is not configured");
-    return { raw, emailExists: false };
+    return { raw, emailExists: false, locale: userLocale };
   }
 
-  return { raw, emailExists: true };
+  return { raw, emailExists: true, locale: userLocale };
+}
+
+/**
+ * Cheap read-only check used by the reset page on mount to tell the user
+ * "this link is expired" BEFORE they fill in a new password. Returns
+ * exactly the same value as `consumeResetToken` would have surfaced as
+ * `reason: "invalid_token"`, without consuming the token. Safe to call on
+ * every page mount — does not extend TTL.
+ */
+export async function inspectResetToken(rawToken: string): Promise<boolean> {
+  if (typeof rawToken !== "string" || rawToken.length < 32) return false;
+  if (!redis) return false;
+  try {
+    const stored = await redis.get(tokenKey(hashToken(rawToken)));
+    return stored !== null;
+  } catch {
+    return false;
+  }
 }
 
 export type ConsumeResult =

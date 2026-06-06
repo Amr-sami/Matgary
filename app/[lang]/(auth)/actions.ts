@@ -19,6 +19,7 @@ import { seedCornerStorePreset } from "@/lib/seeds/cornerstore";
 import { logActivity } from "@/lib/repo/activity";
 import { rateLimit } from "@/lib/ratelimit";
 import { ensureSubscription } from "@/lib/repo/subscriptions";
+import { defaultLocale, isLocale, type Locale } from "@/lib/i18n/config";
 
 // Public signup is wide open — cap it so a script can't churn out tenants.
 // 5 / hour / IP is generous enough for legitimate retries on a flaky form.
@@ -30,6 +31,15 @@ async function clientIp(): Promise<string> {
   const xff = h.get("x-forwarded-for");
   if (xff) return xff.split(",")[0]!.trim();
   return h.get("x-real-ip")?.trim() ?? "unknown";
+}
+
+// Middleware writes x-locale to every authenticated request based on the
+// URL path. Server actions inherit those request headers, so we can read
+// the locale here without needing the form to pass it.
+async function activeLocale(): Promise<Locale> {
+  const h = await headers();
+  const raw = h.get("x-locale");
+  return raw && isLocale(raw) ? raw : defaultLocale;
 }
 
 // All Zod messages here are stable IDENTIFIERS, not user-facing strings.
@@ -131,10 +141,11 @@ export async function signupAction(formData: FormData): Promise<SignupResult> {
     return { ok: false, code: "HANDLE_TAKEN", field: "storeHandle" };
   }
 
+  const locale = await activeLocale();
   await db.transaction(async (tx) => {
     const [user] = await tx
       .insert(users)
-      .values({ email, passwordHash, name: null })
+      .values({ email, passwordHash, name: null, locale })
       .returning({ id: users.id });
 
     const [tenant] = await tx

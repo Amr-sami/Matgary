@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { issueResetToken } from "@/lib/repo/password-reset";
 import { sendMail } from "@/lib/mailer";
 import { rateLimit } from "@/lib/ratelimit";
+import { buildPasswordResetEmail } from "@/lib/mail/password-reset";
 
 const schema = z.object({
   email: z.string().email().max(200),
@@ -71,21 +72,19 @@ export async function POST(req: NextRequest) {
   const issued = await issueResetToken(email);
 
   if (issued.emailExists) {
+    // Use the user's stored locale (set at signup) to pick the email
+    // template AND the locale prefix on the link. Falls back to "ar"
+    // for legacy rows where locale is missing (the column default).
     const origin = req.nextUrl.origin;
-    const link = `${origin}/reset-password?token=${encodeURIComponent(issued.raw)}`;
+    const link =
+      `${origin}/${issued.locale}/reset-password` +
+      `?token=${encodeURIComponent(issued.raw)}`;
+    const tpl = buildPasswordResetEmail(issued.locale, { link });
     await sendMail({
       to: email,
-      subject: "إعادة ضبط كلمة المرور — متجري",
-      text:
-        `لقد طُلب إعادة ضبط كلمة المرور لحسابك على متجري.\n\n` +
-        `افتح هذا الرابط خلال 30 دقيقة لاختيار كلمة مرور جديدة:\n${link}\n\n` +
-        `إذا لم تكن أنت، يمكنك تجاهل هذه الرسالة. كلمة المرور الحالية ستبقى كما هي.`,
-      html:
-        `<div dir="rtl" style="font-family:system-ui,-apple-system,Segoe UI,Tajawal,Cairo,sans-serif;font-size:15px;line-height:1.7;color:#222">` +
-        `<p>لقد طُلب إعادة ضبط كلمة المرور لحسابك على متجري.</p>` +
-        `<p><a href="${link}" style="display:inline-block;background:#1203E3;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">اختر كلمة مرور جديدة</a></p>` +
-        `<p style="font-size:13px;color:#666">الرابط صالح لمدة 30 دقيقة. إذا لم تكن أنت، يمكنك تجاهل هذه الرسالة.</p>` +
-        `</div>`,
+      subject: tpl.subject,
+      text: tpl.text,
+      html: tpl.html,
     });
   }
 

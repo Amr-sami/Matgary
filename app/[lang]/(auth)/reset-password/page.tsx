@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
@@ -21,6 +21,10 @@ export default function ResetPasswordPage() {
   );
 }
 
+// Auto-redirect on success is a courtesy, not a primary path. Users with
+// reduced-motion or slow devices need a button they can click.
+const AUTO_REDIRECT_MS = 5000;
+
 function ResetInner() {
   const { auth } = useDictionary();
   const locale = useLocale();
@@ -31,6 +35,34 @@ function ResetInner() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  // Pre-validate the token on mount so a stale link surfaces immediately
+  // instead of after the user has filled the form twice.
+  const [tokenState, setTokenState] = useState<"checking" | "valid" | "invalid">(
+    token ? "checking" : "invalid",
+  );
+
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    const ctrl = new AbortController();
+    fetch(
+      `/api/account/password/reset/validate?token=${encodeURIComponent(token)}`,
+      { signal: ctrl.signal },
+    )
+      .then((r) => r.json() as Promise<{ valid: boolean }>)
+      .then((j) => {
+        if (!cancelled) setTokenState(j.valid ? "valid" : "invalid");
+      })
+      .catch(() => {
+        // Network failure → let the user try; the POST will surface the
+        // real error. Better than blocking the flow on a transient blip.
+        if (!cancelled) setTokenState("valid");
+      });
+    return () => {
+      cancelled = true;
+      ctrl.abort();
+    };
+  }, [token]);
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -61,14 +93,31 @@ function ResetInner() {
         return;
       }
       setDone(true);
-      // Auto-bounce to login after a short success state.
-      setTimeout(() => router.push(`/${locale}/login`), 2000);
     } finally {
       setBusy(false);
     }
   };
 
-  if (!token) {
+  // Slow auto-redirect AFTER the success card has rendered. The "Continue
+  // to sign in" button is always available — this is just a safety net.
+  useEffect(() => {
+    if (!done) return;
+    const id = setTimeout(
+      () => router.push(`/${locale}/login`),
+      AUTO_REDIRECT_MS,
+    );
+    return () => clearTimeout(id);
+  }, [done, router, locale]);
+
+  if (tokenState === "checking") {
+    return (
+      <div className="w-full bg-white p-4 lg:p-8 lg:rounded-2xl lg:shadow-sm text-center text-text-secondary">
+        <p>{t.checkingLink}</p>
+      </div>
+    );
+  }
+
+  if (tokenState === "invalid") {
     return (
       <div className="w-full bg-white p-4 lg:p-8 lg:rounded-2xl lg:shadow-sm">
         <p className="text-sm text-danger text-center">
@@ -90,8 +139,14 @@ function ResetInner() {
       </div>
 
       {done ? (
-        <div className="text-center space-y-3">
+        <div className="text-center space-y-4">
           <p className="text-success font-medium">{t.successMsg}</p>
+          <p className="text-sm text-text-secondary">{t.successBody}</p>
+          <Link href={`/${locale}/login`} className="block">
+            <Button className="w-full" type="button">
+              {t.continueToLogin}
+            </Button>
+          </Link>
           <p className="text-xs text-text-secondary">{t.redirecting}</p>
         </div>
       ) : (

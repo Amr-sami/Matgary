@@ -307,8 +307,11 @@
       "confirmLabel": "Confirm password",
       "submit": "Change password",
       "successMsg": "Password changed successfully ✓",
+      "successBody": "You can now sign in with your new password.",
+      "continueToLogin": "Continue to sign in",
       "redirecting": "Redirecting you to sign in…",
-      "invalidLinkPrefix": "Invalid link. Request a new one from",
+      "checkingLink": "Checking the link…",
+      "invalidLinkPrefix": "Invalid or expired link. Request a new one from",
       "invalidLinkAction": "Forgot password",
       "errors": {
         "short": "Password must be at least 8 characters",

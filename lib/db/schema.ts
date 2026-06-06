@@ -35,6 +35,11 @@ export const users = pgTable("users", {
    *  everywhere". JWTs carry the value at issue; session callback rejects
    *  tokens whose `tv` claim no longer matches. */
   tokenVersion: integer("token_version").notNull().default(0),
+  /** Preferred UI language. Set at signup from the locale prefix of the
+   *  signup URL; used by the password-reset email to pick a template and
+   *  link locale so users see the email in the language they chose.
+   *  CHECK-constrained to ('ar', 'en') at the DB level (migration 0031). */
+  locale: text("locale").notNull().default("ar"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .default(sql`now()`),
@@ -248,6 +253,17 @@ export const shopSettings = pgTable(
     receiptFooterText: text("receipt_footer_text").notNull().default(""),
     receiptLanguage: text("receipt_language").notNull().default("ar"),
     receiptShowLoyalty: boolean("receipt_show_loyalty").notNull().default(true),
+    /** Receipt designer (migration 0029) — owner-customisable block order
+     *  and font. `receiptBlockOrder` is a JSONB string array; null = default.
+     *  Logo URL re-uses the historical `logo_path` column. */
+    receiptBlockOrder: jsonb("receipt_block_order").$type<string[] | null>(),
+    receiptFontFamily: text("receipt_font_family").notNull().default("cairo"),
+    /** Receipt designer v2 (0030) — owner-defined text blocks the renderer
+     *  splices in by ID via the "custom:<id>" entries in block order. */
+    receiptCustomBlocks: jsonb("receipt_custom_blocks")
+      .$type<Record<string, { text: string; align: "right" | "center" | "left" }>>()
+      .notNull()
+      .default({}),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .default(sql`now()`),
