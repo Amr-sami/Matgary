@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
@@ -12,6 +13,7 @@ export default function OnboardingPage() {
   const { auth } = useDictionary();
   const locale = useLocale();
   const t = auth.onboarding;
+  const { update: refreshSession } = useSession();
   const [isPending, startTransition] = useTransition();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [shopName, setShopName] = useState("");
@@ -31,8 +33,16 @@ export default function OnboardingPage() {
         setError(res.error);
         return;
       }
-      // Full reload — the router cache otherwise lingers on this very page
-      // and the user sees onboarding again until they manually refresh.
+      // Force a JWT refresh BEFORE navigating: the cookie still carries
+      // onboardingComplete=false from before the wizard, and the middleware
+      // onboarding gate reads it straight off the cookie. update() runs the
+      // jwt callback with trigger="update" → resolveTenantContext (cache
+      // busted by the action) → DB sees shopName, returns
+      // onboardingComplete=true → a fresh cookie is written. Without this
+      // the first click bounces back to step 1, and the second click works
+      // only because the intermediate /onboarding render refreshed the
+      // cookie on its own.
+      await refreshSession();
       // After onboarding the user is logged-in → app root (unprefixed) is fine.
       window.location.href = "/";
     });
