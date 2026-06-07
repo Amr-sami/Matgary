@@ -204,6 +204,27 @@
       "when": 1780200000000,
       "tag": "0028_tenant_deletion",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1780300000000,
+      "tag": "0029_receipt_designer",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1780400000000,
+      "tag": "0030_receipt_custom_blocks",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1780500000000,
+      "tag": "0031_user_locale",
+      "breakpoints": true
     }
   ]
 }

@@ -194,3 +194,30 @@ Total Sprint-1 surface: 3 small PRs, ~80 lines added across 5 files. All low-ris
 The codebase is **launch-ready from a security standpoint** once F-01 (migration journal) is reconciled. None of the validation-pass findings represent a pre-auth compromise, cross-tenant breach, or unauthenticated data exposure. The Sprint-1 items close defense-in-depth gaps on already-narrow chains. The Backlog items are hardening, not vulnerabilities.
 
 The pre-pentest hardening pass (H07, closed June 3) and the subsequent auth-flow audit (closed June 7) did real work — the validation here mostly confirms that work landed correctly, and corrects three findings in my previous report where I missed existing controls.
+
+---
+
+## Closure (2026-06-07)
+
+Audit closed by owner. All four agreed items shipped in a single
+batch (one commit). Status:
+
+| Item | Status | Where it landed |
+| --- | --- | --- |
+| F-01 — Migration journal drift | **Fixed** | `lib/db/migrations/meta/_journal.json` extended with idx 29/30/31; `0031_user_locale.sql` constraint wrapped in a `DO $$ IF NOT EXISTS ... $$` block so re-runs on partially-applied envs are idempotent. `npm run db:migrate` now succeeds end-to-end. |
+| F-02 — Sentry scrubber | **Fixed** | New `lib/sentry/scrub.ts` exports `scrubSentryEvent` + `scrubSentryBreadcrumb`. Both Sentry configs (`sentry.server.config.ts`, `sentry.client.config.ts`) wire them as `beforeSend` + `beforeBreadcrumb`. Redacts sensitive headers (Authorization, Cookie, X-CSRF-Token, etc.), sensitive body keys (password / totp / secret / token / code / recovery / ...), `extra` / `contexts`, and sensitive query params on URL-bearing breadcrumbs. |
+| F-03 — 2FA disable/regenerate TOTP brute-force | **Fixed** | New `auth.totp.account_mut` rate-limit bucket (5 attempts / 15 min / user) wired inside `lib/repo/account-security.ts` so any caller of `disable2fa` or `regenerateRecoveryCodes` benefits. New `TotpRateLimitedError` mapped to HTTP 429 by both route handlers. Bucket consumed only on `BAD_PASSWORD` / `INVALID_TOTP` failures so a legitimate user with a single typo doesn't lock themselves out. |
+| F-04 — `/api/team/test-login` oracle + enumeration | **Fixed** | New `team.test_login` rate-limit bucket (10 attempts / hour / caller). The `user_not_found` and `not_in_your_tenant` responses collapsed into a single `no_such_employee` reason — platform-wide email enumeration via this endpoint is now neutralized. Every reject is recorded to `activity_logs` with category=`auth` and a `reason` metadata field so abuse patterns surface in audit review. |
+
+**Verification**
+- `npm run db:migrate` → "Migrations complete." on the dev DB; `users.locale` + `users_locale_chk` + the three new `shop_settings` columns all present (verified via `psql`).
+- `npx tsc --noEmit` → clean.
+- Existing unit suite (`tests/{url-safe,i18n-config,mail-password-reset,egypt-phone}.test.ts`) → 41/41 passing.
+
+**Carried forward into backlog** (acceptable as documented):
+- F-06 (CSV export deformulize helper) — bundle when next export ships.
+- F-08 (per-recipient WhatsApp send bucket) — bundle into next WA task.
+- Original-report Low findings (F-10..F-20) — track in `task.md`
+  alongside the existing H-series.
+
+**Audit closed.** No outstanding launch blockers.

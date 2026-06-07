@@ -10,6 +10,42 @@ import {
   verifyTotp,
 } from "@/lib/totp";
 import { bustUserContextCache } from "@/lib/auth";
+import { rateLimit, rateLimitConsume } from "@/lib/ratelimit";
+
+// F-03 — 2FA mutation paths (disable + regenerate) require a TOTP code on
+// top of the user's password. Without throttling, a stolen session + known
+// password could brute-force the 6-digit code (~1M combinations) at full
+// CPU speed. The login flow's `auth.totp` bucket doesn't apply here, so
+// we mirror the same pattern at this layer: 5 wrong attempts in 15 min
+// locks the user out of these mutations. Successful calls don't consume
+// the bucket so a legit user with typo'd codes doesn't lock themselves
+// out fast. Bucket is per-user (not per-IP) so an attacker on a fresh
+// IP can't reset the counter by switching networks.
+const TOTP_MUT_LIMIT = 5;
+const TOTP_MUT_WINDOW_SEC = 15 * 60;
+
+export class TotpRateLimitedError extends Error {
+  constructor() {
+    super("RATE_LIMITED");
+    this.name = "TotpRateLimitedError";
+  }
+}
+
+async function peekTotpMutationBucket(userId: string): Promise<boolean> {
+  const peek = await rateLimit("auth.totp.account_mut", userId, {
+    limit: TOTP_MUT_LIMIT,
+    windowSec: TOTP_MUT_WINDOW_SEC,
+    commit: false,
+  });
+  return peek.ok;
+}
+
+async function consumeTotpMutationFailure(userId: string): Promise<void> {
+  await rateLimitConsume("auth.totp.account_mut", userId, {
+    limit: TOTP_MUT_LIMIT,
+    windowSec: TOTP_MUT_WINDOW_SEC,
+  });
+}
 
 // H03 — server-side helpers for the 2FA lifecycle. All mutations bust the
 // user-context cache so a newly-enrolled / disabled state is reflected on
@@ -60,6 +96,11 @@ export async function disable2fa(
   password: string,
   token: string,
 ): Promise<void> {
+  // F-03 — peek before the bcrypt + verifyTotp work so a locked-out user
+  // doesn't even burn CPU on the password compare.
+  if (!(await peekTotpMutationBucket(userId))) {
+    throw new TotpRateLimitedError();
+  }
   const [u] = await db
     .select({
       passwordHash: users.passwordHash,
@@ -70,9 +111,13 @@ export async function disable2fa(
     .limit(1);
   if (!u?.passwordHash || !u.totpSecret) throw new Error("NOT_ENROLLED");
   if (!(await bcrypt.compare(password, u.passwordHash))) {
+    await consumeTotpMutationFailure(userId);
     throw new Error("BAD_PASSWORD");
   }
-  if (!verifyTotp(token, u.totpSecret)) throw new Error("INVALID_TOTP");
+  if (!verifyTotp(token, u.totpSecret)) {
+    await consumeTotpMutationFailure(userId);
+    throw new Error("INVALID_TOTP");
+  }
   await db
     .update(users)
     .set({
@@ -90,6 +135,10 @@ export async function regenerateRecoveryCodes(
   password: string,
   token: string,
 ): Promise<string[]> {
+  // F-03 — same rate-limit shape as disable2fa.
+  if (!(await peekTotpMutationBucket(userId))) {
+    throw new TotpRateLimitedError();
+  }
   const [u] = await db
     .select({
       passwordHash: users.passwordHash,
@@ -100,9 +149,13 @@ export async function regenerateRecoveryCodes(
     .limit(1);
   if (!u?.passwordHash || !u.totpSecret) throw new Error("NOT_ENROLLED");
   if (!(await bcrypt.compare(password, u.passwordHash))) {
+    await consumeTotpMutationFailure(userId);
     throw new Error("BAD_PASSWORD");
   }
-  if (!verifyTotp(token, u.totpSecret)) throw new Error("INVALID_TOTP");
+  if (!verifyTotp(token, u.totpSecret)) {
+    await consumeTotpMutationFailure(userId);
+    throw new Error("INVALID_TOTP");
+  }
   const codes = await generateRecoveryCodes();
   await db
     .update(users)

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireTenant } from "@/lib/api/auth-helpers";
-import { disable2fa } from "@/lib/repo/account-security";
+import { disable2fa, TotpRateLimitedError } from "@/lib/repo/account-security";
 import { logActivity } from "@/lib/repo/activity";
 
 const schema = z.object({
@@ -33,6 +33,10 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ ok: true });
   } catch (err) {
+    // F-03 — rate-limit denial returns 429 before any 400/500 mapping.
+    if (err instanceof TotpRateLimitedError) {
+      return NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 });
+    }
     const code = err instanceof Error ? err.message : "UNKNOWN";
     const known = ["NOT_ENROLLED", "BAD_PASSWORD", "INVALID_TOTP"];
     if (known.includes(code)) {
