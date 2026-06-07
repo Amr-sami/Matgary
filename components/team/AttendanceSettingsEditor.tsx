@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { cn } from "@/lib/utils";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 type Toast = { type: "success" | "error"; message: string };
 
@@ -31,14 +32,14 @@ interface StoreLocation {
   geofenceRadiusM: number;
 }
 
-const WEEKDAY_LABELS: { iso: number; ar: string }[] = [
-  { iso: 7, ar: "الأحد" },
-  { iso: 1, ar: "الاثنين" },
-  { iso: 2, ar: "الثلاثاء" },
-  { iso: 3, ar: "الأربعاء" },
-  { iso: 4, ar: "الخميس" },
-  { iso: 5, ar: "الجمعة" },
-  { iso: 6, ar: "السبت" },
+const WEEKDAY_KEYS: { iso: number; key: "sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat" }[] = [
+  { iso: 7, key: "sun" },
+  { iso: 1, key: "mon" },
+  { iso: 2, key: "tue" },
+  { iso: 3, key: "wed" },
+  { iso: 4, key: "thu" },
+  { iso: 5, key: "fri" },
+  { iso: 6, key: "sat" },
 ];
 
 interface Props {
@@ -46,6 +47,8 @@ interface Props {
 }
 
 export function AttendanceSettingsEditor({ onToast }: Props) {
+  const dict = useDictionary();
+  const t = dict.app.team.attendanceSettings;
   const [loading, setLoading] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
   const [savingLocation, setSavingLocation] = useState(false);
@@ -93,14 +96,14 @@ export function AttendanceSettingsEditor({ onToast }: Props) {
         } else if (!res.ok) {
           onToast({
             type: "error",
-            message: json.error || "تعذر فتح الرابط المختصر",
+            message: json.error || t.toast.shortLinkFailed,
           });
         }
       } catch {
         if (!cancelled) {
           onToast({
             type: "error",
-            message: "تعذر الاتصال لفتح الرابط",
+            message: t.toast.shortLinkNetwork,
           });
         }
       } finally {
@@ -120,8 +123,8 @@ export function AttendanceSettingsEditor({ onToast }: Props) {
         fetch("/api/attendance/settings", { cache: "no-store" }),
         fetch("/api/attendance/locations", { cache: "no-store" }),
       ]);
-      if (!sRes.ok) throw new Error("تعذر تحميل الإعدادات");
-      if (!lRes.ok) throw new Error("تعذر تحميل المواقع");
+      if (!sRes.ok) throw new Error(t.toast.loadSettingsFailed);
+      if (!lRes.ok) throw new Error(t.toast.loadLocationsFailed);
       const sJson = await sRes.json();
       const lJson = await lRes.json();
       setSettings(sJson.settings);
@@ -129,7 +132,7 @@ export function AttendanceSettingsEditor({ onToast }: Props) {
     } catch (e) {
       onToast({
         type: "error",
-        message: e instanceof Error ? e.message : "تعذر التحميل",
+        message: e instanceof Error ? e.message : t.toast.loadFailed,
       });
     } finally {
       setLoading(false);
@@ -160,10 +163,10 @@ export function AttendanceSettingsEditor({ onToast }: Props) {
       });
       const json = await res.json();
       if (!res.ok) {
-        onToast({ type: "error", message: json.error || "تعذر الحفظ" });
+        onToast({ type: "error", message: json.error || t.toast.saveFailed });
         return;
       }
-      onToast({ type: "success", message: "تم حفظ الإعدادات" });
+      onToast({ type: "success", message: t.toast.saveSuccess });
     } finally {
       setSavingSettings(false);
     }
@@ -173,7 +176,7 @@ export function AttendanceSettingsEditor({ onToast }: Props) {
     if (!navigator.geolocation) {
       onToast({
         type: "error",
-        message: "المتصفح لا يدعم تحديد الموقع",
+        message: t.toast.geoUnsupported,
       });
       return;
     }
@@ -186,7 +189,7 @@ export function AttendanceSettingsEditor({ onToast }: Props) {
       () => {
         onToast({
           type: "error",
-          message: "تعذر قراءة الموقع — تأكد من الصلاحيات",
+          message: t.toast.geoDenied,
         });
       },
     );
@@ -194,13 +197,13 @@ export function AttendanceSettingsEditor({ onToast }: Props) {
 
   const addLocation = async () => {
     if (!locName.trim()) {
-      onToast({ type: "error", message: "أدخل اسم الموقع" });
+      onToast({ type: "error", message: t.toast.nameRequired });
       return;
     }
     if (!parsedCoords) {
       onToast({
         type: "error",
-        message: "ألصق رابط Google Maps أو الإحداثيات (مثال: 30.044, 31.235)",
+        message: t.toast.coordsRequired,
       });
       return;
     }
@@ -218,14 +221,14 @@ export function AttendanceSettingsEditor({ onToast }: Props) {
       });
       const json = await res.json();
       if (!res.ok) {
-        onToast({ type: "error", message: json.error || "تعذر الإضافة" });
+        onToast({ type: "error", message: json.error || t.toast.addFailed });
         return;
       }
       setLocations((prev) => [json.location, ...prev]);
       setLocName("");
       setLocInput("");
       setLocRadius("50");
-      onToast({ type: "success", message: "تم إضافة الموقع" });
+      onToast({ type: "success", message: t.toast.addSuccess });
     } finally {
       setSavingLocation(false);
     }
@@ -236,7 +239,7 @@ export function AttendanceSettingsEditor({ onToast }: Props) {
       method: "DELETE",
     });
     if (!res.ok) {
-      onToast({ type: "error", message: "تعذر الحذف" });
+      onToast({ type: "error", message: t.toast.deleteFailed });
       return;
     }
     setLocations((prev) => prev.filter((l) => l.id !== id));
@@ -245,7 +248,7 @@ export function AttendanceSettingsEditor({ onToast }: Props) {
   if (loading) {
     return (
       <div className="bg-white rounded-xl border border-border p-8 text-center text-text-secondary">
-        جارٍ التحميل…
+        {t.loading}
       </div>
     );
   }
@@ -256,12 +259,12 @@ export function AttendanceSettingsEditor({ onToast }: Props) {
       <section className="bg-white rounded-xl border border-border p-5 space-y-4">
         <div className="flex items-center gap-2">
           <Clock className="w-5 h-5 text-accent" />
-          <h3 className="font-bold text-base">ساعات العمل والإجازات</h3>
+          <h3 className="font-bold text-base">{t.workHoursSection}</h3>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Input
-            label="عدد ساعات العمل في اليوم"
+            label={t.fields.workHoursPerDay}
             type="number"
             inputMode="decimal"
             min={1}
@@ -275,7 +278,7 @@ export function AttendanceSettingsEditor({ onToast }: Props) {
             }
           />
           <Input
-            label="مضاعف الأجر للساعات الإضافية"
+            label={t.fields.overtimeMultiplier}
             type="number"
             inputMode="decimal"
             min={1}
@@ -290,7 +293,7 @@ export function AttendanceSettingsEditor({ onToast }: Props) {
             }
           />
           <Input
-            label="دقائق السماح للتأخير"
+            label={t.fields.graceMinutesLate}
             type="number"
             inputMode="numeric"
             min={0}
@@ -307,10 +310,10 @@ export function AttendanceSettingsEditor({ onToast }: Props) {
 
         <div>
           <label className="block text-sm font-medium text-text-secondary mb-2">
-            أيام العطلة الأسبوعية (تُحتسب ساعاتها كساعات إضافية)
+            {t.weekend.label}
           </label>
           <div className="flex flex-wrap gap-1.5">
-            {WEEKDAY_LABELS.map((d) => {
+            {WEEKDAY_KEYS.map((d) => {
               const active = settings.weekendDays.includes(d.iso);
               return (
                 <button
@@ -324,7 +327,7 @@ export function AttendanceSettingsEditor({ onToast }: Props) {
                       : "bg-white text-text-secondary border-border hover:border-accent/40",
                   )}
                 >
-                  {d.ar}
+                  {t.weekend.days[d.key]}
                 </button>
               );
             })}
@@ -339,7 +342,7 @@ export function AttendanceSettingsEditor({ onToast }: Props) {
             className="flex items-center gap-2"
           >
             <Save className="w-4 h-4" />
-            حفظ الإعدادات
+            {t.saveSettings}
           </Button>
         </div>
       </section>
@@ -348,12 +351,10 @@ export function AttendanceSettingsEditor({ onToast }: Props) {
       <section className="bg-white rounded-xl border border-border p-5 space-y-4">
         <div className="flex items-center gap-2">
           <MapPin className="w-5 h-5 text-accent" />
-          <h3 className="font-bold text-base">مواقع المتجر</h3>
+          <h3 className="font-bold text-base">{t.locations.title}</h3>
         </div>
         <p className="text-xs text-text-secondary leading-relaxed">
-          عند تسجيل الموظف لحضوره من خلال الموبايل، سيُتحقق أنه داخل نطاق
-          أحد هذه المواقع. أضف موقعاً واحداً على الأقل لتفعيل تسجيل الحضور
-          عبر تحديد الموقع.
+          {t.locations.intro}
         </p>
 
         {locations.length > 0 && (
@@ -364,7 +365,7 @@ export function AttendanceSettingsEditor({ onToast }: Props) {
                 className="flex items-center justify-between gap-3 p-3 rounded-lg border border-border bg-bg-main/30"
               >
                 <div className="min-w-0">
-                  <p className="font-medium text-sm text-text-primary truncate">
+                  <p className="font-medium text-sm text-text-primary truncate" dir="auto">
                     {l.name}
                   </p>
                   <p
@@ -379,7 +380,7 @@ export function AttendanceSettingsEditor({ onToast }: Props) {
                   type="button"
                   onClick={() => deleteLocation(l.id)}
                   className="shrink-0 p-2 rounded-lg text-text-secondary hover:text-danger hover:bg-danger-light"
-                  aria-label="حذف الموقع"
+                  aria-label={t.locations.deleteAria}
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -392,30 +393,29 @@ export function AttendanceSettingsEditor({ onToast }: Props) {
         <div className="rounded-lg border border-border p-3 space-y-3">
           <p className="text-sm font-medium flex items-center gap-1.5">
             <Plus className="w-4 h-4 text-accent" />
-            إضافة موقع
+            {t.locations.addHeading}
           </p>
           <Input
-            label="اسم الموقع"
+            label={t.locations.nameLabel}
             value={locName}
             onChange={(e) => setLocName(e.target.value)}
-            placeholder="الفرع الرئيسي"
+            placeholder={t.locations.namePlaceholder}
           />
 
           <div>
             <label className="block text-sm font-medium text-text-secondary mb-1.5">
-              رابط الموقع من Google Maps
+              {t.locations.linkLabel}
             </label>
             <input
               type="text"
               value={locInput}
               onChange={(e) => setLocInput(e.target.value)}
               dir="ltr"
-              placeholder="https://maps.google.com/...  أو  30.044420, 31.235712"
+              placeholder={t.locations.linkPlaceholder}
               className="w-full px-3 py-2.5 rounded-lg border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-accent placeholder:text-text-secondary/60"
             />
             <p className="text-[11px] text-text-secondary mt-1.5 leading-relaxed">
-              في خرائط جوجل، اضغط بزر الفأرة الأيمن على الموقع ← انسخ الإحداثيات،
-              أو شارك الرابط والصقه هنا.
+              {t.locations.linkHelp}
             </p>
 
             {locInput.trim() &&
@@ -432,17 +432,17 @@ export function AttendanceSettingsEditor({ onToast }: Props) {
                 </div>
               ) : resolvingShort ? (
                 <p className="text-xs text-text-secondary mt-2">
-                  جارٍ فتح الرابط المختصر…
+                  {t.locations.resolvingShort}
                 </p>
               ) : (
                 <p className="text-xs text-danger mt-2">
-                  لم نتمكن من قراءة الإحداثيات من النص.
+                  {t.locations.parseFailed}
                 </p>
               ))}
           </div>
 
           <Input
-            label="نصف القطر (متر)"
+            label={t.locations.radiusLabel}
             type="number"
             min={10}
             max={2000}
@@ -456,7 +456,7 @@ export function AttendanceSettingsEditor({ onToast }: Props) {
               className="flex items-center gap-1.5"
             >
               <MapPin className="w-4 h-4" />
-              استخدم موقعي الحالي
+              {t.locations.useMyLocation}
             </Button>
             <Button
               onClick={addLocation}
@@ -465,7 +465,7 @@ export function AttendanceSettingsEditor({ onToast }: Props) {
               className="flex items-center gap-1.5"
             >
               <Plus className="w-4 h-4" />
-              إضافة
+              {t.locations.addButton}
             </Button>
           </div>
         </div>
@@ -474,9 +474,7 @@ export function AttendanceSettingsEditor({ onToast }: Props) {
       <div className="bg-bg-card/60 border border-border rounded-xl p-4 flex items-start gap-2">
         <SettingsIcon className="w-4 h-4 text-text-secondary shrink-0 mt-0.5" />
         <p className="text-xs text-text-secondary leading-relaxed">
-          هذه الإعدادات تُستخدم في حساب الأجر الإضافي وتسجيل الحضور. أي
-          تعديل يبدأ تطبيقه من اليوم التالي للحفظ، ولا يؤثر على الفترات
-          المنتهية والمحفوظة.
+          {t.footnote}
         </p>
       </div>
     </div>

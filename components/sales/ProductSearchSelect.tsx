@@ -6,6 +6,7 @@ import { useProducts } from "@/hooks/useProducts";
 import type { Product } from "@/lib/types";
 import { Badge } from "../ui/Badge";
 import { CATEGORY_LABELS } from "@/lib/types";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 interface ProductSearchSelectProps {
   value: Product | null;
@@ -13,6 +14,8 @@ interface ProductSearchSelectProps {
 }
 
 export function ProductSearchSelect({ value, onChange }: ProductSearchSelectProps) {
+  const dict = useDictionary();
+  const t = dict.app.sales.form.productSearch;
   const { products } = useProducts();
   const [search, setSearch] = useState("");
   const [isOpen, setIsOpen] = useState(false);
@@ -58,7 +61,7 @@ export function ProductSearchSelect({ value, onChange }: ProductSearchSelectProp
   return (
     <div ref={wrapperRef} className="relative">
       <label className="block text-sm font-medium text-text-secondary mb-1.5">
-        اختيار المنتج
+        {t.label}
       </label>
       <div className="relative">
         <Search className="absolute start-4 top-1/2 -translate-y-1/2 w-5 h-5 text-text-secondary" />
@@ -71,8 +74,8 @@ export function ProductSearchSelect({ value, onChange }: ProductSearchSelectProp
             setIsOpen(true);
           }}
           onFocus={() => setIsOpen(true)}
-          placeholder="ابحث عن منتج..."
-          dir="rtl"
+          placeholder={t.placeholder}
+          dir="auto"
           className="w-full ps-12 pe-10 py-3 rounded-lg border border-border bg-white focus:outline-none focus:ring-2 focus:ring-accent"
         />
         {value && (
@@ -98,9 +101,13 @@ export function ProductSearchSelect({ value, onChange }: ProductSearchSelectProp
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-medium">{product.name}</p>
+                  <p className="font-medium" dir="auto">
+                    {product.name}
+                  </p>
                   {product.brand && (
-                    <p className="text-xs text-text-secondary">{product.brand}</p>
+                    <p className="text-xs text-text-secondary" dir="auto">
+                      {product.brand}
+                    </p>
                   )}
                 </div>
                 <div className="text-end">
@@ -108,7 +115,7 @@ export function ProductSearchSelect({ value, onChange }: ProductSearchSelectProp
                     {CATEGORY_LABELS[product.category]}
                   </Badge>
                   <p className="text-xs text-text-secondary mt-1">
-                    متوفر: {product.quantity}
+                    {t.inStock.replace("{n}", String(product.quantity))}
                   </p>
                 </div>
               </div>

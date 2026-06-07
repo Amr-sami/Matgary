@@ -4,11 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, Search } from "@/lib/icons";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
 import { SupplierPicker } from "@/components/suppliers/SupplierPicker";
 import { useProducts } from "@/hooks/useProducts";
-import { formatPrice } from "@/lib/utils";
 import type { Product } from "@/lib/types";
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
+import { formatCurrency } from "@/lib/i18n/format";
 
 interface Line {
   /** Stable client id for list keying. */
@@ -30,6 +30,9 @@ let nextUid = 1;
 const newUid = () => `line-${nextUid++}`;
 
 export function PurchaseOrderBuilder({ isOpen, onClose, onSaved, onError }: Props) {
+  const dict = useDictionary();
+  const locale = useLocale();
+  const t = dict.app.purchases.builder;
   const { products } = useProducts();
   const [supplierId, setSupplierId] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
@@ -101,7 +104,7 @@ export function PurchaseOrderBuilder({ isOpen, onClose, onSaved, onError }: Prop
 
   const submit = async () => {
     if (!supplierId) {
-      onError("اختر مورداً");
+      onError(t.errors.pickSupplier);
       return;
     }
     const cleaned = lines
@@ -111,7 +114,7 @@ export function PurchaseOrderBuilder({ isOpen, onClose, onSaved, onError }: Prop
       }))
       .filter((l) => l.productName && l.quantity > 0);
     if (cleaned.length === 0) {
-      onError("أضف صنفاً واحداً على الأقل");
+      onError(t.errors.needLine);
       return;
     }
     setSubmitting(true);
@@ -132,7 +135,7 @@ export function PurchaseOrderBuilder({ isOpen, onClose, onSaved, onError }: Prop
       });
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
-        onError(json.error || "تعذر الحفظ");
+        onError(json.error || t.errors.saveFailed);
         return;
       }
       onSaved();
@@ -143,23 +146,23 @@ export function PurchaseOrderBuilder({ isOpen, onClose, onSaved, onError }: Prop
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="أمر شراء جديد" className="max-w-2xl">
+    <Modal isOpen={isOpen} onClose={onClose} title={t.title} className="max-w-2xl">
       <div className="space-y-4">
-        <SupplierPicker value={supplierId} onChange={setSupplierId} label="المورد *" />
+        <SupplierPicker value={supplierId} onChange={setSupplierId} label={t.supplierLabel} />
 
         {/* Product search */}
         <div>
           <label className="block text-sm font-medium text-text-secondary mb-1.5">
-            ابحث عن صنف لإضافته
+            {t.productSearchLabel}
           </label>
           <div className="relative">
             <Search className="w-4 h-4 absolute top-1/2 -translate-y-1/2 end-3 text-text-secondary" />
             <input
               type="search"
-              dir="rtl"
+              dir="auto"
               value={productQuery}
               onChange={(e) => setProductQuery(e.target.value)}
-              placeholder="اسم المنتج أو SKU"
+              placeholder={t.productSearchPlaceholder}
               className="w-full ps-3 pe-9 py-2.5 rounded-lg border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-accent"
             />
           </div>
@@ -172,12 +175,13 @@ export function PurchaseOrderBuilder({ isOpen, onClose, onSaved, onError }: Prop
                   onClick={() => addLine(p)}
                   className="w-full flex items-center justify-between gap-2 px-3 py-2 text-start hover:bg-bg-main"
                 >
-                  <span className="truncate text-sm">
+                  <span className="truncate text-sm" dir="auto">
                     {p.name}
                     {p.brand ? ` — ${p.brand}` : ""}
                   </span>
                   <span className="text-xs text-text-secondary shrink-0">
-                    تكلفة: {p.costPrice ? formatPrice(p.costPrice) : "—"}
+                    {t.costPrefix}{" "}
+                    {p.costPrice ? formatCurrency(p.costPrice, locale) : "—"}
                   </span>
                 </button>
               ))}
@@ -189,7 +193,7 @@ export function PurchaseOrderBuilder({ isOpen, onClose, onSaved, onError }: Prop
             className="mt-2 text-sm text-accent inline-flex items-center gap-1 hover:underline"
           >
             <Plus className="w-4 h-4" />
-            أو أضف صنف خارجي (غير مسجل)
+            {t.addExternal}
           </button>
         </div>
 
@@ -199,10 +203,10 @@ export function PurchaseOrderBuilder({ isOpen, onClose, onSaved, onError }: Prop
             <table className="w-full text-sm">
               <thead className="bg-bg-main">
                 <tr className="text-text-secondary">
-                  <th className="text-start px-3 py-2 font-medium">الصنف</th>
-                  <th className="text-start px-3 py-2 font-medium w-20">الكمية</th>
-                  <th className="text-start px-3 py-2 font-medium w-24">سعر الوحدة</th>
-                  <th className="text-start px-3 py-2 font-medium w-24">الإجمالي</th>
+                  <th className="text-start px-3 py-2 font-medium">{t.table.name}</th>
+                  <th className="text-start px-3 py-2 font-medium w-20">{t.table.quantity}</th>
+                  <th className="text-start px-3 py-2 font-medium w-24">{t.table.unitCost}</th>
+                  <th className="text-start px-3 py-2 font-medium w-24">{t.table.total}</th>
                   <th className="w-10"></th>
                 </tr>
               </thead>
@@ -212,7 +216,7 @@ export function PurchaseOrderBuilder({ isOpen, onClose, onSaved, onError }: Prop
                     <td className="px-3 py-2">
                       <input
                         type="text"
-                        dir="rtl"
+                        dir="auto"
                         value={l.productName}
                         onChange={(e) => updateLine(l.uid, { productName: e.target.value })}
                         className="w-full px-2 py-1 rounded border border-border focus:outline-none focus:ring-1 focus:ring-accent"
@@ -242,14 +246,14 @@ export function PurchaseOrderBuilder({ isOpen, onClose, onSaved, onError }: Prop
                       />
                     </td>
                     <td className="px-3 py-2 text-text-secondary">
-                      {formatPrice(l.quantity * l.unitCost)}
+                      {formatCurrency(l.quantity * l.unitCost, locale)}
                     </td>
                     <td className="px-2 py-2">
                       <button
                         type="button"
                         onClick={() => removeLine(l.uid)}
                         className="p-1 rounded hover:bg-danger-light text-text-secondary hover:text-danger"
-                        title="حذف"
+                        title={t.table.deleteTitle}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -260,9 +264,9 @@ export function PurchaseOrderBuilder({ isOpen, onClose, onSaved, onError }: Prop
               <tfoot className="bg-bg-main">
                 <tr>
                   <td colSpan={3} className="px-3 py-2 text-text-secondary text-end font-medium">
-                    الإجمالي
+                    {t.table.totalRow}
                   </td>
-                  <td className="px-3 py-2 font-bold">{formatPrice(total)}</td>
+                  <td className="px-3 py-2 font-bold">{formatCurrency(total, locale)}</td>
                   <td></td>
                 </tr>
               </tfoot>
@@ -272,10 +276,10 @@ export function PurchaseOrderBuilder({ isOpen, onClose, onSaved, onError }: Prop
 
         <div>
           <label className="block text-sm font-medium text-text-secondary mb-1.5">
-            ملاحظات
+            {t.notesLabel}
           </label>
           <textarea
-            dir="rtl"
+            dir="auto"
             rows={2}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
@@ -285,13 +289,13 @@ export function PurchaseOrderBuilder({ isOpen, onClose, onSaved, onError }: Prop
 
         <div className="flex gap-2 justify-end pt-2 border-t border-border">
           <Button variant="secondary" onClick={onClose} disabled={submitting}>
-            إلغاء
+            {t.cancel}
           </Button>
           <Button
             onClick={submit}
             disabled={submitting || !supplierId || lines.length === 0}
           >
-            {submitting ? "جاري الحفظ…" : "حفظ كمسودة"}
+            {submitting ? t.saving : t.save}
           </Button>
         </div>
       </div>

@@ -6,8 +6,11 @@ import { useSession } from "next-auth/react";
 import { KeyRound } from "@/lib/icons";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 export default function ChangePasswordPage() {
+  const dict = useDictionary();
+  const t = dict.app.changePassword;
   const router = useRouter();
   const { data: session, update } = useSession();
   const [isPending, startTransition] = useTransition();
@@ -23,11 +26,11 @@ export default function ChangePasswordPage() {
     e.preventDefault();
     setError(null);
     if (next.length < 8) {
-      setError("كلمة السر الجديدة يجب أن تكون ٨ أحرف على الأقل");
+      setError(t.tooShort);
       return;
     }
     if (next !== confirm) {
-      setError("كلمتا السر غير متطابقتين");
+      setError(t.mismatch);
       return;
     }
     startTransition(async () => {
@@ -38,12 +41,10 @@ export default function ChangePasswordPage() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        setError(err.error || "تعذر التغيير");
+        setError(err.error || t.genericError);
         return;
       }
       setSuccess(true);
-      // Refresh JWT so mustChangePassword flips to false (otherwise middleware
-      // would redirect them right back here).
       try {
         await update?.();
       } catch {
@@ -61,10 +62,10 @@ export default function ChangePasswordPage() {
           <div className="w-12 h-12 rounded-full bg-accent-light text-accent mx-auto mb-3 flex items-center justify-center">
             <KeyRound className="w-6 h-6" />
           </div>
-          <h1 className="text-2xl font-bold text-text-primary">تغيير كلمة السر</h1>
+          <h1 className="text-2xl font-bold text-text-primary">{t.title}</h1>
           {mustChange && (
             <p className="text-sm text-text-secondary mt-1">
-              يجب عليك تغيير كلمة السر قبل المتابعة
+              {t.mustChange}
             </p>
           )}
         </div>
@@ -72,7 +73,7 @@ export default function ChangePasswordPage() {
         <form onSubmit={submit} className="space-y-4">
           <Input
             type="password"
-            label="كلمة السر الحالية"
+            label={t.current}
             value={current}
             onChange={(e) => setCurrent(e.target.value)}
             required
@@ -81,17 +82,17 @@ export default function ChangePasswordPage() {
           />
           <Input
             type="password"
-            label="كلمة السر الجديدة"
+            label={t.new}
             value={next}
             onChange={(e) => setNext(e.target.value)}
             required
             dir="ltr"
             autoComplete="new-password"
-            placeholder="٨ أحرف على الأقل"
+            placeholder={t.newPlaceholder}
           />
           <Input
             type="password"
-            label="تأكيد كلمة السر الجديدة"
+            label={t.confirm}
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
             required
@@ -101,7 +102,7 @@ export default function ChangePasswordPage() {
 
           {error && <p className="text-sm text-danger">{error}</p>}
           {success && (
-            <p className="text-sm text-success">تم تغيير كلمة السر بنجاح</p>
+            <p className="text-sm text-success">{t.success}</p>
           )}
 
           <Button
@@ -110,7 +111,7 @@ export default function ChangePasswordPage() {
             loading={isPending}
             disabled={!current || !next || !confirm}
           >
-            حفظ
+            {t.submit}
           </Button>
         </form>
       </div>

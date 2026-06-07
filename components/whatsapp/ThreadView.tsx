@@ -14,18 +14,16 @@ import { cn } from "@/lib/utils";
 import { MessageBubble } from "./MessageBubble";
 import { windowDisplay } from "./format";
 import type { ConversationDetailDTO, MessageDTO } from "./types";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 interface Props {
   conversationId: string;
-  /** Closes the thread on mobile (returns to the list pane). */
   onBack: () => void;
-  /** Called after a successful action that should re-poll the list. */
   onChanged: () => void;
   onError: (msg: string) => void;
 }
 
 export interface ThreadViewHandle {
-  /** Imperative refresh — used by the parent's poll loop. */
   refresh: () => void;
 }
 
@@ -34,6 +32,8 @@ const PAGE_SIZE = 50;
 
 export const ThreadView = forwardRef<ThreadViewHandle, Props>(
   function ThreadView({ conversationId, onBack, onChanged, onError }, ref) {
+    const dict = useDictionary();
+    const t = dict.app.whatsappInbox;
     const [conversation, setConversation] = useState<ConversationDetailDTO | null>(
       null,
     );
@@ -70,12 +70,9 @@ export const ThreadView = forwardRef<ThreadViewHandle, Props>(
           messages: MessageDTO[];
           nextBefore: string | null;
         };
-        // API returns newest-first (created_at DESC). Render chronological,
-        // so reverse for display.
         const chrono = [...json.messages].reverse();
         setMessages((prev) => {
           if (opts.append) {
-            // Older page: prepend, deduping by id.
             const seen = new Set(prev.map((m) => m.id));
             return chrono.filter((m) => !seen.has(m.id)).concat(prev);
           }
@@ -86,7 +83,6 @@ export const ThreadView = forwardRef<ThreadViewHandle, Props>(
       [conversationId],
     );
 
-    // Initial load + reset when conversation changes.
     useEffect(() => {
       setLoading(true);
       setMessages([]);
@@ -97,7 +93,6 @@ export const ThreadView = forwardRef<ThreadViewHandle, Props>(
         .finally(() => setLoading(false));
     }, [conversationId, loadConversation, loadMessages, onError]);
 
-    // Auto-mark-read once on open. Fire and forget — failure is harmless.
     useEffect(() => {
       void fetch(`/api/whatsapp/conversations/${conversationId}`, {
         method: "PATCH",
@@ -110,12 +105,8 @@ export const ThreadView = forwardRef<ThreadViewHandle, Props>(
         });
     }, [conversationId, onChanged]);
 
-    // Poll thread for inbound messages + status updates.
     useEffect(() => {
       const handle = setInterval(() => {
-        // Refresh latest page (newest); the older-cursor pagination
-        // stays untouched. Conversation summary too so the window
-        // countdown is fresh.
         void loadConversation();
         void loadMessages({}).catch(() => {
           // swallow — UI keeps showing the last good page
@@ -124,7 +115,6 @@ export const ThreadView = forwardRef<ThreadViewHandle, Props>(
       return () => clearInterval(handle);
     }, [loadConversation, loadMessages]);
 
-    // Imperative refresh for the parent.
     useImperativeHandle(
       ref,
       () => ({
@@ -136,8 +126,6 @@ export const ThreadView = forwardRef<ThreadViewHandle, Props>(
       [loadConversation, loadMessages],
     );
 
-    // Scroll to bottom when the message count grows (new outbound or
-    // inbound), but not when older history is prepended.
     useEffect(() => {
       if (!messages.length) return;
       if (initialLoadRef.current) {
@@ -153,9 +141,6 @@ export const ThreadView = forwardRef<ThreadViewHandle, Props>(
       setLoadingOlder(true);
       try {
         await loadMessages({ before: olderCursor, append: true });
-        // After appending older, also fetch a fresh nextBefore from the
-        // first message we just got.
-        // (The API returned its own nextBefore; we just trust that.)
       } finally {
         setLoadingOlder(false);
       }
@@ -167,7 +152,7 @@ export const ThreadView = forwardRef<ThreadViewHandle, Props>(
       const text = draft.trim();
       if (!text || !conversation) return;
       if (!canSendFreeform) {
-        onError("نافذة الـ 24 ساعة مغلقة. استخدم قالباً معتمداً.");
+        onError(t.thread.windowClosedError);
         return;
       }
       setSending(true);
@@ -186,8 +171,6 @@ export const ThreadView = forwardRef<ThreadViewHandle, Props>(
           return;
         }
         setDraft("");
-        // Refresh both panes immediately so the user sees the queued
-        // message instead of waiting for the 8s tick.
         void loadMessages({});
         void loadConversation();
         onChanged();
@@ -223,28 +206,27 @@ export const ThreadView = forwardRef<ThreadViewHandle, Props>(
     if (loading || !conversation) {
       return (
         <div className="flex flex-col h-full bg-white border border-border rounded-xl items-center justify-center text-text-secondary">
-          جارٍ التحميل...
+          {t.thread.loading}
         </div>
       );
     }
 
-    const w = windowDisplay(conversation.windowExpiresAt);
+    const w = windowDisplay(conversation.windowExpiresAt, t.windowState);
 
     return (
       <div className="flex flex-col h-full bg-white border border-border rounded-xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center gap-3 px-3 py-2.5 border-b border-border">
-          {/* Mobile back button — ChevronRight is the RTL "back". */}
           <button
             type="button"
             onClick={onBack}
             className="md:hidden p-1 rounded hover:bg-bg-main"
-            aria-label="رجوع"
+            aria-label={t.thread.back}
           >
             <ChevronRight className="w-5 h-5" />
           </button>
           <div className="flex-1 min-w-0">
-            <p className="font-medium truncate">
+            <p className="font-medium truncate" dir="auto">
               {conversation.displayName || conversation.phoneNumber}
             </p>
             <p
@@ -260,7 +242,7 @@ export const ThreadView = forwardRef<ThreadViewHandle, Props>(
             disabled={archiving}
             className="text-xs text-text-secondary hover:text-accent px-2 py-1 rounded disabled:opacity-50"
           >
-            {conversation.archivedAt ? "استعادة" : "أرشفة"}
+            {conversation.archivedAt ? t.thread.restore : t.thread.archive}
           </button>
         </div>
 
@@ -288,14 +270,14 @@ export const ThreadView = forwardRef<ThreadViewHandle, Props>(
                 disabled={loadingOlder}
                 className="text-xs text-accent hover:underline disabled:opacity-50"
               >
-                {loadingOlder ? "..." : "تحميل أقدم"}
+                {loadingOlder ? t.thread.loadingOlder : t.thread.loadOlder}
               </button>
             </div>
           )}
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center text-text-secondary">
               <MessageCircle className="w-8 h-8 mb-2 opacity-40" />
-              <p className="text-sm">لا توجد رسائل بعد.</p>
+              <p className="text-sm">{t.thread.emptyMessages}</p>
             </div>
           ) : (
             messages.map((m) => <MessageBubble key={m.id} message={m} />)
@@ -323,8 +305,8 @@ export const ThreadView = forwardRef<ThreadViewHandle, Props>(
                   }
                 }}
                 rows={1}
-                placeholder="اكتب رسالة..."
-                dir="rtl"
+                placeholder={t.thread.composerPlaceholder}
+                dir="auto"
                 className="flex-1 resize-none rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent max-h-32"
               />
               <Button
@@ -334,17 +316,17 @@ export const ThreadView = forwardRef<ThreadViewHandle, Props>(
                 disabled={!draft.trim() || sending}
               >
                 <Send className="w-4 h-4 me-1" />
-                إرسال
+                {t.thread.send}
               </Button>
             </form>
           ) : (
             <div className="text-xs text-text-secondary text-center py-2 leading-relaxed">
-              لا يمكن إرسال رسائل حرّة الآن — استخدم قالباً معتمداً.{" "}
+              {t.thread.outsideWindowHint}
               <a
                 href="/settings"
                 className="text-accent hover:underline"
               >
-                إدارة القوالب
+                {t.thread.manageTemplates}
               </a>
             </div>
           )}

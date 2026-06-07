@@ -3,6 +3,7 @@
 import { User, UserRound } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import type { CategoryAttribute } from "@/lib/types";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 interface Step2AttributesProps {
   attributes: CategoryAttribute[];
@@ -24,18 +25,20 @@ export function Step2Attributes({
   selected,
   onSelect,
 }: Step2AttributesProps) {
+  const dict = useDictionary();
+  const t = dict.app.inventory.addProduct.step2;
   return (
     <div className="space-y-7">
       <div>
-        <h2 className="text-lg font-bold text-text-primary">حدِّد خصائص المنتج</h2>
+        <h2 className="text-lg font-bold text-text-primary">{t.heading}</h2>
         <p className="text-sm text-text-secondary mt-0.5">
-          هذه الخصائص تظهر في التقارير والفلاتر، فاحرص على دقتها.
+          {t.subhead}
         </p>
       </div>
 
       {attributes.map((attr) => (
         <div key={attr.id}>
-          <h3 className="text-sm font-semibold text-text-primary mb-3">
+          <h3 className="text-sm font-semibold text-text-primary mb-3" dir="auto">
             {attr.label}
             {attr.required && <span className="text-danger ms-1">*</span>}
           </h3>
@@ -72,7 +75,7 @@ export function Step2Attributes({
                       )}
                     />
                   )}
-                  <span className="text-sm font-semibold">{value.label}</span>
+                  <span className="text-sm font-semibold" dir="auto">{value.label}</span>
                 </button>
               );
             })}

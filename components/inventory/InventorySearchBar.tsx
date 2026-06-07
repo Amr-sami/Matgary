@@ -1,13 +1,15 @@
 "use client";
 
 import { Search, X } from "@/lib/icons";
-import { useSearch } from "@/hooks/useSearch";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 interface InventorySearchBarProps {
   onSearch: (query: string) => void;
 }
 
 export function InventorySearchBar({ onSearch }: InventorySearchBarProps) {
+  const dict = useDictionary();
+  const t = dict.app.inventory.searchBar;
   const { query, setQuery } = { query: "", setQuery: onSearch };
 
   return (
@@ -15,10 +17,10 @@ export function InventorySearchBar({ onSearch }: InventorySearchBarProps) {
       <Search className="absolute start-4 top-1/2 -translate-y-1/2 w-5 h-5 text-text-secondary" />
       <input
         type="text"
-        placeholder="ابحث عن منتج، براند، أو صنف..."
+        placeholder={t.placeholder}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        dir="rtl"
+        dir="auto"
         className="w-full ps-12 pe-10 py-3 rounded-xl border border-border bg-white focus:outline-none focus:ring-2 focus:ring-accent"
       />
       {query && (

@@ -15,12 +15,13 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { TaskFormModal } from "./TaskFormModal";
 import { useTasks, type TaskItem, type TaskStatus, type TaskPriority } from "@/hooks/useTasks";
 import { can } from "@/lib/permissions";
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
+import { formatDate } from "@/lib/i18n/format";
 
 type Toast = { type: "success" | "error"; message: string };
 
 interface Props {
   onToast: (t: Toast) => void;
-  /** Called whenever the unread badge count needs to refresh. */
   onUnreadChange: () => void;
 }
 
@@ -29,19 +30,6 @@ interface TeamMemberOption {
   displayName: string;
   role: string;
 }
-
-const STATUS_TITLES: Record<TaskStatus, string> = {
-  open: "مفتوحة",
-  in_progress: "قيد التنفيذ",
-  done: "مكتملة",
-  cancelled: "ملغاة",
-};
-
-const PRIORITY_LABELS: Record<TaskPriority, string> = {
-  low: "منخفضة",
-  normal: "عادية",
-  high: "عاجلة",
-};
 
 const PRIORITY_TONES: Record<TaskPriority, string> = {
   low: "bg-gray-100 text-text-secondary",
@@ -52,6 +40,9 @@ const PRIORITY_TONES: Record<TaskPriority, string> = {
 const KANBAN_COLUMNS: TaskStatus[] = ["open", "in_progress", "done"];
 
 export function TasksTab({ onToast, onUnreadChange }: Props) {
+  const dict = useDictionary();
+  const locale = useLocale();
+  const t = dict.app.tasks;
   const { data: session } = useSession();
   const principal = session?.user
     ? { role: session.user.role, permissions: session.user.permissions }
@@ -67,20 +58,16 @@ export function TasksTab({ onToast, onUnreadChange }: Props) {
   const [deleteTarget, setDeleteTarget] = useState<TaskItem | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // Messenger-style read flow: any unseen task assigned to the current user
-  // is acknowledged the moment they're looking at this page. This runs after
-  // every poll-driven refresh, so a task that arrives while the user is on
-  // the page is also auto-seen and the badge stays at zero.
   const myUnreadIds = useMemo(
     () =>
       tasks
         .filter(
-          (t) =>
-            t.assignedToUserId === session?.user?.id &&
-            !t.assigneeSeenAt &&
-            (t.status === "open" || t.status === "in_progress"),
+          (task) =>
+            task.assignedToUserId === session?.user?.id &&
+            !task.assigneeSeenAt &&
+            (task.status === "open" || task.status === "in_progress"),
         )
-        .map((t) => t.id)
+        .map((task) => task.id)
         .join(","),
     [tasks, session?.user?.id],
   );
@@ -105,7 +92,6 @@ export function TasksTab({ onToast, onUnreadChange }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [myUnreadIds]);
 
-  // Manager fetches the team list for the assignee picker.
   useEffect(() => {
     if (!isManager) return;
     (async () => {
@@ -130,7 +116,6 @@ export function TasksTab({ onToast, onUnreadChange }: Props) {
   const myUserId = session?.user?.id;
 
   const visibleTasks = useMemo(() => {
-    // API already filters by permission; client just sorts: unread first, then due date asc.
     const sorted = [...tasks];
     sorted.sort((a, b) => {
       const aUnread = !a.assigneeSeenAt && a.assignedToUserId === myUserId ? 0 : 1;
@@ -150,7 +135,7 @@ export function TasksTab({ onToast, onUnreadChange }: Props) {
       done: [],
       cancelled: [],
     };
-    for (const t of visibleTasks) out[t.status].push(t);
+    for (const task of visibleTasks) out[task.status].push(task);
     return out;
   }, [visibleTasks]);
 
@@ -162,10 +147,10 @@ export function TasksTab({ onToast, onUnreadChange }: Props) {
     });
     if (!res.ok) {
       const json = await res.json().catch(() => ({}));
-      onToast({ type: "error", message: json.error || "تعذر تحديث الحالة" });
+      onToast({ type: "error", message: json.error || t.toast.statusFailed });
       return;
     }
-    onToast({ type: "success", message: "تم تحديث الحالة" });
+    onToast({ type: "success", message: t.toast.statusSuccess });
     await refresh();
     onUnreadChange();
   };
@@ -177,10 +162,10 @@ export function TasksTab({ onToast, onUnreadChange }: Props) {
       const res = await fetch(`/api/tasks/${deleteTarget.id}`, { method: "DELETE" });
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
-        onToast({ type: "error", message: json.error || "تعذر الحذف" });
+        onToast({ type: "error", message: json.error || t.toast.deleteFailed });
         return;
       }
-      onToast({ type: "success", message: "تم الحذف" });
+      onToast({ type: "success", message: t.toast.deleted });
       setDeleteTarget(null);
       await refresh();
       onUnreadChange();
@@ -189,15 +174,15 @@ export function TasksTab({ onToast, onUnreadChange }: Props) {
     }
   };
 
-  const renderCard = (t: TaskItem) => {
-    const isMine = t.assignedToUserId === myUserId;
-    const unreadByMe = isMine && !t.assigneeSeenAt && t.status !== "done";
+  const renderCard = (task: TaskItem) => {
+    const isMine = task.assignedToUserId === myUserId;
+    const unreadByMe = isMine && !task.assigneeSeenAt && task.status !== "done";
     const overdue =
-      t.dueDate && t.status !== "done" && t.dueDate.getTime() < Date.now();
+      task.dueDate && task.status !== "done" && task.dueDate.getTime() < Date.now();
 
     return (
       <div
-        key={t.id}
+        key={task.id}
         className={[
           "rounded-xl border bg-white p-3 space-y-2 transition-colors",
           unreadByMe
@@ -206,32 +191,32 @@ export function TasksTab({ onToast, onUnreadChange }: Props) {
         ].join(" ")}
       >
         <div className="flex items-start justify-between gap-2">
-          <p className="font-medium text-sm text-text-primary leading-snug flex-1">
-            {t.title}
+          <p className="font-medium text-sm text-text-primary leading-snug flex-1" dir="auto">
+            {task.title}
           </p>
           {unreadByMe && (
             <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-accent text-white font-bold">
-              جديدة
+              {t.card.newBadge}
             </span>
           )}
         </div>
 
-        {t.description && (
-          <p className="text-xs text-text-secondary line-clamp-2">{t.description}</p>
+        {task.description && (
+          <p className="text-xs text-text-secondary line-clamp-2" dir="auto">{task.description}</p>
         )}
 
         <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
           <span
-            className={`px-1.5 py-0.5 rounded-full font-medium ${PRIORITY_TONES[t.priority]}`}
+            className={`px-1.5 py-0.5 rounded-full font-medium ${PRIORITY_TONES[task.priority]}`}
           >
-            {PRIORITY_LABELS[t.priority]}
+            {t.priority[task.priority]}
           </span>
-          {t.assignedToName && (
-            <span className="px-1.5 py-0.5 rounded-full bg-bg-main text-text-secondary">
-              {t.assignedToName}
+          {task.assignedToName && (
+            <span className="px-1.5 py-0.5 rounded-full bg-bg-main text-text-secondary" dir="auto">
+              {task.assignedToName}
             </span>
           )}
-          {t.dueDate && (
+          {task.dueDate && (
             <span
               className={[
                 "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full",
@@ -241,43 +226,42 @@ export function TasksTab({ onToast, onUnreadChange }: Props) {
               ].join(" ")}
             >
               <Clock className="w-3 h-3" />
-              {t.dueDate.toLocaleDateString("ar-EG")}
+              {formatDate(task.dueDate, locale)}
             </span>
           )}
         </div>
 
-        {/* Action row */}
         <div className="flex items-center justify-between pt-1 border-t border-border">
           <div className="flex gap-1">
-            {(isMine || isManager) && t.status !== "done" && (
+            {(isMine || isManager) && task.status !== "done" && (
               <>
-                {t.status === "open" && (
+                {task.status === "open" && (
                   <button
                     type="button"
-                    onClick={() => updateStatus(t.id, "in_progress")}
+                    onClick={() => updateStatus(task.id, "in_progress")}
                     className="text-xs text-accent hover:underline inline-flex items-center gap-1"
                   >
                     <Clock className="w-3 h-3" />
-                    ابدأ
+                    {t.card.startAction}
                   </button>
                 )}
                 <button
                   type="button"
-                  onClick={() => updateStatus(t.id, "done")}
+                  onClick={() => updateStatus(task.id, "done")}
                   className="text-xs text-success hover:underline inline-flex items-center gap-1"
                 >
                   <Check className="w-3 h-3" />
-                  تم الإنجاز
+                  {t.card.doneAction}
                 </button>
               </>
             )}
-            {t.status === "done" && isManager && (
+            {task.status === "done" && isManager && (
               <button
                 type="button"
-                onClick={() => updateStatus(t.id, "open")}
+                onClick={() => updateStatus(task.id, "open")}
                 className="text-xs text-text-secondary hover:text-accent"
               >
-                إعادة فتح
+                {t.card.reopenAction}
               </button>
             )}
           </div>
@@ -286,19 +270,19 @@ export function TasksTab({ onToast, onUnreadChange }: Props) {
               <button
                 type="button"
                 onClick={() => {
-                  setEditTarget(t);
+                  setEditTarget(task);
                   setFormOpen(true);
                 }}
                 className="p-1 rounded hover:bg-bg-main text-text-secondary hover:text-accent"
-                title="تعديل"
+                title={t.card.editTitle}
               >
                 <Pencil className="w-3.5 h-3.5" />
               </button>
               <button
                 type="button"
-                onClick={() => setDeleteTarget(t)}
+                onClick={() => setDeleteTarget(task)}
                 className="p-1 rounded hover:bg-danger-light text-text-secondary hover:text-danger"
-                title="حذف"
+                title={t.card.deleteTitle}
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
@@ -313,7 +297,6 @@ export function TasksTab({ onToast, onUnreadChange }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-1 bg-bg-card border border-border rounded-xl p-1">
           <button
@@ -326,7 +309,7 @@ export function TasksTab({ onToast, onUnreadChange }: Props) {
                 : "text-text-secondary",
             ].join(" ")}
           >
-            لوحة
+            {t.toolbar.board}
           </button>
           <button
             type="button"
@@ -338,7 +321,7 @@ export function TasksTab({ onToast, onUnreadChange }: Props) {
                 : "text-text-secondary",
             ].join(" ")}
           >
-            قائمة
+            {t.toolbar.list}
           </button>
         </div>
         {isManager && (
@@ -349,23 +332,21 @@ export function TasksTab({ onToast, onUnreadChange }: Props) {
             }}
           >
             <Plus className="w-4 h-4 me-1" />
-            مهمة جديدة
+            {t.toolbar.newTask}
           </Button>
         )}
       </div>
 
       {loading ? (
-        <p className="text-sm text-text-secondary text-center py-8">جاري التحميل…</p>
+        <p className="text-sm text-text-secondary text-center py-8">{t.empty.loading}</p>
       ) : tasks.length === 0 ? (
         <div className="bg-white rounded-2xl border border-border py-12 text-center">
           <ListChecks className="w-9 h-9 mx-auto mb-3 text-accent" />
           <p className="text-sm font-medium text-text-primary mb-1">
-            {isManager ? "لا توجد مهام بعد" : "لا توجد مهام موكلة إليك"}
+            {isManager ? t.empty.managerTitle : t.empty.staffTitle}
           </p>
           <p className="text-xs text-text-secondary mb-4 max-w-xs mx-auto">
-            {isManager
-              ? "أنشئ مهام وحدد الموظف المسؤول وموعد التنفيذ. سيرى الموظف إشعاراً فور إسناد المهمة."
-              : "ستظهر هنا أي مهمة يسندها لك المدير."}
+            {isManager ? t.empty.managerHint : t.empty.staffHint}
           </p>
           {isManager && (
             <Button
@@ -376,7 +357,7 @@ export function TasksTab({ onToast, onUnreadChange }: Props) {
               }}
             >
               <Plus className="w-4 h-4 me-1" />
-              إنشاء مهمة
+              {t.empty.createButton}
             </Button>
           )}
         </div>
@@ -395,7 +376,7 @@ export function TasksTab({ onToast, onUnreadChange }: Props) {
                           : "bg-success"
                     }`}
                   />
-                  {STATUS_TITLES[col]}
+                  {t.status[col]}
                 </h3>
                 <span className="text-xs text-text-secondary">
                   {grouped[col].length}
@@ -404,7 +385,7 @@ export function TasksTab({ onToast, onUnreadChange }: Props) {
               <div className="bg-bg-main/40 rounded-2xl p-2 min-h-[140px] space-y-2">
                 {grouped[col].length === 0 ? (
                   <p className="text-xs text-text-secondary text-center py-6">
-                    لا شيء هنا
+                    {t.empty.columnEmpty}
                   </p>
                 ) : (
                   grouped[col].map(renderCard)
@@ -415,9 +396,9 @@ export function TasksTab({ onToast, onUnreadChange }: Props) {
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-border divide-y divide-border">
-          {visibleTasks.map((t) => (
-            <div key={t.id} className="p-3">
-              {renderCard(t)}
+          {visibleTasks.map((task) => (
+            <div key={task.id} className="p-3">
+              {renderCard(task)}
             </div>
           ))}
         </div>
@@ -425,7 +406,7 @@ export function TasksTab({ onToast, onUnreadChange }: Props) {
 
       {openCount > 0 && (
         <p className="text-xs text-text-secondary text-center">
-          {openCount} مهمة مفتوحة
+          {t.openCount.replace("{n}", String(openCount))}
         </p>
       )}
 
@@ -437,7 +418,7 @@ export function TasksTab({ onToast, onUnreadChange }: Props) {
         onSaved={async () => {
           onToast({
             type: "success",
-            message: editTarget ? "تم حفظ التعديلات" : "تم إنشاء المهمة",
+            message: editTarget ? t.toast.edited : t.toast.created,
           });
           await refresh();
           onUnreadChange();
@@ -449,13 +430,13 @@ export function TasksTab({ onToast, onUnreadChange }: Props) {
         isOpen={!!deleteTarget}
         onClose={() => !deleting && setDeleteTarget(null)}
         onConfirm={remove}
-        title="حذف المهمة"
+        title={t.delete.title}
         message={
           deleteTarget
-            ? `هل تريد حذف "${deleteTarget.title}"؟ هذا الإجراء لا يمكن التراجع عنه.`
+            ? t.delete.message.replace("{title}", deleteTarget.title)
             : ""
         }
-        confirmText="حذف"
+        confirmText={t.delete.confirm}
         variant="danger"
         loading={deleting}
       />

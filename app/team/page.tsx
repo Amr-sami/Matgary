@@ -13,17 +13,10 @@ import { Tabs, type TabItem } from "@/components/ui/Tabs";
 import { Toast } from "@/components/ui/Toast";
 import { can } from "@/lib/permissions";
 import { useLeaveUnread } from "@/hooks/useLeaveUnread";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 type ToastState = { type: "success" | "error"; message: string } | null;
 type TabKey = "team" | "attendance" | "payroll" | "leaves" | "settings";
-
-const TAB_DESCRIPTIONS: Record<TabKey, string> = {
-  team: "أضف موظفين، حدّد صلاحياتهم، وأدر بياناتهم وصورهم.",
-  attendance: "تابع تسجيل دخول وخروج الموظفين خلال اليوم.",
-  payroll: "إدارة الرواتب الثابتة، المعدلات الساعية، والاستحقاقات.",
-  leaves: "طلبات الإجازة — تقديم الطلبات والموافقة عليها.",
-  settings: "ساعات العمل، أيام الإجازة، نسبة الأوفر، ومواقع المتجر.",
-};
 
 export default function TeamPage() {
   return (
@@ -36,6 +29,8 @@ export default function TeamPage() {
 function TeamPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const dict = useDictionary();
+  const t = dict.app.team;
   const { data: session } = useSession();
   const principal = session?.user
     ? { role: session.user.role, permissions: session.user.permissions }
@@ -49,13 +44,13 @@ function TeamPageInner() {
   // managers see the full set. Default tab is the first allowed.
   const tabs = useMemo<TabItem<TabKey>[]>(() => {
     const items: TabItem<TabKey>[] = [];
-    if (isManager) items.push({ key: "team", label: "الفريق والصلاحيات" });
-    if (isManager) items.push({ key: "attendance", label: "الحضور" });
-    if (isManager) items.push({ key: "payroll", label: "الرواتب" });
-    if (canSeeLeaves) items.push({ key: "leaves", label: "الإجازات" });
-    if (isManager) items.push({ key: "settings", label: "إعدادات الحضور" });
+    if (isManager) items.push({ key: "team", label: t.tabs.team });
+    if (isManager) items.push({ key: "attendance", label: t.tabs.attendance });
+    if (isManager) items.push({ key: "payroll", label: t.tabs.payroll });
+    if (canSeeLeaves) items.push({ key: "leaves", label: t.tabs.leaves });
+    if (isManager) items.push({ key: "settings", label: t.tabs.settings });
     return items;
-  }, [isManager, canSeeLeaves]);
+  }, [isManager, canSeeLeaves, t.tabs]);
 
   const defaultTab: TabKey = useMemo(
     () => tabs[0]?.key ?? "team",
@@ -64,7 +59,7 @@ function TeamPageInner() {
 
   const requestedTab = (searchParams.get("tab") as TabKey | null) ?? null;
   const initialTab: TabKey =
-    requestedTab && tabs.some((t) => t.key === requestedTab)
+    requestedTab && tabs.some((tab) => tab.key === requestedTab)
       ? requestedTab
       : defaultTab;
 
@@ -74,7 +69,9 @@ function TeamPageInner() {
   useEffect(() => {
     const requested = searchParams.get("tab") as TabKey | null;
     const next =
-      requested && tabs.some((t) => t.key === requested) ? requested : defaultTab;
+      requested && tabs.some((tabItem) => tabItem.key === requested)
+        ? requested
+        : defaultTab;
     if (next !== tab) setTab(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, tabs]);
@@ -88,18 +85,18 @@ function TeamPageInner() {
     router.replace(qs ? `/team?${qs}` : "/team", { scroll: false });
   };
 
-  // Page header label adapts: staff land on leaves and shouldn't see "الفريق".
-  const pageTitle = isManager ? "الفريق" : "الإجازات";
+  const pageTitle = isManager ? t.heading.manager : t.heading.staff;
+  const shellTitle = isManager ? t.pageTitle.manager : t.pageTitle.staff;
 
   return (
-    <AppShell title={isManager ? "الموظفون" : "الإجازات"}>
+    <AppShell title={shellTitle}>
       <div className="max-w-5xl mx-auto space-y-6">
         <header>
           <h1 className="text-2xl font-bold text-text-primary leading-tight">
             {pageTitle}
           </h1>
           <p className="text-sm text-text-secondary mt-0.5">
-            {TAB_DESCRIPTIONS[tab]}
+            {t.tabDescriptions[tab]}
           </p>
         </header>
 

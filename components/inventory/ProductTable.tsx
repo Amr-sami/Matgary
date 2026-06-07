@@ -2,7 +2,8 @@
 
 import type { Product } from "@/lib/types";
 import { ProductTableRow } from "./ProductTableRow";
-import { formatPrice } from "@/lib/utils";
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
+import { formatCurrency } from "@/lib/i18n/format";
 
 interface ProductTableProps {
   products: Product[];
@@ -29,6 +30,9 @@ export function ProductTable({
   onToggleSelect,
   onToggleSelectAll,
 }: ProductTableProps) {
+  const dict = useDictionary();
+  const locale = useLocale();
+  const t = dict.app.inventory.table;
   const totalQty = products.reduce((s, p) => s + p.quantity, 0);
   const totalStockValue = products.reduce(
     (s, p) => s + p.quantity * (p.costPrice || 0),
@@ -58,16 +62,16 @@ export function ProductTable({
                 className="w-4 h-4 accent-accent cursor-pointer"
               />
             </th>
-            <th className="text-start pb-3 px-4 py-3">اسم المنتج</th>
-            <th className="text-start pb-3 px-4 py-3">الصنف</th>
-            <th className="text-start pb-3 px-4 py-3">الجنس</th>
-            <th className="text-start pb-3 px-4 py-3">البراند</th>
-            <th className="text-start pb-3 px-4 py-3">الكمية</th>
-            <th className="text-start pb-3 px-4 py-3">السعر</th>
-            <th className="text-start pb-3 px-4 py-3">هامش الربح</th>
-            <th className="text-start pb-3 px-4 py-3">قيمة المخزن</th>
-            <th className="text-start pb-3 px-4 py-3">آخر تحديث</th>
-            <th className="text-start pb-3 px-4 py-3">الإجراءات</th>
+            <th className="text-start pb-3 px-4 py-3">{t.col.name}</th>
+            <th className="text-start pb-3 px-4 py-3">{t.col.category}</th>
+            <th className="text-start pb-3 px-4 py-3">{t.col.gender}</th>
+            <th className="text-start pb-3 px-4 py-3">{t.col.brand}</th>
+            <th className="text-start pb-3 px-4 py-3">{t.col.quantity}</th>
+            <th className="text-start pb-3 px-4 py-3">{t.col.price}</th>
+            <th className="text-start pb-3 px-4 py-3">{t.col.margin}</th>
+            <th className="text-start pb-3 px-4 py-3">{t.col.stockValue}</th>
+            <th className="text-start pb-3 px-4 py-3">{t.col.updatedAt}</th>
+            <th className="text-start pb-3 px-4 py-3">{t.col.actions}</th>
           </tr>
         </thead>
         <tbody>
@@ -90,14 +94,14 @@ export function ProductTable({
           <tfoot className="bg-gray-50 border-t border-border font-medium text-sm">
             <tr>
               <td className="px-4 py-3" colSpan={5}>
-                الإجمالي ({products.length} منتج)
+                {t.footer.totalLabel.replace("{n}", String(products.length))}
               </td>
               <td className="px-4 py-3">{totalQty}</td>
               <td className="px-4 py-3" colSpan={2}>
-                <span className="text-text-secondary">قيمة البيع: </span>
-                {formatPrice(totalRetailValue)}
+                <span className="text-text-secondary">{t.footer.retailValueLabel}{" "}</span>
+                {formatCurrency(totalRetailValue, locale)}
               </td>
-              <td className="px-4 py-3">{formatPrice(totalStockValue)}</td>
+              <td className="px-4 py-3">{formatCurrency(totalStockValue, locale)}</td>
               <td className="px-4 py-3" colSpan={2} />
             </tr>
           </tfoot>

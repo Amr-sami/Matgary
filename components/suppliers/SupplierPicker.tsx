@@ -5,6 +5,7 @@ import { ChevronDown, Plus, Search, Truck, X } from "@/lib/icons";
 import { useSuppliers } from "@/hooks/useSuppliers";
 import { SupplierFormModal } from "./SupplierFormModal";
 import type { SupplierDescriptor } from "@/lib/types";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 interface Props {
   value: string | null;
@@ -19,7 +20,10 @@ interface Props {
  * the supplier id back. The free-text fallback (legacy `supplier` column) is
  * not exposed here — pick a row, or open the modal to create one.
  */
-export function SupplierPicker({ value, onChange, label = "المورد (اختياري)", canCreate = true }: Props) {
+export function SupplierPicker({ value, onChange, label, canCreate = true }: Props) {
+  const dict = useDictionary();
+  const t = dict.app.suppliers.picker;
+  const effectiveLabel = label ?? t.label;
   const { data: suppliers, refresh } = useSuppliers();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -64,9 +68,9 @@ export function SupplierPicker({ value, onChange, label = "المورد (اخت�
 
   return (
     <div className="w-full" ref={wrapperRef}>
-      {label && (
+      {effectiveLabel && (
         <label className="block text-sm font-medium text-text-secondary mb-1.5">
-          {label}
+          {effectiveLabel}
         </label>
       )}
 
@@ -76,17 +80,17 @@ export function SupplierPicker({ value, onChange, label = "المورد (اخت�
           type="button"
           onClick={() => setOpen((v) => !v)}
           className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg border border-border bg-white text-text-primary focus:outline-none focus:ring-2 focus:ring-accent transition-colors"
-          dir="rtl"
+          dir="auto"
         >
           <Truck className="w-4 h-4 text-text-secondary shrink-0" />
           <span className="flex-1 text-start truncate">
-            {selected ? selected.name : <span className="text-text-secondary">اختر مورد...</span>}
+            {selected ? selected.name : <span className="text-text-secondary">{t.placeholder}</span>}
           </span>
           {selected && (
             <span
               role="button"
               tabIndex={0}
-              aria-label="مسح المورد"
+              aria-label={t.clearAria}
               onClick={(e) => {
                 e.stopPropagation();
                 clear();
@@ -117,18 +121,18 @@ export function SupplierPicker({ value, onChange, label = "المورد (اخت�
               <Search className="w-4 h-4 absolute top-1/2 -translate-y-1/2 end-3 text-text-secondary" />
               <input
                 type="search"
-                dir="rtl"
+                dir="auto"
                 autoFocus
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="بحث بالاسم أو الهاتف"
+                placeholder={t.search}
                 className="w-full ps-3 pe-9 py-2 text-sm bg-white focus:outline-none"
               />
             </div>
             <div className="overflow-y-auto flex-1">
               {filtered.length === 0 ? (
                 <p className="px-3 py-3 text-sm text-text-secondary text-center">
-                  {query ? "لا نتائج" : "لا يوجد موردون بعد"}
+                  {query ? t.noResults : t.empty}
                 </p>
               ) : (
                 filtered.map((s) => (
@@ -141,9 +145,9 @@ export function SupplierPicker({ value, onChange, label = "المورد (اخت�
                     }`}
                   >
                     <Truck className="w-4 h-4 shrink-0" />
-                    <span className="flex-1 truncate text-sm">{s.name}</span>
+                    <span className="flex-1 truncate text-sm" dir="auto">{s.name}</span>
                     {s.phone && (
-                      <span className="text-xs text-text-secondary truncate">{s.phone}</span>
+                      <span className="text-xs text-text-secondary truncate" dir="ltr">{s.phone}</span>
                     )}
                   </button>
                 ))
@@ -159,7 +163,7 @@ export function SupplierPicker({ value, onChange, label = "المورد (اخت�
                 className="border-t border-border px-3 py-2.5 text-sm text-accent font-medium hover:bg-accent-light flex items-center gap-2"
               >
                 <Plus className="w-4 h-4" />
-                إضافة مورد جديد
+                {t.addNew}
               </button>
             )}
           </div>

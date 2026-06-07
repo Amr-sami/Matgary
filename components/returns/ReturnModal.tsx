@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { Select } from "../ui/Select";
 import { recordReturn } from "@/lib/api/returns";
 import type { Sale } from "@/lib/types";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 interface ReturnModalProps {
   isOpen: boolean;
@@ -15,25 +16,34 @@ interface ReturnModalProps {
   onSuccess: () => void;
 }
 
-const RETURN_REASONS = [
-  { value: "defect", label: "عيب في المنتج" },
-  { value: "not_liked", label: "المنتج لم يعجب العميل" },
-  { value: "wrong_size", label: "حجم غير مناسب" },
-  { value: "other", label: "أخرى" },
-];
+type ReturnReasonKey = "defect" | "not_liked" | "wrong_size" | "other";
 
 export function ReturnModal({ isOpen, onClose, sale, onSuccess }: ReturnModalProps) {
+  const dict = useDictionary();
+  const t = dict.app.sales.returnModal;
   const [loading, setLoading] = useState(false);
   const [quantity, setQuantity] = useState(1);
-  const [reason, setReason] = useState("");
+  const [reason, setReason] = useState<ReturnReasonKey | "">("");
   const [otherReason, setOtherReason] = useState("");
+
+  const reasonOptions = useMemo(
+    () => [
+      { value: "defect", label: t.reasons.defect },
+      { value: "not_liked", label: t.reasons.not_liked },
+      { value: "wrong_size", label: t.reasons.wrong_size },
+      { value: "other", label: t.reasons.other },
+    ],
+    [t.reasons],
+  );
 
   const handleReturn = async () => {
     if (!sale || quantity < 1 || !reason) return;
     setLoading(true);
     try {
       const returnReason =
-        reason === "other" ? otherReason : RETURN_REASONS.find((r) => r.value === reason)?.label || "";
+        reason === "other"
+          ? otherReason
+          : t.reasons[reason as ReturnReasonKey] || "";
       await recordReturn(sale.id, sale.productId, quantity, returnReason);
       onSuccess();
       onClose();
@@ -50,15 +60,17 @@ export function ReturnModal({ isOpen, onClose, sale, onSuccess }: ReturnModalPro
   if (!sale) return null;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="تسجيل مرتجع">
+    <Modal isOpen={isOpen} onClose={onClose} title={t.title}>
       <div className="space-y-4">
         <div className="p-4 bg-gray-50 rounded-lg">
-          <p className="font-medium">{sale.productName}</p>
-          <p className="text-sm text-text-secondary">المباع: {sale.quantitySold} قطعة</p>
+          <p className="font-medium" dir="auto">{sale.productName}</p>
+          <p className="text-sm text-text-secondary">
+            {t.sold.replace("{n}", String(sale.quantitySold))}
+          </p>
         </div>
 
         <Input
-          label="الكمية المرتجعة"
+          label={t.quantity}
           type="number"
           value={quantity}
           onChange={(e) => setQuantity(Number(e.target.value))}
@@ -66,31 +78,31 @@ export function ReturnModal({ isOpen, onClose, sale, onSuccess }: ReturnModalPro
           max={sale.quantitySold}
           error={
             quantity > sale.quantitySold
-              ? `الحد الأقصى: ${sale.quantitySold}`
+              ? t.maxQuantity.replace("{n}", String(sale.quantitySold))
               : undefined
           }
         />
 
         <Select
-          label="سبب الإرجاع"
-          options={RETURN_REASONS}
+          label={t.reasonLabel}
+          options={reasonOptions}
           value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          placeholder="اختر السبب..."
+          onChange={(e) => setReason(e.target.value as ReturnReasonKey | "")}
+          placeholder={t.reasonPlaceholder}
         />
 
         {reason === "other" && (
           <Input
-            label="اكتب السبب"
+            label={t.otherLabel}
             value={otherReason}
             onChange={(e) => setOtherReason(e.target.value)}
-            placeholder="سبب الإرجاع..."
+            placeholder={t.otherPlaceholder}
           />
         )}
 
         <div className="flex gap-3 pt-4">
           <Button variant="ghost" onClick={onClose} className="flex-1">
-            إلغاء
+            {dict.app.common.cancel}
           </Button>
           <Button
             onClick={handleReturn}
@@ -98,7 +110,7 @@ export function ReturnModal({ isOpen, onClose, sale, onSuccess }: ReturnModalPro
             loading={loading}
             className="flex-1"
           >
-            تأكيد الإرجاع
+            {t.confirm}
           </Button>
         </div>
       </div>

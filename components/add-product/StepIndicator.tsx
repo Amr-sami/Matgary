@@ -2,6 +2,7 @@
 
 import { Check } from "@/lib/icons";
 import { cn } from "@/lib/utils";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 interface StepIndicatorProps {
   currentStep: number;
@@ -9,22 +10,24 @@ interface StepIndicatorProps {
   skipStep2?: boolean;
 }
 
-const STEPS = [
-  { num: 1, label: "الصنف", helper: "اختر القسم" },
-  { num: 2, label: "الخصائص", helper: "حدِّد التفاصيل" },
-  { num: 3, label: "التفاصيل", helper: "السعر والكمية" },
-] as const;
-
 // Modern segmented progress bar. Each step gets a numbered pill (or check),
 // label + helper line, and a connector that fills as you progress. Helper
 // text drops on mobile so the row stays in one line.
 export function StepIndicator({ currentStep, skipStep2 }: StepIndicatorProps) {
+  const dict = useDictionary();
+  const t = dict.app.inventory.addProduct.indicator;
+  const steps = [
+    { num: 1, ...t.steps.category },
+    { num: 2, ...t.steps.attributes },
+    { num: 3, ...t.steps.details },
+  ];
+
   return (
     <ol
       className="flex items-stretch gap-2 sm:gap-3 w-full"
-      aria-label="مراحل إضافة المنتج"
+      aria-label={t.ariaLabel}
     >
-      {STEPS.map((step) => {
+      {steps.map((step) => {
         const isCompleted = step.num < currentStep;
         const isActive = step.num === currentStep;
         const isMuted = step.num > currentStep || (skipStep2 && step.num === 2);

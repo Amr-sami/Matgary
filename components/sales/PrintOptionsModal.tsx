@@ -8,6 +8,7 @@ import { Input } from "../ui/Input";
 import { Receipt } from "./Receipt";
 import { InvoiceReceipt } from "./InvoiceReceipt";
 import type { ReceiptSaleData, ReceiptInvoiceData } from "./SaleForm";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 type PaperPreset = "auto_one" | "xp330b_80" | "thermal_58" | "a4" | "letter" | "custom";
 type Orientation = "portrait" | "landscape";
@@ -25,34 +26,16 @@ interface PrintOptions {
   fitToPage: boolean;
 }
 
-const PAPER_SIZES: Record<
+const PAPER_SPECS: Record<
   PaperPreset,
-  { label: string; widthMm: number; heightMm: number | "auto"; thermal: boolean; useDriverPaper: boolean }
+  { widthMm: number; heightMm: number | "auto"; thermal: boolean; useDriverPaper: boolean }
 > = {
-  auto_one: {
-    label: "تلقائي · نسخة واحدة لكل ورقة (موصى به)",
-    widthMm: 80,
-    heightMm: "auto",
-    thermal: false,
-    useDriverPaper: true,
-  },
-  xp330b_80: {
-    label: "XP-330B حراري 80mm",
-    widthMm: 80,
-    heightMm: "auto",
-    thermal: true,
-    useDriverPaper: false,
-  },
-  thermal_58: {
-    label: "حراري 58mm",
-    widthMm: 58,
-    heightMm: "auto",
-    thermal: true,
-    useDriverPaper: false,
-  },
-  a4: { label: "A4 (210 × 297mm)", widthMm: 210, heightMm: 297, thermal: false, useDriverPaper: false },
-  letter: { label: "Letter (216 × 279mm)", widthMm: 216, heightMm: 279, thermal: false, useDriverPaper: false },
-  custom: { label: "مخصص", widthMm: 80, heightMm: "auto", thermal: true, useDriverPaper: false },
+  auto_one: { widthMm: 80, heightMm: "auto", thermal: false, useDriverPaper: true },
+  xp330b_80: { widthMm: 80, heightMm: "auto", thermal: true, useDriverPaper: false },
+  thermal_58: { widthMm: 58, heightMm: "auto", thermal: true, useDriverPaper: false },
+  a4: { widthMm: 210, heightMm: 297, thermal: false, useDriverPaper: false },
+  letter: { widthMm: 216, heightMm: 279, thermal: false, useDriverPaper: false },
+  custom: { widthMm: 80, heightMm: "auto", thermal: true, useDriverPaper: false },
 };
 
 const MARGIN_MM: Record<MarginPreset, number> = {
@@ -81,7 +64,10 @@ interface PrintOptionsModalProps {
   onConfirm: () => void;
 }
 
-function buildPrintStyle(opts: PrintOptions, preset: typeof PAPER_SIZES[PaperPreset]): string {
+function buildPrintStyle(
+  opts: PrintOptions,
+  preset: typeof PAPER_SPECS[PaperPreset],
+): string {
   const { widthMm, heightMm, orientation, margin, scale, pagesPerSheet, fitToPage } = opts;
   const mm = MARGIN_MM[margin];
   const contentWidth = Math.max(widthMm - mm * 2, 20);
@@ -107,8 +93,6 @@ function buildPrintStyle(opts: PrintOptions, preset: typeof PAPER_SIZES[PaperPre
 
   // fitToPage stretches the receipt vertically to fill the page so there is no
   // blank space between the bottom of the receipt and the bottom of the paper.
-  // Implemented via flex column on the wrapper + flex-grow on a spacer-less
-  // receipt container. We use min-height: 100vh on the container.
   const fitRules = fitToPage && pagesPerSheet === 1
     ? `
       .print-receipt-container > * {
@@ -147,17 +131,19 @@ function buildPrintStyle(opts: PrintOptions, preset: typeof PAPER_SIZES[PaperPre
 }
 
 export function PrintOptionsModal({ isOpen, onClose, receiptData, invoiceData, onConfirm }: PrintOptionsModalProps) {
+  const dict = useDictionary();
+  const t = dict.app.sales.print;
   const useInvoice = !!invoiceData;
   const [opts, setOpts] = useState<PrintOptions>(DEFAULT_OPTS);
 
-  const selectedPaper = PAPER_SIZES[opts.paper];
+  const selectedPaper = PAPER_SPECS[opts.paper];
 
   useEffect(() => {
     if (isOpen) setOpts(DEFAULT_OPTS);
   }, [isOpen]);
 
   const handlePaperChange = (paper: PaperPreset) => {
-    const preset = PAPER_SIZES[paper];
+    const preset = PAPER_SPECS[paper];
     setOpts((o) => ({
       ...o,
       paper,
@@ -198,25 +184,25 @@ export function PrintOptionsModal({ isOpen, onClose, receiptData, invoiceData, o
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="خيارات الطباعة" className="max-w-3xl">
+    <Modal isOpen={isOpen} onClose={onClose} title={t.title} className="max-w-3xl">
       <div className="grid lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Options Column */}
         <div className="space-y-4 order-2 lg:order-1">
           <div>
-            <label className="block text-sm font-medium mb-2">مقاس الورق</label>
+            <label className="block text-sm font-medium mb-2">{t.paperLabel}</label>
             <div className="grid grid-cols-1 gap-2">
-              {(Object.keys(PAPER_SIZES) as PaperPreset[]).map((key) => (
+              {(Object.keys(PAPER_SPECS) as PaperPreset[]).map((key) => (
                 <button
                   key={key}
                   type="button"
                   onClick={() => handlePaperChange(key)}
-                  className={`text-right px-3 py-2 rounded-lg border text-sm transition-colors ${
+                  className={`text-start px-3 py-2 rounded-lg border text-sm transition-colors ${
                     opts.paper === key
                       ? "bg-accent text-white border-accent"
                       : "bg-white border-border hover:bg-accent-light"
                   }`}
                 >
-                  {PAPER_SIZES[key].label}
+                  {t.paper[key]}
                 </button>
               ))}
             </div>
@@ -225,7 +211,7 @@ export function PrintOptionsModal({ isOpen, onClose, receiptData, invoiceData, o
           {opts.paper === "custom" && (
             <div className="grid grid-cols-2 gap-3">
               <Input
-                label="العرض (mm)"
+                label={t.customWidth}
                 type="number"
                 min={20}
                 max={420}
@@ -233,7 +219,7 @@ export function PrintOptionsModal({ isOpen, onClose, receiptData, invoiceData, o
                 onChange={(e) => setOpts((o) => ({ ...o, widthMm: Number(e.target.value) }))}
               />
               <Input
-                label="الارتفاع (mm، 0 = تلقائي)"
+                label={t.customHeight}
                 type="number"
                 min={0}
                 max={1000}
@@ -247,7 +233,7 @@ export function PrintOptionsModal({ isOpen, onClose, receiptData, invoiceData, o
           )}
 
           <div>
-            <label className="block text-sm font-medium mb-2">الاتجاه</label>
+            <label className="block text-sm font-medium mb-2">{t.orientationLabel}</label>
             <div className="flex rounded-lg overflow-hidden border border-border">
               {(["portrait", "landscape"] as Orientation[]).map((o) => (
                 <button
@@ -259,14 +245,14 @@ export function PrintOptionsModal({ isOpen, onClose, receiptData, invoiceData, o
                     opts.orientation === o ? "bg-accent text-white" : "bg-white text-text-secondary"
                   }`}
                 >
-                  {o === "portrait" ? "طولي" : "عرضي"}
+                  {t.orientation[o]}
                 </button>
               ))}
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">الهوامش</label>
+            <label className="block text-sm font-medium mb-2">{t.marginsLabel}</label>
             <div className="flex rounded-lg overflow-hidden border border-border">
               {(["none", "narrow", "normal"] as MarginPreset[]).map((m) => (
                 <button
@@ -277,7 +263,7 @@ export function PrintOptionsModal({ isOpen, onClose, receiptData, invoiceData, o
                     opts.margin === m ? "bg-accent text-white" : "bg-white text-text-secondary"
                   }`}
                 >
-                  {m === "none" ? "بدون" : m === "narrow" ? "ضيق" : "عادي"}
+                  {t.margins[m]}
                 </button>
               ))}
             </div>
@@ -285,7 +271,7 @@ export function PrintOptionsModal({ isOpen, onClose, receiptData, invoiceData, o
 
           <div>
             <label className="block text-sm font-medium mb-2">
-              الحجم (Scale): {opts.scale}%
+              {t.scaleLabel.replace("{pct}", String(opts.scale))}
             </label>
             <input
               type="range"
@@ -299,7 +285,7 @@ export function PrintOptionsModal({ isOpen, onClose, receiptData, invoiceData, o
           </div>
 
           <Input
-            label="عدد النسخ"
+            label={t.copies}
             type="number"
             min={1}
             max={10}
@@ -311,7 +297,7 @@ export function PrintOptionsModal({ isOpen, onClose, receiptData, invoiceData, o
 
           {!selectedPaper.thermal && !selectedPaper.useDriverPaper && (
             <div>
-              <label className="block text-sm font-medium mb-2">صفحات في الورقة</label>
+              <label className="block text-sm font-medium mb-2">{t.pagesPerSheetLabel}</label>
               <div className="flex rounded-lg overflow-hidden border border-border">
                 {([1, 2, 4] as const).map((n) => (
                   <button
@@ -332,9 +318,9 @@ export function PrintOptionsModal({ isOpen, onClose, receiptData, invoiceData, o
           {opts.pagesPerSheet === 1 && (
             <label className="flex items-center justify-between gap-3 p-3 rounded-lg border border-border bg-white cursor-pointer">
               <div>
-                <p className="text-sm font-medium">ملء الصفحة (بدون فراغ أسفل الفاتورة)</p>
+                <p className="text-sm font-medium">{t.fitToPageLabel}</p>
                 <p className="text-xs text-text-secondary mt-0.5">
-                  يمد الفاتورة لتغطي ارتفاع الورقة كاملاً.
+                  {t.fitToPageHint}
                 </p>
               </div>
               <input
@@ -347,15 +333,13 @@ export function PrintOptionsModal({ isOpen, onClose, receiptData, invoiceData, o
           )}
 
           <p className="text-xs text-text-secondary bg-accent-light p-2 rounded leading-relaxed">
-            <strong>منع تكرار الفاتورة 4 مرات:</strong> اختر &quot;تلقائي · نسخة واحدة لكل ورقة&quot;
-            (الافتراضي). هذا الخيار يستخدم مقاس الورق الفعلي للطابعة فيطبع نسخة واحدة فقط في الورقة.
-            استخدم XP-330B فقط مع الطابعة الحرارية.
+            <strong>{t.tipBold}</strong> {t.tipBody}
           </p>
         </div>
 
         {/* Preview Column */}
         <div className="space-y-2 order-1 lg:order-2">
-          <label className="block text-sm font-medium">معاينة</label>
+          <label className="block text-sm font-medium">{t.preview}</label>
           <div className="border border-border rounded-lg bg-bg-main p-2 sm:p-4 max-h-[40vh] lg:max-h-[60vh] overflow-auto flex justify-center">
             <div
               className="receipt-preview w-full max-w-[272px]"
@@ -369,7 +353,7 @@ export function PrintOptionsModal({ isOpen, onClose, receiptData, invoiceData, o
               ) : receiptData ? (
                 <Receipt sale={receiptData} />
               ) : (
-                <p className="text-center text-text-secondary text-sm p-8">لا توجد بيانات</p>
+                <p className="text-center text-text-secondary text-sm p-8">{t.noData}</p>
               )}
             </div>
           </div>
@@ -379,11 +363,11 @@ export function PrintOptionsModal({ isOpen, onClose, receiptData, invoiceData, o
       {/* Footer */}
       <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 sm:gap-3 mt-6 pt-4 border-t border-border">
         <Button variant="ghost" onClick={onClose} className="w-full sm:w-auto">
-          إلغاء
+          {dict.app.common.cancel}
         </Button>
         <Button onClick={handlePrint} disabled={!receiptData && !invoiceData} className="flex items-center justify-center gap-2 w-full sm:w-auto">
           <Printer className="w-4 h-4" />
-          طباعة ({opts.copies}× نسخة)
+          {t.printAction.replace("{n}", String(opts.copies))}
         </Button>
       </div>
 

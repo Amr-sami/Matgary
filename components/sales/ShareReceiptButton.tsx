@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Share2, Copy, MessageCircle, Check } from "@/lib/icons";
 import type { Sale } from "@/lib/types";
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
+import { formatCurrency } from "@/lib/i18n/format";
 
 interface ShareReceiptButtonProps {
   sale: Sale;
@@ -10,13 +12,20 @@ interface ShareReceiptButtonProps {
 }
 
 export function ShareReceiptButton({ sale, variant = "icon" }: ShareReceiptButtonProps) {
+  const dict = useDictionary();
+  const locale = useLocale();
+  const t = dict.app.sales.share;
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
   // Receipts are PDF-only in v1 — no public web URL to share. The button
   // now copies a short text summary (no link) and offers to open WhatsApp
   // with the same text. PDF attachment goes via the dedicated WhatsApp flow.
-  const message = `${sale.productName}${sale.brand ? ` — ${sale.brand}` : ""}\nالإجمالي: ${sale.totalPrice} ج.م`;
+  const totalLine = t.messageTotal.replace(
+    "{amount}",
+    formatCurrency(sale.totalPrice, locale),
+  );
+  const message = `${sale.productName}${sale.brand ? ` — ${sale.brand}` : ""}\n${totalLine}`;
 
   const handleCopy = async () => {
     try {
@@ -50,10 +59,10 @@ export function ShareReceiptButton({ sale, variant = "icon" }: ShareReceiptButto
             ? "p-1.5 bg-gray-100 text-text-secondary rounded-lg hover:bg-accent hover:text-white"
             : "flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-gray-100 text-text-secondary rounded-xl hover:bg-gray-200 text-sm"
         }
-        title="مشاركة"
+        title={t.title}
       >
         <Share2 className="w-4 h-4" />
-        {variant === "row" && <span>مشاركة</span>}
+        {variant === "row" && <span>{t.title}</span>}
       </button>
       {open && (
         <>
@@ -67,16 +76,16 @@ export function ShareReceiptButton({ sale, variant = "icon" }: ShareReceiptButto
               className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50"
             >
               {copied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
-              {copied ? "تم النسخ" : "نسخ النص"}
+              {copied ? t.copied : t.copy}
             </button>
             <button
               onClick={handleWhatsApp}
               className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 border-t border-border"
             >
               <MessageCircle className="w-4 h-4 text-success" />
-              واتساب
+              {t.whatsapp}
               {sale.customerPhone && (
-                <span className="text-xs text-text-secondary">→ {sale.customerPhone}</span>
+                <span className="text-xs text-text-secondary" dir="ltr">→ {sale.customerPhone}</span>
               )}
             </button>
           </div>

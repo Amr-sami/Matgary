@@ -9,11 +9,11 @@ import { PasswordInput } from "../ui/PasswordInput";
 import { PhotoUploadZone } from "./PhotoUploadZone";
 import {
   DEFAULT_STAFF_PERMISSIONS,
-  PERMISSION_GROUPS,
-  PERMISSION_LABELS,
   type Permission,
 } from "@/lib/permissions";
 import { useBranches } from "@/hooks/useBranches";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
+import { usePermissionCopy } from "@/components/i18n/usePermissionCopy";
 
 export interface EmployeeFormMember {
   userId: string;
@@ -49,6 +49,9 @@ interface PendingPhoto {
 const sectionTitle = "text-xs font-semibold uppercase tracking-wide text-text-secondary mb-3";
 
 export function EmployeeFormModal({ isOpen, member, slug, onClose, onSaved, onToast }: Props) {
+  const dict = useDictionary();
+  const t = dict.app.employeeForm;
+  const permissionCopy = usePermissionCopy();
   const isEdit = !!member;
 
   // Field state
@@ -59,12 +62,9 @@ export function EmployeeFormModal({ isOpen, member, slug, onClose, onSaved, onTo
   const [nationalId, setNationalId] = useState("");
   const [address, setAddress] = useState("");
   const [perms, setPerms] = useState<Permission[]>(DEFAULT_STAFF_PERMISSIONS);
-  // Multi-store: each staff member is locked to ONE branch. The picker is
-  // hidden when the tenant has only one branch (nothing to choose).
   const [branchId, setBranchId] = useState<string>("");
   const { branches } = useBranches();
 
-  // Photo state — saved path on server vs. just-picked local file
   const [profilePath, setProfilePath] = useState<string | null>(null);
   const [profilePending, setProfilePending] = useState<PendingPhoto | null>(null);
   const [idPath, setIdPath] = useState<string | null>(null);
@@ -74,7 +74,6 @@ export function EmployeeFormModal({ isOpen, member, slug, onClose, onSaved, onTo
 
   const [submitting, setSubmitting] = useState(false);
 
-  // Hydrate when opening / switching member
   useEffect(() => {
     if (!isOpen) return;
     if (member) {
@@ -96,8 +95,6 @@ export function EmployeeFormModal({ isOpen, member, slug, onClose, onSaved, onTo
       setNationalId("");
       setAddress("");
       setPerms(DEFAULT_STAFF_PERMISSIONS);
-      // Default a new staff member to the active branch (whichever the
-      // owner is currently on) so the most common case is one click.
       const primary = branches.find((b) => b.isPrimary)?.id;
       setBranchId(primary ?? branches[0]?.id ?? "");
       setProfilePath(null);
@@ -107,7 +104,6 @@ export function EmployeeFormModal({ isOpen, member, slug, onClose, onSaved, onTo
     setIdPending(null);
   }, [isOpen, member, branches]);
 
-  // Revoke preview blob URLs on unmount/replacement so we don't leak.
   useEffect(() => {
     return () => {
       if (profilePending) URL.revokeObjectURL(profilePending.previewUrl);
@@ -144,7 +140,6 @@ export function EmployeeFormModal({ isOpen, member, slug, onClose, onSaved, onTo
     }
   };
 
-  /** Upload a pending file, return its server path (or null on failure). */
   const uploadPending = async (
     file: File,
     setUploading: (v: boolean) => void,
@@ -156,7 +151,7 @@ export function EmployeeFormModal({ isOpen, member, slug, onClose, onSaved, onTo
       const res = await fetch("/api/uploads/team", { method: "POST", body: fd });
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
-        onToast({ type: "error", message: json.error || "تعذر رفع الصورة" });
+        onToast({ type: "error", message: json.error || t.errors.uploadFailed });
         return null;
       }
       const json = await res.json();
@@ -167,23 +162,21 @@ export function EmployeeFormModal({ isOpen, member, slug, onClose, onSaved, onTo
   };
 
   const submit = async () => {
-    // Required fields per spec.
     if (!displayName.trim()) {
-      onToast({ type: "error", message: "اسم الموظف مطلوب" });
+      onToast({ type: "error", message: t.errors.nameRequired });
       return;
     }
     if (!isEdit && (!username.trim() || password.length < 8)) {
-      onToast({ type: "error", message: "اسم المستخدم وكلمة سر ٨ أحرف على الأقل" });
+      onToast({ type: "error", message: t.errors.credentialsRequired });
       return;
     }
     if (!phone.trim() || !nationalId.trim() || !address.trim()) {
-      onToast({ type: "error", message: "رقم الهاتف والرقم القومي والعنوان مطلوبون" });
+      onToast({ type: "error", message: t.errors.identityRequired });
       return;
     }
 
     setSubmitting(true);
     try {
-      // Resolve photo paths: upload anything pending first.
       let resolvedProfile = profilePath;
       let resolvedId = idPath;
 
@@ -221,7 +214,7 @@ export function EmployeeFormModal({ isOpen, member, slug, onClose, onSaved, onTo
         });
         if (!res.ok) {
           const json = await res.json().catch(() => ({}));
-          onToast({ type: "error", message: json.error || "تعذر الحفظ" });
+          onToast({ type: "error", message: json.error || t.errors.saveFailed });
           return;
         }
         await onSaved();
@@ -245,7 +238,7 @@ export function EmployeeFormModal({ isOpen, member, slug, onClose, onSaved, onTo
         });
         if (!res.ok) {
           const json = await res.json().catch(() => ({}));
-          onToast({ type: "error", message: json.error || "تعذر الإضافة" });
+          onToast({ type: "error", message: json.error || t.errors.addFailed });
           return;
         }
         const json = await res.json();
@@ -261,17 +254,17 @@ export function EmployeeFormModal({ isOpen, member, slug, onClose, onSaved, onTo
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={isEdit ? "تعديل بيانات الموظف" : "إضافة موظف جديد"}
+      title={isEdit ? t.editTitle : t.createTitle}
       className="max-w-2xl"
     >
       <div className="space-y-6">
         {/* Section 1: Basic info */}
         <section>
-          <h3 className={sectionTitle}>بيانات الموظف</h3>
+          <h3 className={sectionTitle}>{t.basicSection}</h3>
           <div className="grid md:grid-cols-2 gap-3">
             <Input
-              label="الاسم *"
-              placeholder="أحمد محمد"
+              label={t.nameLabel}
+              placeholder={t.namePlaceholder}
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
             />
@@ -279,13 +272,13 @@ export function EmployeeFormModal({ isOpen, member, slug, onClose, onSaved, onTo
             {!isEdit ? (
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1.5">
-                  اسم المستخدم *
+                  {t.usernameLabel}
                 </label>
                 <div className="flex items-center gap-1 bg-white border border-border rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-accent">
                   <input
                     type="text"
                     dir="ltr"
-                    placeholder="ahmed"
+                    placeholder={t.usernamePlaceholder}
                     value={username}
                     onChange={(e) =>
                       setUsername(
@@ -301,7 +294,7 @@ export function EmployeeFormModal({ isOpen, member, slug, onClose, onSaved, onTo
               </div>
             ) : (
               <Input
-                label="اسم المستخدم"
+                label={t.usernameLabelDisabled}
                 value={`${username}@${slug}`}
                 disabled
                 dir="ltr"
@@ -312,8 +305,8 @@ export function EmployeeFormModal({ isOpen, member, slug, onClose, onSaved, onTo
           {!isEdit && (
             <div className="mt-3">
               <PasswordInput
-                label="كلمة السر المؤقتة *"
-                placeholder="٨ أحرف على الأقل — يغيّرها الموظف عند أول دخول"
+                label={t.passwordLabel}
+                placeholder={t.passwordPlaceholder}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
@@ -323,18 +316,18 @@ export function EmployeeFormModal({ isOpen, member, slug, onClose, onSaved, onTo
 
         {/* Section 2: Identity */}
         <section className="pt-4 border-t border-border">
-          <h3 className={sectionTitle}>الهوية وبيانات الاتصال</h3>
+          <h3 className={sectionTitle}>{t.identitySection}</h3>
           <div className="grid md:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-1.5">
                 <Phone className="w-3.5 h-3.5 inline-block me-1" />
-                رقم الهاتف *
+                {t.phoneLabel}
               </label>
               <input
                 type="tel"
                 dir="ltr"
                 inputMode="tel"
-                placeholder="01012345678"
+                placeholder={t.phonePlaceholder}
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 className="w-full px-4 py-2.5 rounded-lg border border-border bg-white text-text-primary focus:outline-none focus:ring-2 focus:ring-accent text-sm"
@@ -343,13 +336,13 @@ export function EmployeeFormModal({ isOpen, member, slug, onClose, onSaved, onTo
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-1.5">
                 <IdentificationCard className="w-3.5 h-3.5 inline-block me-1" />
-                الرقم القومي *
+                {t.nationalIdLabel}
               </label>
               <input
                 type="text"
                 dir="ltr"
                 inputMode="numeric"
-                placeholder="14 رقم"
+                placeholder={t.nationalIdPlaceholder}
                 value={nationalId}
                 onChange={(e) =>
                   setNationalId(e.target.value.replace(/[^0-9]/g, "").slice(0, 14))
@@ -361,12 +354,12 @@ export function EmployeeFormModal({ isOpen, member, slug, onClose, onSaved, onTo
           <div className="mt-3">
             <label className="block text-sm font-medium text-text-secondary mb-1.5">
               <MapPin className="w-3.5 h-3.5 inline-block me-1" />
-              العنوان *
+              {t.addressLabel}
             </label>
             <textarea
-              dir="rtl"
+              dir="auto"
               rows={2}
-              placeholder="المدينة، الشارع، رقم العقار"
+              placeholder={t.addressPlaceholder}
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               className="w-full px-4 py-2.5 rounded-lg border border-border bg-white text-text-primary focus:outline-none focus:ring-2 focus:ring-accent text-sm resize-none"
@@ -376,10 +369,10 @@ export function EmployeeFormModal({ isOpen, member, slug, onClose, onSaved, onTo
 
         {/* Section 3: Photos */}
         <section className="pt-4 border-t border-border">
-          <h3 className={sectionTitle}>الصور (اختياري)</h3>
+          <h3 className={sectionTitle}>{t.photosSection}</h3>
           <div className="grid grid-cols-2 gap-4">
             <PhotoUploadZone
-              label="الصورة الشخصية"
+              label={t.profilePhotoLabel}
               shape="circle"
               path={profilePath}
               previewUrl={profilePending?.previewUrl}
@@ -388,7 +381,7 @@ export function EmployeeFormModal({ isOpen, member, slug, onClose, onSaved, onTo
               onClear={() => clearPhoto("profile")}
             />
             <PhotoUploadZone
-              label="صورة بطاقة الرقم القومي"
+              label={t.idPhotoLabel}
               shape="card"
               path={idPath}
               previewUrl={idPending?.previewUrl}
@@ -399,17 +392,15 @@ export function EmployeeFormModal({ isOpen, member, slug, onClose, onSaved, onTo
           </div>
         </section>
 
-        {/* Section 3.5: Branch — multi-store: each staff member is locked
-            to exactly one branch (when they sign in they only see that
-            branch's data). Hidden for single-store tenants. */}
+        {/* Section 3.5: Branch */}
         {branches.length > 1 && (
           <section className="pt-4 border-t border-border">
             <h3 className={sectionTitle}>
               <Store className="w-3.5 h-3.5 inline-block me-1" />
-              الفرع
+              {t.branchSection}
             </h3>
             <p className="text-xs text-text-secondary mb-2">
-              اختر الفرع الذي يعمل به الموظف. عند تسجيل الدخول لن يرى سوى بيانات هذا الفرع.
+              {t.branchHint}
             </p>
             <select
               value={branchId}
@@ -417,14 +408,14 @@ export function EmployeeFormModal({ isOpen, member, slug, onClose, onSaved, onTo
               className="w-full px-3 py-2 rounded-lg border border-border bg-white text-sm focus:outline-none focus:border-accent"
             >
               <option value="" disabled>
-                اختر فرعاً…
+                {t.branchPlaceholder}
               </option>
               {branches
                 .filter((b) => b.isActive)
                 .map((b) => (
                   <option key={b.id} value={b.id}>
                     {b.name}
-                    {b.isPrimary ? " (الرئيسي)" : ""}
+                    {b.isPrimary ? t.branchPrimarySuffix : ""}
                   </option>
                 ))}
             </select>
@@ -435,10 +426,10 @@ export function EmployeeFormModal({ isOpen, member, slug, onClose, onSaved, onTo
         <section className="pt-4 border-t border-border">
           <h3 className={sectionTitle}>
             <ShieldCheck className="w-3.5 h-3.5 inline-block me-1" />
-            الصلاحيات
+            {t.permissionsSection}
           </h3>
           <div className="space-y-3">
-            {PERMISSION_GROUPS.map((group) => (
+            {permissionCopy.groups.map((group) => (
               <div key={group.title}>
                 <p className="text-xs text-text-secondary mb-1.5">{group.title}</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
@@ -453,7 +444,7 @@ export function EmployeeFormModal({ isOpen, member, slug, onClose, onSaved, onTo
                         checked={perms.includes(p)}
                         onChange={() => togglePerm(p)}
                       />
-                      <span>{PERMISSION_LABELS[p]}</span>
+                      <span>{permissionCopy.labels[p]}</span>
                     </label>
                   ))}
                 </div>
@@ -465,18 +456,18 @@ export function EmployeeFormModal({ isOpen, member, slug, onClose, onSaved, onTo
         {/* Footer */}
         <div className="flex gap-2 justify-end pt-4 border-t border-border">
           <Button variant="secondary" onClick={onClose} disabled={submitting}>
-            إلغاء
+            {t.cancel}
           </Button>
           <Button onClick={submit} loading={submitting}>
             {isEdit ? (
               <>
                 <Save className="w-4 h-4 me-1" />
-                حفظ التعديلات
+                {t.saveChanges}
               </>
             ) : (
               <>
                 <Plus className="w-4 h-4 me-1" />
-                إضافة موظف
+                {t.addEmployee}
               </>
             )}
           </Button>

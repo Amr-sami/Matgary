@@ -19,11 +19,9 @@ import { Button } from "../ui/Button";
 import { PasswordInput } from "../ui/PasswordInput";
 import { Modal } from "../ui/Modal";
 import { EmployeeFormModal } from "./EmployeeFormModal";
-import {
-  PERMISSION_GROUPS,
-  PERMISSION_LABELS,
-  type Permission,
-} from "@/lib/permissions";
+import { type Permission } from "@/lib/permissions";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
+import { usePermissionCopy } from "@/components/i18n/usePermissionCopy";
 
 type Toast = { type: "success" | "error"; message: string };
 
@@ -49,15 +47,16 @@ interface Props {
 }
 
 export function TeamEditor({ onToast }: Props) {
+  const dict = useDictionary();
+  const t = dict.app.teamAdmin;
   const { data: session, update: refreshSession } = useSession();
-  const slug = session?.user?.tenantSlug ?? "متجرك";
+  const slug = session?.user?.tenantSlug ?? t.fallbackSlug;
   const isOwner = session?.user?.role === "owner";
 
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  // Modals
   const [employeeModalOpen, setEmployeeModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Member | null>(null);
   const [credModal, setCredModal] = useState<{ login: string; password: string } | null>(null);
@@ -65,7 +64,9 @@ export function TeamEditor({ onToast }: Props) {
   const [resetPassword, setResetPasswordValue] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Member | null>(null);
   const [editHandleOpen, setEditHandleOpen] = useState(false);
-  const [draftHandle, setDraftHandle] = useState(slug === "متجرك" ? "" : slug);
+  const [draftHandle, setDraftHandle] = useState(
+    slug === t.fallbackSlug ? "" : slug,
+  );
 
   useEffect(() => {
     setDraftHandle(session?.user?.tenantSlug ?? "");
@@ -85,7 +86,7 @@ export function TeamEditor({ onToast }: Props) {
       const json: { data: Member[] } = await res.json();
       setMembers(json.data);
     } catch (e) {
-      onToast({ type: "error", message: e instanceof Error ? e.message : "تعذر التحميل" });
+      onToast({ type: "error", message: e instanceof Error ? e.message : t.toast.loadFailed });
     } finally {
       setLoading(false);
     }
@@ -113,10 +114,10 @@ export function TeamEditor({ onToast }: Props) {
     created?: { loginEmail: string; password: string },
   ) => {
     if (created) {
-      onToast({ type: "success", message: "تم إضافة الموظف" });
+      onToast({ type: "success", message: t.toast.memberAdded });
       setCredModal({ login: created.loginEmail, password: created.password });
     } else {
-      onToast({ type: "success", message: "تم حفظ التعديلات" });
+      onToast({ type: "success", message: t.toast.edited });
     }
     await refresh();
   };
@@ -130,11 +131,11 @@ export function TeamEditor({ onToast }: Props) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || `HTTP ${res.status}`);
       }
-      onToast({ type: "success", message: "تم الحذف" });
+      onToast({ type: "success", message: t.toast.deleted });
       setDeleteTarget(null);
       await refresh();
     } catch (e) {
-      onToast({ type: "error", message: e instanceof Error ? e.message : "تعذر الحذف" });
+      onToast({ type: "error", message: e instanceof Error ? e.message : t.toast.deleteFailed });
     } finally {
       setBusyId(null);
     }
@@ -143,7 +144,7 @@ export function TeamEditor({ onToast }: Props) {
   const confirmReset = async () => {
     if (!resetTarget) return;
     if (resetPassword.length < 8) {
-      onToast({ type: "error", message: "كلمة السر 8 أحرف على الأقل" });
+      onToast({ type: "error", message: t.toast.shortPassword });
       return;
     }
     setBusyId(resetTarget.userId);
@@ -157,13 +158,12 @@ export function TeamEditor({ onToast }: Props) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || `HTTP ${res.status}`);
       }
-      // Show the new credentials so the owner can pass them to the employee.
       setCredModal({ login: resetTarget.loginEmail, password: resetPassword });
       setResetTarget(null);
       setResetPasswordValue("");
       await refresh();
     } catch (e) {
-      onToast({ type: "error", message: e instanceof Error ? e.message : "تعذر التعيين" });
+      onToast({ type: "error", message: e instanceof Error ? e.message : t.toast.resetFailed });
     } finally {
       setBusyId(null);
     }
@@ -183,7 +183,7 @@ export function TeamEditor({ onToast }: Props) {
       }
       onToast({
         type: "success",
-        message: "تم تغيير اسم تسجيل الدخول — أعد إخبار الموظفين بالعنوان الجديد",
+        message: t.toast.renameSuccess,
       });
       setEditHandleOpen(false);
       try {
@@ -193,7 +193,7 @@ export function TeamEditor({ onToast }: Props) {
       }
       await refresh();
     } catch (e) {
-      onToast({ type: "error", message: e instanceof Error ? e.message : "تعذر التغيير" });
+      onToast({ type: "error", message: e instanceof Error ? e.message : t.toast.renameFailed });
     } finally {
       setBusyId(null);
     }
@@ -201,41 +201,40 @@ export function TeamEditor({ onToast }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* Section toolbar — outside the card so the action button reads as page-level */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <button
           type="button"
           onClick={() => setEditHandleOpen(true)}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-white text-text-secondary hover:text-accent hover:border-accent transition-colors"
-          title="تغيير اسم تسجيل الدخول للمتجر"
+          title={t.toolbar.handleTooltip}
         >
           <AtSign className="w-3.5 h-3.5" />
           <span dir="ltr" className="font-mono text-sm">{slug}</span>
-          <span className="text-[10px] text-text-secondary">— رابط دخول الموظفين</span>
+          <span className="text-[10px] text-text-secondary">{t.toolbar.handleHint}</span>
         </button>
         <Button onClick={openAdd}>
           <Plus className="w-4 h-4 me-1" />
-          موظف جديد
+          {t.toolbar.addEmployee}
         </Button>
       </div>
 
-      {/* List card */}
       <div className="bg-white rounded-2xl border border-border overflow-hidden">
         <div className="flex items-center justify-between gap-2 px-5 py-3 border-b border-border bg-bg-main/40">
           <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-accent" />
-            الموظفون
+            {t.list.title}
           </h2>
           {!loading && members.length > 0 && (
             <span className="text-xs text-text-secondary">
-              {members.length} {members.length === 1 ? "حساب" : "حسابات"}
+              {members.length}{" "}
+              {members.length === 1 ? t.list.countOne : t.list.countMany}
             </span>
           )}
         </div>
 
         {loading ? (
           <div className="px-5 py-8 text-center">
-            <p className="text-sm text-text-secondary">جاري التحميل…</p>
+            <p className="text-sm text-text-secondary">{t.list.loading}</p>
           </div>
         ) : members.length === 0 ? (
           <div className="px-5 py-12 text-center">
@@ -243,14 +242,14 @@ export function TeamEditor({ onToast }: Props) {
               <ShieldCheck className="w-7 h-7" />
             </div>
             <p className="text-sm font-medium text-text-primary mb-1">
-              لم تُضف موظفين بعد
+              {t.list.emptyTitle}
             </p>
             <p className="text-xs text-text-secondary mb-4 max-w-xs mx-auto">
-              أنشئ حساباً لكل موظف لمنحه صلاحيات الدخول للنظام وتسجيل المبيعات والحضور.
+              {t.list.emptyHint}
             </p>
             <Button size="sm" onClick={openAdd}>
               <Plus className="w-4 h-4 me-1" />
-              إضافة أول موظف
+              {t.list.addFirst}
             </Button>
           </div>
         ) : (
@@ -274,7 +273,6 @@ export function TeamEditor({ onToast }: Props) {
         )}
       </div>
 
-      {/* Modals */}
       <EmployeeFormModal
         isOpen={employeeModalOpen}
         member={
@@ -346,6 +344,8 @@ function CredentialsModal({
   creds: { login: string; password: string } | null;
   onClose: () => void;
 }) {
+  const dict = useDictionary();
+  const t = dict.app.teamAdmin.credModal;
   const [copiedField, setCopiedField] = useState<"login" | "password" | "both" | null>(null);
   const [testStatus, setTestStatus] = useState<"idle" | "testing" | "ok" | "fail">("idle");
   const [testMessage, setTestMessage] = useState<string | null>(null);
@@ -376,15 +376,14 @@ function CredentialsModal({
         setTestMessage(json.message);
       } else {
         setTestStatus("fail");
-        setTestMessage(json.message ?? "فشل تسجيل الدخول");
+        setTestMessage(json.message ?? t.verifyFail);
       }
     } catch (e) {
       setTestStatus("fail");
-      setTestMessage(e instanceof Error ? e.message : "خطأ في الشبكة");
+      setTestMessage(e instanceof Error ? e.message : t.networkError);
     }
   };
 
-  // Reset test status when the modal opens with new creds.
   useEffect(() => {
     if (creds) {
       setTestStatus("idle");
@@ -393,20 +392,20 @@ function CredentialsModal({
   }, [creds]);
 
   return (
-    <Modal isOpen={!!creds} onClose={onClose} title="بيانات تسجيل الدخول للموظف">
+    <Modal isOpen={!!creds} onClose={onClose} title={t.title}>
       {creds && (
         <div className="space-y-4">
           <p className="text-sm text-text-secondary">
-            احفظ هذه البيانات أو ابعتها للموظف الآن — لن تُعرض كلمة السر مرة أخرى.
+            {t.intro}
           </p>
           <CredField
-            label="اسم تسجيل الدخول"
+            label={t.loginLabel}
             value={creds.login}
             copied={copiedField === "login"}
             onCopy={() => copy(creds.login, "login")}
           />
           <CredField
-            label="كلمة السر"
+            label={t.passwordLabel}
             value={creds.password}
             copied={copiedField === "password"}
             onCopy={() => copy(creds.password, "password")}
@@ -414,14 +413,14 @@ function CredentialsModal({
 
           <div className="rounded-lg border border-border p-3 space-y-2 bg-bg-main/40">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-medium text-text-primary">تأكد أن البيانات تعمل</p>
+              <p className="text-sm font-medium text-text-primary">{t.verifyTitle}</p>
               <Button
                 size="sm"
                 variant="secondary"
                 onClick={testLogin}
                 loading={testStatus === "testing"}
               >
-                اختبار تسجيل الدخول
+                {t.verifyButton}
               </Button>
             </div>
             {testStatus === "ok" && (
@@ -435,7 +434,7 @@ function CredentialsModal({
             )}
             {testStatus === "idle" && (
               <p className="text-xs text-text-secondary">
-                يجرّب البيانات على السيرفر ويخبرك ما إذا كانت ستعمل.
+                {t.verifyIdle}
               </p>
             )}
           </div>
@@ -451,17 +450,17 @@ function CredentialsModal({
               {copiedField === "both" ? (
                 <>
                   <Check className="w-4 h-4 me-1" />
-                  تم النسخ
+                  {t.copied}
                 </>
               ) : (
                 <>
                   <Copy className="w-4 h-4 me-1" />
-                  نسخ الاثنين
+                  {t.copyBoth}
                 </>
               )}
             </Button>
             <Button className="flex-1" onClick={onClose}>
-              تم
+              {t.done}
             </Button>
           </div>
         </div>
@@ -481,6 +480,7 @@ function CredField({
   copied: boolean;
   onCopy: () => void;
 }) {
+  const dict = useDictionary();
   return (
     <div>
       <label className="block text-xs text-text-secondary mb-1">{label}</label>
@@ -492,7 +492,7 @@ function CredField({
           type="button"
           onClick={onCopy}
           className="p-1.5 rounded-md text-text-secondary hover:bg-white hover:text-accent"
-          title="نسخ"
+          title={dict.app.teamAdmin.credModal.copy}
         >
           {copied ? (
             <Check className="w-4 h-4 text-success" />
@@ -520,28 +520,38 @@ function ResetPasswordModal({
   onCancel: () => void;
   busy: boolean;
 }) {
+  const dict = useDictionary();
+  const t = dict.app.teamAdmin.resetModal;
   return (
-    <Modal isOpen={!!target} onClose={onCancel} title="إعادة تعيين كلمة السر">
+    <Modal isOpen={!!target} onClose={onCancel} title={t.title}>
       {target && (
         <div className="space-y-4">
           <p className="text-sm text-text-secondary">
-            سيُطلب من <span className="font-medium text-text-primary">{target.displayName}</span> تغيير
-            كلمة السر فور تسجيل الدخول التالي.
+            {t.intro.split("{name}").map((part, i, arr) => (
+              <span key={i}>
+                {part}
+                {i < arr.length - 1 && (
+                  <span className="font-medium text-text-primary" dir="auto">
+                    {target.displayName}
+                  </span>
+                )}
+              </span>
+            ))}
           </p>
           <div className="bg-bg-main rounded-lg border border-border p-2">
-            <p className="text-xs text-text-secondary mb-0.5">اسم تسجيل الدخول</p>
+            <p className="text-xs text-text-secondary mb-0.5">{t.loginLabel}</p>
             <code dir="ltr" className="text-sm font-mono">{target.loginEmail}</code>
           </div>
           <PasswordInput
-            label="كلمة السر الجديدة"
-            placeholder="٨ أحرف على الأقل"
+            label={t.newPasswordLabel}
+            placeholder={t.newPasswordPlaceholder}
             value={value}
             onChange={(e) => onChange(e.target.value)}
             autoFocus
           />
           <div className="flex gap-2">
             <Button variant="secondary" className="flex-1" onClick={onCancel} disabled={busy}>
-              إلغاء
+              {t.cancel}
             </Button>
             <Button
               className="flex-1"
@@ -549,7 +559,7 @@ function ResetPasswordModal({
               loading={busy}
               disabled={value.length < 8}
             >
-              تعيين
+              {t.confirm}
             </Button>
           </div>
         </div>
@@ -569,23 +579,38 @@ function DeleteMemberModal({
   onCancel: () => void;
   busy: boolean;
 }) {
+  const dict = useDictionary();
+  const t = dict.app.teamAdmin.deleteModal;
   return (
-    <Modal isOpen={!!target} onClose={onCancel} title="حذف موظف">
+    <Modal isOpen={!!target} onClose={onCancel} title={t.title}>
       {target && (
         <div className="space-y-4">
           <p className="text-sm text-text-primary">
-            هل تريد حذف <span className="font-bold">{target.displayName}</span>؟
+            {t.intro.split("{name}").map((part, i, arr) => (
+              <span key={i}>
+                {part}
+                {i < arr.length - 1 && (
+                  <span className="font-bold" dir="auto">{target.displayName}</span>
+                )}
+              </span>
+            ))}
           </p>
           <p className="text-xs text-text-secondary">
-            لن يستطيع <code dir="ltr" className="font-mono">{target.loginEmail}</code> تسجيل الدخول بعد ذلك.
-            الإجراء لا يمكن التراجع عنه.
+            {t.warning.split("{login}").map((part, i, arr) => (
+              <span key={i}>
+                {part}
+                {i < arr.length - 1 && (
+                  <code dir="ltr" className="font-mono">{target.loginEmail}</code>
+                )}
+              </span>
+            ))}
           </p>
           <div className="flex gap-2">
             <Button variant="secondary" className="flex-1" onClick={onCancel} disabled={busy}>
-              إلغاء
+              {t.cancel}
             </Button>
             <Button variant="danger" className="flex-1" onClick={onConfirm} loading={busy}>
-              حذف
+              {t.confirm}
             </Button>
           </div>
         </div>
@@ -611,19 +636,27 @@ function RenameHandleModal({
   onCancel: () => void;
   busy: boolean;
 }) {
+  const dict = useDictionary();
+  const t = dict.app.teamAdmin.renameModal;
   const valid = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(value) && value.length >= 2;
   const changed = value && value !== currentSlug;
 
   return (
-    <Modal isOpen={isOpen} onClose={onCancel} title="اسم تسجيل الدخول للمتجر">
+    <Modal isOpen={isOpen} onClose={onCancel} title={t.title}>
       <div className="space-y-4">
         <p className="text-sm text-text-secondary">
-          يستخدمه موظفوك في تسجيل الدخول كـ <code dir="ltr" className="font-mono">username@&lt;handle&gt;</code>.
-          تغييره يحدّث جميع عناوين الموظفين تلقائياً.
+          {t.intro.split("{pattern}").map((part, i, arr) => (
+            <span key={i}>
+              {part}
+              {i < arr.length - 1 && (
+                <code dir="ltr" className="font-mono">username@&lt;handle&gt;</code>
+              )}
+            </span>
+          ))}
         </p>
         <div>
           <label className="block text-sm font-medium text-text-secondary mb-1.5">
-            الاسم الجديد
+            {t.newLabel}
           </label>
           <div className="flex items-center gap-1 bg-white border border-border rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-accent">
             <span dir="ltr" className="px-3 py-2.5 text-text-secondary bg-bg-main text-sm">
@@ -642,13 +675,13 @@ function RenameHandleModal({
             />
           </div>
           <p className="mt-1 text-xs text-text-secondary">
-            الحالي:{" "}
+            {t.currentLabel}{" "}
             <code dir="ltr" className="font-mono">@{currentSlug}</code>
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" className="flex-1" onClick={onCancel} disabled={busy}>
-            إلغاء
+            {t.cancel}
           </Button>
           <Button
             className="flex-1"
@@ -656,7 +689,7 @@ function RenameHandleModal({
             loading={busy}
             disabled={!valid || !changed}
           >
-            حفظ
+            {t.save}
           </Button>
         </div>
       </div>
@@ -687,6 +720,9 @@ function MemberRow({
   onResetPassword,
   onEditDetails,
 }: RowProps) {
+  const dict = useDictionary();
+  const t = dict.app.teamAdmin;
+  const permissionCopy = usePermissionCopy();
   const [editing, setEditing] = useState(false);
   const [perms, setPerms] = useState<Permission[]>(member.permissions);
 
@@ -705,11 +741,11 @@ function MemberRow({
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || `HTTP ${res.status}`);
       }
-      onToast({ type: "success", message: "تم حفظ الصلاحيات" });
+      onToast({ type: "success", message: t.toast.savePermsSuccess });
       setEditing(false);
       await onChange();
     } catch (e) {
-      onToast({ type: "error", message: e instanceof Error ? e.message : "تعذر الحفظ" });
+      onToast({ type: "error", message: e instanceof Error ? e.message : t.toast.saveFailed });
     }
   };
 
@@ -720,7 +756,6 @@ function MemberRow({
     <li className="px-5 py-3.5 hover:bg-bg-main/60 transition-colors">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1 flex items-center gap-3">
-          {/* Avatar */}
           <div
             className={`w-11 h-11 rounded-full flex items-center justify-center font-semibold text-sm shrink-0 overflow-hidden ring-2 ring-white ${
               isOwnerRow ? "bg-accent text-white" : "bg-accent-light text-accent"
@@ -740,7 +775,7 @@ function MemberRow({
 
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-medium text-text-primary truncate">{member.displayName}</span>
+              <span className="font-medium text-text-primary truncate" dir="auto">{member.displayName}</span>
               <span
                 className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
                   isOwnerRow
@@ -748,11 +783,11 @@ function MemberRow({
                     : "bg-gray-100 text-text-secondary"
                 }`}
               >
-                {isOwnerRow ? "المالك" : "موظف"}
+                {isOwnerRow ? t.role.owner : t.role.staff}
               </span>
               {member.mustChangePassword && !isOwnerRow && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-orange-50 text-orange-700">
-                  يجب تغيير كلمة السر
+                  {t.role.mustChange}
                 </span>
               )}
             </div>
@@ -784,17 +819,17 @@ function MemberRow({
               onClick={onEditDetails}
               disabled={busy}
               className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-text-secondary hover:bg-white hover:text-accent border border-transparent hover:border-border disabled:opacity-50 transition-colors"
-              title="تعديل البيانات"
+              title={t.row.editDetailsTitle}
             >
               <Pencil className="w-3.5 h-3.5" />
-              تعديل
+              {t.row.edit}
             </button>
             <button
               type="button"
               onClick={onEditDetails}
               disabled={busy}
               className="sm:hidden p-2 rounded-md text-text-secondary hover:bg-white hover:text-accent disabled:opacity-50"
-              title="تعديل البيانات"
+              title={t.row.editDetailsTitle}
             >
               <Pencil className="w-4 h-4" />
             </button>
@@ -805,14 +840,14 @@ function MemberRow({
               className="hidden md:inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-accent hover:bg-accent-light disabled:opacity-50 transition-colors"
             >
               <ShieldCheck className="w-3.5 h-3.5" />
-              {editing ? "إغلاق" : "الصلاحيات"}
+              {editing ? t.row.close : t.row.permissions}
             </button>
             <button
               type="button"
               onClick={onResetPassword}
               disabled={busy}
               className="p-2 rounded-md text-text-secondary hover:bg-white hover:text-accent disabled:opacity-50"
-              title="إعادة تعيين كلمة السر"
+              title={t.row.resetPassword}
             >
               <KeyRound className="w-4 h-4" />
             </button>
@@ -821,7 +856,7 @@ function MemberRow({
               onClick={onRemove}
               disabled={busy}
               className="p-2 rounded-md text-text-secondary hover:bg-danger-light hover:text-danger disabled:opacity-50"
-              title="حذف"
+              title={t.row.deleteTitle}
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -831,7 +866,7 @@ function MemberRow({
 
       {editing && !isOwnerRow && (
         <div className="mt-3 ms-14 rounded-xl border border-border p-4 bg-bg-main/60 space-y-3">
-          {PERMISSION_GROUPS.map((group) => (
+          {permissionCopy.groups.map((group) => (
             <div key={group.title}>
               <p className="text-xs font-medium text-text-secondary mb-1.5">{group.title}</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
@@ -849,7 +884,7 @@ function MemberRow({
                         else setPerms([...perms, p]);
                       }}
                     />
-                    <span>{PERMISSION_LABELS[p]}</span>
+                    <span>{permissionCopy.labels[p]}</span>
                   </label>
                 ))}
               </div>
@@ -858,7 +893,7 @@ function MemberRow({
           <div className="flex justify-end pt-1">
             <Button size="sm" onClick={save}>
               <Save className="w-4 h-4 me-1" />
-              حفظ الصلاحيات
+              {t.row.savePermissions}
             </Button>
           </div>
         </div>

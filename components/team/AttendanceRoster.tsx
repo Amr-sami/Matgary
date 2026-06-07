@@ -14,6 +14,8 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { cn } from "@/lib/utils";
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
+import { formatTime } from "@/lib/i18n/format";
 
 type Toast = { type: "success" | "error"; message: string };
 
@@ -45,6 +47,9 @@ interface Props {
 }
 
 export function AttendanceRoster({ onToast }: Props) {
+  const dict = useDictionary();
+  const locale = useLocale();
+  const t = dict.app.team.roster;
   const [roster, setRoster] = useState<RosterRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -66,7 +71,7 @@ export function AttendanceRoster({ onToast }: Props) {
     } catch (e) {
       onToast({
         type: "error",
-        message: e instanceof Error ? e.message : "تعذر التحميل",
+        message: e instanceof Error ? e.message : t.loadFailed,
       });
     } finally {
       setLoading(false);
@@ -95,13 +100,12 @@ export function AttendanceRoster({ onToast }: Props) {
       });
       const json = await res.json();
       if (!res.ok) {
-        onToast({ type: "error", message: json.error || "تعذر التسجيل" });
+        onToast({ type: "error", message: json.error || t.toast.saveFailed });
         return;
       }
       onToast({
         type: "success",
-        message:
-          type === "check_in" ? "تم تسجيل الحضور" : "تم تسجيل الانصراف",
+        message: type === "check_in" ? t.toast.checkedIn : t.toast.checkedOut,
       });
       await refresh();
     } finally {
@@ -112,7 +116,7 @@ export function AttendanceRoster({ onToast }: Props) {
   if (loading) {
     return (
       <div className="bg-white rounded-xl border border-border p-8 text-center text-text-secondary">
-        جارٍ التحميل…
+        {t.loading}
       </div>
     );
   }
@@ -122,7 +126,7 @@ export function AttendanceRoster({ onToast }: Props) {
       <div className="bg-white rounded-xl border border-border p-8 text-center">
         <Clock className="w-8 h-8 text-text-secondary mx-auto mb-2" />
         <p className="text-text-secondary text-sm">
-          أضف موظفاً من قسم "الفريق والصلاحيات" أولاً ليظهر هنا.
+          {t.empty}
         </p>
       </div>
     );
@@ -135,27 +139,41 @@ export function AttendanceRoster({ onToast }: Props) {
     (r) => r.lastEvent?.requiresReview,
   ).length;
 
+  const todayLabel = new Date().toLocaleDateString(
+    locale === "en" ? "en-EG" : "ar-EG",
+    {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      numberingSystem: "latn",
+    } as Intl.DateTimeFormatOptions,
+  );
+
+  const renderStatusLabel = (r: RosterRow) => {
+    if (!r.lastEvent) return t.status.notYet;
+    const at = formatTime(r.lastEvent.occurredAt, locale);
+    return r.status === "checked_in"
+      ? t.status.checkedInAt.replace("{time}", at)
+      : t.status.checkedOutAt.replace("{time}", at);
+  };
+
   return (
     <>
       <div className="bg-white rounded-xl border border-border overflow-hidden">
         <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2">
             <Clock className="w-5 h-5 text-accent" />
-            <h3 className="font-bold text-base">حضور اليوم</h3>
+            <h3 className="font-bold text-base">{t.todayHeading}</h3>
             <span className="text-xs text-text-secondary">
-              {new Date().toLocaleDateString("ar-EG", {
-                weekday: "long",
-                day: "numeric",
-                month: "long",
-              })}
+              {todayLabel}
             </span>
           </div>
           <div className="flex items-center gap-2 text-xs">
-            <Pill color="success" label={`حاضر ${inCount}`} />
-            <Pill color="muted" label={`انصرف ${outCount}`} />
-            <Pill color="muted" label={`غائب ${absentCount}`} />
+            <Pill color="success" label={t.pill.present.replace("{n}", String(inCount))} />
+            <Pill color="muted" label={t.pill.out.replace("{n}", String(outCount))} />
+            <Pill color="muted" label={t.pill.absent.replace("{n}", String(absentCount))} />
             {reviewCount > 0 && (
-              <Pill color="warn" label={`للمراجعة ${reviewCount}`} />
+              <Pill color="warn" label={t.pill.review.replace("{n}", String(reviewCount))} />
             )}
           </div>
         </div>
@@ -175,7 +193,7 @@ export function AttendanceRoster({ onToast }: Props) {
                   {m.displayName.charAt(0)}
                 </span>
                 <div className="min-w-0">
-                  <p className="font-medium text-text-primary truncate flex items-center gap-1.5">
+                  <p className="font-medium text-text-primary truncate flex items-center gap-1.5" dir="auto">
                     {m.displayName}
                     {m.lastEvent?.requiresReview && (
                       <AlertCircle
@@ -185,7 +203,7 @@ export function AttendanceRoster({ onToast }: Props) {
                     )}
                   </p>
                   <p className="text-xs text-text-secondary truncate">
-                    {statusLabel(m)}
+                    {renderStatusLabel(m)}
                   </p>
                 </div>
               </button>
@@ -200,7 +218,7 @@ export function AttendanceRoster({ onToast }: Props) {
                     className="px-3 py-1.5 text-xs gap-1.5"
                   >
                     <XCircle className="w-3.5 h-3.5" />
-                    انصراف
+                    {t.action.checkOut}
                   </Button>
                 ) : (
                   <Button
@@ -210,7 +228,7 @@ export function AttendanceRoster({ onToast }: Props) {
                     className="px-3 py-1.5 text-xs gap-1.5"
                   >
                     <Check className="w-3.5 h-3.5" />
-                    حضور
+                    {t.action.checkIn}
                   </Button>
                 )}
               </div>
@@ -251,16 +269,6 @@ function Pill({
   );
 }
 
-function statusLabel(r: RosterRow): string {
-  if (!r.lastEvent) return "لم يحضر بعد";
-  const at = new Date(r.lastEvent.occurredAt).toLocaleTimeString("ar-EG", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-  if (r.status === "checked_in") return `حضر ${at}`;
-  return `انصرف ${at}`;
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Day events modal — shows the full day's events for one employee with edit/delete
 // ─────────────────────────────────────────────────────────────────────────────
@@ -276,6 +284,9 @@ function DayEventsModal({
   onRefresh: () => Promise<void>;
   onToast: (t: Toast) => void;
 }) {
+  const dict = useDictionary();
+  const locale = useLocale();
+  const t = dict.app.team.dayEvents;
   const [events, setEvents] = useState<DayEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<DayEvent | null>(null);
@@ -308,7 +319,7 @@ function DayEventsModal({
     } catch (e) {
       onToast({
         type: "error",
-        message: e instanceof Error ? e.message : "تعذر التحميل",
+        message: e instanceof Error ? e.message : t.toast.loadFailed,
       });
     } finally {
       setLoading(false);
@@ -325,7 +336,7 @@ function DayEventsModal({
       method: "DELETE",
     });
     if (!res.ok) {
-      onToast({ type: "error", message: "تعذر الحذف" });
+      onToast({ type: "error", message: t.toast.deleteFailed });
       return;
     }
     await load();
@@ -339,19 +350,24 @@ function DayEventsModal({
       body: JSON.stringify({ requiresReview: false }),
     });
     if (!res.ok) {
-      onToast({ type: "error", message: "تعذر التحديث" });
+      onToast({ type: "error", message: t.toast.updateFailed });
       return;
     }
     await load();
     await onRefresh();
   };
 
+  const sourceLabel = (s: string): string => {
+    const map = t.source as Record<string, string>;
+    return map[s] ?? t.source.manual;
+  };
+
   return (
-    <Modal isOpen onClose={onClose} title={`سجل ${member.displayName}`}>
+    <Modal isOpen onClose={onClose} title={t.title.replace("{name}", member.displayName)}>
       {loading ? (
-        <p className="text-center text-text-secondary py-8">جارٍ التحميل…</p>
+        <p className="text-center text-text-secondary py-8">{t.loading}</p>
       ) : events.length === 0 ? (
-        <p className="text-center text-text-secondary py-8">لا توجد أحداث.</p>
+        <p className="text-center text-text-secondary py-8">{t.empty}</p>
       ) : (
         <ul className="space-y-2">
           {events.map((e) => (
@@ -372,19 +388,16 @@ function DayEventsModal({
                 )}
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-text-primary">
-                    {e.type === "check_in" ? "حضور" : "انصراف"}{" "}
+                    {e.type === "check_in" ? t.event.checkIn : t.event.checkOut}{" "}
                     <span className="text-text-secondary text-xs font-normal">
                       ({sourceLabel(e.source)})
                     </span>
                   </p>
                   <p className="text-xs text-text-secondary mt-0.5">
-                    {new Date(e.occurredAt).toLocaleTimeString("ar-EG", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {formatTime(e.occurredAt, locale)}
                     {e.requiresReview && (
                       <span className="text-warning font-medium me-2">
-                        · يحتاج مراجعة
+                        {t.event.needsReview}
                       </span>
                     )}
                   </p>
@@ -395,7 +408,7 @@ function DayEventsModal({
                   <button
                     type="button"
                     onClick={() => clearReview(e.id)}
-                    title="إنهاء المراجعة"
+                    title={t.action.clearReview}
                     className="p-1.5 rounded-lg text-text-secondary hover:text-success hover:bg-success/10"
                   >
                     <Check className="w-4 h-4" />
@@ -404,7 +417,7 @@ function DayEventsModal({
                 <button
                   type="button"
                   onClick={() => setEditing(e)}
-                  title="تعديل"
+                  title={t.action.edit}
                   className="p-1.5 rounded-lg text-text-secondary hover:text-accent hover:bg-accent-light"
                 >
                   <Pencil className="w-4 h-4" />
@@ -412,7 +425,7 @@ function DayEventsModal({
                 <button
                   type="button"
                   onClick={() => removeEvent(e.id)}
-                  title="حذف"
+                  title={t.action.delete}
                   className="p-1.5 rounded-lg text-text-secondary hover:text-danger hover:bg-danger-light"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -439,13 +452,6 @@ function DayEventsModal({
   );
 }
 
-function sourceLabel(s: string): string {
-  if (s === "manager_attest") return "بتسجيل المدير";
-  if (s === "geofence") return "موقع جغرافي";
-  if (s === "qr") return "QR";
-  return "يدوي";
-}
-
 function EditEventForm({
   event,
   onClose,
@@ -457,6 +463,8 @@ function EditEventForm({
   onSaved: () => Promise<void>;
   onToast: (t: Toast) => void;
 }) {
+  const dict = useDictionary();
+  const t = dict.app.team.editEvent;
   const initialTime = new Date(event.occurredAt);
   const hh = String(initialTime.getHours()).padStart(2, "0");
   const mm = String(initialTime.getMinutes()).padStart(2, "0");
@@ -482,10 +490,10 @@ function EditEventForm({
       });
       const json = await res.json();
       if (!res.ok) {
-        onToast({ type: "error", message: json.error || "تعذر الحفظ" });
+        onToast({ type: "error", message: json.error || t.saveFailed });
         return;
       }
-      onToast({ type: "success", message: "تم التعديل" });
+      onToast({ type: "success", message: t.saveSuccess });
       await onSaved();
     } finally {
       setBusy(false);
@@ -493,45 +501,45 @@ function EditEventForm({
   };
 
   return (
-    <Modal isOpen onClose={onClose} title="تعديل الحدث">
+    <Modal isOpen onClose={onClose} title={t.title}>
       <div className="space-y-3">
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-sm font-medium text-text-secondary mb-1.5">
-              النوع
+              {t.typeLabel}
             </label>
             <select
               value={type}
               onChange={(e) =>
                 setType(e.target.value as "check_in" | "check_out")
               }
-              dir="rtl"
+              dir="auto"
               className="w-full px-3 py-2.5 rounded-lg border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-accent"
             >
-              <option value="check_in">حضور</option>
-              <option value="check_out">انصراف</option>
+              <option value="check_in">{t.checkIn}</option>
+              <option value="check_out">{t.checkOut}</option>
             </select>
           </div>
           <Input
-            label="الوقت"
+            label={t.timeLabel}
             type="time"
             value={time}
             onChange={(e) => setTime(e.target.value)}
           />
         </div>
         <Input
-          label="ملاحظة (اختياري)"
+          label={t.noteLabel}
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          placeholder="سبب التعديل…"
+          placeholder={t.notePlaceholder}
         />
         <div className="flex justify-end gap-2 pt-1">
           <Button variant="secondary" onClick={onClose}>
-            إلغاء
+            {t.cancel}
           </Button>
           <Button onClick={save} loading={busy} disabled={busy}>
             <RotateCcw className="w-4 h-4 me-1" />
-            حفظ
+            {t.save}
           </Button>
         </div>
       </div>

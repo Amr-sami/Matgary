@@ -5,6 +5,7 @@ import { Plus, Trash2 } from "@/lib/icons";
 import { Button } from "../ui/Button";
 import { useCategories } from "@/hooks/useCategories";
 import type { BrandDescriptor } from "@/lib/types";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 type Toast = { type: "success" | "error"; message: string };
 
@@ -13,6 +14,8 @@ interface Props {
 }
 
 export function BrandsEditor({ onToast }: Props) {
+  const dict = useDictionary();
+  const t = dict.app.catalog.brandsAdmin;
   const { data: categories } = useCategories();
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [brands, setBrands] = useState<BrandDescriptor[]>([]);
@@ -51,7 +54,7 @@ export function BrandsEditor({ onToast }: Props) {
     if (!res.ok) {
       onToast({
         type: "error",
-        message: (await res.json().catch(() => ({}))).error || "تعذر الإضافة",
+        message: (await res.json().catch(() => ({}))).error || t.errors.addFailed,
       });
       return;
     }
@@ -60,7 +63,7 @@ export function BrandsEditor({ onToast }: Props) {
   };
 
   const removeBrand = async (id: string) => {
-    if (!confirm("حذف هذا البراند؟")) return;
+    if (!confirm(t.confirmDelete)) return;
     await fetch(`/api/brands/${id}`, { method: "DELETE" });
     if (selectedCategoryId) await refresh(selectedCategoryId);
   };
@@ -68,9 +71,9 @@ export function BrandsEditor({ onToast }: Props) {
   if (categories.length === 0) {
     return (
       <div className="bg-white rounded-2xl border border-border p-6">
-        <h2 className="text-lg font-bold text-text-primary mb-2">البراندات</h2>
+        <h2 className="text-lg font-bold text-text-primary mb-2">{t.title}</h2>
         <p className="text-sm text-text-secondary">
-          أضف قسمًا أولاً ثم ارجع لتعريف البراندات.
+          {t.noCategoriesHint}
         </p>
       </div>
     );
@@ -78,7 +81,7 @@ export function BrandsEditor({ onToast }: Props) {
 
   return (
     <div className="bg-white rounded-2xl border border-border p-6 space-y-4">
-      <h2 className="text-lg font-bold text-text-primary">البراندات</h2>
+      <h2 className="text-lg font-bold text-text-primary">{t.title}</h2>
 
       <div className="flex flex-wrap gap-2">
         {categories.map((c) => (
@@ -91,6 +94,7 @@ export function BrandsEditor({ onToast }: Props) {
                 ? "bg-accent text-white border-accent"
                 : "bg-white border-border text-text-secondary hover:border-accent"
             }`}
+            dir="auto"
           >
             {c.label}
           </button>
@@ -100,32 +104,32 @@ export function BrandsEditor({ onToast }: Props) {
       <div className="flex gap-2">
         <input
           type="text"
-          dir="rtl"
-          placeholder="اسم البراند الجديد"
+          dir="auto"
+          placeholder={t.newPlaceholder}
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
           className="flex-1 px-3 py-2 rounded-lg border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-accent"
         />
         <Button onClick={addBrand} disabled={!newName.trim() || !selectedCategoryId}>
           <Plus className="w-4 h-4 me-1" />
-          إضافة
+          {t.add}
         </Button>
       </div>
 
       {loading ? (
-        <p className="text-sm text-text-secondary">جاري التحميل…</p>
+        <p className="text-sm text-text-secondary">{t.loading}</p>
       ) : brands.length === 0 ? (
-        <p className="text-sm text-text-secondary">لا توجد براندات لهذا القسم.</p>
+        <p className="text-sm text-text-secondary">{t.empty}</p>
       ) : (
         <ul className="divide-y divide-border">
           {brands.map((b) => (
             <li key={b.id} className="flex items-center justify-between py-2">
-              <span className="text-sm">{b.name}</span>
+              <span className="text-sm" dir="auto">{b.name}</span>
               <button
                 type="button"
                 onClick={() => removeBrand(b.id)}
                 className="p-1.5 rounded-md text-text-secondary hover:bg-danger-light hover:text-danger"
-                title="حذف"
+                title={t.deleteTitle}
               >
                 <Trash2 className="w-4 h-4" />
               </button>

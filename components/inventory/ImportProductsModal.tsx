@@ -11,20 +11,20 @@ import {
 } from "@/lib/icons";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 // Bulk product import — drop-zone upload → server preview → confirm.
 //
-// Two-phase UX so the cashier never imports something they don't
-// understand:
-//   1. Upload CSV → server parses & validates → modal shows a preview
-//      table with create/update/error tags per row.
-//   2. If everything is clean OR the cashier is happy with what's
-//      shown, the "تأكيد الاستيراد" button POSTs the same CSV with
-//      mode=commit. Server re-validates + writes in a single tx.
+// Two-phase UX so the cashier never imports something they don't understand:
+//   1. Upload CSV → server parses & validates → modal shows a preview table
+//      with create/update/error tags per row.
+//   2. If everything is clean OR the cashier is happy with what's shown, the
+//      confirm button POSTs the same CSV with mode=commit. Server re-validates
+//      + writes in a single tx.
 //
-// Templates: a "تحميل القالب" link downloads a CSV pre-populated with
-// this branch's category keys so the cashier has a working starting
-// point instead of a blank file.
+// Templates: the inline template link downloads a CSV pre-populated with this
+// branch's category keys so the cashier has a working starting point instead
+// of a blank file.
 
 interface ImportRowError {
   row: number;
@@ -61,6 +61,8 @@ interface Props {
 }
 
 export function ImportProductsModal({ isOpen, onClose, onImported }: Props) {
+  const dict = useDictionary();
+  const t = dict.app.inventory.import;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [csvText, setCsvText] = useState<string | null>(null);
   const [filename, setFilename] = useState<string | null>(null);
@@ -90,7 +92,7 @@ export function ImportProductsModal({ isOpen, onClose, onImported }: Props) {
     setPreview(null);
     if (!file) return;
     if (file.size > 2 * 1024 * 1024) {
-      setError("الملف أكبر من 2 ميغا. قسّمه على ملفات أصغر.");
+      setError(t.errors.tooLarge);
       return;
     }
     const text = await file.text();
@@ -110,11 +112,11 @@ export function ImportProductsModal({ isOpen, onClose, onImported }: Props) {
       const json = (await res.json()) as ImportPreview;
       setPreview(json);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "تعذر قراءة الملف");
+      setError(e instanceof Error ? e.message : t.errors.readFailed);
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [t.errors]);
 
   const onDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -143,7 +145,7 @@ export function ImportProductsModal({ isOpen, onClose, onImported }: Props) {
         await onImported();
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "تعذر تنفيذ الاستيراد");
+      setError(e instanceof Error ? e.message : t.errors.importFailed);
     } finally {
       setBusy(false);
     }
@@ -153,7 +155,7 @@ export function ImportProductsModal({ isOpen, onClose, onImported }: Props) {
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title="استيراد منتجات من CSV"
+      title={t.title}
       className="max-w-3xl"
     >
       <div className="space-y-4">
@@ -162,24 +164,22 @@ export function ImportProductsModal({ isOpen, onClose, onImported }: Props) {
           <div className="rounded-xl border border-success/30 bg-success-light p-4 text-sm text-success">
             <div className="flex items-center gap-2 font-bold mb-1">
               <CheckCircle className="w-5 h-5" />
-              تم الاستيراد بنجاح
+              {t.result.success}
             </div>
-            <p>
-              تم إضافة <b>{result.created}</b> منتج جديد وتحديث{" "}
-              <b>{result.updated}</b> منتج
-              {result.failed > 0 && (
-                <>
-                  ، وفشل <b>{result.failed}</b> صف
-                </>
-              )}
-              .
-            </p>
+            <p
+              dangerouslySetInnerHTML={{
+                __html: (result.failed > 0 ? t.result.summaryWithFailed : t.result.summary)
+                  .replace("{created}", String(result.created))
+                  .replace("{updated}", String(result.updated))
+                  .replace("{failed}", String(result.failed)),
+              }}
+            />
             <Button
               onClick={handleClose}
               variant="secondary"
               className="mt-3"
             >
-              إغلاق
+              {t.result.close}
             </Button>
           </div>
         )}
@@ -191,29 +191,33 @@ export function ImportProductsModal({ isOpen, onClose, onImported }: Props) {
               <Info className="w-4 h-4 text-accent shrink-0 mt-0.5" />
               <div className="space-y-1.5">
                 <p className="font-semibold text-text-primary">
-                  أعمدة الملف (الترتيب غير مهم، لكن الأسماء حساسة):
+                  {t.guide.heading}
                 </p>
                 <ul className="list-disc list-inside space-y-0.5 text-text-secondary leading-relaxed">
                   <li>
                     <code className="text-accent">name, category, price, quantity</code>{" "}
-                    — مطلوبة.
+                    {t.guide.required}
                   </li>
                   <li>
-                    <code className="text-accent">sku</code> — اختياري؛ لو
-                    موجود يستخدم لتحديث منتج قائم بدلاً من إنشاء جديد.
+                    <code className="text-accent">sku</code>{" "}
+                    {t.guide.skuHint}
                   </li>
                   <li>
                     <code className="text-accent">brand, cost_price, low_stock_threshold, supplier, location, tags</code>{" "}
-                    — اختيارية.
+                    {t.guide.optional}
                   </li>
                   <li>
-                    <code className="text-accent">attribute_values</code> —
-                    خصائص الصنف بصيغة <code>key=label;key2=label2</code>،
-                    مثلاً <code>gender=رجالي</code>.
+                    <code className="text-accent">attribute_values</code>{" "}
+                    {t.guide.attributeValuesHint}{" "}
+                    <code>key=label;key2=label2</code>
+                    {t.guide.attributeValuesExample}{" "}
+                    <code dir="auto">gender=رجالي</code>.
                   </li>
                   <li>
-                    <code className="text-accent">category</code> — يقبل مفتاح
-                    الصنف (<code>watches</code>) أو الاسم العربي (<code>ساعات</code>).
+                    <code className="text-accent">category</code>{" "}
+                    {t.guide.categoryHint}{" "}
+                    (<code>watches</code>) {t.guide.categoryHintOr}{" "}
+                    (<code dir="auto">ساعات</code>).
                   </li>
                 </ul>
                 <a
@@ -221,7 +225,7 @@ export function ImportProductsModal({ isOpen, onClose, onImported }: Props) {
                   className="inline-flex items-center gap-1 mt-1 text-accent hover:underline"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  تحميل قالب جاهز بأصناف فرعك الحالي
+                  {t.guide.templateLink}
                 </a>
               </div>
             </div>
@@ -245,7 +249,7 @@ export function ImportProductsModal({ isOpen, onClose, onImported }: Props) {
           >
             <Upload className="w-10 h-10 text-text-secondary mx-auto mb-3" />
             <p className="text-sm text-text-secondary">
-              اسحب ملف CSV هنا أو
+              {t.drop.instructionLine}
             </p>
             <button
               type="button"
@@ -253,7 +257,7 @@ export function ImportProductsModal({ isOpen, onClose, onImported }: Props) {
               disabled={busy}
               className="mt-3 px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium hover:bg-accent/90 disabled:opacity-60"
             >
-              {busy ? "جارٍ التحقق…" : "اختر ملفاً"}
+              {busy ? t.drop.checking : t.drop.chooseFile}
             </button>
             <input
               ref={fileInputRef}
@@ -266,7 +270,7 @@ export function ImportProductsModal({ isOpen, onClose, onImported }: Props) {
               }}
             />
             <p className="text-[11px] text-text-secondary mt-3">
-              CSV فقط · حتى 2 ميغابايت · UTF-8 (Excel: حفظ كـ "CSV UTF-8")
+              {t.drop.footnote}
             </p>
           </div>
         )}
@@ -284,8 +288,8 @@ export function ImportProductsModal({ isOpen, onClose, onImported }: Props) {
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <p className="text-sm">
-                <span className="text-text-secondary">الملف:</span>{" "}
-                <span className="font-medium">{filename}</span>
+                <span className="text-text-secondary">{t.preview.fileLabel}</span>{" "}
+                <span className="font-medium" dir="auto">{filename}</span>
               </p>
               <button
                 type="button"
@@ -293,31 +297,31 @@ export function ImportProductsModal({ isOpen, onClose, onImported }: Props) {
                 className="text-xs text-text-secondary hover:text-danger inline-flex items-center gap-1"
               >
                 <X className="w-3 h-3" />
-                إعادة اختيار ملف آخر
+                {t.preview.resetCta}
               </button>
             </div>
 
             <div className="grid grid-cols-3 gap-2 text-center text-xs">
-              <Stat label="ستُضاف" value={preview.toCreate} tone="success" />
-              <Stat label="ستُحدَّث" value={preview.toUpdate} tone="accent" />
+              <Stat label={t.preview.stats.create} value={preview.toCreate} tone="success" />
+              <Stat label={t.preview.stats.update} value={preview.toUpdate} tone="accent" />
               <Stat
-                label="بها أخطاء"
+                label={t.preview.stats.error}
                 value={preview.errored}
                 tone={preview.errored > 0 ? "danger" : "default"}
               />
             </div>
 
             <div className="border border-border rounded-xl overflow-hidden max-h-[40vh] overflow-y-auto">
-              <table className="w-full text-xs [direction:rtl]">
+              <table className="w-full text-xs">
                 <thead className="bg-bg-main/40 sticky top-0">
                   <tr className="text-text-secondary">
-                    <th className="px-3 py-2 text-start font-medium">السطر</th>
-                    <th className="px-3 py-2 text-start font-medium">الحالة</th>
-                    <th className="px-3 py-2 text-start font-medium">الاسم</th>
-                    <th className="px-3 py-2 text-start font-medium">الصنف</th>
-                    <th className="px-3 py-2 text-end font-medium">السعر</th>
-                    <th className="px-3 py-2 text-end font-medium">الكمية</th>
-                    <th className="px-3 py-2 text-start font-medium">ملاحظات</th>
+                    <th className="px-3 py-2 text-start font-medium">{t.preview.table.row}</th>
+                    <th className="px-3 py-2 text-start font-medium">{t.preview.table.status}</th>
+                    <th className="px-3 py-2 text-start font-medium">{t.preview.table.name}</th>
+                    <th className="px-3 py-2 text-start font-medium">{t.preview.table.category}</th>
+                    <th className="px-3 py-2 text-end font-medium">{t.preview.table.price}</th>
+                    <th className="px-3 py-2 text-end font-medium">{t.preview.table.quantity}</th>
+                    <th className="px-3 py-2 text-start font-medium">{t.preview.table.notes}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -336,12 +340,12 @@ export function ImportProductsModal({ isOpen, onClose, onImported }: Props) {
                         {p.row}
                       </td>
                       <td className="px-3 py-2">
-                        <ActionPill action={p.action} />
+                        <ActionPill action={p.action} t={t.action} />
                       </td>
-                      <td className="px-3 py-2 truncate max-w-[180px]">
+                      <td className="px-3 py-2 truncate max-w-[180px]" dir="auto">
                         {p.raw.name || "—"}
                       </td>
-                      <td className="px-3 py-2 truncate max-w-[100px]">
+                      <td className="px-3 py-2 truncate max-w-[100px]" dir="auto">
                         {p.raw.category || "—"}
                       </td>
                       <td className="px-3 py-2 text-end tabular-nums">
@@ -350,7 +354,7 @@ export function ImportProductsModal({ isOpen, onClose, onImported }: Props) {
                       <td className="px-3 py-2 text-end tabular-nums">
                         {p.raw.quantity || "—"}
                       </td>
-                      <td className="px-3 py-2 text-danger">
+                      <td className="px-3 py-2 text-danger" dir="auto">
                         {p.errors.map((e) => e.message).join(" · ") || ""}
                       </td>
                     </tr>
@@ -361,8 +365,7 @@ export function ImportProductsModal({ isOpen, onClose, onImported }: Props) {
 
             {preview.errored > 0 && (
               <div className="rounded-lg bg-orange-50 border border-orange-200 text-orange-800 text-xs p-3 leading-relaxed">
-                هناك أخطاء في {preview.errored} صف. صحح الملف ثم أعد رفعه —
-                لا يمكن المتابعة بصف واحد خاطئ (لتجنّب استيراد جزئي).
+                {t.preview.errorBanner.replace("{n}", String(preview.errored))}
               </div>
             )}
 
@@ -372,7 +375,7 @@ export function ImportProductsModal({ isOpen, onClose, onImported }: Props) {
                 onClick={handleClose}
                 className="text-sm text-text-secondary hover:text-text-primary px-3 py-2"
               >
-                إلغاء
+                {dict.app.common.cancel}
               </button>
               <Button
                 onClick={commit}
@@ -382,7 +385,10 @@ export function ImportProductsModal({ isOpen, onClose, onImported }: Props) {
                 loading={busy}
               >
                 <CheckCircle className="w-4 h-4 me-1" />
-                تأكيد الاستيراد ({preview.toCreate + preview.toUpdate} صف)
+                {t.preview.commit.replace(
+                  "{n}",
+                  String(preview.toCreate + preview.toUpdate),
+                )}
               </Button>
             </div>
           </div>
@@ -415,11 +421,17 @@ function Stat({
   );
 }
 
-function ActionPill({ action }: { action: ImportRowPlan["action"] }) {
+function ActionPill({
+  action,
+  t,
+}: {
+  action: ImportRowPlan["action"];
+  t: { create: string; update: string; error: string };
+}) {
   const map = {
-    create: { label: "إضافة", cls: "bg-success-light text-success" },
-    update: { label: "تحديث", cls: "bg-accent-light/60 text-accent" },
-    error: { label: "خطأ", cls: "bg-danger-light text-danger" },
+    create: { label: t.create, cls: "bg-success-light text-success" },
+    update: { label: t.update, cls: "bg-accent-light/60 text-accent" },
+    error: { label: t.error, cls: "bg-danger-light text-danger" },
   };
   const it = map[action];
   return (

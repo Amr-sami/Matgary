@@ -7,6 +7,7 @@ import { Input } from "../ui/Input";
 import { useCategories } from "@/hooks/useCategories";
 import { slugify } from "@/lib/utils/slug";
 import type { CategoryAttribute, CategoryDescriptor } from "@/lib/types";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 // Curated icon options the picker shows. Anything else is allowed if typed
 // into the icon field directly — Step1Category falls back to Package if it
@@ -32,6 +33,8 @@ interface Props {
 }
 
 export function CategoriesEditor({ onToast }: Props) {
+  const dict = useDictionary();
+  const t = dict.app.catalog.categoriesAdmin;
   const { data: categories, refresh } = useCategories();
   const [adding, setAdding] = useState(false);
   const [newLabel, setNewLabel] = useState("");
@@ -54,20 +57,23 @@ export function CategoriesEditor({ onToast }: Props) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || `HTTP ${res.status}`);
       }
-      onToast({ type: "success", message: "تم إضافة القسم" });
+      onToast({ type: "success", message: t.toasts.categoryAdded });
       setNewLabel("");
       setNewIcon("Package");
       setAdding(false);
       await refresh();
     } catch (e) {
-      onToast({ type: "error", message: e instanceof Error ? e.message : "تعذر الإضافة" });
+      onToast({
+        type: "error",
+        message: e instanceof Error ? e.message : t.toasts.addFailed,
+      });
     } finally {
       setBusyId(null);
     }
   };
 
   const removeCategory = async (id: string) => {
-    if (!confirm("حذف هذا القسم؟")) return;
+    if (!confirm(t.confirmDeleteCategory)) return;
     setBusyId(id);
     try {
       const res = await fetch(`/api/categories/${id}`, { method: "DELETE" });
@@ -75,10 +81,13 @@ export function CategoriesEditor({ onToast }: Props) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || `HTTP ${res.status}`);
       }
-      onToast({ type: "success", message: "تم الحذف" });
+      onToast({ type: "success", message: t.toasts.categoryDeleted });
       await refresh();
     } catch (e) {
-      onToast({ type: "error", message: e instanceof Error ? e.message : "تعذر الحذف" });
+      onToast({
+        type: "error",
+        message: e instanceof Error ? e.message : t.toasts.deleteFailed,
+      });
     } finally {
       setBusyId(null);
     }
@@ -87,28 +96,28 @@ export function CategoriesEditor({ onToast }: Props) {
   return (
     <div className="bg-white rounded-2xl border border-border p-6 space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-text-primary">الأقسام</h2>
+        <h2 className="text-lg font-bold text-text-primary">{t.title}</h2>
         <Button
           variant={adding ? "ghost" : "secondary"}
           size="sm"
           onClick={() => setAdding((v) => !v)}
         >
           <Plus className="w-4 h-4 me-1" />
-          {adding ? "إلغاء" : "قسم جديد"}
+          {adding ? t.cancel : t.addCategory}
         </Button>
       </div>
 
       {adding && (
         <div className="rounded-xl border border-border p-4 space-y-3 bg-bg-main/40">
           <Input
-            label="اسم القسم"
-            placeholder="مثال: سماعات"
+            label={t.labelLabel}
+            placeholder={t.labelPlaceholder}
             value={newLabel}
             onChange={(e) => setNewLabel(e.target.value)}
           />
           <div>
             <label className="block text-sm font-medium text-text-secondary mb-1.5">
-              الأيقونة
+              {t.iconLabel}
             </label>
             <div className="flex flex-wrap gap-2">
               {ICON_OPTIONS.map((name) => (
@@ -121,6 +130,7 @@ export function CategoriesEditor({ onToast }: Props) {
                       ? "bg-accent text-white border-accent"
                       : "bg-white border-border text-text-secondary hover:border-accent"
                   }`}
+                  dir="ltr"
                 >
                   {name}
                 </button>
@@ -129,14 +139,14 @@ export function CategoriesEditor({ onToast }: Props) {
           </div>
           <Button onClick={addCategory} loading={busyId === "__add"} disabled={!newLabel.trim()}>
             <Save className="w-4 h-4 me-1" />
-            حفظ
+            {t.save}
           </Button>
         </div>
       )}
 
       {categories.length === 0 ? (
         <p className="text-center text-text-secondary text-sm py-4">
-          لا توجد أقسام بعد. أضف أول قسم من الزر أعلاه.
+          {t.empty}
         </p>
       ) : (
         <ul className="divide-y divide-border">
@@ -150,6 +160,7 @@ export function CategoriesEditor({ onToast }: Props) {
               onDelete={() => removeCategory(cat.id)}
               onToast={onToast}
               onChange={refresh}
+              deleteTitle={t.deleteTitle}
             />
           ))}
         </ul>
@@ -166,9 +177,19 @@ interface RowProps {
   onDelete: () => void;
   onToast: (t: Toast) => void;
   onChange: () => Promise<void> | void;
+  deleteTitle: string;
 }
 
-function CategoryRow({ category, expanded, busy, onToggle, onDelete, onToast, onChange }: RowProps) {
+function CategoryRow({
+  category,
+  expanded,
+  busy,
+  onToggle,
+  onDelete,
+  onToast,
+  onChange,
+  deleteTitle,
+}: RowProps) {
   return (
     <li className="py-3">
       <div className="flex items-center justify-between gap-2">
@@ -182,15 +203,15 @@ function CategoryRow({ category, expanded, busy, onToggle, onDelete, onToast, on
           ) : (
             <ChevronRight className="w-4 h-4 text-text-secondary" />
           )}
-          <span className="font-medium">{category.label}</span>
-          <span className="text-xs text-text-secondary font-mono">{category.key}</span>
+          <span className="font-medium" dir="auto">{category.label}</span>
+          <span className="text-xs text-text-secondary font-mono" dir="ltr">{category.key}</span>
         </button>
         <button
           type="button"
           onClick={onDelete}
           disabled={busy}
           className="p-1.5 rounded-md text-text-secondary hover:bg-danger-light hover:text-danger disabled:opacity-50"
-          title="حذف"
+          title={deleteTitle}
         >
           <Trash2 className="w-4 h-4" />
         </button>
@@ -212,6 +233,9 @@ interface AttrProps {
 }
 
 function AttributesEditor({ categoryId, onToast, onChange }: AttrProps) {
+  const dict = useDictionary();
+  const t = dict.app.catalog.categoriesAdmin.attributes;
+  const tAdmin = dict.app.catalog.categoriesAdmin;
   const [attrs, setAttrs] = useState<CategoryAttribute[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
@@ -249,72 +273,87 @@ function AttributesEditor({ categoryId, onToast, onChange }: AttrProps) {
       await refresh();
       await onChange();
     } catch (e) {
-      onToast({ type: "error", message: e instanceof Error ? e.message : "تعذر الإضافة" });
+      onToast({
+        type: "error",
+        message: e instanceof Error ? e.message : tAdmin.toasts.addFailed,
+      });
     }
   };
 
   const removeAttr = async (id: string) => {
-    if (!confirm("حذف هذه الخاصية؟")) return;
+    if (!confirm(t.confirmDeleteAttribute)) return;
     await fetch(`/api/attributes/${id}`, { method: "DELETE" });
     await refresh();
     await onChange();
   };
 
   const addValue = async (attrId: string, label: string) => {
-    const t = label.trim();
-    if (!t) return;
-    const key = slugify(t);
+    const trimmed = label.trim();
+    if (!trimmed) return;
+    const key = slugify(trimmed);
     const res = await fetch(`/api/attributes/${attrId}/values`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key, label: t, position: 0 }),
+      body: JSON.stringify({ key, label: trimmed, position: 0 }),
     });
     if (!res.ok) {
-      onToast({ type: "error", message: (await res.json().catch(() => ({}))).error || "تعذر الإضافة" });
+      onToast({
+        type: "error",
+        message: (await res.json().catch(() => ({}))).error || tAdmin.toasts.addFailed,
+      });
       return;
     }
     await refresh();
   };
 
   const removeValue = async (id: string) => {
-    if (!confirm("حذف هذه القيمة؟")) return;
+    if (!confirm(t.confirmDeleteValue)) return;
     await fetch(`/api/attribute-values/${id}`, { method: "DELETE" });
     await refresh();
   };
 
-  if (loading) return <div className="text-sm text-text-secondary">جاري التحميل…</div>;
+  if (loading) return <div className="text-sm text-text-secondary">{t.loading}</div>;
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-text-secondary">الخصائص</h3>
+        <h3 className="text-sm font-semibold text-text-secondary">{t.heading}</h3>
         <Button variant="ghost" size="sm" onClick={() => setAdding((v) => !v)}>
           <Plus className="w-3.5 h-3.5 me-1" />
-          {adding ? "إلغاء" : "خاصية"}
+          {adding ? t.cancel : t.addAttribute}
         </Button>
       </div>
 
       {adding && (
         <div className="flex gap-2">
           <Input
-            placeholder="اسم الخاصية (مثل: النوع)"
+            placeholder={t.namePlaceholder}
             value={newLabel}
             onChange={(e) => setNewLabel(e.target.value)}
           />
           <Button size="sm" onClick={addAttr} disabled={!newLabel.trim()}>
-            حفظ
+            {t.save}
           </Button>
         </div>
       )}
 
       {attrs.length === 0 ? (
         <p className="text-xs text-text-secondary">
-          لا توجد خصائص. تخطّى المعالج الخطوة الثانية لهذا القسم.
+          {t.empty}
         </p>
       ) : (
         <ul className="space-y-3">
           {attrs.map((a) => (
-            <AttributeRow key={a.id} attr={a} onAddValue={addValue} onRemove={removeAttr} onRemoveValue={removeValue} />
+            <AttributeRow
+              key={a.id}
+              attr={a}
+              onAddValue={addValue}
+              onRemove={removeAttr}
+              onRemoveValue={removeValue}
+              valuePlaceholder={t.valuePlaceholder}
+              addValueLabel={t.addValue}
+              deleteValueTitle={t.deleteValueTitle}
+            />
           ))}
         </ul>
       )}
@@ -327,24 +366,31 @@ function AttributeRow({
   onAddValue,
   onRemove,
   onRemoveValue,
+  valuePlaceholder,
+  addValueLabel,
+  deleteValueTitle,
 }: {
   attr: CategoryAttribute;
   onAddValue: (attrId: string, label: string) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
   onRemoveValue: (id: string) => Promise<void>;
+  valuePlaceholder: string;
+  addValueLabel: string;
+  deleteValueTitle: string;
 }) {
   const [val, setVal] = useState("");
   return (
     <li className="rounded-lg border border-border p-3 space-y-2 bg-bg-main/30">
       <div className="flex items-center justify-between">
         <div>
-          <div className="font-medium text-sm">{attr.label}</div>
-          <div className="text-xs text-text-secondary font-mono">{attr.key}</div>
+          <div className="font-medium text-sm" dir="auto">{attr.label}</div>
+          <div className="text-xs text-text-secondary font-mono" dir="ltr">{attr.key}</div>
         </div>
         <button
           type="button"
           onClick={() => onRemove(attr.id)}
           className="p-1.5 rounded-md text-text-secondary hover:bg-danger-light hover:text-danger"
+          title={deleteValueTitle}
         >
           <Trash2 className="w-3.5 h-3.5" />
         </button>
@@ -355,13 +401,14 @@ function AttributeRow({
           <span
             key={v.id}
             className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-full bg-accent-light text-accent"
+            dir="auto"
           >
             {v.label}
             <button
               type="button"
               onClick={() => onRemoveValue(v.id)}
               className="text-accent/60 hover:text-danger"
-              title="حذف"
+              title={deleteValueTitle}
             >
               ×
             </button>
@@ -372,8 +419,8 @@ function AttributeRow({
       <div className="flex gap-2">
         <input
           type="text"
-          dir="rtl"
-          placeholder="قيمة جديدة (مثل: رجالي)"
+          dir="auto"
+          placeholder={valuePlaceholder}
           value={val}
           onChange={(e) => setVal(e.target.value)}
           className="flex-1 px-3 py-1.5 rounded-md border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-accent"
@@ -387,7 +434,7 @@ function AttributeRow({
           }}
           disabled={!val.trim()}
         >
-          إضافة
+          {addValueLabel}
         </Button>
       </div>
     </li>

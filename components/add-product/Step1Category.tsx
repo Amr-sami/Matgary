@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { slugify } from "@/lib/utils/slug";
 import type { CategoryDescriptor } from "@/lib/types";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 const DEFAULT_NEW_CATEGORY_ICON = "Package";
 
@@ -37,6 +38,8 @@ export function Step1Category({
   onCategoryCreated,
   loading,
 }: Step1CategoryProps) {
+  const dict = useDictionary();
+  const t = dict.app.inventory.addProduct.step1;
   const [modalOpen, setModalOpen] = useState(false);
   const [newLabel, setNewLabel] = useState("");
   const [saving, setSaving] = useState(false);
@@ -74,7 +77,7 @@ export function Step1Category({
       if (newId) onSelect(newId);
       closeModal();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "تعذر الإضافة");
+      setError(e instanceof Error ? e.message : t.newCategory.error);
     } finally {
       setSaving(false);
     }
@@ -82,13 +85,13 @@ export function Step1Category({
 
   if (loading) {
     return (
-      <div className="text-center py-12 text-text-secondary">جاري التحميل…</div>
+      <div className="text-center py-12 text-text-secondary">{t.loading}</div>
     );
   }
 
   return (
     <div>
-      <h3 className="text-center font-semibold mb-6">اختر الصنف</h3>
+      <h3 className="text-center font-semibold mb-6">{t.heading}</h3>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {categories.map((cat) => {
           const Icon = getIcon(cat.icon);
@@ -106,7 +109,7 @@ export function Step1Category({
               )}
             >
               <Icon className={cn("w-16 h-16 mb-4", isSelected && "text-accent")} />
-              <span className="text-xl font-semibold">{cat.label}</span>
+              <span className="text-xl font-semibold" dir="auto">{cat.label}</span>
             </button>
           );
         })}
@@ -117,15 +120,15 @@ export function Step1Category({
           className="flex flex-col items-center justify-center p-8 rounded-xl border-2 border-dashed border-border bg-white text-text-secondary hover:border-accent hover:text-accent transition-all"
         >
           <Plus className="w-16 h-16 mb-4" />
-          <span className="text-xl font-semibold">إضافة صنف</span>
+          <span className="text-xl font-semibold">{t.addCategory}</span>
         </button>
       </div>
 
-      <Modal isOpen={modalOpen} onClose={closeModal} title="إضافة صنف جديد">
+      <Modal isOpen={modalOpen} onClose={closeModal} title={t.newCategory.title}>
         <div className="space-y-4">
           <Input
-            label="اسم الصنف"
-            placeholder="مثلاً: جلود"
+            label={t.newCategory.label}
+            placeholder={t.newCategory.placeholder}
             value={newLabel}
             onChange={(e) => setNewLabel(e.target.value)}
             autoFocus
@@ -144,7 +147,7 @@ export function Step1Category({
               disabled={saving}
               className="flex-1"
             >
-              إلغاء
+              {dict.app.common.cancel}
             </Button>
             <Button
               onClick={submitNewCategory}
@@ -152,7 +155,7 @@ export function Step1Category({
               disabled={!newLabel.trim()}
               className="flex-1"
             >
-              حفظ الصنف
+              {t.newCategory.save}
             </Button>
           </div>
         </div>

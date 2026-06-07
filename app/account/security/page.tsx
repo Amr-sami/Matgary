@@ -8,8 +8,11 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { ShieldCheck } from "@/lib/icons";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 function DeleteTenantCard({ isOwner }: { isOwner: boolean }) {
+  const dict = useDictionary();
+  const t = dict.app.accountSecurity.delete;
   const [slug, setSlug] = useState("");
   const [busy, setBusy] = useState(false);
   const [scheduledAt, setScheduledAt] = useState<string | null>(null);
@@ -36,10 +39,10 @@ function DeleteTenantCard({ isOwner }: { isOwner: boolean }) {
       const body = (await res.json()) as { scheduledAt?: string; error?: string };
       if (!res.ok) {
         const map: Record<string, string> = {
-          SLUG_MISMATCH: "اسم المتجر لا يطابق",
-          Forbidden: "غير مسموح",
+          SLUG_MISMATCH: t.errors.slugMismatch,
+          Forbidden: t.errors.forbidden,
         };
-        setError(map[body.error ?? ""] ?? "تعذر التحديد");
+        setError(map[body.error ?? ""] ?? t.errors.genericError);
         return;
       }
       setScheduledAt(body.scheduledAt ?? null);
@@ -59,24 +62,27 @@ function DeleteTenantCard({ isOwner }: { isOwner: boolean }) {
   };
   return (
     <div className="bg-white rounded-2xl border border-danger/30 p-6 space-y-3">
-      <p className="text-sm font-medium text-danger">حذف المتجر نهائياً</p>
+      <p className="text-sm font-medium text-danger">{t.title}</p>
       <p className="text-xs text-text-secondary">
-        يحذف كل البيانات (المنتجات، المبيعات، الموظفين، السجلات) بعد فترة سماح ٣٠ يوماً. يمكنك التراجع خلالها.
+        {t.intro}
       </p>
       {scheduledAt ? (
         <div className="space-y-2 bg-danger/5 rounded-lg p-3">
           <p className="text-xs text-text-secondary">
-            موعد الحذف: <span dir="ltr" className="font-mono">{new Date(scheduledAt).toISOString().slice(0, 10)}</span>
+            {t.scheduledLabel}{" "}
+            <span dir="ltr" className="font-mono">
+              {new Date(scheduledAt).toISOString().slice(0, 10)}
+            </span>
           </p>
-          <Button variant="secondary" onClick={cancel} loading={busy}>إلغاء الحذف</Button>
+          <Button variant="secondary" onClick={cancel} loading={busy}>{t.cancelButton}</Button>
         </div>
       ) : (
         <>
-          <p className="text-xs text-text-secondary">للتأكيد، اكتب اسم المتجر (slug) كما يظهر في عنوان تسجيل الدخول:</p>
-          <Input value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="my-store" dir="ltr" />
+          <p className="text-xs text-text-secondary">{t.confirmHint}</p>
+          <Input value={slug} onChange={(e) => setSlug(e.target.value)} placeholder={t.slugPlaceholder} dir="ltr" />
           {error && <p className="text-xs text-danger">{error}</p>}
           <Button variant="secondary" onClick={schedule} loading={busy} disabled={!slug.trim()}>
-            بدء عملية الحذف (٣٠ يوماً)
+            {t.startButton}
           </Button>
         </>
       )}
@@ -85,9 +91,6 @@ function DeleteTenantCard({ isOwner }: { isOwner: boolean }) {
 }
 
 // H03 — /account/security. Owner-only enrolment + management UI for TOTP 2FA.
-// Manual-secret entry path (no QR rendering in v1; mobile authenticator apps
-// accept either a pasted secret or a tapped otpauth:// link).
-
 type Status = "loading" | "off" | "enrolling" | "on" | "showingCodes";
 
 interface EnrollmentPreview {
@@ -96,6 +99,8 @@ interface EnrollmentPreview {
 }
 
 export default function SecurityPage() {
+  const dict = useDictionary();
+  const t = dict.app.accountSecurity;
   const { data: session } = useSession();
   const [status, setStatus] = useState<Status>("loading");
   const [preview, setPreview] = useState<EnrollmentPreview | null>(null);
@@ -109,8 +114,6 @@ export default function SecurityPage() {
   const [revoking, setRevoking] = useState(false);
 
   useEffect(() => {
-    // Probe initial state via the session — the JWT carries no 2FA flag so
-    // we'd ideally fetch /api/account/me. For v1, lean on a tiny lookup.
     void (async () => {
       const res = await fetch("/api/account/2fa-status").catch(() => null);
       if (!res?.ok) {
@@ -129,12 +132,9 @@ export default function SecurityPage() {
     setBusy(true);
     try {
       const res = await fetch("/api/account/2fa/start", { method: "POST" });
-      if (!res.ok) throw new Error("تعذر بدء التفعيل");
+      if (!res.ok) throw new Error(t.errors.startFailed);
       const p = (await res.json()) as EnrollmentPreview;
       setPreview(p);
-      // Render the otpauth:// URI as a QR data URI so phones can scan it.
-      // 256 px is enough for any reasonable camera; margin=1 keeps the
-      // quiet zone narrow so it fits nicely on a card.
       try {
         const dataUri = await QRCode.toDataURL(p.otpauthUri, {
           width: 256,
@@ -143,11 +143,11 @@ export default function SecurityPage() {
         });
         setQrDataUri(dataUri);
       } catch {
-        setQrDataUri(null); // fall back to manual paste only
+        setQrDataUri(null);
       }
       setStatus("enrolling");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "خطأ غير متوقع");
+      setError(e instanceof Error ? e.message : t.errors.unexpected);
     } finally {
       setBusy(false);
     }
@@ -165,7 +165,7 @@ export default function SecurityPage() {
       });
       const body = (await res.json()) as { recoveryCodes?: string[]; error?: string };
       if (!res.ok) {
-        setError(body.error === "INVALID_TOTP" ? "الرمز غير صحيح" : "تعذر التفعيل");
+        setError(body.error === "INVALID_TOTP" ? t.errors.badCode : t.errors.enableFailed);
         return;
       }
       setRecoveryCodes(body.recoveryCodes ?? []);
@@ -188,11 +188,11 @@ export default function SecurityPage() {
       const body = (await res.json()) as { error?: string };
       if (!res.ok) {
         const map: Record<string, string> = {
-          BAD_PASSWORD: "كلمة المرور غير صحيحة",
-          INVALID_TOTP: "الرمز غير صحيح",
-          NOT_ENROLLED: "2FA غير مفعلة",
+          BAD_PASSWORD: t.errors.badPassword,
+          INVALID_TOTP: t.errors.badCode,
+          NOT_ENROLLED: t.errors.notEnrolled,
         };
-        setError(map[body.error ?? ""] ?? "تعذر التعطيل");
+        setError(map[body.error ?? ""] ?? t.errors.disableFailed);
         return;
       }
       setStatus("off");
@@ -215,10 +215,10 @@ export default function SecurityPage() {
       const body = (await res.json()) as { recoveryCodes?: string[]; error?: string };
       if (!res.ok) {
         const map: Record<string, string> = {
-          BAD_PASSWORD: "كلمة المرور غير صحيحة",
-          INVALID_TOTP: "الرمز غير صحيح",
+          BAD_PASSWORD: t.errors.badPassword,
+          INVALID_TOTP: t.errors.badCode,
         };
-        setError(map[body.error ?? ""] ?? "تعذر التجديد");
+        setError(map[body.error ?? ""] ?? t.errors.regenerateFailed);
         return;
       }
       setRecoveryCodes(body.recoveryCodes ?? []);
@@ -232,7 +232,7 @@ export default function SecurityPage() {
 
   if (status === "loading") {
     return (
-      <AppShell title="الأمان">
+      <AppShell title={t.title}>
         <div className="p-8 text-center text-text-secondary">…</div>
       </AppShell>
     );
@@ -240,23 +240,23 @@ export default function SecurityPage() {
 
   if (!isOwner) {
     return (
-      <AppShell title="الأمان">
+      <AppShell title={t.title}>
         <div className="max-w-xl mx-auto p-8 text-center">
-          <p className="text-text-secondary">المصادقة الثنائية متاحة لمالك المتجر فقط في هذه النسخة.</p>
+          <p className="text-text-secondary">{t.staffNotice}</p>
         </div>
       </AppShell>
     );
   }
 
   return (
-    <AppShell title="الأمان">
+    <AppShell title={t.title}>
     <div className="max-w-xl mx-auto p-6 space-y-6">
       <header className="flex items-center gap-3">
         <ShieldCheck className="w-7 h-7 text-accent" />
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">المصادقة الثنائية (2FA)</h1>
+          <h1 className="text-2xl font-bold text-text-primary">{t.heading}</h1>
           <p className="text-sm text-text-secondary">
-            طبقة حماية إضافية فوق كلمة السر — تطبيق المصادقة على هاتفك يولّد رمزاً من 6 أرقام يتغير كل 30 ثانية.
+            {t.subhead}
           </p>
         </div>
       </header>
@@ -268,23 +268,24 @@ export default function SecurityPage() {
       {status === "off" && (
         <div className="bg-white rounded-2xl border border-border p-6 space-y-4">
           <p className="text-text-secondary text-sm">
-            الحالة الحالية: <span className="text-text-primary font-medium">معطلة</span>
+            {t.statusOffLine}
+            <span className="text-text-primary font-medium">{t.statusOff}</span>
           </p>
-          <Button onClick={startEnroll} loading={busy}>تفعيل المصادقة الثنائية</Button>
+          <Button onClick={startEnroll} loading={busy}>{t.enableButton}</Button>
         </div>
       )}
 
       {status === "enrolling" && preview && (
         <div className="bg-white rounded-2xl border border-border p-6 space-y-4">
           <p className="text-sm text-text-secondary">
-            1) افتح تطبيق المصادقة على هاتفك (Google Authenticator / Microsoft Authenticator / Authy)، ثم اختر "إضافة حساب → مسح الكود":
+            {t.enrollStep1}
           </p>
           {qrDataUri && (
             <div className="flex justify-center">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={qrDataUri}
-                alt="QR للمصادقة الثنائية"
+                alt={t.qrAlt}
                 width={256}
                 height={256}
                 className="rounded-lg border border-border bg-white p-2"
@@ -293,17 +294,17 @@ export default function SecurityPage() {
           )}
           <details className="text-sm">
             <summary className="cursor-pointer text-text-secondary hover:text-text-primary">
-              لا يمكنك مسح الكود؟ أدخله يدوياً
+              {t.manualSummary}
             </summary>
             <div className="mt-3 space-y-2">
               <p className="text-xs text-text-secondary">
-                في تطبيق المصادقة، اختر "إضافة حساب → إدخال يدوي" والصق هذا المفتاح:
+                {t.manualHint}
               </p>
               <div className="font-mono text-center bg-bg-main rounded-lg p-3 select-all" dir="ltr">
                 {preview.secret.match(/.{1,4}/g)?.join(" ")}
               </div>
               <p className="text-xs text-text-secondary">
-                أو على نفس الجهاز، اضغط الرابط لإضافة الحساب مباشرة:
+                {t.linkHint}
               </p>
               <a
                 href={preview.otpauthUri}
@@ -315,7 +316,7 @@ export default function SecurityPage() {
             </div>
           </details>
           <p className="text-sm text-text-secondary">
-            2) أدخل الرمز المكوّن من 6 أرقام الذي يعرضه التطبيق الآن:
+            {t.enrollStep2}
           </p>
           <Input
             value={code}
@@ -327,8 +328,8 @@ export default function SecurityPage() {
             autoComplete="one-time-code"
           />
           <div className="flex gap-2">
-            <Button variant="secondary" onClick={() => setStatus("off")} disabled={busy}>إلغاء</Button>
-            <Button onClick={confirmEnroll} loading={busy} disabled={code.length !== 6}>تأكيد التفعيل</Button>
+            <Button variant="secondary" onClick={() => setStatus("off")} disabled={busy}>{t.cancel}</Button>
+            <Button onClick={confirmEnroll} loading={busy} disabled={code.length !== 6}>{t.confirmEnroll}</Button>
           </div>
         </div>
       )}
@@ -336,14 +337,14 @@ export default function SecurityPage() {
       {status === "showingCodes" && (
         <div className="bg-white rounded-2xl border border-border p-6 space-y-4">
           <p className="text-sm text-text-primary font-medium">
-            احفظ هذه الرموز الاحتياطية في مكان آمن — لن تظهر مرة أخرى. كل رمز يصلح لمرة واحدة فقط ويفتح حسابك إذا فقدت هاتفك.
+            {t.codesHeading}
           </p>
           <div className="font-mono bg-bg-main rounded-lg p-3 grid grid-cols-2 gap-2 text-center" dir="ltr">
             {recoveryCodes.map((c) => (
               <span key={c} className="select-all">{c}</span>
             ))}
           </div>
-          <Button onClick={() => setStatus("on")}>فهمت، حفظتها</Button>
+          <Button onClick={() => setStatus("on")}>{t.codesUnderstood}</Button>
         </div>
       )}
 
@@ -351,9 +352,9 @@ export default function SecurityPage() {
 
       {(status === "on" || status === "off") && (
         <div className="bg-white rounded-2xl border border-border p-6 space-y-3">
-          <p className="text-sm font-medium">تنزيل نسخة من بيانات متجرك</p>
+          <p className="text-sm font-medium">{t.export.title}</p>
           <p className="text-xs text-text-secondary">
-            ملف JSON يحتوي كل الجداول التابعة لهذا المتجر (المنتجات، المبيعات، الموظفين، السجلات…). يتم تحميله مباشرة على جهازك.
+            {t.export.intro}
           </p>
           <Button
             variant="secondary"
@@ -362,7 +363,7 @@ export default function SecurityPage() {
               try {
                 const res = await fetch("/api/account/export", { method: "POST" });
                 if (!res.ok) {
-                  setError("تعذر التنزيل. حاول مرة أخرى لاحقاً.");
+                  setError(t.export.error);
                   return;
                 }
                 const blob = await res.blob();
@@ -382,16 +383,16 @@ export default function SecurityPage() {
             }}
             loading={exporting}
           >
-            تنزيل البيانات
+            {t.export.button}
           </Button>
         </div>
       )}
 
       {(status === "on" || status === "off") && (
         <div className="bg-white rounded-2xl border border-border p-6 space-y-3">
-          <p className="text-sm font-medium">تسجيل خروج من جميع الأجهزة</p>
+          <p className="text-sm font-medium">{t.revoke.title}</p>
           <p className="text-xs text-text-secondary">
-            ينهي كل جلسات هذا الحساب فوراً، بما في ذلك الجلسة الحالية. مفيد إذا فقدت جهازاً أو شككت في تسريب حسابك.
+            {t.revoke.intro}
           </p>
           <Button
             variant="secondary"
@@ -405,7 +406,7 @@ export default function SecurityPage() {
             }}
             loading={revoking}
           >
-            تسجيل الخروج من كل مكان
+            {t.revoke.button}
           </Button>
         </div>
       )}
@@ -413,21 +414,24 @@ export default function SecurityPage() {
       {status === "on" && (
         <>
           <div className="bg-white rounded-2xl border border-border p-6 space-y-4">
-            <p className="text-sm text-text-secondary">2FA الحالة الحالية: <span className="text-success font-medium">مفعّلة</span></p>
+            <p className="text-sm text-text-secondary">
+              {t.statusOnLine}
+              <span className="text-success font-medium">{t.statusOn}</span>
+            </p>
             <div className="space-y-3 pt-2">
-              <p className="text-sm font-medium">تجديد الرموز الاحتياطية</p>
-              <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} placeholder="كلمة المرور الحالية" autoComplete="current-password" />
-              <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="رمز التطبيق (6 أرقام)" maxLength={6} dir="ltr" inputMode="numeric" autoComplete="one-time-code" />
-              <Button onClick={regenerate} loading={busy}>تجديد الرموز</Button>
+              <p className="text-sm font-medium">{t.regenerateHeading}</p>
+              <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t.currentPasswordPlaceholder} autoComplete="current-password" />
+              <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder={t.codePlaceholder} maxLength={6} dir="ltr" inputMode="numeric" autoComplete="one-time-code" />
+              <Button onClick={regenerate} loading={busy}>{t.regenerate}</Button>
             </div>
           </div>
           <div className="bg-white rounded-2xl border border-border p-6 space-y-4">
-            <p className="text-sm font-medium text-danger">تعطيل المصادقة الثنائية</p>
+            <p className="text-sm font-medium text-danger">{t.disableHeading}</p>
             <p className="text-xs text-text-secondary">
-              يضعف حماية حسابك. لا تفعل ذلك إلا إذا كنت متأكداً.
+              {t.disableHint}
             </p>
             <Button variant="secondary" onClick={disable} loading={busy} disabled={!password || code.length !== 6}>
-              تعطيل (يستخدم نفس كلمة المرور + الرمز أعلاه)
+              {t.disableButton}
             </Button>
           </div>
         </>

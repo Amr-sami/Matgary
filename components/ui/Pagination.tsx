@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronRight, ChevronLeft } from "@/lib/icons";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 interface PaginationProps {
   page: number;
@@ -17,6 +18,8 @@ export function Pagination({
   onPageChange,
   onPageSizeChange,
 }: PaginationProps) {
+  const dict = useDictionary();
+  const t = dict.app.ui.pagination;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const end = Math.min(total, page * pageSize);
@@ -26,7 +29,10 @@ export function Pagination({
   return (
     <div className="flex items-center justify-between flex-wrap gap-2 px-2 py-2 text-sm">
       <span className="text-text-secondary">
-        {start}–{end} من {total}
+        {t.range
+          .replace("{start}", String(start))
+          .replace("{end}", String(end))
+          .replace("{total}", String(total))}
       </span>
       <div className="flex items-center gap-2">
         {onPageSizeChange && (
@@ -37,7 +43,7 @@ export function Pagination({
           >
             {[25, 50, 100, 200].map((n) => (
               <option key={n} value={n}>
-                {n} / صفحة
+                {t.perPage.replace("{n}", String(n))}
               </option>
             ))}
           </select>

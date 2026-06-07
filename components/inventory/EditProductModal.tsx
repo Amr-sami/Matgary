@@ -7,6 +7,7 @@ import { Input } from "../ui/Input";
 import { SupplierPicker } from "../suppliers/SupplierPicker";
 import { updateProduct } from "@/lib/api/products";
 import type { Product } from "@/lib/types";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 interface EditProductModalProps {
   isOpen: boolean;
@@ -21,6 +22,8 @@ export function EditProductModal({
   product,
   onSuccess,
 }: EditProductModalProps) {
+  const dict = useDictionary();
+  const t = dict.app.inventory.editForm;
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState("");
   const [brand, setBrand] = useState("");
@@ -54,14 +57,14 @@ export function EditProductModal({
     if (!product) return;
     const trimmedName = name.trim();
     if (!trimmedName) {
-      alert("اسم المنتج مطلوب");
+      alert(t.errors.nameRequired);
       return;
     }
     setLoading(true);
     try {
       const tagList = tags
         .split(",")
-        .map((t) => t.trim())
+        .map((tag) => tag.trim())
         .filter(Boolean);
       await updateProduct(product.id, {
         name: trimmedName,
@@ -82,7 +85,7 @@ export function EditProductModal({
       onClose();
     } catch (error) {
       console.error(error);
-      alert("حدث خطأ أثناء التحديث");
+      alert(t.errors.updateFailed);
     } finally {
       setLoading(false);
     }
@@ -91,24 +94,24 @@ export function EditProductModal({
   if (!product) return null;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="تعديل المنتج">
+    <Modal isOpen={isOpen} onClose={onClose} title={t.title}>
       <div className="space-y-4">
         <Input
-          label="اسم المنتج"
+          label={t.fields.name}
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
 
         <Input
-          label="الماركة"
+          label={t.fields.brand}
           type="text"
           value={brand}
           onChange={(e) => setBrand(e.target.value)}
         />
 
         <Input
-          label="الكمية"
+          label={t.fields.quantity}
           type="number"
           value={quantity}
           onChange={(e) => setQuantity(Number(e.target.value))}
@@ -116,7 +119,7 @@ export function EditProductModal({
         />
 
         <Input
-          label="سعر البيع (جنيه)"
+          label={t.fields.price}
           type="number"
           value={price}
           onChange={(e) => setPrice(Number(e.target.value))}
@@ -124,7 +127,7 @@ export function EditProductModal({
         />
 
         <Input
-          label="سعر الشراء (جنيه)"
+          label={t.fields.costPrice}
           type="number"
           value={costPrice}
           onChange={(e) => setCostPrice(Number(e.target.value))}
@@ -132,7 +135,7 @@ export function EditProductModal({
         />
 
         <Input
-          label="حد التنبيه عند انخفاض الكمية"
+          label={t.fields.lowStockThreshold}
           type="number"
           value={lowStockThreshold}
           onChange={(e) => setLowStockThreshold(Number(e.target.value))}
@@ -140,7 +143,7 @@ export function EditProductModal({
         />
 
         <Input
-          label="كود المنتج / الباركود"
+          label={t.fields.sku}
           type="text"
           value={sku}
           onChange={(e) => setSku(e.target.value)}
@@ -149,11 +152,11 @@ export function EditProductModal({
         <SupplierPicker
           value={supplierId}
           onChange={setSupplierId}
-          label="المورد"
+          label={t.fields.supplier}
         />
         {!supplierId && supplier && (
           <Input
-            label="المورد (نص قديم)"
+            label={t.fields.legacySupplier}
             type="text"
             value={supplier}
             onChange={(e) => setSupplier(e.target.value)}
@@ -161,26 +164,26 @@ export function EditProductModal({
         )}
 
         <Input
-          label="مكان التخزين"
+          label={t.fields.location}
           type="text"
           value={location}
           onChange={(e) => setLocation(e.target.value)}
         />
 
         <Input
-          label="تاجات (افصل بفاصلة)"
+          label={t.fields.tags}
           type="text"
           value={tags}
           onChange={(e) => setTags(e.target.value)}
-          placeholder="عرض، جديد، تصفية"
+          placeholder={t.fields.tagsPlaceholder}
         />
 
         <div className="flex gap-3 pt-4">
           <Button variant="ghost" onClick={onClose} className="flex-1">
-            إلغاء
+            {dict.app.common.cancel}
           </Button>
           <Button onClick={handleSave} loading={loading} className="flex-1">
-            حفظ
+            {t.save}
           </Button>
         </div>
       </div>

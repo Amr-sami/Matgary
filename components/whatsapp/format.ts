@@ -1,36 +1,56 @@
 // Time-ago + window-countdown formatters for the inbox.
+//
+// Both formatters take their localised copy from the dictionary so callers
+// can stay locale-aware. Callers pass `locale` (for the absolute-date fallback)
+// and the relevant copy bundle (relative or window).
 
-export function relativeTime(iso: string | null | undefined): string {
+import type { Locale } from "@/lib/i18n/config";
+import { formatDate, formatTime } from "@/lib/i18n/format";
+
+export interface RelativeCopy {
+  now: string;
+  minutes: string;
+  hours: string;
+  days: string;
+}
+
+export function relativeTime(
+  iso: string | null | undefined,
+  locale: Locale,
+  copy: RelativeCopy,
+): string {
   if (!iso) return "";
   const d = new Date(iso);
   if (!Number.isFinite(d.valueOf())) return "";
   const diffMs = Date.now() - d.getTime();
   const min = Math.round(diffMs / 60_000);
-  if (min < 1) return "الآن";
-  if (min < 60) return `قبل ${min} د`;
+  if (min < 1) return copy.now;
+  if (min < 60) return copy.minutes.replace("{n}", String(min));
   const h = Math.round(min / 60);
-  if (h < 24) return `قبل ${h} س`;
+  if (h < 24) return copy.hours.replace("{n}", String(h));
   const days = Math.round(h / 24);
-  if (days < 7) return `قبل ${days} ي`;
-  return d.toLocaleDateString("ar-EG", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  if (days < 7) return copy.days.replace("{n}", String(days));
+  return formatDate(d, locale);
 }
 
-export function clockTime(iso: string | null | undefined): string {
+export function clockTime(
+  iso: string | null | undefined,
+  locale: Locale,
+): string {
   if (!iso) return "";
   const d = new Date(iso);
   if (!Number.isFinite(d.valueOf())) return "";
-  return d.toLocaleTimeString("ar-EG", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatTime(d, locale);
 }
 
-/** Window state for the thread header. Returns a short Arabic label
- *  plus a tone hint so the caller can colour appropriately. */
+export interface WindowCopy {
+  noChat: string;
+  closed: string;
+  endingSoon: string;
+  /** `"النافذة مفتوحة ({h} ساعة متبقية)"` */
+  openHours: string;
+}
+
 export interface WindowDisplay {
   label: string;
   tone: "open" | "warning" | "closed";
@@ -38,29 +58,21 @@ export interface WindowDisplay {
 
 export function windowDisplay(
   expiresAt: string | null | undefined,
+  copy: WindowCopy,
 ): WindowDisplay {
   if (!expiresAt) {
-    return {
-      label: "العميل لم يراسل بعد — استخدم قالباً",
-      tone: "closed",
-    };
+    return { label: copy.noChat, tone: "closed" };
   }
   const ms = new Date(expiresAt).getTime() - Date.now();
   if (ms <= 0) {
-    return {
-      label: "نافذة المحادثة مغلقة — استخدم قالباً",
-      tone: "closed",
-    };
+    return { label: copy.closed, tone: "closed" };
   }
   const h = Math.round(ms / 3_600_000);
   if (h <= 1) {
-    return {
-      label: "النافذة تنتهي خلال ساعة — أرسل بسرعة",
-      tone: "warning",
-    };
+    return { label: copy.endingSoon, tone: "warning" };
   }
   return {
-    label: `النافذة مفتوحة (${h} ساعة متبقية)`,
+    label: copy.openHours.replace("{h}", String(h)),
     tone: "open",
   };
 }

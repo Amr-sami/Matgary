@@ -2,9 +2,14 @@
 
 import { cn } from "@/lib/utils";
 import type { Category, Gender, CategoryDescriptor } from "@/lib/types";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 export type StockStatus = "in" | "low" | "out";
 
+/**
+ * Back-compat export for callers that haven't been migrated to use the dict.
+ * New code should pull labels from `dict.app.inventory.filters.stockStatus`.
+ */
 export const STOCK_STATUS_LABELS: Record<StockStatus, string> = {
   in: "متوفر",
   low: "مخزون منخفض",
@@ -60,6 +65,8 @@ export function InventoryFilters({
   selectedSupplier,
   onSupplierChange,
 }: InventoryFiltersProps) {
+  const dict = useDictionary();
+  const t = dict.app.inventory.filters;
   const stockStatuses: (StockStatus | null)[] = [null, "in", "low", "out"];
 
   return (
@@ -76,7 +83,7 @@ export function InventoryFilters({
               : "bg-white border border-border text-text-secondary hover:border-accent",
           )}
         >
-          كل الأصناف
+          {t.allCategories}
         </button>
         {categoryOptions.map((cat) => (
           <button
@@ -88,6 +95,7 @@ export function InventoryFilters({
                 ? "bg-accent text-white"
                 : "bg-white border border-border text-text-secondary hover:border-accent",
             )}
+            dir="auto"
           >
             {cat.label}
           </button>
@@ -107,7 +115,7 @@ export function InventoryFilters({
                 : "bg-white border border-border text-text-secondary hover:border-accent",
             )}
           >
-            الكل
+            {t.allGenders}
           </button>
           {genderOptions.map((g) => (
             <button
@@ -119,6 +127,7 @@ export function InventoryFilters({
                   ? "bg-accent text-white"
                   : "bg-white border border-border text-text-secondary hover:border-accent",
               )}
+              dir="auto"
             >
               {g}
             </button>
@@ -139,7 +148,7 @@ export function InventoryFilters({
                 : "bg-white border border-border text-text-secondary hover:border-accent"
             )}
           >
-            {s ? STOCK_STATUS_LABELS[s] : "كل الحالات"}
+            {s ? t.stockStatus[s] : t.allStatuses}
           </button>
         ))}
       </div>
@@ -151,9 +160,9 @@ export function InventoryFilters({
             value={selectedBrand || ""}
             onChange={(e) => onBrandChange(e.target.value || null)}
             className="px-3 py-2 rounded-lg border border-border bg-white text-sm"
-            dir="rtl"
+            dir="auto"
           >
-            <option value="">كل البراندات</option>
+            <option value="">{t.allBrands}</option>
             {brands.map((brand) => (
               <option key={brand} value={brand}>
                 {brand}
@@ -166,9 +175,9 @@ export function InventoryFilters({
             value={selectedSupplier || ""}
             onChange={(e) => onSupplierChange(e.target.value || null)}
             className="px-3 py-2 rounded-lg border border-border bg-white text-sm"
-            dir="rtl"
+            dir="auto"
           >
-            <option value="">كل الموردين</option>
+            <option value="">{t.allSuppliers}</option>
             {suppliers.map((s) => (
               <option key={s} value={s}>
                 {s}
@@ -180,20 +189,20 @@ export function InventoryFilters({
           type="number"
           min={0}
           inputMode="numeric"
-          placeholder="أقل سعر"
+          placeholder={t.minPrice}
           value={minPrice}
           onChange={(e) => onMinPriceChange(e.target.value)}
-          dir="rtl"
+          dir="ltr"
           className="px-3 py-2 rounded-lg border border-border bg-white text-sm w-28"
         />
         <input
           type="number"
           min={0}
           inputMode="numeric"
-          placeholder="أعلى سعر"
+          placeholder={t.maxPrice}
           value={maxPrice}
           onChange={(e) => onMaxPriceChange(e.target.value)}
-          dir="rtl"
+          dir="ltr"
           className="px-3 py-2 rounded-lg border border-border bg-white text-sm w-28"
         />
       </div>
@@ -210,20 +219,21 @@ export function InventoryFilters({
                 : "bg-white border border-border text-text-secondary hover:border-accent"
             )}
           >
-            كل التاجات
+            {t.allTags}
           </button>
-          {tags.map((t) => (
+          {tags.map((tag) => (
             <button
-              key={t}
-              onClick={() => onTagChange(selectedTag === t ? null : t)}
+              key={tag}
+              onClick={() => onTagChange(selectedTag === tag ? null : tag)}
               className={cn(
                 "px-3 py-1.5 rounded-full text-xs font-medium transition-colors",
-                selectedTag === t
+                selectedTag === tag
                   ? "bg-accent text-white"
                   : "bg-white border border-border text-text-secondary hover:border-accent"
               )}
+              dir="auto"
             >
-              #{t}
+              #{tag}
             </button>
           ))}
         </div>

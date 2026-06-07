@@ -2,14 +2,18 @@
 
 import { useMemo } from "react";
 import type { Sale } from "@/lib/types";
-import { formatPrice } from "@/lib/utils";
 import { TrendingUp, TrendingDown, Minus } from "@/lib/icons";
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
+import { formatCurrency } from "@/lib/i18n/format";
 
 interface DayCompareCardProps {
   sales: Sale[]; // entire sales list (not date-filtered)
 }
 
 export function DayCompareCard({ sales }: DayCompareCardProps) {
+  const dict = useDictionary();
+  const locale = useLocale();
+  const t = dict.app.sales.dayCompare;
   const stats = useMemo(() => {
     const now = new Date();
     const startToday = new Date(now);
@@ -28,11 +32,11 @@ export function DayCompareCard({ sales }: DayCompareCardProps) {
     let lastCount = 0;
     for (const s of sales) {
       if (s.isReturned) continue;
-      const t = s.saleDate.getTime();
-      if (t >= startToday.getTime() && t <= endToday.getTime()) {
+      const ts = s.saleDate.getTime();
+      if (ts >= startToday.getTime() && ts <= endToday.getTime()) {
         today += s.totalPrice;
         todayCount += 1;
-      } else if (t >= startLast.getTime() && t <= endLast.getTime()) {
+      } else if (ts >= startLast.getTime() && ts <= endLast.getTime()) {
         lastWeek += s.totalPrice;
         lastCount += 1;
       }
@@ -42,22 +46,27 @@ export function DayCompareCard({ sales }: DayCompareCardProps) {
 
   const diff = stats.today - stats.lastWeek;
   const pct = stats.lastWeek > 0 ? (diff / stats.lastWeek) * 100 : null;
-  const dayName = new Date().toLocaleDateString("ar-EG", { weekday: "long" });
+  const dayName = new Date().toLocaleDateString(
+    locale === "en" ? "en-EG" : "ar-EG",
+    { weekday: "long" } as Intl.DateTimeFormatOptions,
+  );
 
   return (
     <div className="rounded-xl border border-border bg-white p-4">
       <p className="text-sm text-text-secondary mb-1">
-        مقارنة يوم {dayName} الحالي بـ {dayName} الماضي
+        {t.header.replace(/\{day\}/g, dayName)}
       </p>
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xl font-bold">{formatPrice(stats.today)}</p>
-          <p className="text-xs text-text-secondary">{stats.todayCount} فاتورة اليوم</p>
+          <p className="text-xl font-bold">{formatCurrency(stats.today, locale)}</p>
+          <p className="text-xs text-text-secondary">
+            {t.todayInvoices.replace("{n}", String(stats.todayCount))}
+          </p>
         </div>
         <div className="text-end">
-          <p className="text-sm text-text-secondary">{formatPrice(stats.lastWeek)}</p>
+          <p className="text-sm text-text-secondary">{formatCurrency(stats.lastWeek, locale)}</p>
           <p className="text-[10px] text-text-secondary">
-            {stats.lastCount} فاتورة الأسبوع الماضي
+            {t.lastWeekInvoices.replace("{n}", String(stats.lastCount))}
           </p>
         </div>
       </div>
@@ -79,7 +88,7 @@ export function DayCompareCard({ sales }: DayCompareCardProps) {
           }
         >
           {diff >= 0 ? "+" : ""}
-          {formatPrice(Math.abs(diff))}
+          {formatCurrency(Math.abs(diff), locale)}
           {pct !== null && (
             <span className="ms-1 text-xs">
               ({pct >= 0 ? "+" : ""}

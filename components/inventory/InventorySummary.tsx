@@ -2,7 +2,8 @@
 
 import type { Product } from "@/lib/types";
 import { AlertTriangle, Package, PackageX, Wallet } from "@/lib/icons";
-import { formatPrice } from "@/lib/utils";
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
+import { formatCurrency } from "@/lib/i18n/format";
 
 interface InventorySummaryProps {
   products: Product[];
@@ -11,6 +12,9 @@ interface InventorySummaryProps {
 }
 
 export function InventorySummary({ products, onFilterLow, onFilterOut }: InventorySummaryProps) {
+  const dict = useDictionary();
+  const locale = useLocale();
+  const t = dict.app.inventory.summary;
   const total = products.length;
   const outOfStock = products.filter((p) => p.quantity === 0).length;
   const lowStock = products.filter(
@@ -23,7 +27,7 @@ export function InventorySummary({ products, onFilterLow, onFilterOut }: Invento
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-      <Card icon={<Package className="w-5 h-5" />} label="إجمالي المنتجات" value={String(total)} />
+      <Card icon={<Package className="w-5 h-5" />} label={t.totalProducts} value={String(total)} />
       <button
         type="button"
         onClick={onFilterLow}
@@ -32,7 +36,7 @@ export function InventorySummary({ products, onFilterLow, onFilterOut }: Invento
       >
         <Card
           icon={<AlertTriangle className="w-5 h-5" />}
-          label="مخزون منخفض"
+          label={t.lowStock}
           value={String(lowStock)}
           tone={lowStock > 0 ? "warning" : "default"}
           clickable={lowStock > 0}
@@ -46,7 +50,7 @@ export function InventorySummary({ products, onFilterLow, onFilterOut }: Invento
       >
         <Card
           icon={<PackageX className="w-5 h-5" />}
-          label="نفذ المخزون"
+          label={t.outOfStock}
           value={String(outOfStock)}
           tone={outOfStock > 0 ? "danger" : "default"}
           clickable={outOfStock > 0}
@@ -54,8 +58,8 @@ export function InventorySummary({ products, onFilterLow, onFilterOut }: Invento
       </button>
       <Card
         icon={<Wallet className="w-5 h-5" />}
-        label="قيمة المخزن"
-        value={formatPrice(stockValue)}
+        label={t.stockValue}
+        value={formatCurrency(stockValue, locale)}
       />
     </div>
   );

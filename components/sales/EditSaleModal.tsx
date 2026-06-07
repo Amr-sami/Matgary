@@ -6,7 +6,8 @@ import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { updateSale } from "@/lib/api/sales";
 import type { Sale, DiscountType } from "@/lib/types";
-import { formatPrice } from "@/lib/utils";
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
+import { formatCurrency } from "@/lib/i18n/format";
 
 interface EditSaleModalProps {
   isOpen: boolean;
@@ -16,6 +17,9 @@ interface EditSaleModalProps {
 }
 
 export function EditSaleModal({ isOpen, onClose, sale, onSuccess }: EditSaleModalProps) {
+  const dict = useDictionary();
+  const locale = useLocale();
+  const t = dict.app.sales.editModal;
   const [quantity, setQuantity] = useState(1);
   const [pricePerUnit, setPricePerUnit] = useState(0);
   const [discountType, setDiscountType] = useState<DiscountType>("percentage");
@@ -61,24 +65,28 @@ export function EditSaleModal({ isOpen, onClose, sale, onSuccess }: EditSaleModa
       onSuccess();
       onClose();
     } catch (e: any) {
-      alert(e.message || "تعذر تحديث الفاتورة");
+      alert(e.message || t.error);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`تعديل البيع: ${sale.productName}`}>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={t.title.replace("{productName}", sale.productName)}
+    >
       <div className="space-y-4">
         <Input
-          label="الكمية"
+          label={t.quantity}
           type="number"
           min={1}
           value={quantity}
           onChange={(e) => setQuantity(Number(e.target.value))}
         />
         <Input
-          label="سعر الوحدة"
+          label={t.unitPrice}
           type="number"
           min={0}
           value={pricePerUnit}
@@ -95,7 +103,7 @@ export function EditSaleModal({ isOpen, onClose, sale, onSuccess }: EditSaleModa
                   : "bg-white text-text-secondary"
               }`}
             >
-              نسبة %
+              {t.discountPercent}
             </button>
             <button
               type="button"
@@ -106,11 +114,11 @@ export function EditSaleModal({ isOpen, onClose, sale, onSuccess }: EditSaleModa
                   : "bg-white text-text-secondary"
               }`}
             >
-              مبلغ ثابت
+              {t.discountFixed}
             </button>
           </div>
           <Input
-            label="قيمة الخصم"
+            label={t.discountValue}
             type="number"
             min={0}
             value={discountValue}
@@ -118,7 +126,7 @@ export function EditSaleModal({ isOpen, onClose, sale, onSuccess }: EditSaleModa
           />
         </div>
         <div>
-          <label className="block text-sm text-text-secondary mb-1.5">تاريخ الفاتورة</label>
+          <label className="block text-sm text-text-secondary mb-1.5">{t.saleDate}</label>
           <input
             type="date"
             value={date}
@@ -127,34 +135,34 @@ export function EditSaleModal({ isOpen, onClose, sale, onSuccess }: EditSaleModa
           />
         </div>
         <Input
-          label="ملاحظة"
+          label={t.note}
           value={note}
           onChange={(e) => setNote(e.target.value)}
         />
 
         <div className="p-3 bg-accent-light rounded-lg text-sm space-y-1">
           <div className="flex justify-between">
-            <span className="text-text-secondary">المجموع الفرعي</span>
-            <span>{formatPrice(subtotal)}</span>
+            <span className="text-text-secondary">{t.totals.subtotal}</span>
+            <span>{formatCurrency(subtotal, locale)}</span>
           </div>
           {discountAmount > 0 && (
             <div className="flex justify-between text-danger">
-              <span>الخصم</span>
-              <span>- {formatPrice(discountAmount)}</span>
+              <span>{t.totals.discount}</span>
+              <span>- {formatCurrency(discountAmount, locale)}</span>
             </div>
           )}
           <div className="flex justify-between font-bold border-t border-accent/20 pt-1">
-            <span>الإجمالي</span>
-            <span className="text-accent">{formatPrice(totalPrice)}</span>
+            <span>{t.totals.total}</span>
+            <span className="text-accent">{formatCurrency(totalPrice, locale)}</span>
           </div>
         </div>
 
         <div className="flex gap-3 pt-2">
           <Button variant="ghost" onClick={onClose} className="flex-1">
-            إلغاء
+            {dict.app.common.cancel}
           </Button>
           <Button onClick={handleSave} loading={loading} className="flex-1">
-            حفظ التعديلات
+            {t.save}
           </Button>
         </div>
       </div>

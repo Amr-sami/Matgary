@@ -4,7 +4,9 @@ import { Pencil, Trash2, ShoppingCart, Plus, Minus, History } from "@/lib/icons"
 import type { Product } from "@/lib/types";
 import { Badge } from "../ui/Badge";
 import { useCatalog } from "@/components/catalog-context";
-import { formatPrice, cn } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
+import { formatCurrency } from "@/lib/i18n/format";
 
 interface ProductCardProps {
   product: Product;
@@ -27,6 +29,10 @@ export function ProductCard({
   selected,
   onToggleSelect,
 }: ProductCardProps) {
+  const dict = useDictionary();
+  const locale = useLocale();
+  const t = dict.app.inventory.card;
+  const tActions = dict.app.inventory.table.actions;
   const isOutOfStock = product.quantity === 0;
   const isLowStock = product.quantity > 0 && product.quantity <= product.lowStockThreshold;
   const cost = product.costPrice || 0;
@@ -52,9 +58,9 @@ export function ProductCard({
           className="mt-1 w-4 h-4 accent-accent cursor-pointer"
         />
         <div className="flex-1 ms-2">
-          <h3 className="font-medium">{product.name}</h3>
+          <h3 className="font-medium" dir="auto">{product.name}</h3>
           {product.brand && (
-            <p className="text-xs text-text-secondary">{product.brand}</p>
+            <p className="text-xs text-text-secondary" dir="auto">{product.brand}</p>
           )}
           <div className="flex flex-wrap gap-1 mt-1">
             {product.sku && (
@@ -63,7 +69,7 @@ export function ProductCard({
               </span>
             )}
             {product.location && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-text-secondary">
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-text-secondary" dir="auto">
                 📍 {product.location}
               </span>
             )}
@@ -80,12 +86,13 @@ export function ProductCard({
             {genderLabel}
           </Badge>
         )}
-        {(product.tags || []).slice(0, 3).map((t) => (
+        {(product.tags || []).slice(0, 3).map((tag) => (
           <span
-            key={t}
+            key={tag}
             className="text-[10px] px-2 py-0.5 rounded-full bg-accent-light text-accent font-medium"
+            dir="auto"
           >
-            #{t}
+            #{tag}
           </span>
         ))}
         {cost > 0 && (
@@ -99,20 +106,21 @@ export function ProductCard({
                   : "bg-success-light text-success"
             )}
           >
-            هامش {margin.toFixed(0)}%
+            {t.marginLabel.replace("{pct}", margin.toFixed(0))}
           </span>
         )}
       </div>
 
       <div className="flex items-center justify-between mb-4">
         <div>
-          <p className="text-sm text-text-secondary mb-1">الكمية</p>
+          <p className="text-sm text-text-secondary mb-1">{t.quantityLabel}</p>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => onAdjustQty(product, -1)}
               disabled={isOutOfStock}
               className="p-1 rounded-md border border-border disabled:opacity-30"
+              title={tActions.decrease}
             >
               <Minus className="w-3.5 h-3.5" />
             </button>
@@ -129,14 +137,15 @@ export function ProductCard({
               type="button"
               onClick={() => onAdjustQty(product, 1)}
               className="p-1 rounded-md border border-border"
+              title={tActions.increase}
             >
               <Plus className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
         <div className="text-end">
-          <p className="text-sm text-text-secondary">السعر</p>
-          <p className="text-xl font-bold">{formatPrice(product.price)}</p>
+          <p className="text-sm text-text-secondary">{t.priceLabel}</p>
+          <p className="text-xl font-bold">{formatCurrency(product.price, locale)}</p>
         </div>
       </div>
 
@@ -147,25 +156,26 @@ export function ProductCard({
           className="flex-1 flex items-center justify-center gap-2 py-2 bg-success-light text-success rounded-lg disabled:opacity-50"
         >
           <ShoppingCart className="w-4 h-4" />
-          <span className="text-sm">بيع</span>
+          <span className="text-sm">{t.sellAction}</span>
         </button>
         <button
           onClick={() => onEdit(product)}
           className="flex-1 flex items-center justify-center gap-2 py-2 bg-accent-light text-accent rounded-lg"
         >
           <Pencil className="w-4 h-4" />
-          <span className="text-sm">تعديل</span>
+          <span className="text-sm">{t.editAction}</span>
         </button>
         <button
           onClick={() => onHistory(product)}
           className="p-2 bg-gray-100 text-text-secondary rounded-lg"
-          title="سجل المنتج"
+          title={t.historyTitle}
         >
           <History className="w-4 h-4" />
         </button>
         <button
           onClick={() => onDelete(product)}
           className="p-2 bg-danger-light text-danger rounded-lg"
+          title={tActions.delete}
         >
           <Trash2 className="w-4 h-4" />
         </button>

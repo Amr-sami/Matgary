@@ -2,9 +2,15 @@
 
 import { cn } from "@/lib/utils";
 import { CATEGORY_LABELS, GENDER_LABELS, type Category, type Gender } from "@/lib/types";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 export type DateRangeKey = "today" | "yesterday" | "7d" | "30d" | "thisMonth" | "all" | "custom";
 
+/**
+ * Kept for back-compat with components that haven't been rewired to use
+ * `dict.app.dateRange` yet (e.g. Purchases). New code should pull labels
+ * from the dictionary instead of this constant.
+ */
 export const DATE_RANGE_LABELS: Record<DateRangeKey, string> = {
   today: "اليوم",
   yesterday: "أمس",
@@ -22,15 +28,6 @@ export type SalesSortKey =
   | "totalAsc"
   | "qtyDesc"
   | "qtyAsc";
-
-export const SALES_SORT_LABELS: Record<SalesSortKey, string> = {
-  newest: "الأحدث",
-  oldest: "الأقدم",
-  totalDesc: "الإجمالي (الأعلى)",
-  totalAsc: "الإجمالي (الأقل)",
-  qtyDesc: "الكمية (الأكثر)",
-  qtyAsc: "الكمية (الأقل)",
-};
 
 interface SalesFiltersProps {
   selectedCategory: Category | null;
@@ -79,23 +76,44 @@ export function SalesFilters({
   query,
   onQueryChange,
 }: SalesFiltersProps) {
+  const dict = useDictionary();
+  const t = dict.app.sales.filters;
+  const dr = dict.app.dateRange;
+  const dateRangeLabels: Record<DateRangeKey, string> = {
+    today: dr.today,
+    yesterday: dr.yesterday,
+    "7d": dr["7d"],
+    "30d": dr["30d"],
+    thisMonth: dr.thisMonth,
+    all: dr.all,
+    custom: dr.custom,
+  };
+  const sortLabels: Record<SalesSortKey, string> = {
+    newest: t.sort.newest,
+    oldest: t.sort.oldest,
+    totalDesc: t.sort.totalDesc,
+    totalAsc: t.sort.totalAsc,
+    qtyDesc: t.sort.qtyDesc,
+    qtyAsc: t.sort.qtyAsc,
+  };
+
   const categories: (Category | null)[] = [null, "watches", "perfumes", "sunglasses"];
   const genders: (Gender | null)[] = [null, "male", "female"];
-  const statuses = [
-    { value: "all", label: "الكل" },
-    { value: "sold", label: "مباع" },
-    { value: "returned", label: "مرتجع" },
-  ] as const;
+  const statuses: { value: "all" | "sold" | "returned"; label: string }[] = [
+    { value: "all", label: t.status.all },
+    { value: "sold", label: t.status.sold },
+    { value: "returned", label: t.status.returned },
+  ];
   const ranges: DateRangeKey[] = ["today", "yesterday", "7d", "30d", "thisMonth", "all", "custom"];
 
   return (
     <div className="space-y-3 bg-white rounded-xl border border-border p-3">
       <input
         type="text"
-        placeholder="ابحث بالمنتج، البراند، أو ملاحظة..."
+        placeholder={t.searchPlaceholder}
         value={query}
         onChange={(e) => onQueryChange(e.target.value)}
-        dir="rtl"
+        dir="auto"
         className="w-full px-4 py-2.5 rounded-lg border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-accent"
       />
 
@@ -112,7 +130,7 @@ export function SalesFilters({
                 : "bg-white border border-border text-text-secondary hover:border-accent"
             )}
           >
-            {DATE_RANGE_LABELS[r]}
+            {dateRangeLabels[r]}
           </button>
         ))}
       </div>
@@ -147,7 +165,7 @@ export function SalesFilters({
                 : "bg-white border border-border text-text-secondary hover:border-accent"
             )}
           >
-            {cat ? CATEGORY_LABELS[cat] : "كل الأصناف"}
+            {cat ? CATEGORY_LABELS[cat] : t.allCategories}
           </button>
         ))}
       </div>
@@ -165,7 +183,7 @@ export function SalesFilters({
                 : "bg-white border border-border text-text-secondary hover:border-accent"
             )}
           >
-            {g ? GENDER_LABELS[g] : "الكل"}
+            {g ? GENDER_LABELS[g] : t.allGenders}
           </button>
         ))}
       </div>
@@ -191,10 +209,10 @@ export function SalesFilters({
           <select
             value={selectedBrand || ""}
             onChange={(e) => onBrandChange(e.target.value || null)}
-            dir="rtl"
+            dir="auto"
             className="px-3 py-1.5 rounded-lg border border-border bg-white text-sm"
           >
-            <option value="">كل البراندات</option>
+            <option value="">{t.allBrands}</option>
             {brands.map((b) => (
               <option key={b} value={b}>
                 {b}
@@ -206,12 +224,12 @@ export function SalesFilters({
         <select
           value={sort}
           onChange={(e) => onSortChange(e.target.value as SalesSortKey)}
-          dir="rtl"
+          dir="auto"
           className="px-3 py-1.5 rounded-lg border border-border bg-white text-sm"
         >
-          {(Object.keys(SALES_SORT_LABELS) as SalesSortKey[]).map((k) => (
+          {(Object.keys(sortLabels) as SalesSortKey[]).map((k) => (
             <option key={k} value={k}>
-              ترتيب: {SALES_SORT_LABELS[k]}
+              {t.sortPrefix.replace("{label}", sortLabels[k])}
             </option>
           ))}
         </select>
@@ -223,7 +241,7 @@ export function SalesFilters({
             onChange={(e) => onDiscountOnlyChange(e.target.checked)}
             className="w-4 h-4 accent-accent"
           />
-          <span>بخصم فقط</span>
+          <span>{t.discountOnly}</span>
         </label>
       </div>
     </div>

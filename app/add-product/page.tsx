@@ -12,6 +12,7 @@ import { useCategories } from "@/hooks/useCategories";
 import { useCategoryAttributes } from "@/hooks/useCategoryAttributes";
 import { useBrands } from "@/hooks/useBrands";
 import { ChevronRight, ChevronLeft } from "@/lib/icons";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 const EMPTY_FORM = {
   brand: "",
@@ -29,6 +30,8 @@ const EMPTY_FORM = {
 };
 
 export default function AddProductPage() {
+  const dict = useDictionary();
+  const t = dict.app.inventory.addProduct;
   const [step, setStep] = useState(1);
   const [categoryId, setCategoryId] = useState<string | null>(null);
   // attribute_id -> attribute_value_id
@@ -141,7 +144,7 @@ export default function AddProductPage() {
         }
       }
 
-      setToast({ type: "success", message: "تم إضافة المنتج بنجاح" });
+      setToast({ type: "success", message: t.toast.success });
 
       // Reset for the next entry. Cashiers add many products in a row, so
       // we keep the user on the page rather than redirecting.
@@ -152,7 +155,7 @@ export default function AddProductPage() {
     } catch (error) {
       setToast({
         type: "error",
-        message: error instanceof Error ? error.message : "حدث خطأ",
+        message: error instanceof Error ? error.message : t.toast.error,
       });
     } finally {
       setLoading(false);
@@ -162,14 +165,14 @@ export default function AddProductPage() {
   const isFinalStep = step === 3;
 
   return (
-    <AppShell title="إضافة صنف جديد">
+    <AppShell title={t.title}>
       <div className="max-w-6xl mx-auto pb-24">
         <header className="mb-6">
           <h1 className="text-2xl font-bold text-text-primary leading-tight">
-            إضافة منتج جديد
+            {t.heading}
           </h1>
           <p className="text-sm text-text-secondary mt-1">
-            ثلاث خطوات سريعة: اختر القسم، حدِّد الخصائص، ثم أكمل التفاصيل.
+            {t.subtitle}
           </p>
         </header>
 
@@ -229,13 +232,13 @@ export default function AddProductPage() {
             type="button"
           >
             <ChevronRight className="w-4 h-4 ms-1" />
-            السابق
+            {t.footer.back}
           </Button>
 
           <p className="text-xs text-text-secondary hidden sm:block">
             {isFinalStep
-              ? "جاهز للحفظ؟ راجع المعاينة على الجانب."
-              : `الخطوة ${step} من 3`}
+              ? t.footer.readyHint
+              : t.footer.stepCounter.replace("{n}", String(step))}
           </p>
 
           {isFinalStep ? (
@@ -244,7 +247,7 @@ export default function AddProductPage() {
               loading={loading}
               disabled={!canSubmit}
             >
-              حفظ المنتج
+              {t.footer.save}
             </Button>
           ) : (
             <Button
@@ -252,7 +255,7 @@ export default function AddProductPage() {
               disabled={!canProceedFromStep}
               type="button"
             >
-              التالي
+              {t.footer.next}
               <ChevronLeft className="w-4 h-4 me-1" />
             </Button>
           )}

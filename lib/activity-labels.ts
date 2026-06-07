@@ -31,6 +31,10 @@ export const ACTIVITY_CATEGORIES: ActivityCategory[] = [
 
 // Arabic labels for known actions. The page renders the raw key when missing,
 // so adding a new action without updating this map is harmless.
+//
+// React components on the new i18n path prefer `dict.app.activityLabels.actions`
+// (sourced from the dictionary). This constant stays as a back-compat fallback
+// for non-React callers (logs, exports, server-side renderers).
 export const ACTION_LABELS: Record<string, string> = {
   "auth.login": "تسجيل الدخول",
   "auth.2fa_enable": "تفعيل المصادقة الثنائية",
@@ -89,9 +93,10 @@ export const ACTION_LABELS: Record<string, string> = {
   "branch.switch": "تبديل الفرع الحالي",
 };
 
-// Friendly Arabic label for a metadata field key. Falls back to the raw key
-// when missing — the formatter then drops the row to avoid showing junk.
-const FIELD_LABELS: Record<string, string> = {
+// Arabic back-compat label for a metadata field key. The locale-aware path
+// in `formatActivityDetails` reads from `copy.fields` / `copy.fieldNames`
+// when callers pass a dict-driven copy bundle.
+const FIELD_LABELS_AR: Record<string, string> = {
   username: "اسم المستخدم",
   permissions: "الصلاحيات",
   changed: "الحقول المعدلة",
@@ -121,7 +126,7 @@ const FIELD_LABELS: Record<string, string> = {
   accuracyM: "دقة الموقع (متر)",
 };
 
-const FIELD_NAME_LABELS: Record<string, string> = {
+const FIELD_NAME_LABELS_AR: Record<string, string> = {
   shopName: "اسم المتجر",
   shopPhone: "هاتف المتجر",
   logoPath: "شعار المتجر",
@@ -154,32 +159,32 @@ const FIELD_NAME_LABELS: Record<string, string> = {
   location: "موقع التخزين",
 };
 
-const PAY_METHOD_LABELS: Record<string, string> = {
+const PAY_METHOD_LABELS_AR: Record<string, string> = {
   cash: "نقدي",
   instapay: "إنستاباي",
   card: "كارت",
   deferred: "آجل",
 };
 
-const PAY_TYPE_LABELS: Record<string, string> = {
+const PAY_TYPE_LABELS_AR: Record<string, string> = {
   fixed: "ثابت",
   hourly: "بالساعة",
   hybrid: "مختلط",
 };
 
-const ATTENDANCE_TYPE_LABELS: Record<string, string> = {
+const ATTENDANCE_TYPE_LABELS_AR: Record<string, string> = {
   check_in: "تسجيل دخول",
   check_out: "تسجيل خروج",
 };
 
-const ATTENDANCE_SOURCE_LABELS: Record<string, string> = {
+const ATTENDANCE_SOURCE_LABELS_AR: Record<string, string> = {
   manual: "يدوي",
   geofence: "تلقائي بالموقع",
   qr: "QR",
   manager_attest: "إثبات مدير",
 };
 
-const EXPENSE_CATEGORY_LABELS: Record<string, string> = {
+const EXPENSE_CATEGORY_LABELS_AR: Record<string, string> = {
   rent: "إيجار",
   salaries: "رواتب",
   electricity: "كهرباء",
@@ -194,22 +199,51 @@ export interface ActivityDetail {
   value: string;
 }
 
-function formatNumber(v: unknown): string {
-  if (typeof v !== "number" || !Number.isFinite(v)) return String(v);
-  return v.toLocaleString("ar-EG", { maximumFractionDigits: 6 });
+/**
+ * Copy bundle sourced from the dictionary. React callers pass this; legacy
+ * callers omit it and get the Arabic constants above.
+ */
+export interface ActivityCopy {
+  fields: Record<string, string>;
+  fieldNames: Record<string, string>;
+  paymentMethods: Record<string, string>;
+  payTypes: Record<string, string>;
+  attendanceTypes: Record<string, string>;
+  attendanceSources: Record<string, string>;
+  expenseCategories: Record<string, string>;
+  /** Template like `"±{n} م"` / `"±{n}m"` */
+  accuracySuffix: string;
 }
 
-function formatDate(v: unknown): string {
+const AR_FALLBACK: ActivityCopy = {
+  fields: FIELD_LABELS_AR,
+  fieldNames: FIELD_NAME_LABELS_AR,
+  paymentMethods: PAY_METHOD_LABELS_AR,
+  payTypes: PAY_TYPE_LABELS_AR,
+  attendanceTypes: ATTENDANCE_TYPE_LABELS_AR,
+  attendanceSources: ATTENDANCE_SOURCE_LABELS_AR,
+  expenseCategories: EXPENSE_CATEGORY_LABELS_AR,
+  accuracySuffix: "±{n} م",
+};
+
+function formatNumber(v: unknown): string {
+  if (typeof v !== "number" || !Number.isFinite(v)) return String(v);
+  return v.toLocaleString("en-US", {
+    maximumFractionDigits: 6,
+  });
+}
+
+function formatDateValue(v: unknown): string {
   if (typeof v !== "string") return String(v);
   const d = new Date(v);
   if (!Number.isFinite(d.valueOf())) return v;
-  return d.toLocaleDateString("ar-EG");
+  return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
 }
 
-function listOfChangedFields(keys: unknown): string {
+function listOfChangedFields(keys: unknown, copy: ActivityCopy): string {
   if (!Array.isArray(keys)) return String(keys);
   return keys
-    .map((k) => FIELD_NAME_LABELS[String(k)] ?? FIELD_LABELS[String(k)] ?? String(k))
+    .map((k) => copy.fieldNames[String(k)] ?? copy.fields[String(k)] ?? String(k))
     .join(" • ");
 }
 
@@ -217,18 +251,23 @@ function listOfChangedFields(keys: unknown): string {
  * Translate the metadata blob attached to an activity row into a small list
  * of "label: value" pairs the owner can actually read. Returns an empty array
  * when there's nothing meaningful to show.
+ *
+ * Pass `copy` from the dictionary when calling from React (preferred). When
+ * omitted, falls back to the Arabic labels so non-React callers keep working.
  */
 export function formatActivityDetails(
   action: string,
   metadata: Record<string, unknown> | null | undefined,
+  copy: ActivityCopy = AR_FALLBACK,
 ): ActivityDetail[] {
   if (!metadata) return [];
   const out: ActivityDetail[] = [];
   const m = metadata;
+  const f = copy.fields;
 
   switch (action) {
     case "sale.create": {
-      if (m.invoiceId) out.push({ label: "رقم الفاتورة", value: String(m.invoiceId) });
+      if (m.invoiceId) out.push({ label: f.invoiceId, value: String(m.invoiceId) });
       if (Array.isArray(m.lines) && m.lines.length > 0) {
         const lines = m.lines as Array<{
           productName?: unknown;
@@ -248,57 +287,60 @@ export function formatActivityDetails(
             return name;
           })
           .join("، ");
-        out.push({ label: "الأصناف", value: summary });
+        out.push({ label: f.lines, value: summary });
       }
       if (typeof m.totalQuantity === "number")
-        out.push({ label: "إجمالي القطع", value: formatNumber(m.totalQuantity) });
+        out.push({ label: f.totalQuantity, value: formatNumber(m.totalQuantity) });
       if (typeof m.total === "number")
-        out.push({ label: "الإجمالي", value: formatNumber(m.total) });
+        out.push({ label: f.total, value: formatNumber(m.total) });
       if (typeof m.quantitySold === "number")
-        out.push({ label: "الكمية", value: formatNumber(m.quantitySold) });
+        out.push({ label: f.quantitySold, value: formatNumber(m.quantitySold) });
       if (typeof m.pricePerUnit === "number")
-        out.push({ label: "السعر", value: formatNumber(m.pricePerUnit) });
+        out.push({ label: f.pricePerUnit, value: formatNumber(m.pricePerUnit) });
       if (m.paymentMethod)
         out.push({
-          label: "طريقة الدفع",
-          value: PAY_METHOD_LABELS[String(m.paymentMethod)] ?? String(m.paymentMethod),
+          label: f.paymentMethod,
+          value: copy.paymentMethods[String(m.paymentMethod)] ?? String(m.paymentMethod),
         });
       if (m.customerName)
-        out.push({ label: "اسم العميل", value: String(m.customerName) });
+        out.push({ label: f.customerName, value: String(m.customerName) });
       if (m.customerPhone)
-        out.push({ label: "هاتف العميل", value: String(m.customerPhone) });
-      if (m.note) out.push({ label: "ملاحظة", value: String(m.note) });
+        out.push({ label: f.customerPhone, value: String(m.customerPhone) });
+      if (m.note) out.push({ label: f.note, value: String(m.note) });
       return out;
     }
     case "attendance.check_in":
     case "attendance.check_out": {
       if (m.source)
         out.push({
-          label: "الطريقة",
-          value: ATTENDANCE_SOURCE_LABELS[String(m.source)] ?? String(m.source),
+          label: f.source,
+          value: copy.attendanceSources[String(m.source)] ?? String(m.source),
         });
       return out;
     }
     case "attendance.geofence_rejected": {
       if (m.type)
         out.push({
-          label: "نوع المحاولة",
-          value: ATTENDANCE_TYPE_LABELS[String(m.type)] ?? String(m.type),
+          label: f.attemptType,
+          value: copy.attendanceTypes[String(m.type)] ?? String(m.type),
         });
       if (typeof m.latitude === "number" && typeof m.longitude === "number") {
         const lat = m.latitude.toFixed(6);
         const lng = m.longitude.toFixed(6);
-        out.push({ label: "الموقع المسجَّل", value: `${lat}, ${lng}` });
+        out.push({ label: f.loggedLocation, value: `${lat}, ${lng}` });
       }
       if (typeof m.accuracyM === "number")
-        out.push({ label: "دقة الموقع", value: `±${formatNumber(m.accuracyM)} م` });
+        out.push({
+          label: f.locationAccuracy,
+          value: copy.accuracySuffix.replace("{n}", formatNumber(m.accuracyM)),
+        });
       return out;
     }
     case "team.add": {
-      if (m.username) out.push({ label: "اسم المستخدم", value: String(m.username) });
+      if (m.username) out.push({ label: f.username, value: String(m.username) });
       if (Array.isArray(m.permissions))
         out.push({
-          label: "عدد الصلاحيات",
+          label: f.permissionsCount,
           value: formatNumber(m.permissions.length),
         });
       return out;
@@ -308,65 +350,65 @@ export function formatActivityDetails(
     case "settings.update":
     case "settings.attendance_update": {
       if (Array.isArray(m.changed) && m.changed.length > 0)
-        out.push({ label: "الحقول المعدلة", value: listOfChangedFields(m.changed) });
+        out.push({ label: f.changed, value: listOfChangedFields(m.changed, copy) });
       return out;
     }
     case "team.compensation_set": {
       if (m.payType)
         out.push({
-          label: "نوع الراتب",
-          value: PAY_TYPE_LABELS[String(m.payType)] ?? String(m.payType),
+          label: f.payType,
+          value: copy.payTypes[String(m.payType)] ?? String(m.payType),
         });
       if (m.baseSalaryMonthly != null)
         out.push({
-          label: "الراتب الشهري",
+          label: f.baseSalaryMonthly,
           value: formatNumber(m.baseSalaryMonthly),
         });
       if (m.hourlyRate != null)
-        out.push({ label: "أجر الساعة", value: formatNumber(m.hourlyRate) });
+        out.push({ label: f.hourlyRate, value: formatNumber(m.hourlyRate) });
       return out;
     }
     case "product.create": {
       if (typeof m.quantity === "number")
-        out.push({ label: "الكمية الابتدائية", value: formatNumber(m.quantity) });
+        out.push({ label: f.initialQuantity, value: formatNumber(m.quantity) });
       if (typeof m.price === "number")
-        out.push({ label: "السعر", value: formatNumber(m.price) });
+        out.push({ label: f.price, value: formatNumber(m.price) });
       return out;
     }
     case "product.adjust": {
       if (typeof m.delta === "number") {
         const sign = m.delta > 0 ? "+" : "";
-        out.push({ label: "التغيير", value: `${sign}${formatNumber(m.delta)}` });
+        out.push({ label: f.delta, value: `${sign}${formatNumber(m.delta)}` });
       }
       if (typeof m.newQuantity === "number")
-        out.push({ label: "الرصيد الجديد", value: formatNumber(m.newQuantity) });
+        out.push({ label: f.newQuantity, value: formatNumber(m.newQuantity) });
       return out;
     }
     case "expense.create": {
       if (typeof m.amount === "number")
-        out.push({ label: "المبلغ", value: formatNumber(m.amount) });
+        out.push({ label: f.amount, value: formatNumber(m.amount) });
       if (m.category)
         out.push({
-          label: "النوع",
-          value: EXPENSE_CATEGORY_LABELS[String(m.category)] ?? String(m.category),
+          label: f.type,
+          value: copy.expenseCategories[String(m.category)] ?? String(m.category),
         });
       return out;
     }
     case "leave.submit": {
-      if (m.startDate) out.push({ label: "من", value: formatDate(m.startDate) });
-      if (m.endDate) out.push({ label: "إلى", value: formatDate(m.endDate) });
+      if (m.startDate) out.push({ label: f.startDate, value: formatDateValue(m.startDate) });
+      if (m.endDate) out.push({ label: f.endDate, value: formatDateValue(m.endDate) });
       return out;
     }
     case "leave.approve":
     case "leave.reject": {
-      if (m.note) out.push({ label: "ملاحظة", value: String(m.note) });
+      if (m.note) out.push({ label: f.note, value: String(m.note) });
       return out;
     }
     default:
       // Generic best-effort: expose any keys we know how to label.
       for (const [k, v] of Object.entries(m)) {
         if (v == null || v === "") continue;
-        const label = FIELD_LABELS[k] ?? FIELD_NAME_LABELS[k];
+        const label = copy.fields[k] ?? copy.fieldNames[k];
         if (!label) continue;
         out.push({
           label,

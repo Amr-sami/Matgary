@@ -12,11 +12,16 @@ import { useSales } from "@/hooks/useSales";
 import { useReturns } from "@/hooks/useReturns";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { formatPrice, startOfDay, endOfDay, isBetween, getTodayRange, getThisMonthRange } from "@/lib/utils";
+import { startOfDay, endOfDay, isBetween, getTodayRange, getThisMonthRange } from "@/lib/utils";
 import { DollarSign, ShoppingCart, RotateCcw } from "@/lib/icons";
 import type { Sale } from "@/lib/types";
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
+import { formatCurrency } from "@/lib/i18n/format";
 
 function ReportsContent() {
+  const dict = useDictionary();
+  const locale = useLocale();
+  const t = dict.app.reports;
   const searchParams = useSearchParams();
   const { sales, loading: salesLoading } = useSales();
   const { returns, loading: returnsLoading } = useReturns();
@@ -89,29 +94,29 @@ function ReportsContent() {
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <StatCard
-            title="إجمالي المبيعات"
-            value={formatPrice(stats.totalSales)}
+            title={t.totalSales}
+            value={formatCurrency(stats.totalSales, locale)}
             icon={DollarSign}
             color="success"
           />
           <StatCard
-            title="كمية المبيعات"
-            value={`${stats.totalQty} قطعة`}
+            title={t.totalQty}
+            value={t.qtySuffix.replace("{n}", String(stats.totalQty))}
             icon={ShoppingCart}
             color="accent"
           />
           <StatCard
-            title="عدد المرتجعات"
+            title={t.totalReturns}
             value={stats.totalReturns}
-            subtitle="مرتجع"
+            subtitle={t.returnsSubtitle}
             icon={RotateCcw}
             color="danger"
           />
         </div>
 
         <div className="space-y-4">
-          <h3 className="font-bold text-lg px-1">تفاصيل المبيعات للفترة المختارة</h3>
-          
+          <h3 className="font-bold text-lg px-1">{t.detailsHeading}</h3>
+
           {filteredData.sales.length === 0 ? (
             <EmptyState type="sales" />
           ) : (
@@ -153,7 +158,7 @@ function ReportsContent() {
       {/* Hidden Receipt for Printing */}
       {printSale && (
         <div className="print-receipt-container">
-          <Receipt 
+          <Receipt
             sale={{
               productName: printSale.productName,
               brand: printSale.brand,
@@ -165,7 +170,7 @@ function ReportsContent() {
               discountAmount: printSale.discountAmount || 0,
               totalPrice: printSale.totalPrice,
               saleDate: printSale.saleDate,
-            }} 
+            }}
           />
         </div>
       )}
@@ -174,8 +179,9 @@ function ReportsContent() {
 }
 
 export default function ReportsPage() {
+  const dict = useDictionary();
   return (
-    <AppShell title="التقارير والاحصائيات">
+    <AppShell title={dict.app.reports.title}>
       <Suspense fallback={<PageSkeleton chart rows={6} />}>
         <ReportsContent />
       </Suspense>

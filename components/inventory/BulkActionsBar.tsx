@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { Trash2, Tag, Wrench, Download, X, Percent, Truck, MapPin, Package } from "@/lib/icons";
 import type { Category, Gender, Product } from "@/lib/types";
-import { CATEGORY_LABELS, GENDER_LABELS } from "@/lib/types";
+import { useCategories } from "@/hooks/useCategories";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 export type BulkAction =
   | { type: "delete" }
@@ -21,7 +22,17 @@ interface BulkActionsBarProps {
   onAction: (action: BulkAction) => void;
 }
 
+// Built-in gender options as a fallback when no per-category gender attribute
+// is defined yet. Keys are the stored attribute values (Arabic in v1 DBs).
+const FALLBACK_GENDERS: { value: string; labelKey: "male" | "female" }[] = [
+  { value: "رجالي", labelKey: "male" },
+  { value: "حريمي", labelKey: "female" },
+];
+
 export function BulkActionsBar({ selected, onClear, onAction }: BulkActionsBarProps) {
+  const dict = useDictionary();
+  const t = dict.app.inventory.bulkActions;
+  const { data: categories } = useCategories();
   const [openMenu, setOpenMenu] = useState<null | "tag" | "price" | "category" | "gender" | "supplier" | "location">(null);
   const [tagInput, setTagInput] = useState("");
   const [percentInput, setPercentInput] = useState("");
@@ -31,11 +42,12 @@ export function BulkActionsBar({ selected, onClear, onAction }: BulkActionsBarPr
   if (selected.length === 0) return null;
 
   const closeMenus = () => setOpenMenu(null);
+  const genderLabel = (key: "male" | "female") => (key === "male" ? "رجالي" : "حريمي");
 
   return (
     <div className="sticky top-2 z-20 bg-accent text-white rounded-xl shadow-lg p-3 flex flex-wrap items-center gap-2">
       <span className="font-medium text-sm">
-        تم تحديد {selected.length} منتج
+        {t.selectedCount.replace("{n}", String(selected.length))}
       </span>
       <div className="flex-1" />
 
@@ -46,16 +58,16 @@ export function BulkActionsBar({ selected, onClear, onAction }: BulkActionsBarPr
           className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-sm"
         >
           <Tag className="w-4 h-4" />
-          إضافة تاج
+          {t.addTag}
         </button>
         {openMenu === "tag" && (
           <div className="absolute end-0 top-full mt-1 bg-white text-text-primary rounded-lg shadow-lg p-2 flex gap-2 min-w-[220px]">
             <input
               autoFocus
-              dir="rtl"
+              dir="auto"
               value={tagInput}
               onChange={(e) => setTagInput(e.target.value)}
-              placeholder="اسم التاج"
+              placeholder={t.tagInputPlaceholder}
               className="flex-1 px-2 py-1.5 border border-border rounded text-sm"
             />
             <button
@@ -68,7 +80,7 @@ export function BulkActionsBar({ selected, onClear, onAction }: BulkActionsBarPr
               }}
               className="px-3 py-1.5 bg-accent text-white rounded text-sm"
             >
-              تطبيق
+              {t.apply}
             </button>
           </div>
         )}
@@ -81,17 +93,17 @@ export function BulkActionsBar({ selected, onClear, onAction }: BulkActionsBarPr
           className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-sm"
         >
           <Percent className="w-4 h-4" />
-          تعديل السعر
+          {t.priceAdjust}
         </button>
         {openMenu === "price" && (
           <div className="absolute end-0 top-full mt-1 bg-white text-text-primary rounded-lg shadow-lg p-2 flex gap-2 min-w-[260px]">
             <input
               autoFocus
               type="number"
-              dir="rtl"
+              dir="ltr"
               value={percentInput}
               onChange={(e) => setPercentInput(e.target.value)}
-              placeholder="نسبة (مثال: 10 أو -5)"
+              placeholder={t.pricePlaceholder}
               className="flex-1 px-2 py-1.5 border border-border rounded text-sm"
             />
             <button
@@ -105,60 +117,64 @@ export function BulkActionsBar({ selected, onClear, onAction }: BulkActionsBarPr
               }}
               className="px-3 py-1.5 bg-accent text-white rounded text-sm whitespace-nowrap"
             >
-              تطبيق %
+              {t.applyPercent}
             </button>
           </div>
         )}
       </div>
 
-      {/* Change category */}
-      <div className="relative">
-        <button
-          onClick={() => setOpenMenu(openMenu === "category" ? null : "category")}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-sm"
-        >
-          <Package className="w-4 h-4" />
-          الصنف
-        </button>
-        {openMenu === "category" && (
-          <div className="absolute end-0 top-full mt-1 bg-white text-text-primary rounded-lg shadow-lg p-2 flex flex-col min-w-[160px]">
-            {(Object.keys(CATEGORY_LABELS) as Category[]).map((c) => (
-              <button
-                key={c}
-                onClick={() => {
-                  onAction({ type: "category", value: c });
-                  closeMenus();
-                }}
-                className="text-start px-3 py-1.5 hover:bg-gray-100 rounded text-sm"
-              >
-                {CATEGORY_LABELS[c]}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* Change category — sourced from per-tenant category list */}
+      {categories.length > 0 && (
+        <div className="relative">
+          <button
+            onClick={() => setOpenMenu(openMenu === "category" ? null : "category")}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-sm"
+          >
+            <Package className="w-4 h-4" />
+            {t.category}
+          </button>
+          {openMenu === "category" && (
+            <div className="absolute end-0 top-full mt-1 bg-white text-text-primary rounded-lg shadow-lg p-2 flex flex-col min-w-[160px]">
+              {categories.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => {
+                    onAction({ type: "category", value: c.id });
+                    closeMenus();
+                  }}
+                  className="text-start px-3 py-1.5 hover:bg-gray-100 rounded text-sm"
+                  dir="auto"
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
-      {/* Change gender */}
+      {/* Change gender — fixed list backing the legacy attribute */}
       <div className="relative">
         <button
           onClick={() => setOpenMenu(openMenu === "gender" ? null : "gender")}
           className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-sm"
         >
           <Wrench className="w-4 h-4" />
-          النوع
+          {t.gender}
         </button>
         {openMenu === "gender" && (
           <div className="absolute end-0 top-full mt-1 bg-white text-text-primary rounded-lg shadow-lg p-2 flex flex-col min-w-[140px]">
-            {(Object.keys(GENDER_LABELS) as Gender[]).map((g) => (
+            {FALLBACK_GENDERS.map((g) => (
               <button
-                key={g}
+                key={g.value}
                 onClick={() => {
-                  onAction({ type: "gender", value: g });
+                  onAction({ type: "gender", value: g.value });
                   closeMenus();
                 }}
                 className="text-start px-3 py-1.5 hover:bg-gray-100 rounded text-sm"
+                dir="auto"
               >
-                {GENDER_LABELS[g]}
+                {genderLabel(g.labelKey)}
               </button>
             ))}
           </div>
@@ -172,16 +188,16 @@ export function BulkActionsBar({ selected, onClear, onAction }: BulkActionsBarPr
           className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-sm"
         >
           <Truck className="w-4 h-4" />
-          المورد
+          {t.supplier}
         </button>
         {openMenu === "supplier" && (
           <div className="absolute end-0 top-full mt-1 bg-white text-text-primary rounded-lg shadow-lg p-2 flex gap-2 min-w-[240px]">
             <input
               autoFocus
-              dir="rtl"
+              dir="auto"
               value={supplierInput}
               onChange={(e) => setSupplierInput(e.target.value)}
-              placeholder="اسم المورد"
+              placeholder={t.supplierPlaceholder}
               className="flex-1 px-2 py-1.5 border border-border rounded text-sm"
             />
             <button
@@ -192,7 +208,7 @@ export function BulkActionsBar({ selected, onClear, onAction }: BulkActionsBarPr
               }}
               className="px-3 py-1.5 bg-accent text-white rounded text-sm"
             >
-              تطبيق
+              {t.apply}
             </button>
           </div>
         )}
@@ -205,16 +221,16 @@ export function BulkActionsBar({ selected, onClear, onAction }: BulkActionsBarPr
           className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-sm"
         >
           <MapPin className="w-4 h-4" />
-          المكان
+          {t.location}
         </button>
         {openMenu === "location" && (
           <div className="absolute end-0 top-full mt-1 bg-white text-text-primary rounded-lg shadow-lg p-2 flex gap-2 min-w-[240px]">
             <input
               autoFocus
-              dir="rtl"
+              dir="auto"
               value={locationInput}
               onChange={(e) => setLocationInput(e.target.value)}
-              placeholder="مكان التخزين"
+              placeholder={t.locationPlaceholder}
               className="flex-1 px-2 py-1.5 border border-border rounded text-sm"
             />
             <button
@@ -225,7 +241,7 @@ export function BulkActionsBar({ selected, onClear, onAction }: BulkActionsBarPr
               }}
               className="px-3 py-1.5 bg-accent text-white rounded text-sm"
             >
-              تطبيق
+              {t.apply}
             </button>
           </div>
         )}
@@ -237,7 +253,7 @@ export function BulkActionsBar({ selected, onClear, onAction }: BulkActionsBarPr
         className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-sm"
       >
         <Download className="w-4 h-4" />
-        تصدير
+        {t.export}
       </button>
 
       {/* Delete */}
@@ -246,14 +262,14 @@ export function BulkActionsBar({ selected, onClear, onAction }: BulkActionsBarPr
         className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-danger hover:bg-danger/90 text-sm"
       >
         <Trash2 className="w-4 h-4" />
-        حذف
+        {t.delete}
       </button>
 
       {/* Clear */}
       <button
         onClick={onClear}
         className="p-1.5 rounded-lg hover:bg-white/10"
-        title="إلغاء التحديد"
+        title={t.clearTitle}
       >
         <X className="w-4 h-4" />
       </button>

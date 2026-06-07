@@ -3,8 +3,9 @@
 import { useMemo, useState } from "react";
 import { Wallet, Phone, CheckCircle2 } from "@/lib/icons";
 import type { Sale } from "@/lib/types";
-import { formatPrice, formatDate } from "@/lib/utils";
 import { markInvoicePaid, markSalePaid } from "@/lib/api/sales";
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
+import { formatCurrency, formatDate } from "@/lib/i18n/format";
 
 interface DeferredPanelProps {
   sales: Sale[];
@@ -21,6 +22,9 @@ interface DeferredGroup {
 }
 
 export function DeferredPanel({ sales }: DeferredPanelProps) {
+  const dict = useDictionary();
+  const locale = useLocale();
+  const t = dict.app.sales.deferred;
   const [busy, setBusy] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
 
@@ -77,19 +81,21 @@ export function DeferredPanel({ sales }: DeferredPanelProps) {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <Wallet className="w-5 h-5 text-orange-600" />
-          <p className="font-bold">آجل غير مدفوع</p>
+          <p className="font-bold">{t.title}</p>
           <span className="text-xs px-2 py-0.5 rounded-full bg-orange-200 text-orange-900">
-            {groups.length} عميل
+            {t.customerCount.replace("{n}", String(groups.length))}
           </span>
         </div>
-        <p className="font-bold text-orange-700">{formatPrice(totalOutstanding)}</p>
+        <p className="font-bold text-orange-700">
+          {formatCurrency(totalOutstanding, locale)}
+        </p>
       </div>
 
       <button
         onClick={() => setExpanded((v) => !v)}
         className="text-xs text-orange-700 mt-2 hover:underline"
       >
-        {expanded ? "إخفاء" : "عرض التفاصيل"}
+        {expanded ? t.hide : t.showDetails}
       </button>
 
       {expanded && (
@@ -100,24 +106,26 @@ export function DeferredPanel({ sales }: DeferredPanelProps) {
               className="flex flex-wrap items-center gap-2 p-3 rounded-lg bg-white border border-orange-100"
             >
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm truncate">
-                  {g.customerName || "بدون اسم"}
+                <p className="font-medium text-sm truncate" dir="auto">
+                  {g.customerName || t.noName}
                 </p>
                 <div className="flex flex-wrap gap-2 text-xs text-text-secondary mt-0.5">
                   {g.customerPhone && (
-                    <span className="flex items-center gap-1">
+                    <span className="flex items-center gap-1" dir="ltr">
                       <Phone className="w-3 h-3" />
                       {g.customerPhone}
                     </span>
                   )}
-                  <span>{formatDate(g.earliest)}</span>
+                  <span>{formatDate(g.earliest, locale)}</span>
                   <span>
-                    {g.saleIds.length === 1 ? "فاتورة واحدة" : `${g.saleIds.length} عناصر`}
+                    {g.saleIds.length === 1
+                      ? t.singleItem
+                      : t.multipleItems.replace("{n}", String(g.saleIds.length))}
                   </span>
                 </div>
               </div>
               <span className="font-bold text-orange-700 whitespace-nowrap">
-                {formatPrice(g.total)}
+                {formatCurrency(g.total, locale)}
               </span>
               <button
                 onClick={() => handleMarkPaid(g)}
@@ -125,7 +133,7 @@ export function DeferredPanel({ sales }: DeferredPanelProps) {
                 className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-success text-white text-xs font-medium hover:bg-success/90 disabled:opacity-50"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                مدفوع
+                {t.markPaid}
               </button>
             </li>
           ))}

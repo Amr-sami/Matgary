@@ -14,7 +14,6 @@ import {
   Megaphone,
 } from "@/lib/icons";
 import { CATEGORY_LABELS } from "@/lib/types";
-import { formatPrice, formatDate } from "@/lib/utils";
 import {
   type CustomerAggregate,
   daysSince,
@@ -22,6 +21,8 @@ import {
 } from "@/lib/customers";
 import type { CustomerSaleRecord } from "@/hooks/useCustomersData";
 import { useShopSettings } from "@/hooks/useShopSettings";
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
+import { formatCurrency, formatDate } from "@/lib/i18n/format";
 
 interface CustomerRowProps {
   customer: CustomerAggregate;
@@ -39,15 +40,16 @@ function waLink(phone: string | undefined, message: string): string {
 }
 
 export function CustomerRow({ customer, records, onChange }: CustomerRowProps) {
+  const dict = useDictionary();
+  const locale = useLocale();
+  const tCustomers = dict.app.customers;
+  const t = tCustomers.row;
   const [expanded, setExpanded] = useState(false);
   const [busyInvoice, setBusyInvoice] = useState<string | null>(null);
   const isRepeat = customer.invoiceCount >= 3;
   const inactive = daysSince(customer.lastVisit) >= 60;
-  // WhatsApp messages substitute the real shop name (was hardcoded
-  // "Corner Store" pre-customer-ledger). Detail-page links only show for
-  // customers we have a phone for — the ledger is keyed on phone.
   const { settings } = useShopSettings();
-  const shopName = settings.shopName?.trim() || "متجرنا";
+  const shopName = settings.shopName?.trim() || tCustomers.fallbackShopName;
   const detailHref = customer.phone
     ? `/customers/${encodeURIComponent(customer.phone)}`
     : null;
@@ -61,7 +63,6 @@ export function CustomerRow({ customer, records, onChange }: CustomerRowProps) {
       const key = phone || `name:${name.toLowerCase()}`;
       return key === customer.key;
     });
-    // Group by invoiceId (fallback to sale id)
     const map = new Map<string, CustomerSaleRecord[]>();
     for (const s of filtered) {
       const id = s.invoiceId || s.id;
@@ -75,9 +76,6 @@ export function CustomerRow({ customer, records, onChange }: CustomerRowProps) {
         lines,
         date: lines[0].saleDate,
         total: lines.reduce((s, l) => s + l.totalPrice, 0),
-        // An invoice is "paid" only if every line is paid (the per-line
-        // isPaid mirrors what the server stores). A single unpaid line
-        // keeps the invoice in the "آجل" bucket.
         isPaid: lines.every((l) => l.isPaid !== false),
         saleIds: lines.map((l) => l.id),
       }))
@@ -95,41 +93,44 @@ export function CustomerRow({ customer, records, onChange }: CustomerRowProps) {
           fetch(`/api/sales/${id}/paid`, { method: "POST" }),
         ),
       );
-      // Tell the parent to re-fetch so this row's outstanding total +
-      // the page-level "آجل غير مدفوع" summary update without a manual
-      // refresh. The expanded list closes itself if there's nothing
-      // left to chase, otherwise stays open showing the now-paid badge.
       if (onChange) await onChange();
     } finally {
       setBusyInvoice(null);
     }
   };
 
+  const categoryWord = customer.topCategory
+    ? CATEGORY_LABELS[customer.topCategory] || t.defaultCategoryWord
+    : t.defaultCategoryWord;
+
   return (
     <div className="bg-white rounded-xl border border-border overflow-hidden">
       <div className="p-4 flex flex-wrap items-start gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-bold text-base truncate">{customer.name}</h3>
+            <h3 className="font-bold text-base truncate" dir="auto">{customer.name}</h3>
             {isRepeat && (
               <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-accent text-white font-medium">
                 <Star className="w-3 h-3" />
-                عميل دائم
+                {t.repeatBadge}
               </span>
             )}
             {inactive && (
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
-                غير نشط ({daysSince(customer.lastVisit)} يوم)
+                {t.inactiveBadge.replace("{n}", String(daysSince(customer.lastVisit)))}
               </span>
             )}
             {customer.outstandingBalance > 0 && (
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium">
-                آجل {formatPrice(customer.outstandingBalance)}
+                {t.owedBadge.replace(
+                  "{amount}",
+                  formatCurrency(customer.outstandingBalance, locale),
+                )}
               </span>
             )}
           </div>
           {customer.phone && (
-            <p className="text-xs text-text-secondary flex items-center gap-1 mt-1">
+            <p className="text-xs text-text-secondary flex items-center gap-1 mt-1" dir="ltr">
               <Phone className="w-3 h-3" />
               {customer.phone}
             </p>
@@ -138,21 +139,25 @@ export function CustomerRow({ customer, records, onChange }: CustomerRowProps) {
 
         <div className="flex items-center gap-4 text-end">
           <div>
-            <p className="text-[10px] text-text-secondary">إجمالي الإنفاق</p>
-            <p className="font-bold text-accent">{formatPrice(customer.lifetimeValue)}</p>
+            <p className="text-[10px] text-text-secondary">{t.lifetime}</p>
+            <p className="font-bold text-accent">
+              {formatCurrency(customer.lifetimeValue, locale)}
+            </p>
           </div>
           <div>
-            <p className="text-[10px] text-text-secondary">فواتير</p>
+            <p className="text-[10px] text-text-secondary">{t.invoicesLabel}</p>
             <p className="font-bold">{customer.invoiceCount}</p>
           </div>
         </div>
       </div>
 
       <div className="px-4 pb-3 flex flex-wrap items-center gap-2 text-xs">
-        <span className="text-text-secondary">آخر زيارة: {formatDate(customer.lastVisit)}</span>
+        <span className="text-text-secondary">
+          {t.lastVisit.replace("{date}", formatDate(customer.lastVisit, locale))}
+        </span>
         {customer.topCategory && (
           <span className="px-2 py-0.5 rounded-full bg-gray-100 text-text-secondary">
-            يفضّل: {topCategoryLabel(customer.topCategory)}
+            {t.prefersLabel.replace("{category}", topCategoryLabel(customer.topCategory))}
           </span>
         )}
       </div>
@@ -164,12 +169,11 @@ export function CustomerRow({ customer, records, onChange }: CustomerRowProps) {
           className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white border border-border text-xs hover:border-accent"
         >
           {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-          {expanded ? "إخفاء" : "عرض الفواتير"}
+          {expanded ? t.hide : t.showInvoices}
         </button>
 
         <div className="flex-1" />
 
-        {/* Detail-page link — primary CTA when there's debt to chase. */}
         {detailHref && (
           <Link
             href={detailHref}
@@ -179,54 +183,59 @@ export function CustomerRow({ customer, records, onChange }: CustomerRowProps) {
                 : "bg-white border border-border text-text-secondary hover:border-accent hover:text-accent"
             }`}
           >
-            {customer.outstandingBalance > 0 ? "إدارة الآجل" : "ملف العميل"}
+            {customer.outstandingBalance > 0 ? t.manageDebt : t.openProfile}
             <ChevronLeft className="w-3.5 h-3.5" />
           </Link>
         )}
 
-        {/* WhatsApp shortcuts — substitute the active branch's shop name. */}
         <a
           href={waLink(
             customer.phone,
-            `أهلاً ${customer.name}! شكراً لتسوقك من ${shopName} ❤️ نتشرف بزيارتك مرة أخرى.`
+            t.thanksMessage
+              .replace("{name}", customer.name)
+              .replace("{shop}", shopName),
           )}
           target="_blank"
           rel="noreferrer"
           className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-success-light text-success text-xs hover:bg-success hover:text-white"
-          title="رسالة شكر"
+          title={t.thanksTitle}
         >
           <MessageCircle className="w-3.5 h-3.5" />
-          شكر
+          {t.thanksButton}
         </a>
         {customer.outstandingBalance > 0 && (
           <a
             href={waLink(
               customer.phone,
-              `أهلاً ${customer.name}، تذكير ودي بمبلغ ${customer.outstandingBalance.toLocaleString("ar-EG")} ج.م الآجل عندك في ${shopName}. شكراً!`
+              t.reminderMessage
+                .replace("{name}", customer.name)
+                .replace("{amount}", formatCurrency(customer.outstandingBalance, locale))
+                .replace("{shop}", shopName),
             )}
             target="_blank"
             rel="noreferrer"
             className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-orange-100 text-orange-700 text-xs hover:bg-orange-500 hover:text-white"
-            title="تذكير بالآجل"
+            title={t.reminderTitle}
           >
             <Bell className="w-3.5 h-3.5" />
-            تذكير آجل
+            {t.reminderButton}
           </a>
         )}
         <a
           href={waLink(
             customer.phone,
-            `${customer.name}! وصلتنا تشكيلة جديدة من ${
-              customer.topCategory ? CATEGORY_LABELS[customer.topCategory] : "المنتجات"
-            } في ${shopName}. تعالى شوفها 🌟`
+            t.newCollectionMessage
+              .replace("{name}", customer.name)
+              .replace("{category}", categoryWord)
+              .replace("{shop}", shopName),
           )}
           target="_blank"
           rel="noreferrer"
           className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-accent-light text-accent text-xs hover:bg-accent hover:text-white"
-          title="عرض جديد"
+          title={t.newCollectionTitle}
         >
           <Megaphone className="w-3.5 h-3.5" />
-          عرض جديد
+          {t.newCollectionButton}
         </a>
       </div>
 
@@ -234,7 +243,7 @@ export function CustomerRow({ customer, records, onChange }: CustomerRowProps) {
         <div className="border-t border-border divide-y divide-border">
           {invoices.length === 0 && (
             <p className="p-4 text-sm text-text-secondary text-center">
-              لا يوجد فواتير
+              {t.emptyInvoices}
             </p>
           )}
           {invoices.map((inv) => {
@@ -249,25 +258,26 @@ export function CustomerRow({ customer, records, onChange }: CustomerRowProps) {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-xs text-text-secondary">
-                      {formatDate(inv.date)} · {inv.lines.length} قطعة
+                      {formatDate(inv.date, locale)} ·{" "}
+                      {t.pieces.replace("{n}", String(inv.lines.length))}
                     </p>
                     {inv.isPaid ? (
                       <span className="text-[10px] px-2 py-0.5 rounded-full bg-success-light text-success font-medium">
-                        مدفوع
+                        {t.paidBadge}
                       </span>
                     ) : (
                       <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium">
-                        آجل
+                        {t.deferredBadge}
                       </span>
                     )}
                   </div>
-                  <p className="text-sm mt-0.5">
+                  <p className="text-sm mt-0.5" dir="auto">
                     {inv.lines.map((l) => l.productName).join("، ")}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <p className="font-bold text-accent tabular-nums">
-                    {formatPrice(inv.total)}
+                    {formatCurrency(inv.total, locale)}
                   </p>
                   {!inv.isPaid && (
                     <button
@@ -277,7 +287,7 @@ export function CustomerRow({ customer, records, onChange }: CustomerRowProps) {
                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-success text-white text-xs font-medium hover:bg-success/90 disabled:opacity-60"
                     >
                       <CheckCircle className="w-3 h-3" />
-                      {busy ? "..." : "تأكيد الدفع"}
+                      {busy ? t.markPaidBusy : t.markPaid}
                     </button>
                   )}
                 </div>

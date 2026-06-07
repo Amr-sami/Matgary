@@ -209,6 +209,2211 @@
         }
       }
     },
+    "sales": {
+      "title": "المبيعات",
+      "filters": {
+        "searchPlaceholder": "ابحث بالمنتج، البراند، أو ملاحظة…",
+        "status": {
+          "all": "الكل",
+          "sold": "مباع",
+          "returned": "مرتجع"
+        },
+        "allCategories": "كل الأصناف",
+        "allGenders": "الكل",
+        "allBrands": "كل البراندات",
+        "sortPrefix": "ترتيب: {label}",
+        "sort": {
+          "newest": "الأحدث",
+          "oldest": "الأقدم",
+          "totalDesc": "الإجمالي (الأعلى)",
+          "totalAsc": "الإجمالي (الأقل)",
+          "qtyDesc": "الكمية (الأكثر)",
+          "qtyAsc": "الكمية (الأقل)"
+        },
+        "discountOnly": "بخصم فقط"
+      },
+      "clearFilters": "مسح الفلاتر",
+      "invoiceCount": "{n} فاتورة",
+      "rangeLabel": {
+        "today": "اليوم",
+        "yesterday": "أمس",
+        "7d": "آخر 7 أيام",
+        "30d": "آخر 30 يوم",
+        "thisMonth": "الشهر",
+        "all": "الكل",
+        "custom": "الفترة المختارة"
+      },
+      "heatmap": {
+        "title": "الساعات الأكثر ازدحاماً",
+        "peak": "ذروة: {hour}:00 ({n} فاتورة)",
+        "cellTitle": "{h}:00 — {n} فاتورة"
+      },
+      "chart": {
+        "headline": "مبيعات آخر {days} يوم",
+        "last7": "آخر 7 أيام",
+        "wow": "{arrow} {pct}% مقارنة بالأسبوع السابق"
+      },
+      "toast": {
+        "saleSuccess": "تم تسجيل البيع بنجاح",
+        "returnSuccess": "تم تسجيل المرتجع وتحديث المخزن",
+        "saleUpdated": "تم تحديث الفاتورة",
+        "saleDeleted": "تم حذف الفاتورة",
+        "saleDeletedRestocked": "تم حذف الفاتورة وإرجاع المخزون",
+        "deleteFailed": "تعذر الحذف",
+        "nothingToPrint": "لا توجد فواتير صالحة للطباعة في التحديد"
+      },
+      "void": {
+        "title": "حذف الفاتورة",
+        "messageReturned": "هذه الفاتورة مرتجعة بالفعل. سيتم حذفها بشكل نهائي.",
+        "message": "سيتم حذف الفاتورة وإرجاع {n} قطعة من \"{name}\" إلى المخزن.",
+        "confirm": "حذف"
+      },
+      "kpi": {
+        "invoicesInRange": "فواتير {range}",
+        "netSales": "صافي المبيعات",
+        "netProfit": "صافي الربح",
+        "profitNeedsReview": "يحتاج مراجعة",
+        "avgBasket": "متوسط الفاتورة",
+        "avgDiscount": "متوسط الخصم"
+      },
+      "deferred": {
+        "title": "آجل غير مدفوع",
+        "customerCount": "{n} عميل",
+        "hide": "إخفاء",
+        "showDetails": "عرض التفاصيل",
+        "singleItem": "فاتورة واحدة",
+        "multipleItems": "{n} عناصر",
+        "markPaid": "مدفوع",
+        "noName": "بدون اسم"
+      },
+      "summary": {
+        "todaySales": "مبيعات اليوم"
+      },
+      "topProducts": {
+        "title": "الأعلى مبيعاً",
+        "empty": "لا توجد بيانات",
+        "pieces": "{n} قطعة"
+      },
+      "topCustomers": {
+        "title": "أعلى العملاء إنفاقاً",
+        "viewAll": "عرض الكل"
+      },
+      "dayCompare": {
+        "header": "مقارنة يوم {day} الحالي بـ {day} الماضي",
+        "todayInvoices": "{n} فاتورة اليوم",
+        "lastWeekInvoices": "{n} فاتورة الأسبوع الماضي"
+      },
+      "table": {
+        "col": {
+          "date": "التاريخ",
+          "product": "المنتج",
+          "category": "الصنف",
+          "brand": "البراند",
+          "quantity": "الكمية",
+          "price": "السعر",
+          "total": "الإجمالي",
+          "status": "الحالة",
+          "action": "إجراء"
+        },
+        "rowCustomerTooltip": "عرض كل فواتير هذا العميل",
+        "discountAmount": "خصم {value}",
+        "actions": {
+          "print": "طباعة",
+          "edit": "تعديل",
+          "return": "مرتجع",
+          "void": "حذف الفاتورة (إرجاع للمخزن)"
+        }
+      },
+      "status": {
+        "sold": "مباع",
+        "returned": "مرتجع"
+      },
+      "card": {
+        "soldQty": "الكمية المباعة",
+        "qtyPieces": "{n} قطعة",
+        "unitPrice": "سعر الوحدة",
+        "totalLabel": "الإجمالي",
+        "voidLong": "حذف الفاتورة",
+        "voidTooltip": "حذف الفاتورة وإرجاع المخزون"
+      },
+      "bulk": {
+        "selectedCount": "{n} فاتورة محددة",
+        "printSelected": "طباعة المحدد",
+        "exportCsv": "تصدير CSV",
+        "clearSelection": "إلغاء التحديد"
+      },
+      "share": {
+        "title": "مشاركة",
+        "copy": "نسخ النص",
+        "copied": "تم النسخ",
+        "whatsapp": "واتساب",
+        "messageTotal": "الإجمالي: {amount}"
+      },
+      "editModal": {
+        "title": "تعديل البيع: {productName}",
+        "quantity": "الكمية",
+        "unitPrice": "سعر الوحدة",
+        "discountPercent": "نسبة %",
+        "discountFixed": "مبلغ ثابت",
+        "discountValue": "قيمة الخصم",
+        "saleDate": "تاريخ الفاتورة",
+        "note": "ملاحظة",
+        "totals": {
+          "subtotal": "المجموع الفرعي",
+          "discount": "الخصم",
+          "total": "الإجمالي"
+        },
+        "save": "حفظ التعديلات",
+        "error": "تعذر تحديث الفاتورة"
+      },
+      "returnModal": {
+        "title": "تسجيل مرتجع",
+        "sold": "المباع: {n} قطعة",
+        "quantity": "الكمية المرتجعة",
+        "maxQuantity": "الحد الأقصى: {n}",
+        "reasonLabel": "سبب الإرجاع",
+        "reasonPlaceholder": "اختر السبب…",
+        "reasons": {
+          "defect": "عيب في المنتج",
+          "not_liked": "المنتج لم يعجب العميل",
+          "wrong_size": "حجم غير مناسب",
+          "other": "أخرى"
+        },
+        "otherLabel": "اكتب السبب",
+        "otherPlaceholder": "سبب الإرجاع…",
+        "confirm": "تأكيد الإرجاع"
+      },
+      "print": {
+        "title": "خيارات الطباعة",
+        "paperLabel": "مقاس الورق",
+        "paper": {
+          "auto_one": "تلقائي · نسخة واحدة لكل ورقة (موصى به)",
+          "xp330b_80": "XP-330B حراري 80mm",
+          "thermal_58": "حراري 58mm",
+          "a4": "A4 (210 × 297mm)",
+          "letter": "Letter (216 × 279mm)",
+          "custom": "مخصص"
+        },
+        "customWidth": "العرض (mm)",
+        "customHeight": "الارتفاع (mm، 0 = تلقائي)",
+        "orientationLabel": "الاتجاه",
+        "orientation": {
+          "portrait": "طولي",
+          "landscape": "عرضي"
+        },
+        "marginsLabel": "الهوامش",
+        "margins": {
+          "none": "بدون",
+          "narrow": "ضيق",
+          "normal": "عادي"
+        },
+        "scaleLabel": "الحجم (Scale): {pct}%",
+        "copies": "عدد النسخ",
+        "pagesPerSheetLabel": "صفحات في الورقة",
+        "fitToPageLabel": "ملء الصفحة (بدون فراغ أسفل الفاتورة)",
+        "fitToPageHint": "يمد الفاتورة لتغطي ارتفاع الورقة كاملاً.",
+        "tipBold": "منع تكرار الفاتورة 4 مرات:",
+        "tipBody": "اختر \"تلقائي · نسخة واحدة لكل ورقة\" (الافتراضي). هذا الخيار يستخدم مقاس الورق الفعلي للطابعة فيطبع نسخة واحدة فقط في الورقة. استخدم XP-330B فقط مع الطابعة الحرارية.",
+        "preview": "معاينة",
+        "noData": "لا توجد بيانات",
+        "printAction": "طباعة ({n}× نسخة)"
+      },
+      "form": {
+        "title": "تسجيل بيع جديد",
+        "itemsInCart": "{n} منتج في الفاتورة",
+        "productSearch": {
+          "label": "اختيار المنتج",
+          "placeholder": "ابحث عن منتج…",
+          "inStock": "متوفر: {n}"
+        },
+        "recentLabel": "منتجات حديثة:",
+        "available": "المتاح: {n} قطعة",
+        "fields": {
+          "quantity": "الكمية",
+          "maxQuantity": "الحد الأقصى: {n}",
+          "pricePerUnit": "سعر الوحدة (جنيه)",
+          "lineDiscount": "خصم على هذا المنتج (اختياري)",
+          "discountPercent": "نسبة %",
+          "discountAmount": "مبلغ ج.م",
+          "percent": "نسبة",
+          "amount": "مبلغ"
+        },
+        "addToCart": "إضافة للفاتورة",
+        "lineDiscountInline": "(خصم - {amount})",
+        "orderDiscount": "خصم على إجمالي الفاتورة (اختياري)",
+        "totals": {
+          "subtotal": "المجموع الفرعي",
+          "lineDiscounts": "خصومات بنود",
+          "orderDiscount": "خصم الفاتورة",
+          "loyaltyPoints": "خصم نقاط ({n} نقطة)",
+          "loyaltyCredit": "خصم الرصيد",
+          "total": "الإجمالي",
+          "loyaltyTrimmedNote": "تم تعديل قيمة الخصم تلقائياً لتطابق الحد المتاح من المحفظة ورصيد الفاتورة."
+        },
+        "customer": {
+          "nameLabel": "اسم العميل (اختياري)",
+          "namePlaceholder": "ابدأ الكتابة لاختيار عميل سابق…",
+          "phoneLabel": "رقم الموبايل",
+          "phonePlaceholder": "ابدأ الكتابة لاختيار رقم سابق…",
+          "noName": "بدون اسم",
+          "fallbackName": "عميلنا الكريم"
+        },
+        "loyalty": {
+          "walletLabel": "محفظة العميل",
+          "pointsSuffix": "نقطة",
+          "currencyShort": "ج",
+          "creditSuffix": "رصيد",
+          "redeemPoints": "خصم نقاط",
+          "applyCredit": "استخدام رصيد (ج)"
+        },
+        "payment": {
+          "label": "طريقة الدفع",
+          "deferredNote": "ستُسجَّل الفاتورة كآجل غير مدفوع."
+        },
+        "note": {
+          "label": "ملاحظة (اختياري)",
+          "placeholder": "ملاحظة…"
+        },
+        "backdate": {
+          "label": "تسجيل الفاتورة بتاريخ سابق"
+        },
+        "submit": "تسجيل الفاتورة",
+        "printInvoice": "طباعة الفاتورة",
+        "errors": {
+          "invalidDate": "تاريخ غير صحيح",
+          "futureDate": "لا يمكن تسجيل بيع في تاريخ مستقبلي",
+          "sessionMissing": "جلسة غير مكتملة. أعد تحميل الصفحة."
+        }
+      }
+    },
+    "catalog": {
+      "payment": {
+        "cash": "كاش",
+        "instapay": "انستاباي",
+        "card": "بطاقة",
+        "deferred": "آجل"
+      },
+      "uncategorized": "غير مصنّف",
+      "expenseCategory": {
+        "rent": "إيجار",
+        "salaries": "مرتبات",
+        "electricity": "كهرباء",
+        "water": "مياه",
+        "internet": "إنترنت",
+        "supplier": "مورد",
+        "other": "أخرى"
+      },
+      "brandsAdmin": {
+        "title": "البراندات",
+        "noCategoriesHint": "أضف قسمًا أولاً ثم ارجع لتعريف البراندات.",
+        "newPlaceholder": "اسم البراند الجديد",
+        "add": "إضافة",
+        "loading": "جاري التحميل…",
+        "empty": "لا توجد براندات لهذا القسم.",
+        "errors": {
+          "addFailed": "تعذر الإضافة"
+        },
+        "confirmDelete": "حذف هذا البراند؟",
+        "deleteTitle": "حذف"
+      },
+      "categoriesAdmin": {
+        "title": "الأقسام",
+        "addCategory": "قسم جديد",
+        "cancel": "إلغاء",
+        "labelLabel": "اسم القسم",
+        "labelPlaceholder": "مثال: سماعات",
+        "iconLabel": "الأيقونة",
+        "save": "حفظ",
+        "empty": "لا توجد أقسام بعد. أضف أول قسم من الزر أعلاه.",
+        "deleteTitle": "حذف",
+        "confirmDeleteCategory": "حذف هذا القسم؟",
+        "toasts": {
+          "categoryAdded": "تم إضافة القسم",
+          "categoryDeleted": "تم الحذف",
+          "addFailed": "تعذر الإضافة",
+          "deleteFailed": "تعذر الحذف"
+        },
+        "attributes": {
+          "loading": "جاري التحميل…",
+          "heading": "الخصائص",
+          "addAttribute": "خاصية",
+          "cancel": "إلغاء",
+          "namePlaceholder": "اسم الخاصية (مثل: النوع)",
+          "save": "حفظ",
+          "empty": "لا توجد خصائص. تخطّى المعالج الخطوة الثانية لهذا القسم.",
+          "confirmDeleteAttribute": "حذف هذه الخاصية؟",
+          "confirmDeleteValue": "حذف هذه القيمة؟",
+          "deleteValueTitle": "حذف",
+          "valuePlaceholder": "قيمة جديدة (مثل: رجالي)",
+          "addValue": "إضافة"
+        }
+      }
+    },
+    "reports": {
+      "title": "التقارير والاحصائيات",
+      "totalSales": "إجمالي المبيعات",
+      "totalQty": "كمية المبيعات",
+      "qtySuffix": "{n} قطعة",
+      "totalReturns": "عدد المرتجعات",
+      "returnsSubtitle": "مرتجع",
+      "detailsHeading": "تفاصيل المبيعات للفترة المختارة"
+    },
+    "activityLabels": {
+      "fields": {
+        "invoiceId": "رقم الفاتورة",
+        "lineCount": "عدد الأصناف",
+        "totalQuantity": "إجمالي القطع",
+        "paymentMethod": "طريقة الدفع",
+        "lines": "الأصناف",
+        "total": "الإجمالي",
+        "quantitySold": "الكمية",
+        "pricePerUnit": "السعر",
+        "customerName": "اسم العميل",
+        "customerPhone": "هاتف العميل",
+        "note": "ملاحظة",
+        "source": "الطريقة",
+        "attemptType": "نوع المحاولة",
+        "loggedLocation": "الموقع المسجَّل",
+        "locationAccuracy": "دقة الموقع",
+        "username": "اسم المستخدم",
+        "permissionsCount": "عدد الصلاحيات",
+        "changed": "الحقول المعدلة",
+        "payType": "نوع الراتب",
+        "baseSalaryMonthly": "الراتب الشهري",
+        "hourlyRate": "أجر الساعة",
+        "initialQuantity": "الكمية الابتدائية",
+        "price": "السعر",
+        "delta": "التغيير",
+        "newQuantity": "الرصيد الجديد",
+        "amount": "المبلغ",
+        "type": "النوع",
+        "startDate": "من",
+        "endDate": "إلى"
+      },
+      "fieldNames": {
+        "shopName": "اسم المتجر",
+        "shopPhone": "هاتف المتجر",
+        "logoPath": "شعار المتجر",
+        "messageTemplate": "نص رسالة WhatsApp",
+        "greenApiEnabled": "تفعيل Green API",
+        "greenApiInstanceId": "معرّف الـ Instance",
+        "greenApiUrl": "رابط الخدمة",
+        "whatsappCloudEnabled": "تفعيل WhatsApp Cloud API",
+        "whatsappCloudPhoneId": "Phone Number ID",
+        "whatsappCloudBusinessId": "WhatsApp Business Account ID",
+        "sendAsPdf": "إرسال كـ PDF",
+        "autoOpenWhatsApp": "فتح WhatsApp تلقائياً",
+        "workHoursPerDay": "ساعات العمل اليومية",
+        "weekendDays": "أيام الإجازة الأسبوعية",
+        "overtimeMultiplier": "معدل الأوفر",
+        "graceMinutesLate": "دقائق التأخير المسموحة",
+        "displayName": "الاسم الظاهر",
+        "phone": "الهاتف",
+        "nationalId": "الرقم القومي",
+        "address": "العنوان",
+        "profilePhotoPath": "صورة شخصية",
+        "idPhotoPath": "صورة البطاقة",
+        "brand": "البراند",
+        "costPrice": "سعر الشراء",
+        "lowStockThreshold": "حد التنبيه للمخزون",
+        "sku": "الكود (SKU)",
+        "tags": "وسوم",
+        "supplier": "المورد",
+        "supplierId": "المورد",
+        "location": "موقع التخزين"
+      },
+      "paymentMethods": {
+        "cash": "نقدي",
+        "instapay": "إنستاباي",
+        "card": "كارت",
+        "deferred": "آجل"
+      },
+      "payTypes": {
+        "fixed": "ثابت",
+        "hourly": "بالساعة",
+        "hybrid": "مختلط"
+      },
+      "attendanceTypes": {
+        "check_in": "تسجيل دخول",
+        "check_out": "تسجيل خروج"
+      },
+      "attendanceSources": {
+        "manual": "يدوي",
+        "geofence": "تلقائي بالموقع",
+        "qr": "QR",
+        "manager_attest": "إثبات مدير"
+      },
+      "expenseCategories": {
+        "rent": "إيجار",
+        "salaries": "رواتب",
+        "electricity": "كهرباء",
+        "water": "مياه",
+        "internet": "إنترنت",
+        "supplier": "مورد",
+        "other": "أخرى"
+      },
+      "accuracySuffix": "±{n} م",
+      "categories": {
+        "auth": "الحساب",
+        "team": "الموظفون",
+        "settings": "الإعدادات",
+        "leave": "الإجازات",
+        "task": "المهام",
+        "product": "المنتجات",
+        "sale": "المبيعات",
+        "expense": "المصاريف",
+        "supplier": "الموردون",
+        "purchase": "المشتريات",
+        "attendance": "الحضور"
+      },
+      "actions": {
+        "auth.login": "تسجيل الدخول",
+        "auth.2fa_enable": "تفعيل المصادقة الثنائية",
+        "auth.2fa_disable": "تعطيل المصادقة الثنائية",
+        "auth.recovery_codes_regenerated": "تجديد الرموز الاحتياطية",
+        "auth.session_revoke_all": "تسجيل خروج من جميع الأجهزة",
+        "auth.data_export": "تنزيل نسخة من بيانات المتجر",
+        "tenant.deletion_scheduled": "تحديد موعد حذف المتجر",
+        "tenant.deletion_cancelled": "إلغاء حذف المتجر",
+        "auth.logout": "تسجيل الخروج",
+        "auth.password_change": "تغيير كلمة المرور",
+        "team.add": "إضافة موظف",
+        "team.update": "تعديل بيانات موظف",
+        "team.delete": "حذف موظف",
+        "team.password_reset": "إعادة ضبط كلمة مرور موظف",
+        "team.compensation_set": "تعديل راتب / أجر موظف",
+        "settings.update": "تعديل إعدادات المتجر",
+        "settings.attendance_update": "تعديل إعدادات الحضور",
+        "leave.submit": "تقديم طلب إجازة",
+        "leave.approve": "الموافقة على إجازة",
+        "leave.reject": "رفض إجازة",
+        "task.create": "إنشاء مهمة",
+        "task.update": "تعديل مهمة",
+        "task.delete": "حذف مهمة",
+        "product.create": "إضافة منتج",
+        "product.update": "تعديل منتج",
+        "product.delete": "حذف منتج",
+        "product.adjust": "تعديل مخزون",
+        "sale.create": "تسجيل فاتورة",
+        "sale.update": "تعديل فاتورة",
+        "sale.void": "إلغاء فاتورة",
+        "sale.mark_paid": "تأكيد دفع فاتورة",
+        "expense.create": "تسجيل مصروف",
+        "expense.delete": "حذف مصروف",
+        "expense.recurring_materialized": "إنشاء مصاريف دورية مستحقة",
+        "supplier.create": "إضافة مورد",
+        "supplier.update": "تعديل مورد",
+        "supplier.delete": "حذف مورد",
+        "purchase.create": "إنشاء أمر شراء",
+        "purchase.receive": "استلام أمر شراء",
+        "purchase.cancel": "إلغاء أمر شراء",
+        "attendance.check_in": "تسجيل دخول",
+        "attendance.check_out": "تسجيل خروج",
+        "attendance.geofence_rejected": "محاولة حضور من خارج نطاق المتجر",
+        "billing.checkout_started": "فتح صفحة الدفع",
+        "billing.payment_succeeded": "تم استلام دفعة الاشتراك",
+        "billing.payment_failed": "فشل دفع الاشتراك",
+        "billing.cancelled": "إلغاء الاشتراك",
+        "loyalty.credit_grant": "إضافة رصيد للعميل",
+        "loyalty.credit_deduct": "خصم رصيد من العميل",
+        "branch.create": "إضافة فرع",
+        "branch.update": "تعديل فرع",
+        "branch.disable": "إيقاف فرع",
+        "branch.enable": "تفعيل فرع",
+        "branch.delete": "حذف فرع",
+        "branch.switch": "تبديل الفرع الحالي"
+      }
+    },
+    "permissions": {
+      "labels": {
+        "view_dashboard": "لوحة التحكم",
+        "view_inventory": "المخزن",
+        "view_sales": "المبيعات",
+        "view_customers": "العملاء",
+        "view_expenses": "المصاريف",
+        "view_returns": "المرتجعات",
+        "view_insights": "إحصائيات",
+        "view_settings": "الإعدادات",
+        "view_suppliers": "الموردين",
+        "view_purchases": "المشتريات",
+        "manage_inventory": "إدارة المنتجات (إضافة / تعديل / حذف)",
+        "record_sales": "تسجيل المبيعات",
+        "modify_sales": "تعديل / إلغاء فاتورة",
+        "manage_returns": "تسجيل المرتجعات",
+        "manage_expenses": "إدارة المصاريف",
+        "manage_catalog": "إدارة الأقسام والبراندات",
+        "manage_suppliers": "إدارة الموردين",
+        "manage_purchases": "إدارة المشتريات (إنشاء / استلام)",
+        "manage_whatsapp": "إعدادات المتجر و WhatsApp",
+        "manage_team": "إدارة الموظفين",
+        "attendance_self_manual": "تسجيل الحضور يدوياً",
+        "manage_tasks": "إنشاء وتوزيع المهام",
+        "request_leave": "تقديم طلبات إجازة",
+        "manage_leave": "الموافقة على طلبات الإجازة",
+        "view_activity_log": "عرض سجل النشاط"
+      },
+      "groups": {
+        "pages": "الوصول للصفحات",
+        "edit": "صلاحيات التعديل",
+        "suppliersPurchases": "الموردين والمشتريات",
+        "tasksLeaves": "المهام والإجازات",
+        "audit": "المراقبة والتدقيق",
+        "attendance": "الحضور والانصراف"
+      }
+    },
+    "ui": {
+      "pagination": {
+        "range": "{start}–{end} من {total}",
+        "perPage": "{n} / صفحة"
+      },
+      "empty": {
+        "products": "لم تتم إضافة أي أصناف بعد. ابدأ بإضافة صنف جديد.",
+        "sales": "لم يتم تسجيل أي مبيعات بعد.",
+        "returns": "لم تتم أي مرتجعات بعد."
+      },
+      "confirm": {
+        "confirm": "تأكيد",
+        "cancel": "إلغاء"
+      }
+    },
+    "whatsappInbox": {
+      "title": "WhatsApp",
+      "loading": "جارٍ التحميل…",
+      "notAllowed": "ليس لديك صلاحية لعرض محادثات واتساب.",
+      "selectHint": "اختر محادثة لعرض الرسائل.",
+      "tabs": {
+        "all": "الكل",
+        "unread": "غير مقروء",
+        "archived": "مؤرشف"
+      },
+      "list": {
+        "loading": "جارٍ التحميل…",
+        "errorPrefix": "تعذر تحميل المحادثات:",
+        "emptyAll": "لا توجد محادثات بعد. ستظهر هنا أول رسالة من عميل.",
+        "emptyUnread": "لا توجد رسائل غير مقروءة.",
+        "emptyArchived": "لا توجد محادثات مؤرشفة.",
+        "youPrefix": "أنت: ",
+        "loadMore": "تحميل المزيد",
+        "loadingMore": "جارٍ التحميل…"
+      },
+      "thread": {
+        "back": "رجوع",
+        "archive": "أرشفة",
+        "restore": "استعادة",
+        "loading": "جارٍ التحميل…",
+        "loadOlder": "تحميل أقدم",
+        "loadingOlder": "…",
+        "emptyMessages": "لا توجد رسائل بعد.",
+        "composerPlaceholder": "اكتب رسالة…",
+        "send": "إرسال",
+        "windowClosedError": "نافذة الـ 24 ساعة مغلقة. استخدم قالباً معتمداً.",
+        "outsideWindowHint": "لا يمكن إرسال رسائل حرّة الآن — استخدم قالباً معتمداً. ",
+        "manageTemplates": "إدارة القوالب"
+      },
+      "windowState": {
+        "noChat": "العميل لم يراسل بعد — استخدم قالباً",
+        "closed": "نافذة المحادثة مغلقة — استخدم قالباً",
+        "endingSoon": "النافذة تنتهي خلال ساعة — أرسل بسرعة",
+        "openHours": "النافذة مفتوحة ({h} ساعة متبقية)"
+      },
+      "relative": {
+        "now": "الآن",
+        "minutes": "قبل {n} د",
+        "hours": "قبل {n} س",
+        "days": "قبل {n} ي"
+      },
+      "messageTypes": {
+        "image": "[صورة]",
+        "document": "[مستند]",
+        "video": "[فيديو]",
+        "audio": "[ملف صوتي]",
+        "sticker": "[ملصق]",
+        "location": "[موقع]",
+        "button_reply": "[زر]",
+        "interactive_reply": "[تفاعلي]",
+        "reaction": "[تفاعل]",
+        "template": "[قالب]",
+        "unknown": "[رسالة]"
+      },
+      "messageStatus": {
+        "queued": "في الانتظار",
+        "sent": "أُرسلت",
+        "delivered": "وُصلت",
+        "read": "مقروءة",
+        "failed": "فشلت"
+      }
+    },
+    "tasks": {
+      "page": {
+        "title": "المهام",
+        "heading": "المهام",
+        "subhead": "تابع المهام الموكلة إليك، وحدّث حالتها عند البدء أو الإنجاز."
+      },
+      "status": {
+        "open": "مفتوحة",
+        "in_progress": "قيد التنفيذ",
+        "done": "مكتملة",
+        "cancelled": "ملغاة"
+      },
+      "priority": {
+        "low": "منخفضة",
+        "normal": "عادية",
+        "high": "عاجلة"
+      },
+      "toolbar": {
+        "board": "لوحة",
+        "list": "قائمة",
+        "newTask": "مهمة جديدة"
+      },
+      "card": {
+        "newBadge": "جديدة",
+        "startAction": "ابدأ",
+        "doneAction": "تم الإنجاز",
+        "reopenAction": "إعادة فتح",
+        "editTitle": "تعديل",
+        "deleteTitle": "حذف"
+      },
+      "empty": {
+        "loading": "جاري التحميل…",
+        "managerTitle": "لا توجد مهام بعد",
+        "staffTitle": "لا توجد مهام موكلة إليك",
+        "managerHint": "أنشئ مهام وحدد الموظف المسؤول وموعد التنفيذ. سيرى الموظف إشعاراً فور إسناد المهمة.",
+        "staffHint": "ستظهر هنا أي مهمة يسندها لك المدير.",
+        "createButton": "إنشاء مهمة",
+        "columnEmpty": "لا شيء هنا"
+      },
+      "openCount": "{n} مهمة مفتوحة",
+      "toast": {
+        "statusFailed": "تعذر تحديث الحالة",
+        "statusSuccess": "تم تحديث الحالة",
+        "deleteFailed": "تعذر الحذف",
+        "deleted": "تم الحذف",
+        "edited": "تم حفظ التعديلات",
+        "created": "تم إنشاء المهمة"
+      },
+      "delete": {
+        "title": "حذف المهمة",
+        "message": "هل تريد حذف \"{title}\"؟ هذا الإجراء لا يمكن التراجع عنه.",
+        "confirm": "حذف"
+      },
+      "form": {
+        "editTitle": "تعديل المهمة",
+        "createTitle": "مهمة جديدة",
+        "titleLabel": "العنوان *",
+        "titlePlaceholder": "مثلاً: ترتيب الفترينة الرئيسية",
+        "descriptionLabel": "الوصف",
+        "descriptionPlaceholder": "تفاصيل المهمة، خطوات التنفيذ…",
+        "assigneeLabel": "إسناد إلى *",
+        "assigneePlaceholder": "اختر موظف…",
+        "ownerSuffix": " (المالك)",
+        "priorityLabel": "الأولوية",
+        "dueDateLabel": "التاريخ المستحق",
+        "cancel": "إلغاء",
+        "save": "حفظ",
+        "create": "إنشاء",
+        "errors": {
+          "titleRequired": "عنوان المهمة مطلوب",
+          "assigneeRequired": "اختر الموظف المُسند إليه",
+          "saveFailed": "تعذر الحفظ"
+        }
+      }
+    },
+    "returns": {
+      "title": "المرتجعات",
+      "monthLabel": "مرتجعات الشهر"
+    },
+    "activity": {
+      "title": "سجل النشاط",
+      "heading": "سجل النشاط",
+      "subhead": "كل العمليات التي تتم في النظام — من أضاف، عدّل، أو حذف.",
+      "notAllowed": "ليس لديك صلاحية لعرض السجل.",
+      "filters": {
+        "fromLabel": "من تاريخ",
+        "toLabel": "إلى تاريخ",
+        "userLabel": "المستخدم",
+        "categoryLabel": "القسم",
+        "allCategories": "كل الأقسام",
+        "allUsers": "كل المستخدمين",
+        "clear": "مسح",
+        "apply": "تطبيق"
+      },
+      "loading": "جاري التحميل…",
+      "loadMore": "تحميل المزيد",
+      "errors": {
+        "loadFailed": "تعذر تحميل السجل",
+        "loadMoreFailed": "تعذر تحميل المزيد",
+        "generic": "خطأ غير معروف"
+      },
+      "empty": "لا توجد عمليات مسجلة في هذه الفترة.",
+      "relative": {
+        "now": "الآن",
+        "minutes": "منذ {n} دقيقة",
+        "hours": "منذ {n} ساعة",
+        "days": "منذ {n} يوم"
+      }
+    },
+    "customers": {
+      "title": "العملاء",
+      "fallbackShopName": "متجرنا",
+      "diagnostics": {
+        "noneYetTitle": "لا يوجد عملاء بعد",
+        "noneYetBody": "عندك {total} فاتورة في النظام، لكن لم يتم إدخال اسم أو رقم العميل في أي منها.",
+        "noneYetFix": "الحل: عند تسجيل البيع، اكتب اسم العميل أو رقم الموبايل في حقول \"العميل\" قبل الضغط على \"تسجيل الفاتورة\".",
+        "latestLabel": "أحدث فاتورة (للتشخيص):",
+        "missing": "(غير موجود)",
+        "refreshHint": "لو ظهر \"غير موجود\" مع إنك سجلت اسم/رقم: المتصفح بيحمّل نسخة قديمة من البرنامج. اعمل hard refresh: Ctrl+Shift+R (ويندوز) أو Cmd+Shift+R (ماك)، أو افتح الصفحة في incognito.",
+        "build": "build: {stamp}",
+        "linkedSummary": "تم ربط بيانات العملاء بـ {n} من أصل {total} فاتورة. باقي الفواتير لم يتم تسجيل اسم/رقم لها."
+      },
+      "summary": {
+        "total": "إجمالي العملاء",
+        "repeats": "عملاء دائمون",
+        "inactive": "غير نشطين",
+        "outstanding": "آجل غير مدفوع"
+      },
+      "top5": {
+        "title": "أعلى 5 عملاء إنفاقاً",
+        "invoiceCount": "{n} فاتورة"
+      },
+      "search": {
+        "placeholder": "ابحث بالاسم أو الموبايل…"
+      },
+      "filter": {
+        "all": "كل العملاء",
+        "repeat": "عملاء دائمون",
+        "inactive": "غير نشط (60+ يوم)",
+        "outstanding": "عليه آجل"
+      },
+      "sort": {
+        "prefix": "ترتيب: {label}",
+        "options": {
+          "ltv": "الأعلى إنفاقاً",
+          "recent": "الأحدث زيارة",
+          "invoices": "الأكثر فواتير",
+          "outstanding": "أعلى آجل غير مدفوع",
+          "name": "الاسم"
+        }
+      },
+      "bulkInactive": "مراسلة غير النشطين",
+      "bulkInactiveTitle": "ينسخ كل أرقام العملاء غير النشطين ويفتح واتساب على أول رقم",
+      "bulkInactiveMessage": "أهلاً! وحشتنا في {shop}. تشكيلتنا الجديدة وصلت — بنستناك 🌟",
+      "bulkInactiveClipboard": "{n} رقم:\n{phones}\n\nرسالة:\n{message}",
+      "exportCsv": "تصدير CSV",
+      "count": "{n} عميل",
+      "emptyNoSales": "لم يتم تسجيل أي عملاء بعد. أضف الاسم/الموبايل عند تسجيل البيع.",
+      "emptyNoResults": "لا توجد نتائج",
+      "row": {
+        "repeatBadge": "عميل دائم",
+        "inactiveBadge": "غير نشط ({n} يوم)",
+        "owedBadge": "آجل {amount}",
+        "lifetime": "إجمالي الإنفاق",
+        "invoicesLabel": "فواتير",
+        "lastVisit": "آخر زيارة: {date}",
+        "prefersLabel": "يفضّل: {category}",
+        "showInvoices": "عرض الفواتير",
+        "hide": "إخفاء",
+        "manageDebt": "إدارة الآجل",
+        "openProfile": "ملف العميل",
+        "thanksTitle": "رسالة شكر",
+        "thanksButton": "شكر",
+        "thanksMessage": "أهلاً {name}! شكراً لتسوقك من {shop} ❤️ نتشرف بزيارتك مرة أخرى.",
+        "reminderTitle": "تذكير بالآجل",
+        "reminderButton": "تذكير آجل",
+        "reminderMessage": "أهلاً {name}، تذكير ودي بمبلغ {amount} الآجل عندك في {shop}. شكراً!",
+        "newCollectionTitle": "عرض جديد",
+        "newCollectionButton": "عرض جديد",
+        "newCollectionMessage": "{name}! وصلتنا تشكيلة جديدة من {category} في {shop}. تعالى شوفها 🌟",
+        "defaultCategoryWord": "المنتجات",
+        "emptyInvoices": "لا يوجد فواتير",
+        "pieces": "{n} قطعة",
+        "paidBadge": "مدفوع",
+        "deferredBadge": "آجل",
+        "markPaidBusy": "…",
+        "markPaid": "تأكيد الدفع"
+      }
+    },
+    "receiptDesigner": {
+      "title": "تصميم الفاتورة",
+      "subhead": "اسحب أي قسم من الفاتورة لتغيير ترتيبه. حرّك المؤشر فوق القسم تظهر أيقونات الإخفاء والتعديل.",
+      "logoAlt": "الشعار",
+      "logoEmptyTitle": "لا يوجد شعار",
+      "logoEmptySubtitle": "(يستخدم الافتراضي)",
+      "logoUpload": "رفع شعار",
+      "logoChange": "تغيير الشعار",
+      "logoUploading": "جارٍ التجهيز…",
+      "logoRemove": "إزالة الشعار",
+      "logoFormatHint": "PNG / JPEG / WebP / SVG — يُعاد ضبط الحجم تلقائياً ليطبع بوضوح. أبعاد مربعة أفضل.",
+      "logoSizeLabel": "حجم الشعار على الفاتورة",
+      "logoSize": {
+        "hidden": "بدون شعار",
+        "small": "صغير",
+        "medium": "متوسط",
+        "large": "كبير"
+      },
+      "fontLabel": "خط الفاتورة",
+      "fontSelected": "مختار ✓",
+      "fonts": {
+        "cairo": "الفاتورة بخط واضح ومقروء",
+        "tajawal": "خط عصري للعناوين والشعارات",
+        "lemonada": "خط مرح ومميز للمتاجر"
+      },
+      "previewLabel": "↓ اسحب الأقسام لإعادة الترتيب ↓",
+      "addCustom": "+ نص مخصص",
+      "restoreOrder": "استعادة الترتيب",
+      "emptyReceipt": "الفاتورة فارغة — أضف أقساماً من «أقسام مخفية» تحت.",
+      "hiddenTitle": "أقسام مخفية",
+      "customPlaceholder": "نص مخصص",
+      "permanentDelete": "حذف نهائي",
+      "blockLabels": {
+        "logo": "الشعار",
+        "shopInfo": "اسم المتجر والهاتف",
+        "purchaseDate": "تاريخ ووقت الشراء",
+        "items": "بنود الفاتورة",
+        "totals": "الإجماليات",
+        "loyalty": "النقاط والرصيد",
+        "footer": "الذيل (شكراً + QR)"
+      },
+      "blockBody": {
+        "newTextDefault": "نص جديد",
+        "customDeletedMark": "— نص محذوف —",
+        "customEmpty": "نص فارغ",
+        "logoHidden": "— الشعار مخفي بإعداد الحجم —",
+        "loyaltyDisabled": "— الولاء غير مفعّل —"
+      },
+      "drag": {
+        "dragLabel": "اسحب لإعادة الترتيب",
+        "editLabel": "تعديل النص",
+        "deleteLabel": "حذف",
+        "deletePermTitle": "حذف نهائي",
+        "hideLabel": "إخفاء",
+        "hideTitle": "إخفاء من الفاتورة"
+      },
+      "editor": {
+        "title": "تعديل نص مخصص",
+        "done": "تم",
+        "placeholder": "اكتب أي نص تحب يظهر على الفاتورة",
+        "align": {
+          "right": "يمين",
+          "center": "وسط",
+          "left": "يسار"
+        },
+        "deletePermanently": "حذف هذا النص نهائياً"
+      },
+      "errors": {
+        "unsupportedType": "نوع الملف غير مدعوم. استخدم PNG أو JPEG أو WebP أو SVG.",
+        "tooLarge": "الملف كبير جداً (أكبر من {n} ميجابايت). حاول صورة أخرى.",
+        "svgTooLarge": "ملف SVG كبير جداً. حاول نسخة مبسّطة.",
+        "readFailed": "تعذر قراءة الصورة. حاول ملفاً آخر.",
+        "processFailed": "تعذر معالجة الصورة. حاول ملفاً آخر."
+      }
+    },
+    "teamAdmin": {
+      "fallbackSlug": "متجرك",
+      "toolbar": {
+        "handleTooltip": "تغيير اسم تسجيل الدخول للمتجر",
+        "handleHint": "— رابط دخول الموظفين",
+        "addEmployee": "موظف جديد"
+      },
+      "list": {
+        "title": "الموظفون",
+        "loading": "جاري التحميل…",
+        "countOne": "حساب",
+        "countMany": "حسابات",
+        "emptyTitle": "لم تُضف موظفين بعد",
+        "emptyHint": "أنشئ حساباً لكل موظف لمنحه صلاحيات الدخول للنظام وتسجيل المبيعات والحضور.",
+        "addFirst": "إضافة أول موظف"
+      },
+      "role": {
+        "owner": "المالك",
+        "staff": "موظف",
+        "mustChange": "يجب تغيير كلمة السر"
+      },
+      "row": {
+        "edit": "تعديل",
+        "editDetailsTitle": "تعديل البيانات",
+        "permissions": "الصلاحيات",
+        "close": "إغلاق",
+        "resetPassword": "إعادة تعيين كلمة السر",
+        "deleteTitle": "حذف",
+        "savePermissions": "حفظ الصلاحيات"
+      },
+      "toast": {
+        "loadFailed": "تعذر التحميل",
+        "memberAdded": "تم إضافة الموظف",
+        "edited": "تم حفظ التعديلات",
+        "deleted": "تم الحذف",
+        "deleteFailed": "تعذر الحذف",
+        "shortPassword": "كلمة السر 8 أحرف على الأقل",
+        "resetFailed": "تعذر التعيين",
+        "renameSuccess": "تم تغيير اسم تسجيل الدخول — أعد إخبار الموظفين بالعنوان الجديد",
+        "renameFailed": "تعذر التغيير",
+        "savePermsSuccess": "تم حفظ الصلاحيات",
+        "saveFailed": "تعذر الحفظ"
+      },
+      "credModal": {
+        "title": "بيانات تسجيل الدخول للموظف",
+        "intro": "احفظ هذه البيانات أو ابعتها للموظف الآن — لن تُعرض كلمة السر مرة أخرى.",
+        "loginLabel": "اسم تسجيل الدخول",
+        "passwordLabel": "كلمة السر",
+        "verifyTitle": "تأكد أن البيانات تعمل",
+        "verifyButton": "اختبار تسجيل الدخول",
+        "verifyIdle": "يجرّب البيانات على السيرفر ويخبرك ما إذا كانت ستعمل.",
+        "verifyFail": "فشل تسجيل الدخول",
+        "networkError": "خطأ في الشبكة",
+        "copyBoth": "نسخ الاثنين",
+        "copied": "تم النسخ",
+        "done": "تم",
+        "copy": "نسخ"
+      },
+      "resetModal": {
+        "title": "إعادة تعيين كلمة السر",
+        "intro": "سيُطلب من {name} تغيير كلمة السر فور تسجيل الدخول التالي.",
+        "loginLabel": "اسم تسجيل الدخول",
+        "newPasswordLabel": "كلمة السر الجديدة",
+        "newPasswordPlaceholder": "٨ أحرف على الأقل",
+        "cancel": "إلغاء",
+        "confirm": "تعيين"
+      },
+      "deleteModal": {
+        "title": "حذف موظف",
+        "intro": "هل تريد حذف {name}؟",
+        "warning": "لن يستطيع {login} تسجيل الدخول بعد ذلك. الإجراء لا يمكن التراجع عنه.",
+        "cancel": "إلغاء",
+        "confirm": "حذف"
+      },
+      "renameModal": {
+        "title": "اسم تسجيل الدخول للمتجر",
+        "intro": "يستخدمه موظفوك في تسجيل الدخول كـ {pattern}. تغييره يحدّث جميع عناوين الموظفين تلقائياً.",
+        "newLabel": "الاسم الجديد",
+        "currentLabel": "الحالي:",
+        "cancel": "إلغاء",
+        "save": "حفظ"
+      }
+    },
+    "employeeForm": {
+      "editTitle": "تعديل بيانات الموظف",
+      "createTitle": "إضافة موظف جديد",
+      "basicSection": "بيانات الموظف",
+      "nameLabel": "الاسم *",
+      "namePlaceholder": "أحمد محمد",
+      "usernameLabel": "اسم المستخدم *",
+      "usernamePlaceholder": "ahmed",
+      "usernameLabelDisabled": "اسم المستخدم",
+      "passwordLabel": "كلمة السر المؤقتة *",
+      "passwordPlaceholder": "٨ أحرف على الأقل — يغيّرها الموظف عند أول دخول",
+      "identitySection": "الهوية وبيانات الاتصال",
+      "phoneLabel": "رقم الهاتف *",
+      "phonePlaceholder": "01012345678",
+      "nationalIdLabel": "الرقم القومي *",
+      "nationalIdPlaceholder": "14 رقم",
+      "addressLabel": "العنوان *",
+      "addressPlaceholder": "المدينة، الشارع، رقم العقار",
+      "photosSection": "الصور (اختياري)",
+      "profilePhotoLabel": "الصورة الشخصية",
+      "idPhotoLabel": "صورة بطاقة الرقم القومي",
+      "branchSection": "الفرع",
+      "branchHint": "اختر الفرع الذي يعمل به الموظف. عند تسجيل الدخول لن يرى سوى بيانات هذا الفرع.",
+      "branchPlaceholder": "اختر فرعاً…",
+      "branchPrimarySuffix": " (الرئيسي)",
+      "permissionsSection": "الصلاحيات",
+      "cancel": "إلغاء",
+      "saveChanges": "حفظ التعديلات",
+      "addEmployee": "إضافة موظف",
+      "errors": {
+        "nameRequired": "اسم الموظف مطلوب",
+        "credentialsRequired": "اسم المستخدم وكلمة سر ٨ أحرف على الأقل",
+        "identityRequired": "رقم الهاتف والرقم القومي والعنوان مطلوبون",
+        "uploadFailed": "تعذر رفع الصورة",
+        "saveFailed": "تعذر الحفظ",
+        "addFailed": "تعذر الإضافة"
+      }
+    },
+    "photoUpload": {
+      "dropHint": "اسحب الصورة هنا أو اضغط للاختيار",
+      "fileTypeHint": "JPG / PNG / WebP — حتى 3MB",
+      "changeAria": "تغيير الصورة",
+      "uploadAria": "رفع صورة",
+      "change": "تغيير",
+      "choose": "اختيار صورة",
+      "delete": "حذف"
+    },
+    "branchesPage": {
+      "title": "إدارة الفروع",
+      "shellTitle": "الفروع",
+      "loading": "جاري التحميل…",
+      "heading": "الفروع",
+      "subhead": "تعدد الفروع يتيح لك تتبع المبيعات والمخزون لكل موقع على حدة.",
+      "add": "إضافة فرع",
+      "editTitle": "تعديل فرع",
+      "newTitle": "فرع جديد",
+      "nameLabel": "اسم الفرع",
+      "namePlaceholder": "مثال: فرع المعادي",
+      "phoneLabel": "رقم الهاتف",
+      "addressLabel": "العنوان",
+      "addressPlaceholder": "شارع X، حي Y، …",
+      "cancel": "إلغاء",
+      "saveChanges": "حفظ التعديلات",
+      "create": "إنشاء",
+      "empty": "لا توجد فروع.",
+      "labels": {
+        "primary": "رئيسي",
+        "current": "الفرع الحالي",
+        "suspended": "موقوف"
+      },
+      "actions": {
+        "open": "فتح",
+        "edit": "تعديل",
+        "suspend": "إيقاف الفرع",
+        "activate": "تفعيل الفرع",
+        "delete": "حذف"
+      },
+      "confirmDelete": "هل تريد حذف فرع «{name}»؟ سيتم رفض العملية إذا كان الفرع يحتوي على بيانات (مبيعات/مصاريف/مخزون).",
+      "toast": {
+        "nameRequired": "اسم الفرع مطلوب",
+        "saveFailed": "تعذر الحفظ",
+        "created": "تم إنشاء الفرع",
+        "edited": "تم حفظ التعديلات",
+        "genericError": "حدث خطأ",
+        "primarySuspend": "لا يمكن إيقاف الفرع الرئيسي",
+        "updateFailed": "تعذر التحديث",
+        "suspended": "تم إيقاف الفرع",
+        "activated": "تم تفعيل الفرع",
+        "primaryDelete": "لا يمكن حذف الفرع الرئيسي",
+        "deleteFailed": "تعذر الحذف",
+        "deleted": "تم حذف الفرع",
+        "switchFailed": "تعذر التبديل"
+      }
+    },
+    "accountSecurity": {
+      "title": "الأمان",
+      "staffNotice": "المصادقة الثنائية متاحة لمالك المتجر فقط في هذه النسخة.",
+      "heading": "المصادقة الثنائية (2FA)",
+      "subhead": "طبقة حماية إضافية فوق كلمة السر — تطبيق المصادقة على هاتفك يولّد رمزاً من 6 أرقام يتغير كل 30 ثانية.",
+      "statusOffLine": "الحالة الحالية: ",
+      "statusOff": "معطلة",
+      "statusOnLine": "2FA الحالة الحالية: ",
+      "statusOn": "مفعّلة",
+      "enableButton": "تفعيل المصادقة الثنائية",
+      "enrollStep1": "1) افتح تطبيق المصادقة على هاتفك (Google Authenticator / Microsoft Authenticator / Authy)، ثم اختر \"إضافة حساب → مسح الكود\":",
+      "qrAlt": "QR للمصادقة الثنائية",
+      "manualSummary": "لا يمكنك مسح الكود؟ أدخله يدوياً",
+      "manualHint": "في تطبيق المصادقة، اختر \"إضافة حساب → إدخال يدوي\" والصق هذا المفتاح:",
+      "linkHint": "أو على نفس الجهاز، اضغط الرابط لإضافة الحساب مباشرة:",
+      "enrollStep2": "2) أدخل الرمز المكوّن من 6 أرقام الذي يعرضه التطبيق الآن:",
+      "cancel": "إلغاء",
+      "confirmEnroll": "تأكيد التفعيل",
+      "codesHeading": "احفظ هذه الرموز الاحتياطية في مكان آمن — لن تظهر مرة أخرى. كل رمز يصلح لمرة واحدة فقط ويفتح حسابك إذا فقدت هاتفك.",
+      "codesUnderstood": "فهمت، حفظتها",
+      "regenerateHeading": "تجديد الرموز الاحتياطية",
+      "regenerate": "تجديد الرموز",
+      "currentPasswordPlaceholder": "كلمة المرور الحالية",
+      "codePlaceholder": "رمز التطبيق (6 أرقام)",
+      "disableHeading": "تعطيل المصادقة الثنائية",
+      "disableHint": "يضعف حماية حسابك. لا تفعل ذلك إلا إذا كنت متأكداً.",
+      "disableButton": "تعطيل (يستخدم نفس كلمة المرور + الرمز أعلاه)",
+      "errors": {
+        "startFailed": "تعذر بدء التفعيل",
+        "unexpected": "خطأ غير متوقع",
+        "badCode": "الرمز غير صحيح",
+        "enableFailed": "تعذر التفعيل",
+        "badPassword": "كلمة المرور غير صحيحة",
+        "notEnrolled": "2FA غير مفعلة",
+        "disableFailed": "تعذر التعطيل",
+        "regenerateFailed": "تعذر التجديد"
+      },
+      "delete": {
+        "title": "حذف المتجر نهائياً",
+        "intro": "يحذف كل البيانات (المنتجات، المبيعات، الموظفين، السجلات) بعد فترة سماح ٣٠ يوماً. يمكنك التراجع خلالها.",
+        "scheduledLabel": "موعد الحذف:",
+        "cancelButton": "إلغاء الحذف",
+        "confirmHint": "للتأكيد، اكتب اسم المتجر (slug) كما يظهر في عنوان تسجيل الدخول:",
+        "slugPlaceholder": "my-store",
+        "startButton": "بدء عملية الحذف (٣٠ يوماً)",
+        "errors": {
+          "slugMismatch": "اسم المتجر لا يطابق",
+          "forbidden": "غير مسموح",
+          "genericError": "تعذر التحديد"
+        }
+      },
+      "export": {
+        "title": "تنزيل نسخة من بيانات متجرك",
+        "intro": "ملف JSON يحتوي كل الجداول التابعة لهذا المتجر (المنتجات، المبيعات، الموظفين، السجلات…). يتم تحميله مباشرة على جهازك.",
+        "button": "تنزيل البيانات",
+        "error": "تعذر التنزيل. حاول مرة أخرى لاحقاً."
+      },
+      "revoke": {
+        "title": "تسجيل خروج من جميع الأجهزة",
+        "intro": "ينهي كل جلسات هذا الحساب فوراً، بما في ذلك الجلسة الحالية. مفيد إذا فقدت جهازاً أو شككت في تسريب حسابك.",
+        "button": "تسجيل الخروج من كل مكان"
+      }
+    },
+    "changePassword": {
+      "title": "تغيير كلمة السر",
+      "mustChange": "يجب عليك تغيير كلمة السر قبل المتابعة",
+      "current": "كلمة السر الحالية",
+      "new": "كلمة السر الجديدة",
+      "newPlaceholder": "٨ أحرف على الأقل",
+      "confirm": "تأكيد كلمة السر الجديدة",
+      "submit": "حفظ",
+      "tooShort": "كلمة السر الجديدة يجب أن تكون ٨ أحرف على الأقل",
+      "mismatch": "كلمتا السر غير متطابقتين",
+      "genericError": "تعذر التغيير",
+      "success": "تم تغيير كلمة السر بنجاح"
+    },
+    "settingsPage": {
+      "title": "الإعدادات",
+      "loading": "جارٍ التحميل...",
+      "save": "حفظ الإعدادات",
+      "dirty": "لديك تعديلات لم تُحفظ",
+      "clean": "لا توجد تعديلات",
+      "toast": {
+        "saveSuccess": "تم حفظ الإعدادات",
+        "saveFailed": "تعذر الحفظ",
+        "needPhone": "أدخل رقم للاختبار",
+        "needGreenCreds": "أدخل instanceId و apiToken أولاً",
+        "needCloudCreds": "أدخل Phone Number ID والتوكن أولاً",
+        "sendOk": "تم الإرسال (id: {id})",
+        "sendFailed": "تعذر الإرسال",
+        "connectOk": "تم ربط حساب واتساب بنجاح",
+        "connectOkDetail": "تم ربط واتساب — {detail}",
+        "connectFailed": "تعذر إكمال ربط واتساب",
+        "healthOk": "الاتصال سليم",
+        "healthFailed": "تعذر التحقق",
+        "confirmDisconnect": "تأكيد فصل ربط واتساب؟ يمكنك الربط مرة أخرى لاحقاً.",
+        "disconnected": "تم فصل الربط",
+        "disconnectFailed": "تعذر فصل الربط",
+        "templatesSynced": "تم تحديث القوالب — {n} قالب",
+        "templatesSyncedFrom": "تم تحديث القوالب — {n} قالب من {total}"
+      },
+      "branches": {
+        "title": "إدارة الفروع",
+        "countOne": "فرع",
+        "countMany": "فروع",
+        "hintOne": "أضف فرعاً جديداً لتتبع المبيعات والمخزون لكل موقع على حدة.",
+        "hintMany": "إدارة الفروع، تعطيل أو حذف فرع، وتعديل بيانات الموقع."
+      },
+      "loyalty": {
+        "title": "برنامج الولاء",
+        "subtitle": "نقاط ورصيد العميل — كل فرع له برنامجه المستقل.",
+        "enabled": "مفعّل",
+        "disabled": "غير مفعّل",
+        "pointsPerEgp": "نقاط لكل ج.م مصروف",
+        "pointsPerEgpPlaceholder": "مثال: 0.1 = نقطة لكل 10 ج.م",
+        "egpPerPoint": "قيمة النقطة الواحدة (ج.م)",
+        "egpPerPointPlaceholder": "مثال: 0.1 = نقطة بـ 10 قروش",
+        "exampleLabel": "مثال:",
+        "exampleBody": "فاتورة بـ <b>100 ج.م</b> تكسب <b>{earned}</b> نقطة قيمتها <b>{value}</b> خصم على فاتورة قادمة.",
+        "exampleWarning": "⚠ النقاط لن تُكتسب أو تُخصم حتى تحدد أحد المعدلين."
+      },
+      "receiptLogoSize": {
+        "hidden": "بدون شعار",
+        "small": "صغير",
+        "medium": "متوسط (افتراضي)",
+        "large": "كبير"
+      },
+      "receiptLanguage": {
+        "ar": "العربية",
+        "en": "English",
+        "bilingual": "ثنائي اللغة",
+        "arHint": "الإجمالي، الخصم، شكراً…",
+        "enHint": "TOTAL, DISCOUNT, THANK YOU…",
+        "bilingualHint": "TOTAL · الإجمالي"
+      },
+      "receiptCard": {
+        "heading": "تخصيص الفاتورة",
+        "subhead": "مظهر ولغة الإيصال المطبوع — كل فرع له إعداداته المستقلة.",
+        "logoSize": "حجم الشعار",
+        "logoHint": "لو طابعتك حرارية واللوجو طلع وحش، خليه «صغير» أو «بدون».",
+        "language": "لغة المسميات",
+        "footerLabel": "نص ذيل الفاتورة (اختياري)",
+        "footerPlaceholder": "مثلاً: سياسة الإرجاع خلال 7 أيام بالفاتورة. تابعنا على إنستجرام @yourshop",
+        "footerCount": "{n}/500 — يظهر تحت «شكراً لتسوقكم».",
+        "showLoyalty": "إظهار النقاط والرصيد على الفاتورة",
+        "showLoyaltyHint": "يطبع «نقاط مكتسبة» و«رصيد المحفظة» — أقوى محفز لاستخدام برنامج الولاء. يحتاج برنامج الولاء مفعّل.",
+        "previewLabel": "↓ معاينة مبدئية ↓"
+      },
+      "whatsapp": {
+        "section": "إعدادات واتساب",
+        "autoOpen": "إرسال الفاتورة تلقائياً عبر واتساب",
+        "autoOpenHint": "عند تسجيل بيع جديد لعميل عنده رقم موبايل، البرنامج يفتح واتساب فيه الفاتورة + رسالة شكر جاهزة. تحتاج تضغط \"إرسال\" فقط."
+      },
+      "greenApi": {
+        "section": "Green API — إرسال تلقائي بالكامل",
+        "stepsTitle": "خطوات التفعيل:",
+        "step1Prefix": "افتح حساب على ",
+        "step2": "أنشئ Instance جديد",
+        "step3": "من شاشة الـ Instance، انسخ idInstance و apiTokenInstance والصقهم في الخانات تحت",
+        "step4": "اسكان الـ QR من واتساب موبايل المتجر مرة واحدة لربط الحساب",
+        "step5": "فعّل الخيار وضغط \"حفظ الإعدادات\"، ثم جرب الإرسال من خانة الاختبار",
+        "warning": "<strong>تنبيه:</strong> Green API بتستخدم بروتوكول واتساب ويب غير الرسمي. الاستخدام العادي للمتجر آمن، لكن الإرسال الكتلي أو مكرّر بسرعة ممكن يعرّض الرقم للحظر.",
+        "enable": "تفعيل الإرسال التلقائي عبر Green API",
+        "enableHint": "لو مفعّل، الفاتورة تُرسل في الخلفية بدون ما يفتح أي تاب.",
+        "sendAsPdf": "إرسال الفاتورة كملف PDF بدلاً من رابط",
+        "sendAsPdfHint": "لو مفعّل، العميل بياخد الفاتورة كملف PDF مرفق في الواتساب (مع نص الرسالة كـ caption). أنظف وأكثر احترافاً من الرابط. يحتاج Green API مفعّل.",
+        "instanceLabel": "idInstance",
+        "tokenLabel": "apiTokenInstance",
+        "tokenPlaceholder": "••••••••••••••••",
+        "urlLabel": "apiUrl (اختياري — من شاشة Green API)",
+        "testHeading": "اختبار الإرسال",
+        "testButton": "إرسال تجريبي",
+        "testHint": "سيُرسل رسالة قصيرة \"🧪 رسالة اختبار\" للتأكد من ربط الحساب. تأكد من حفظ الإعدادات بعد الاختبار الناجح.",
+        "testMessage": "🧪 رسالة اختبار من {shop}\nالتاريخ: {date}"
+      },
+      "cloudApi": {
+        "section": "WhatsApp Cloud API — القناة الرسمية من Meta",
+        "checkingConnection": "جارٍ التحقق من حالة الربط...",
+        "connected": "حساب واتساب مربوط",
+        "modeLive": "إنتاج",
+        "modeSandbox": "اختبار (sandbox)",
+        "webhookPending": "webhook معلّق",
+        "webhookPendingTitle": "لم يتم تفعيل اشتراك الويبهوك بعد",
+        "connectedAt": "تم الربط: {date}",
+        "errorFallback": "تنبيه على الاتصال — راجع التفاصيل.",
+        "reconnect": "إعادة الربط الآن",
+        "retry": "إعادة المحاولة",
+        "healthCheck": "فحص الاتصال",
+        "reconnectShort": "إعادة الربط",
+        "disconnect": "فصل الربط",
+        "notConnected": "لم يتم ربط حساب واتساب بعد",
+        "connectIntro": "اضغط \"ربط حساب واتساب\" لفتح Meta Embedded Signup. ستختار حساب WhatsApp Business، تضيف/تتحقق من رقم، وتعتمد الصلاحيات، وسنحفظ التوكن مشفّر تلقائياً — بدون نسخ يدوي.",
+        "connectButton": "ربط حساب واتساب",
+        "toggleManualShow": "أو ضبط يدوي للتوكن (مؤقت)",
+        "toggleManualHide": "إخفاء الضبط اليدوي",
+        "lastError": "آخر خطأ: {message}",
+        "manualStepsTitle": "خطوات التفعيل:",
+        "manualSteps": {
+          "step1": {
+            "prefix": "افتح حساب على ",
+            "linkText": "Meta Business Manager",
+            "suffixHtml": " وأنشئ <b>WhatsApp Business Account</b> (WABA)"
+          },
+          "step2": {
+            "prefix": "من ",
+            "linkText": "Meta for Developers",
+            "suffixHtml": " أنشئ App من نوع <code class=\"bg-white px-1 rounded\">Business</code> وأضف منتج <code class=\"bg-white px-1 rounded\">WhatsApp</code>"
+          },
+          "step3Html": "من شاشة WhatsApp &gt; API Setup، اربط رقم المتجر (Add phone number) ووثّقه عبر SMS/مكالمة",
+          "step4Html": "انسخ <code class=\"bg-white px-1 rounded\">Phone number ID</code> والصقه في الخانة تحت (مش رقم الموبايل — الـ ID رقمي بـ 15-17 خانة)",
+          "step5": {
+            "prefix": "أنشئ ",
+            "linkText": "System User Token دائم",
+            "suffixHtml": " بصلاحيتي <code class=\"bg-white px-1 rounded\">whatsapp_business_messaging</code> و <code class=\"bg-white px-1 rounded\">whatsapp_business_management</code>، والصقه في خانة Access Token (التوكن المؤقت 24 ساعة لن يصلح للإنتاج)"
+          },
+          "step6": "فعّل الخيار واضغط \"حفظ الإعدادات\"، ثم جرب الإرسال من خانة الاختبار"
+        },
+        "manualNotes": {
+          "windowHtml": "Meta بتسمح بإرسال رسائل حرّة فقط خلال <b>نافذة 24 ساعة</b> بعد أول رسالة من العميل.",
+          "pdf": "إرسال PDF شغّال في الحالتين (داخل أو خارج النافذة) لو المرفق جزء من قالب موافَق عليه.",
+          "official": "القناة رسمية ومستقرة — لا تعرّض رقمك للحظر زي ما ممكن يحصل مع Green API."
+        },
+        "manualImportantNotes": "<strong>ملاحظات مهمة:</strong>",
+        "manualEnable": "تفعيل الإرسال التلقائي عبر WhatsApp Cloud API",
+        "manualEnableHint": "لو مفعّل، الفاتورة تُرسل في الخلفية عبر القناة الرسمية. لو Green API و Cloud API الاتنين مفعّلين، البرنامج بيستخدم Cloud API.",
+        "phoneIdLabel": "Phone Number ID",
+        "tokenLabel": "Access Token (System User)",
+        "businessIdLabel": "WhatsApp Business Account ID (اختياري)",
+        "testHeading": "اختبار الإرسال",
+        "testButton": "إرسال تجريبي",
+        "testHint": "لو خرجت رسالة \"Recipient phone number not in allowed list\" فأنت لسه في وضع الاختبار — أضف رقم المستلم من شاشة API Setup أو اعتمد التطبيق ليخرج من sandbox.",
+        "errorState": {
+          "token_expired": "انتهت صلاحية التوكن. اضغط إعادة الربط لإصدار توكن جديد.",
+          "token_revoked": "تم إبطال التوكن من Meta. اضغط إعادة الربط لإعادة المصادقة.",
+          "scope_missing": "صلاحيات ناقصة على التوكن. اعد الربط ووافق على جميع الصلاحيات.",
+          "phone_unverified": "الرقم غير موثّق على Meta. أكمل التحقق من Business Manager.",
+          "waba_inaccessible": "تعذر الوصول لحساب WhatsApp Business. تحقق من الإذن أو أعد الربط.",
+          "network": "تعذر الاتصال بـ Meta مؤقتاً. أعد المحاولة بعد لحظات."
+        }
+      },
+      "templates": {
+        "section": "قوالب الرسائل (Meta)",
+        "subhead": "القوالب المعتمدة فقط هي اللي تقدر تستخدمها للإرسال خارج نافذة الـ 24 ساعة. اعتمد القوالب من Meta Business Manager، بعدين اضغط مزامنة هنا.",
+        "syncButton": "مزامنة من Meta",
+        "loading": "جارٍ التحميل...",
+        "empty": "لا توجد قوالب مخزّنة بعد. أنشئ قوالبك في Meta Business Manager واضغط \"مزامنة من Meta\".",
+        "receiptTitle": "قالب الفاتورة (اختياري)",
+        "receiptHint": "لو حددت قالب، البرنامج هيرسل الفاتورة كرسالة قالب موافَق عليها من Meta بدل من PDF — وده هيشتغل حتى خارج نافذة الـ 24 ساعة. لازم يكون عند القالب 4 متغيرات في الـ body بالترتيب التالي:",
+        "receiptVarCustomer": "اسم العميل",
+        "receiptVarInvoice": "كود الفاتورة",
+        "receiptVarTotal": "الإجمالي",
+        "receiptVarProducts": "أسماء المنتجات",
+        "noTemplate": "— بدون قالب (PDF افتراضياً) —",
+        "clear": "مسح"
+      },
+      "shopInfo": {
+        "section": "معلومات المتجر",
+        "shopNameLabel": "اسم المتجر",
+        "phoneLabel": "رقم واتساب المتجر",
+        "phoneHint": "يُستخدم في توقيع الرسالة وفي رابط tel: على فواتير العملاء."
+      },
+      "messageTemplate": {
+        "section": "قالب الرسالة",
+        "resetDefault": "استعادة الافتراضي",
+        "varsHint": "المتغيرات المتاحة (اضغط لإضافتها للنص):",
+        "previewLabel": "معاينة (مع بيانات تجريبية):",
+        "vars": {
+          "customerName": "اسم العميل",
+          "customerPhone": "رقم العميل",
+          "invoiceId": "رقم الفاتورة الكامل",
+          "invoiceCode": "آخر 8 أحرف من رقم الفاتورة",
+          "totalPrice": "إجمالي الفاتورة",
+          "productNames": "أسماء المنتجات (مفصولة بفاصلة)",
+          "receiptLink": "رابط الفاتورة",
+          "date": "تاريخ البيع",
+          "shopName": "اسم المتجر",
+          "shopPhone": "رقم المتجر"
+        },
+        "sampleCustomer": "عمرو سامي",
+        "sampleProducts": "ساعة Naviforce, نظارة Ray-Ban"
+      }
+    },
+    "team": {
+      "pageTitle": {
+        "manager": "الموظفون",
+        "staff": "الإجازات"
+      },
+      "heading": {
+        "manager": "الفريق",
+        "staff": "الإجازات"
+      },
+      "tabs": {
+        "team": "الفريق والصلاحيات",
+        "attendance": "الحضور",
+        "payroll": "الرواتب",
+        "leaves": "الإجازات",
+        "settings": "إعدادات الحضور"
+      },
+      "tabDescriptions": {
+        "team": "أضف موظفين، حدّد صلاحياتهم، وأدر بياناتهم وصورهم.",
+        "attendance": "تابع تسجيل دخول وخروج الموظفين خلال اليوم.",
+        "payroll": "إدارة الرواتب الثابتة، المعدلات الساعية، والاستحقاقات.",
+        "leaves": "طلبات الإجازة — تقديم الطلبات والموافقة عليها.",
+        "settings": "ساعات العمل، أيام الإجازة، نسبة الأوفر، ومواقع المتجر."
+      },
+      "selfCheckIn": {
+        "checkedIn": "أنت حاضر الآن",
+        "checkInTitle": "تسجيل الحضور",
+        "sinceLabel": "حضور منذ {time}",
+        "lastCheckoutLabel": "آخر انصراف: {time}",
+        "notYetToday": "لم تسجل حضورك بعد اليوم",
+        "checkOut": "انصراف",
+        "checkIn": "حضور",
+        "manualButton": "تسجيل يدوي",
+        "needsLocation": "يتطلب الموقع",
+        "toast": {
+          "geoFailed": "تعذر قراءة الموقع — تأكد من تفعيل تحديد الموقع",
+          "saveFailed": "تعذر التسجيل",
+          "checkedIn": "تم تسجيل الحضور",
+          "checkedOut": "تم تسجيل الانصراف"
+        }
+      },
+      "roster": {
+        "loading": "جارٍ التحميل…",
+        "loadFailed": "تعذر التحميل",
+        "empty": "أضف موظفاً من قسم \"الفريق والصلاحيات\" أولاً ليظهر هنا.",
+        "todayHeading": "حضور اليوم",
+        "pill": {
+          "present": "حاضر {n}",
+          "out": "انصرف {n}",
+          "absent": "غائب {n}",
+          "review": "للمراجعة {n}"
+        },
+        "status": {
+          "notYet": "لم يحضر بعد",
+          "checkedInAt": "حضر {time}",
+          "checkedOutAt": "انصرف {time}"
+        },
+        "action": {
+          "checkIn": "حضور",
+          "checkOut": "انصراف"
+        },
+        "toast": {
+          "saveFailed": "تعذر التسجيل",
+          "checkedIn": "تم تسجيل الحضور",
+          "checkedOut": "تم تسجيل الانصراف"
+        }
+      },
+      "dayEvents": {
+        "title": "سجل {name}",
+        "loading": "جارٍ التحميل…",
+        "empty": "لا توجد أحداث.",
+        "event": {
+          "checkIn": "حضور",
+          "checkOut": "انصراف",
+          "needsReview": "· يحتاج مراجعة"
+        },
+        "source": {
+          "manager_attest": "بتسجيل المدير",
+          "geofence": "موقع جغرافي",
+          "qr": "QR",
+          "manual": "يدوي"
+        },
+        "action": {
+          "clearReview": "إنهاء المراجعة",
+          "edit": "تعديل",
+          "delete": "حذف"
+        },
+        "toast": {
+          "loadFailed": "تعذر التحميل",
+          "deleteFailed": "تعذر الحذف",
+          "updateFailed": "تعذر التحديث"
+        }
+      },
+      "editEvent": {
+        "title": "تعديل الحدث",
+        "typeLabel": "النوع",
+        "timeLabel": "الوقت",
+        "noteLabel": "ملاحظة (اختياري)",
+        "notePlaceholder": "سبب التعديل…",
+        "checkIn": "حضور",
+        "checkOut": "انصراف",
+        "cancel": "إلغاء",
+        "save": "حفظ",
+        "saveFailed": "تعذر الحفظ",
+        "saveSuccess": "تم التعديل"
+      },
+      "attendanceSettings": {
+        "loading": "جارٍ التحميل…",
+        "workHoursSection": "ساعات العمل والإجازات",
+        "fields": {
+          "workHoursPerDay": "عدد ساعات العمل في اليوم",
+          "overtimeMultiplier": "مضاعف الأجر للساعات الإضافية",
+          "graceMinutesLate": "دقائق السماح للتأخير"
+        },
+        "weekend": {
+          "label": "أيام العطلة الأسبوعية (تُحتسب ساعاتها كساعات إضافية)",
+          "days": {
+            "sun": "الأحد",
+            "mon": "الاثنين",
+            "tue": "الثلاثاء",
+            "wed": "الأربعاء",
+            "thu": "الخميس",
+            "fri": "الجمعة",
+            "sat": "السبت"
+          }
+        },
+        "saveSettings": "حفظ الإعدادات",
+        "locations": {
+          "title": "مواقع المتجر",
+          "intro": "عند تسجيل الموظف لحضوره من خلال الموبايل، سيُتحقق أنه داخل نطاق أحد هذه المواقع. أضف موقعاً واحداً على الأقل لتفعيل تسجيل الحضور عبر تحديد الموقع.",
+          "deleteAria": "حذف الموقع",
+          "addHeading": "إضافة موقع",
+          "nameLabel": "اسم الموقع",
+          "namePlaceholder": "الفرع الرئيسي",
+          "linkLabel": "رابط الموقع من Google Maps",
+          "linkPlaceholder": "https://maps.google.com/...  أو  30.044420, 31.235712",
+          "linkHelp": "في خرائط جوجل، اضغط بزر الفأرة الأيمن على الموقع ← انسخ الإحداثيات، أو شارك الرابط والصقه هنا.",
+          "resolvingShort": "جارٍ فتح الرابط المختصر…",
+          "parseFailed": "لم نتمكن من قراءة الإحداثيات من النص.",
+          "radiusLabel": "نصف القطر (متر)",
+          "useMyLocation": "استخدم موقعي الحالي",
+          "addButton": "إضافة"
+        },
+        "footnote": "هذه الإعدادات تُستخدم في حساب الأجر الإضافي وتسجيل الحضور. أي تعديل يبدأ تطبيقه من اليوم التالي للحفظ، ولا يؤثر على الفترات المنتهية والمحفوظة.",
+        "toast": {
+          "loadSettingsFailed": "تعذر تحميل الإعدادات",
+          "loadLocationsFailed": "تعذر تحميل المواقع",
+          "loadFailed": "تعذر التحميل",
+          "saveFailed": "تعذر الحفظ",
+          "saveSuccess": "تم حفظ الإعدادات",
+          "geoUnsupported": "المتصفح لا يدعم تحديد الموقع",
+          "geoDenied": "تعذر قراءة الموقع — تأكد من الصلاحيات",
+          "nameRequired": "أدخل اسم الموقع",
+          "coordsRequired": "ألصق رابط Google Maps أو الإحداثيات (مثال: 30.044, 31.235)",
+          "addFailed": "تعذر الإضافة",
+          "addSuccess": "تم إضافة الموقع",
+          "deleteFailed": "تعذر الحذف",
+          "shortLinkFailed": "تعذر فتح الرابط المختصر",
+          "shortLinkNetwork": "تعذر الاتصال لفتح الرابط"
+        }
+      },
+      "compensation": {
+        "ownerOnly": "إدارة الرواتب متاحة لصاحب المتجر فقط.",
+        "loading": "جارٍ التحميل…",
+        "empty": "أضف موظفاً من قسم \"الفريق والصلاحيات\" أولاً ليظهر هنا.",
+        "listHeading": "رواتب الموظفين",
+        "noCompensation": "لم يتم تحديد راتب",
+        "hide": "إخفاء",
+        "edit": "تعديل",
+        "form": {
+          "payType": "نوع الأجر",
+          "payTypes": {
+            "fixed": "راتب شهري ثابت",
+            "hourly": "بالساعة فقط",
+            "hybrid": "راتب أساسي + إضافي بالساعة"
+          },
+          "baseSalary": "الراتب الأساسي الشهري (ج.م)",
+          "baseSalaryPlaceholder": "3000",
+          "hourlyRate": "الأجر بالساعة (ج.م)",
+          "hourlyRatePlaceholder": "25",
+          "standardHours": "الساعات المشمولة في الراتب الأساسي / شهر",
+          "standardHoursPlaceholder": "180",
+          "effectiveFrom": "ساري من تاريخ",
+          "save": "حفظ التحديث",
+          "historyHeading": "سجل التغييرات"
+        },
+        "summary": {
+          "fixed": "راتب شهري {amount}",
+          "hourly": "{amount} / ساعة",
+          "hybrid": "أساسي {base} + {hourly}/ساعة"
+        },
+        "period": {
+          "heading": "ملخص الرواتب — {label}",
+          "exportCsv": "تصدير CSV",
+          "loading": "جارٍ الحساب…",
+          "noStaff": "لا يوجد موظفون.",
+          "stats": {
+            "headcount": "عدد الموظفين",
+            "grossTotal": "إجمالي الراتب",
+            "regularHours": "ساعات أساسية",
+            "overtimeHours": "ساعات إضافية"
+          },
+          "reviewNotice": "هناك <strong>{n}</strong> فترة تحتاج مراجعة (نسيان تسجيل الانصراف). راجعها من تبويب \"الحضور\" قبل اعتماد الراتب."
+        },
+        "toast": {
+          "loadFailed": "تعذر التحميل",
+          "loadTeamFailed": "تعذر تحميل الفريق",
+          "saveFailed": "تعذر الحفظ",
+          "saveSuccess": "تم حفظ الراتب"
+        }
+      }
+    },
+    "leave": {
+      "status": {
+        "pending": "بانتظار الرد",
+        "approved": "تمت الموافقة",
+        "rejected": "مرفوض"
+      },
+      "tab": {
+        "pendingCount": "{n} طلب بانتظار الرد",
+        "request": "طلب إجازة",
+        "loading": "جاري التحميل…",
+        "emptyTitle": "لا توجد طلبات إجازة",
+        "emptyManager": "ستظهر طلبات الموظفين هنا حالما يقدّمونها.",
+        "emptyEmployee": "قدّم أول طلب إجازة. سيرى المدير الطلب وسيتم إعلامك بالقرار.",
+        "newRequest": "طلب جديد",
+        "daysSuffix": "({n} يوم)",
+        "reasonLabel": "السبب:",
+        "noteLabel": "ملاحظة:",
+        "decisionBy": "قرار من {name} · {date}",
+        "anonymousEmployee": "موظف",
+        "approve": "قبول",
+        "reject": "رفض",
+        "deleteTitle": "حذف",
+        "deleteDialog": {
+          "title": "حذف الطلب",
+          "message": "هل تريد حذف هذا الطلب نهائياً؟",
+          "confirm": "حذف"
+        },
+        "decision": {
+          "approveTitle": "قبول الطلب",
+          "rejectTitle": "رفض الطلب",
+          "noteOptional": "ملاحظة (اختياري)",
+          "cancel": "إلغاء",
+          "approveButton": "قبول",
+          "rejectButton": "رفض"
+        },
+        "toast": {
+          "submitFailed": "تعذر التقديم",
+          "submitted": "تم تقديم الطلب",
+          "saveFailed": "تعذر الحفظ",
+          "approved": "تمت الموافقة",
+          "rejected": "تم الرفض",
+          "deleteFailed": "تعذر الحذف",
+          "deleted": "تم الحذف"
+        }
+      },
+      "form": {
+        "title": "طلب إجازة جديد",
+        "from": "من",
+        "to": "إلى",
+        "reasonLabel": "السبب (اختياري)",
+        "reasonPlaceholder": "مثلاً: ظرف عائلي، سفر…",
+        "cancel": "إلغاء",
+        "submit": "تقديم الطلب"
+      },
+      "range": {
+        "separator": " – "
+      }
+    },
+    "suppliers": {
+      "title": "الموردين",
+      "list": {
+        "heading": "الموردين",
+        "count": "{n} مورد",
+        "outstanding": "إجمالي مستحق: {amount}",
+        "add": "إضافة مورد",
+        "searchPlaceholder": "بحث بالاسم أو الهاتف أو البريد",
+        "loading": "جاري التحميل…",
+        "empty": "لم تتم إضافة أي مورد بعد.",
+        "noResults": "لا نتائج مطابقة.",
+        "owedLabel": "مستحق: {amount}",
+        "editTitle": "تعديل",
+        "deleteTitle": "حذف",
+        "deleteDialog": {
+          "title": "حذف المورد",
+          "message": "هل تريد حذف المورد \"{name}\"؟ هذا الإجراء لا يمكن التراجع عنه.",
+          "confirm": "حذف"
+        },
+        "toast": {
+          "deleted": "تم حذف المورد",
+          "deleteFailed": "تعذر الحذف",
+          "added": "تم إضافة المورد",
+          "edited": "تم حفظ التعديلات"
+        }
+      },
+      "detail": {
+        "title": "المورد",
+        "loading": "جاري التحميل…",
+        "notFound": "المورد غير موجود.",
+        "backToList": "العودة لقائمة الموردين",
+        "edit": "تعديل",
+        "stats": {
+          "balance": "المستحق الحالي",
+          "totalPurchases": "إجمالي المشتريات",
+          "totalPayments": "إجمالي المدفوعات"
+        },
+        "notes": "ملاحظات",
+        "purchaseOrders": "أوامر الشراء",
+        "purchaseOrdersEmpty": "لا توجد أوامر شراء لهذا المورد.",
+        "itemCount": "{n} صنف",
+        "payments": "المدفوعات",
+        "paymentsEmpty": "لا توجد مدفوعات مسجلة. يمكنك إضافة دفعة من صفحة المصاريف بتصنيف «مورد».",
+        "toast": {
+          "edited": "تم حفظ التعديلات"
+        }
+      },
+      "form": {
+        "createTitle": "مورد جديد",
+        "editTitle": "تعديل مورد",
+        "name": "الاسم *",
+        "phone": "رقم الهاتف",
+        "email": "البريد الإلكتروني",
+        "address": "العنوان",
+        "notes": "ملاحظات",
+        "cancel": "إلغاء",
+        "save": "حفظ",
+        "add": "إضافة",
+        "saving": "جاري الحفظ…",
+        "errors": {
+          "saveFailed": "تعذر الحفظ"
+        }
+      },
+      "picker": {
+        "label": "المورد (اختياري)",
+        "placeholder": "اختر مورد…",
+        "clearAria": "مسح المورد",
+        "search": "بحث بالاسم أو الهاتف",
+        "noResults": "لا نتائج",
+        "empty": "لا يوجد موردون بعد",
+        "addNew": "إضافة مورد جديد"
+      }
+    },
+    "purchasesStatus": {
+      "draft": "مسودة",
+      "received": "تم الاستلام",
+      "cancelled": "ملغي"
+    },
+    "purchases": {
+      "title": "المشتريات",
+      "heading": "المشتريات",
+      "count": "{n} أمر شراء معروض",
+      "newOrder": "أمر شراء جديد",
+      "loading": "جاري التحميل…",
+      "emptyFresh": "لا توجد أوامر شراء بعد.",
+      "emptyFiltered": "لا توجد أوامر شراء بهذه الفلاتر.",
+      "loadingPayments": "جاري تحميل الدفعات…",
+      "noPayments": "لا توجد دفعات مسجلة حتى الآن.",
+      "kpi": {
+        "received": "أوامر مستلمة {range}",
+        "totalPurchases": "إجمالي المشتريات",
+        "paid": "المدفوع",
+        "remaining": "المتبقي على الموردين",
+        "avg": "متوسط الأمر"
+      },
+      "filters": {
+        "searchPlaceholder": "ابحث بالمورد أو ملاحظة…",
+        "clear": "مسح",
+        "all": "الكل",
+        "drafts": "مسودات",
+        "received": "مستلمة",
+        "cancelled": "ملغية",
+        "allSuppliers": "كل الموردين",
+        "paymentStatus": {
+          "all": "كل الدفعات",
+          "unpaid": "غير مدفوع",
+          "partial": "مدفوع جزئياً",
+          "paid": "مسدد بالكامل"
+        }
+      },
+      "row": {
+        "itemCount": "{n} صنف",
+        "total": "إجمالي: {amount}",
+        "paid": "مدفوع: {amount}",
+        "remaining": "متبقي: {amount}",
+        "received": "استُلم {date}",
+        "ordered": "طُلب {date}",
+        "pay": "تسديد",
+        "receive": "استلام",
+        "cancel": "إلغاء",
+        "deleteTitle": "حذف"
+      },
+      "paymentBadge": {
+        "paid": "مسدد",
+        "partial": "جزئي",
+        "unpaid": "غير مدفوع"
+      },
+      "actions": {
+        "receive": {
+          "title": "استلام أمر الشراء",
+          "message": "سيتم إضافة الكميات إلى المخزن وتسجيل المبلغ كمستحق على المورد. هل تريد المتابعة؟",
+          "confirm": "استلام"
+        },
+        "cancel": {
+          "title": "إلغاء أمر الشراء",
+          "message": "سيتم إلغاء هذا الأمر. لن يتأثر المخزن. هل أنت متأكد؟",
+          "confirm": "إلغاء الأمر"
+        },
+        "delete": {
+          "title": "حذف أمر الشراء",
+          "message": "سيتم حذف هذا الأمر نهائياً ولا يمكن التراجع عنه.",
+          "confirm": "حذف"
+        },
+        "deletePayment": {
+          "title": "إلغاء الدفعة",
+          "message": "سيتم حذف هذه الدفعة وإعادة المبلغ إلى المستحق على المورد. متابعة؟",
+          "confirm": "حذف الدفعة",
+          "deleteRowTitle": "إلغاء الدفعة"
+        },
+        "defaultConfirm": "تأكيد"
+      },
+      "toast": {
+        "created": "تم إنشاء أمر الشراء",
+        "paymentRecorded": "تم تسجيل الدفعة",
+        "receiveSuccess": "تم الاستلام وتحديث المخزن",
+        "receiveFailed": "تعذر الاستلام",
+        "cancelSuccess": "تم الإلغاء",
+        "cancelFailed": "تعذر الإلغاء",
+        "deleteSuccess": "تم الحذف",
+        "deleteFailed": "تعذر الحذف",
+        "paymentDeleted": "تم إلغاء الدفعة",
+        "paymentDeleteFailed": "تعذر إلغاء الدفعة"
+      },
+      "paymentMethod": {
+        "cash": "نقدي",
+        "bank": "بنكي",
+        "bankTransfer": "تحويل بنكي",
+        "vfcash": "VF Cash",
+        "instapay": "InstaPay",
+        "other": "أخرى"
+      },
+      "paymentModal": {
+        "title": "تسديد للمورد: {name}",
+        "totalLabel": "إجمالي",
+        "paidLabel": "المدفوع",
+        "remainingLabel": "المتبقي",
+        "amountLabel": "المبلغ",
+        "amountPlaceholder": "أقصى {amount}",
+        "quickAmounts": {
+          "quarter": "ربع",
+          "half": "نصف",
+          "all": "كل المتبقي"
+        },
+        "methodLabel": "طريقة الدفع",
+        "notesLabel": "ملاحظات (اختياري)",
+        "cancel": "إلغاء",
+        "save": "حفظ الدفعة",
+        "saving": "جاري الحفظ…",
+        "error": "تعذر تسجيل الدفعة"
+      },
+      "builder": {
+        "title": "أمر شراء جديد",
+        "supplierLabel": "المورد *",
+        "productSearchLabel": "ابحث عن صنف لإضافته",
+        "productSearchPlaceholder": "اسم المنتج أو SKU",
+        "costPrefix": "تكلفة:",
+        "addExternal": "أو أضف صنف خارجي (غير مسجل)",
+        "table": {
+          "name": "الصنف",
+          "quantity": "الكمية",
+          "unitCost": "سعر الوحدة",
+          "total": "الإجمالي",
+          "totalRow": "الإجمالي",
+          "deleteTitle": "حذف"
+        },
+        "notesLabel": "ملاحظات",
+        "cancel": "إلغاء",
+        "save": "حفظ كمسودة",
+        "saving": "جاري الحفظ…",
+        "errors": {
+          "pickSupplier": "اختر مورداً",
+          "needLine": "أضف صنفاً واحداً على الأقل",
+          "saveFailed": "تعذر الحفظ"
+        }
+      }
+    },
+    "expenses": {
+      "title": "المصاريف",
+      "manageTitle": "إدارة المصاريف",
+      "summary": {
+        "label": "إجمالي المصاريف المسجلة"
+      },
+      "listHeading": "سجل المصاريف",
+      "toast": {
+        "added": "تم تسجيل المصروف بنجاح"
+      },
+      "form": {
+        "heading": "تسجيل مصروف جديد",
+        "titleLabel": "بيان المصروف",
+        "titlePlaceholder": "مثلاً: إيجار المحل، فاتورة الكهرباء…",
+        "amountLabel": "المبلغ (جنيه)",
+        "amountPlaceholder": "0.00",
+        "categoryLabel": "التصنيف",
+        "supplierLabel": "المورد *",
+        "recurring": {
+          "title": "تكرار تلقائي",
+          "hint": "ستظهر النسخة التالية تلقائياً في موعدها بدون إدخال يدوي.",
+          "monthly": "شهري",
+          "weekly": "أسبوعي"
+        },
+        "noteLabel": "ملاحظة (اختياري)",
+        "notePlaceholder": "…",
+        "submit": "تسجيل المصروف"
+      },
+      "table": {
+        "col": {
+          "date": "التاريخ",
+          "title": "البيان",
+          "category": "التصنيف",
+          "amount": "القيمة",
+          "actions": "إجراء"
+        },
+        "recurringTitle": "مصروف متكرر — يتولّد تلقائياً",
+        "generated": "مولّد تلقائياً",
+        "generatedTitle": "نسخة من مصروف متكرر",
+        "weekly": "أسبوعي",
+        "monthly": "شهري",
+        "deleteTitle": "حذف",
+        "confirmDelete": "هل أنت متأكد من حذف هذا المصروف؟",
+        "empty": "لا توجد مصاريف مسجلة حالياً"
+      }
+    },
+    "inventory": {
+      "title": "المخزن",
+      "search": {
+        "placeholder": "ابحث بالاسم، الباركود، التاج، البراند، أو المورد…"
+      },
+      "summary": {
+        "totalProducts": "إجمالي المنتجات",
+        "lowStock": "مخزون منخفض",
+        "outOfStock": "نفذ المخزون",
+        "stockValue": "قيمة المخزن"
+      },
+      "filters": {
+        "allCategories": "كل الأصناف",
+        "allGenders": "الكل",
+        "allStatuses": "كل الحالات",
+        "allBrands": "كل البراندات",
+        "allSuppliers": "كل الموردين",
+        "minPrice": "أقل سعر",
+        "maxPrice": "أعلى سعر",
+        "allTags": "كل التاجات",
+        "stockStatus": {
+          "in": "متوفر",
+          "low": "مخزون منخفض",
+          "out": "نفذ"
+        }
+      },
+      "sort": {
+        "label": "ترتيب:",
+        "options": {
+          "newest": "الأحدث",
+          "oldest": "الأقدم",
+          "name": "الاسم (أ-ي)",
+          "priceAsc": "السعر (الأقل)",
+          "priceDesc": "السعر (الأعلى)",
+          "qtyAsc": "الكمية (الأقل)",
+          "qtyDesc": "الكمية (الأعلى)",
+          "marginAsc": "هامش الربح (الأقل)",
+          "marginDesc": "هامش الربح (الأعلى)"
+        }
+      },
+      "tools": {
+        "deadStock": "مخزون راكد",
+        "deadStockTitle": "منتجات لم تُبَع في 60 يوم",
+        "clearFilters": "مسح الفلاتر",
+        "densityTitle": "كثافة الجدول",
+        "compact": "مدمج",
+        "comfortable": "موسّع",
+        "import": "استيراد",
+        "exportCsv": "تصدير CSV"
+      },
+      "count": "{n} منتج في المخزن",
+      "table": {
+        "col": {
+          "name": "اسم المنتج",
+          "category": "الصنف",
+          "gender": "الجنس",
+          "brand": "البراند",
+          "quantity": "الكمية",
+          "price": "السعر",
+          "margin": "هامش الربح",
+          "stockValue": "قيمة المخزن",
+          "updatedAt": "آخر تحديث",
+          "actions": "الإجراءات"
+        },
+        "footer": {
+          "totalLabel": "الإجمالي ({n} منتج)",
+          "retailValueLabel": "قيمة البيع:"
+        },
+        "actions": {
+          "decrease": "إنقاص",
+          "increase": "زيادة",
+          "sell": "بيع",
+          "edit": "تعديل",
+          "history": "سجل المنتج",
+          "delete": "حذف"
+        }
+      },
+      "card": {
+        "marginLabel": "هامش {pct}%",
+        "quantityLabel": "الكمية",
+        "priceLabel": "السعر",
+        "sellAction": "بيع",
+        "editAction": "تعديل",
+        "historyTitle": "سجل المنتج"
+      },
+      "empty": {
+        "search": "لا توجد نتائج للبحث عن \"{q}\"",
+        "filters": "لا توجد نتائج تطابق الفلاتر الحالية",
+        "fresh": "لم تتم إضافة أي أصناف بعد. ابدأ بإضافة صنف جديد."
+      },
+      "toast": {
+        "productDeleted": "تم حذف المنتج بنجاح",
+        "deleteFailed": "حدث خطأ",
+        "productUpdated": "تم تحديث المنتج بنجاح",
+        "qtyAdjusted": "تم تعديل كمية \"{name}\" إلى {n}",
+        "qtyAdjustFailed": "تعذر تعديل الكمية",
+        "tagAdded": "تمت إضافة التاج لـ {n} منتج",
+        "priceUpdated": "تم تعديل سعر {n} منتج",
+        "categoryUpdated": "تم تغيير الصنف لـ {n} منتج",
+        "genderUpdated": "تم تغيير النوع لـ {n} منتج",
+        "supplierUpdated": "تم تحديد المورد لـ {n} منتج",
+        "locationUpdated": "تم تحديد المكان لـ {n} منتج",
+        "actionFailed": "تعذر تنفيذ الإجراء",
+        "bulkDeleted": "تم حذف {n} منتج",
+        "bulkDeleteFailed": "تعذر الحذف الجماعي",
+        "importRefreshed": "تم تحديث القائمة"
+      },
+      "confirmDelete": {
+        "title": "حذف المنتج",
+        "message": "هل أنت متأكد من حذف \"{name}\"؟",
+        "confirm": "حذف"
+      },
+      "confirmBulkDelete": {
+        "title": "حذف جماعي",
+        "message": "هل أنت متأكد من حذف {n} منتج؟ لا يمكن التراجع.",
+        "confirm": "حذف الكل"
+      },
+      "bulkActions": {
+        "selectedCount": "تم تحديد {n} منتج",
+        "addTag": "إضافة تاج",
+        "tagInputPlaceholder": "اسم التاج",
+        "apply": "تطبيق",
+        "priceAdjust": "تعديل السعر",
+        "pricePlaceholder": "نسبة (مثال: 10 أو -5)",
+        "applyPercent": "تطبيق %",
+        "category": "الصنف",
+        "gender": "النوع",
+        "supplier": "المورد",
+        "supplierPlaceholder": "اسم المورد",
+        "location": "المكان",
+        "locationPlaceholder": "مكان التخزين",
+        "export": "تصدير",
+        "delete": "حذف",
+        "clearTitle": "إلغاء التحديد"
+      },
+      "searchBar": {
+        "placeholder": "ابحث عن منتج، براند، أو صنف…"
+      },
+      "editForm": {
+        "title": "تعديل المنتج",
+        "fields": {
+          "name": "اسم المنتج",
+          "brand": "الماركة",
+          "quantity": "الكمية",
+          "price": "سعر البيع (جنيه)",
+          "costPrice": "سعر الشراء (جنيه)",
+          "lowStockThreshold": "حد التنبيه عند انخفاض الكمية",
+          "sku": "كود المنتج / الباركود",
+          "supplier": "المورد",
+          "legacySupplier": "المورد (نص قديم)",
+          "location": "مكان التخزين",
+          "tags": "تاجات (افصل بفاصلة)",
+          "tagsPlaceholder": "عرض، جديد، تصفية"
+        },
+        "errors": {
+          "nameRequired": "اسم المنتج مطلوب",
+          "updateFailed": "حدث خطأ أثناء التحديث"
+        },
+        "save": "حفظ"
+      },
+      "history": {
+        "title": "سجل: {name}",
+        "empty": "لا يوجد سجل سابق لهذا المنتج",
+        "events": {
+          "created": "تمت الإضافة",
+          "updated": "تعديل بيانات",
+          "restocked": "زيادة كمية",
+          "decreased": "إنقاص كمية",
+          "sold": "بيع",
+          "returned": "مرتجع"
+        },
+        "qtyAfter": "→ الكمية: {n}"
+      },
+      "import": {
+        "title": "استيراد منتجات من CSV",
+        "result": {
+          "success": "تم الاستيراد بنجاح",
+          "summary": "تم إضافة <b>{created}</b> منتج جديد وتحديث <b>{updated}</b> منتج",
+          "summaryWithFailed": "تم إضافة <b>{created}</b> منتج جديد وتحديث <b>{updated}</b> منتج، وفشل <b>{failed}</b> صف",
+          "close": "إغلاق"
+        },
+        "guide": {
+          "heading": "أعمدة الملف (الترتيب غير مهم، لكن الأسماء حساسة):",
+          "required": "— مطلوبة.",
+          "skuHint": "— اختياري؛ لو موجود يستخدم لتحديث منتج قائم بدلاً من إنشاء جديد.",
+          "optional": "— اختيارية.",
+          "attributeValuesHint": "— خصائص الصنف بصيغة",
+          "attributeValuesExample": "، مثلاً",
+          "categoryHint": "— يقبل مفتاح الصنف",
+          "categoryHintOr": "أو الاسم العربي",
+          "templateLink": "تحميل قالب جاهز بأصناف فرعك الحالي"
+        },
+        "drop": {
+          "instructionLine": "اسحب ملف CSV هنا أو",
+          "chooseFile": "اختر ملفاً",
+          "checking": "جارٍ التحقق…",
+          "footnote": "CSV فقط · حتى 2 ميغابايت · UTF-8 (Excel: حفظ كـ \"CSV UTF-8\")"
+        },
+        "errors": {
+          "tooLarge": "الملف أكبر من 2 ميغا. قسّمه على ملفات أصغر.",
+          "readFailed": "تعذر قراءة الملف",
+          "importFailed": "تعذر تنفيذ الاستيراد"
+        },
+        "preview": {
+          "fileLabel": "الملف:",
+          "resetCta": "إعادة اختيار ملف آخر",
+          "stats": {
+            "create": "ستُضاف",
+            "update": "ستُحدَّث",
+            "error": "بها أخطاء"
+          },
+          "table": {
+            "row": "السطر",
+            "status": "الحالة",
+            "name": "الاسم",
+            "category": "الصنف",
+            "price": "السعر",
+            "quantity": "الكمية",
+            "notes": "ملاحظات"
+          },
+          "errorBanner": "هناك أخطاء في {n} صف. صحح الملف ثم أعد رفعه — لا يمكن المتابعة بصف واحد خاطئ (لتجنّب استيراد جزئي).",
+          "commit": "تأكيد الاستيراد ({n} صف)"
+        },
+        "action": {
+          "create": "إضافة",
+          "update": "تحديث",
+          "error": "خطأ"
+        }
+      },
+      "addProduct": {
+        "title": "إضافة صنف جديد",
+        "heading": "إضافة منتج جديد",
+        "subtitle": "ثلاث خطوات سريعة: اختر القسم، حدِّد الخصائص، ثم أكمل التفاصيل.",
+        "footer": {
+          "back": "السابق",
+          "next": "التالي",
+          "save": "حفظ المنتج",
+          "stepCounter": "الخطوة {n} من 3",
+          "readyHint": "جاهز للحفظ؟ راجع المعاينة على الجانب."
+        },
+        "toast": {
+          "success": "تم إضافة المنتج بنجاح",
+          "error": "حدث خطأ"
+        },
+        "indicator": {
+          "ariaLabel": "مراحل إضافة المنتج",
+          "steps": {
+            "category": { "label": "الصنف", "helper": "اختر القسم" },
+            "attributes": { "label": "الخصائص", "helper": "حدِّد التفاصيل" },
+            "details": { "label": "التفاصيل", "helper": "السعر والكمية" }
+          }
+        },
+        "step1": {
+          "heading": "اختر الصنف",
+          "loading": "جاري التحميل…",
+          "addCategory": "إضافة صنف",
+          "newCategory": {
+            "title": "إضافة صنف جديد",
+            "label": "اسم الصنف",
+            "placeholder": "مثلاً: جلود",
+            "save": "حفظ الصنف",
+            "error": "تعذر الإضافة"
+          }
+        },
+        "step2": {
+          "heading": "حدِّد خصائص المنتج",
+          "subhead": "هذه الخصائص تظهر في التقارير والفلاتر، فاحرص على دقتها."
+        },
+        "step3": {
+          "heading": "تفاصيل المنتج",
+          "subhead": "راجع التفاصيل قبل الحفظ — تظهر في المعاينة على الجانب.",
+          "sections": {
+            "basics": {
+              "title": "بيانات أساسية",
+              "subtitle": "ما يظهر للموظف وللعميل في الفاتورة."
+            },
+            "pricing": {
+              "title": "التسعير والمخزون",
+              "subtitle": "سعر الشراء يستخدم لحساب الربح في التقارير."
+            },
+            "extras": {
+              "title": "بيانات إضافية",
+              "subtitle": "اختياري — يُحسِّن البحث والتقارير."
+            }
+          },
+          "fields": {
+            "brand": "البراند (اختياري)",
+            "brandPlaceholder": "اختر البراند…",
+            "brandOther": "أخرى (إضافة براند جديد)",
+            "newBrand": "اسم البراند الجديد",
+            "newBrandPlaceholder": "اسم البراند…",
+            "name": "اسم المنتج",
+            "namePlaceholder": "مثال: ساعة كاجوال جلد بني",
+            "price": "سعر البيع",
+            "costPrice": "سعر الشراء",
+            "quantity": "الكمية الابتدائية",
+            "lowStockThreshold": "حد التنبيه عند انخفاض الكمية",
+            "sku": "كود المنتج / باركود",
+            "skuPlaceholder": "SKU أو باركود",
+            "location": "مكان التخزين",
+            "locationPlaceholder": "رف 3، فاترينة B",
+            "tags": "تاجات (افصل بفاصلة)",
+            "tagsPlaceholder": "عرض، جديد، تصفية",
+            "currencySuffix": "ج.م"
+          },
+          "preview": {
+            "title": "معاينة سريعة",
+            "namePlaceholder": "اسم المنتج",
+            "costLine": "سعر الشراء: {cost}",
+            "quantity": "الكمية",
+            "lowStock": "حد التنبيه",
+            "margin": "هامش الربح",
+            "footnote": "تتغير المعاينة لحظياً مع كل حقل تكمله."
+          }
+        }
+      }
+    },
     "shell": {
       "primary": {
         "dashboard": "لوحة التحكم",

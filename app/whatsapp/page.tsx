@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { Suspense, useCallback, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { AppShell } from "@/components/layout/AppShell";
@@ -12,8 +12,19 @@ import {
   type ThreadViewHandle,
 } from "@/components/whatsapp/ThreadView";
 import { MessageCircle } from "@/lib/icons";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 export default function WhatsAppInboxPage() {
+  return (
+    <Suspense fallback={null}>
+      <WhatsAppInboxPageInner />
+    </Suspense>
+  );
+}
+
+function WhatsAppInboxPageInner() {
+  const dict = useDictionary();
+  const t = dict.app.whatsappInbox;
   const { data: session, status } = useSession();
   const principal = session?.user
     ? {
@@ -25,8 +36,6 @@ export default function WhatsAppInboxPage() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
-  // The active conversation lives in the URL so refresh/back/share all
-  // work. `c=<id>` keeps the path stable at /whatsapp.
   const activeId = searchParams.get("c");
 
   const [toast, setToast] = useState<{
@@ -34,9 +43,6 @@ export default function WhatsAppInboxPage() {
     message: string;
   } | null>(null);
 
-  // Refresh signal — bumped by the thread when it sends, archives,
-  // marks-read, etc., so the conversation list re-polls immediately
-  // instead of waiting for its 10s tick.
   const [listRefreshTick, setListRefreshTick] = useState(0);
   const bumpListRefresh = useCallback(() => {
     setListRefreshTick((n) => n + 1);
@@ -53,9 +59,9 @@ export default function WhatsAppInboxPage() {
 
   if (status === "loading") {
     return (
-      <AppShell title="WhatsApp">
+      <AppShell title={t.title}>
         <div className="text-center py-12 text-text-secondary">
-          جارٍ التحميل...
+          {t.loading}
         </div>
       </AppShell>
     );
@@ -63,10 +69,10 @@ export default function WhatsAppInboxPage() {
 
   if (!allowed) {
     return (
-      <AppShell title="WhatsApp">
+      <AppShell title={t.title}>
         <div className="max-w-5xl mx-auto">
           <div className="bg-bg-card border border-border rounded-xl p-8 text-center text-text-secondary">
-            ليس لديك صلاحية لعرض محادثات واتساب.
+            {t.notAllowed}
           </div>
         </div>
       </AppShell>
@@ -74,10 +80,8 @@ export default function WhatsAppInboxPage() {
   }
 
   return (
-    <AppShell title="WhatsApp">
+    <AppShell title={t.title}>
       <div className="max-w-6xl mx-auto h-[calc(100dvh-9rem)]">
-        {/* Desktop: list + thread side-by-side. Mobile: stack — show
-            list when no conversation is selected, thread when one is. */}
         <div className="h-full grid md:grid-cols-[340px_1fr] gap-3">
           <div
             className={
@@ -107,7 +111,7 @@ export default function WhatsAppInboxPage() {
             ) : (
               <div className="text-center text-text-secondary">
                 <MessageCircle className="w-12 h-12 mx-auto mb-3 opacity-40" />
-                <p className="text-sm">اختر محادثة لعرض الرسائل.</p>
+                <p className="text-sm">{t.selectHint}</p>
               </div>
             )}
           </div>

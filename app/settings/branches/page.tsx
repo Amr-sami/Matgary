@@ -16,6 +16,7 @@ import {
   EyeOff,
 } from "@/lib/icons";
 import { useBranches, type BranchSummary } from "@/hooks/useBranches";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 interface DraftBranch {
   id: string | null;
@@ -32,6 +33,8 @@ const EMPTY_DRAFT: DraftBranch = {
 };
 
 export default function BranchesSettingsPage() {
+  const dict = useDictionary();
+  const t = dict.app.branchesPage;
   const { data: session, status } = useSession();
   const router = useRouter();
   const isOwner = session?.user?.role === "owner";
@@ -44,8 +47,6 @@ export default function BranchesSettingsPage() {
     tone: "success" | "error";
   } | null>(null);
 
-  // Owners only — non-owners get bounced. SSR doesn't know the role; once the
-  // session resolves on the client we redirect away.
   useEffect(() => {
     if (status === "loading") return;
     if (!isOwner) router.replace("/settings");
@@ -53,8 +54,8 @@ export default function BranchesSettingsPage() {
 
   if (status === "loading" || !isOwner) {
     return (
-      <AppShell title="الفروع">
-        <p className="text-sm text-text-secondary">جاري التحميل…</p>
+      <AppShell title={t.shellTitle}>
+        <p className="text-sm text-text-secondary">{t.loading}</p>
       </AppShell>
     );
   }
@@ -73,7 +74,7 @@ export default function BranchesSettingsPage() {
   const submit = async () => {
     if (!draft) return;
     if (!draft.name.trim()) {
-      setToast({ msg: "اسم الفرع مطلوب", tone: "error" });
+      setToast({ msg: t.toast.nameRequired, tone: "error" });
       return;
     }
     setBusy(true);
@@ -92,17 +93,17 @@ export default function BranchesSettingsPage() {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? "تعذر الحفظ");
+        throw new Error(body.error ?? t.toast.saveFailed);
       }
       setToast({
-        msg: isCreate ? "تم إنشاء الفرع" : "تم حفظ التعديلات",
+        msg: isCreate ? t.toast.created : t.toast.edited,
         tone: "success",
       });
       setDraft(null);
       await refresh();
     } catch (err) {
       setToast({
-        msg: err instanceof Error ? err.message : "حدث خطأ",
+        msg: err instanceof Error ? err.message : t.toast.genericError,
         tone: "error",
       });
     } finally {
@@ -112,7 +113,7 @@ export default function BranchesSettingsPage() {
 
   const toggleActive = async (b: BranchSummary) => {
     if (b.isPrimary && b.isActive) {
-      setToast({ msg: "لا يمكن إيقاف الفرع الرئيسي", tone: "error" });
+      setToast({ msg: t.toast.primarySuspend, tone: "error" });
       return;
     }
     setBusy(true);
@@ -124,16 +125,16 @@ export default function BranchesSettingsPage() {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? "تعذر التحديث");
+        throw new Error(body.error ?? t.toast.updateFailed);
       }
       setToast({
-        msg: b.isActive ? "تم إيقاف الفرع" : "تم تفعيل الفرع",
+        msg: b.isActive ? t.toast.suspended : t.toast.activated,
         tone: "success",
       });
       await refresh();
     } catch (err) {
       setToast({
-        msg: err instanceof Error ? err.message : "حدث خطأ",
+        msg: err instanceof Error ? err.message : t.toast.genericError,
         tone: "error",
       });
     } finally {
@@ -143,14 +144,10 @@ export default function BranchesSettingsPage() {
 
   const remove = async (b: BranchSummary) => {
     if (b.isPrimary) {
-      setToast({ msg: "لا يمكن حذف الفرع الرئيسي", tone: "error" });
+      setToast({ msg: t.toast.primaryDelete, tone: "error" });
       return;
     }
-    if (
-      !window.confirm(
-        `هل تريد حذف فرع «${b.name}»؟ سيتم رفض العملية إذا كان الفرع يحتوي على بيانات (مبيعات/مصاريف/مخزون).`,
-      )
-    ) {
+    if (!window.confirm(t.confirmDelete.replace("{name}", b.name))) {
       return;
     }
     setBusy(true);
@@ -167,13 +164,13 @@ export default function BranchesSettingsPage() {
               .map(([k, n]) => `${k}: ${n}`)
               .join(" • ")
           : "";
-        throw new Error(`${body.error ?? "تعذر الحذف"}${hint ? ` (${hint})` : ""}`);
+        throw new Error(`${body.error ?? t.toast.deleteFailed}${hint ? ` (${hint})` : ""}`);
       }
-      setToast({ msg: "تم حذف الفرع", tone: "success" });
+      setToast({ msg: t.toast.deleted, tone: "success" });
       await refresh();
     } catch (err) {
       setToast({
-        msg: err instanceof Error ? err.message : "حدث خطأ",
+        msg: err instanceof Error ? err.message : t.toast.genericError,
         tone: "error",
       });
     } finally {
@@ -182,19 +179,19 @@ export default function BranchesSettingsPage() {
   };
 
   return (
-    <AppShell title="إدارة الفروع">
+    <AppShell title={t.title}>
       <div className="max-w-3xl mx-auto space-y-5">
         <header className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-text-primary">الفروع</h1>
+            <h1 className="text-2xl font-bold text-text-primary">{t.heading}</h1>
             <p className="text-sm text-text-secondary mt-1">
-              تعدد الفروع يتيح لك تتبع المبيعات والمخزون لكل موقع على حدة.
+              {t.subhead}
             </p>
           </div>
           {!draft && (
             <Button onClick={startCreate} disabled={busy} className="shrink-0">
               <Plus className="w-4 h-4" />
-              إضافة فرع
+              {t.add}
             </Button>
           )}
         </header>
@@ -203,20 +200,20 @@ export default function BranchesSettingsPage() {
         {draft && (
           <div className="bg-bg-card border border-border rounded-2xl p-5 space-y-4">
             <h2 className="text-base font-semibold text-text-primary">
-              {draft.id ? "تعديل فرع" : "فرع جديد"}
+              {draft.id ? t.editTitle : t.newTitle}
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <Input
-                label="اسم الفرع"
+                label={t.nameLabel}
                 value={draft.name}
                 onChange={(e) =>
                   setDraft({ ...draft, name: e.target.value })
                 }
-                placeholder="مثال: فرع المعادي"
+                placeholder={t.namePlaceholder}
                 disabled={busy}
               />
               <Input
-                label="رقم الهاتف"
+                label={t.phoneLabel}
                 value={draft.phone}
                 onChange={(e) =>
                   setDraft({ ...draft, phone: e.target.value })
@@ -226,12 +223,12 @@ export default function BranchesSettingsPage() {
               />
               <div className="md:col-span-2">
                 <Input
-                  label="العنوان"
+                  label={t.addressLabel}
                   value={draft.address}
                   onChange={(e) =>
                     setDraft({ ...draft, address: e.target.value })
                   }
-                  placeholder="شارع X، حي Y، …"
+                  placeholder={t.addressPlaceholder}
                   disabled={busy}
                 />
               </div>
@@ -243,10 +240,10 @@ export default function BranchesSettingsPage() {
                 disabled={busy}
                 className="text-sm text-text-secondary hover:text-text-primary px-3 py-2"
               >
-                إلغاء
+                {t.cancel}
               </button>
               <Button onClick={submit} disabled={busy} loading={busy}>
-                {draft.id ? "حفظ التعديلات" : "إنشاء"}
+                {draft.id ? t.saveChanges : t.create}
               </Button>
             </div>
           </div>
@@ -256,11 +253,11 @@ export default function BranchesSettingsPage() {
         <div className="bg-bg-card border border-border rounded-2xl overflow-hidden">
           {loading ? (
             <p className="text-sm text-text-secondary text-center py-10">
-              جاري التحميل…
+              {t.loading}
             </p>
           ) : branches.length === 0 ? (
             <p className="text-sm text-text-secondary text-center py-10">
-              لا توجد فروع.
+              {t.empty}
             </p>
           ) : (
             <ul className="divide-y divide-border">
@@ -282,32 +279,32 @@ export default function BranchesSettingsPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-medium text-text-primary truncate">
+                        <p className="font-medium text-text-primary truncate" dir="auto">
                           {b.name}
                         </p>
                         {b.isPrimary && (
                           <span className="text-[10px] px-2 py-0.5 rounded-full bg-accent-light text-accent">
-                            رئيسي
+                            {t.labels.primary}
                           </span>
                         )}
                         {isCurrent && (
                           <span className="text-[10px] px-2 py-0.5 rounded-full bg-success-light text-success">
-                            الفرع الحالي
+                            {t.labels.current}
                           </span>
                         )}
                         {!b.isActive && (
                           <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-text-secondary">
-                            موقوف
+                            {t.labels.suspended}
                           </span>
                         )}
                       </div>
                       {b.address && (
-                        <p className="text-xs text-text-secondary mt-0.5 truncate">
+                        <p className="text-xs text-text-secondary mt-0.5 truncate" dir="auto">
                           {b.address}
                         </p>
                       )}
                       {b.phone && (
-                        <p className="text-xs text-text-secondary mt-0.5">
+                        <p className="text-xs text-text-secondary mt-0.5" dir="ltr">
                           {b.phone}
                         </p>
                       )}
@@ -324,7 +321,7 @@ export default function BranchesSettingsPage() {
                                 msg:
                                   err instanceof Error
                                     ? err.message
-                                    : "تعذر التبديل",
+                                    : t.toast.switchFailed,
                                 tone: "error",
                               });
                             }
@@ -332,14 +329,14 @@ export default function BranchesSettingsPage() {
                           disabled={busy}
                           className="text-xs px-3 py-1.5 rounded-md bg-accent text-white hover:bg-accent-hover transition-colors"
                         >
-                          فتح
+                          {t.actions.open}
                         </button>
                       )}
                       <button
                         type="button"
                         onClick={() => startEdit(b)}
                         disabled={busy}
-                        title="تعديل"
+                        title={t.actions.edit}
                         className="p-2 rounded-md text-text-secondary hover:bg-bg-main hover:text-accent"
                       >
                         <Pencil className="w-4 h-4" />
@@ -348,7 +345,7 @@ export default function BranchesSettingsPage() {
                         type="button"
                         onClick={() => toggleActive(b)}
                         disabled={busy || b.isPrimary}
-                        title={b.isActive ? "إيقاف الفرع" : "تفعيل الفرع"}
+                        title={b.isActive ? t.actions.suspend : t.actions.activate}
                         className={`p-2 rounded-md transition-colors disabled:opacity-30 ${
                           b.isActive
                             ? "text-text-secondary hover:bg-bg-main hover:text-orange-600"
@@ -365,7 +362,7 @@ export default function BranchesSettingsPage() {
                         type="button"
                         onClick={() => remove(b)}
                         disabled={busy || b.isPrimary}
-                        title="حذف"
+                        title={t.actions.delete}
                         className="p-2 rounded-md text-text-secondary hover:bg-danger-light hover:text-danger disabled:opacity-30"
                       >
                         <Trash2 className="w-4 h-4" />

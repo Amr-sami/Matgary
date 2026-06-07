@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { Upload, Trash2, Loader2 } from "@/lib/icons";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 interface Props {
   label: string;
@@ -25,6 +26,8 @@ export function PhotoUploadZone({
   onPick,
   onClear,
 }: Props) {
+  const dict = useDictionary();
+  const t = dict.app.photoUpload;
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
 
@@ -78,8 +81,8 @@ export function PhotoUploadZone({
         {!src && (
           <div className="text-center px-4 py-6">
             <Upload className="w-6 h-6 text-text-secondary mx-auto mb-1.5" />
-            <p className="text-xs text-text-secondary">اسحب الصورة هنا أو اضغط للاختيار</p>
-            <p className="text-[10px] text-text-secondary mt-0.5">JPG / PNG / WebP — حتى 3MB</p>
+            <p className="text-xs text-text-secondary">{t.dropHint}</p>
+            <p className="text-[10px] text-text-secondary mt-0.5">{t.fileTypeHint}</p>
           </div>
         )}
 
@@ -93,7 +96,7 @@ export function PhotoUploadZone({
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
-          aria-label={hasImage ? "تغيير الصورة" : "رفع صورة"}
+          aria-label={hasImage ? t.changeAria : t.uploadAria}
           className="absolute inset-0 cursor-pointer disabled:cursor-default"
         />
       </div>
@@ -105,7 +108,7 @@ export function PhotoUploadZone({
           disabled={uploading}
           className="text-xs font-medium text-accent hover:underline disabled:opacity-50"
         >
-          {hasImage ? "تغيير" : "اختيار صورة"}
+          {hasImage ? t.change : t.choose}
         </button>
         {hasImage && !uploading && (
           <button
@@ -114,7 +117,7 @@ export function PhotoUploadZone({
             className="text-xs font-medium text-danger hover:underline inline-flex items-center gap-1"
           >
             <Trash2 className="w-3 h-3" />
-            حذف
+            {t.delete}
           </button>
         )}
       </div>

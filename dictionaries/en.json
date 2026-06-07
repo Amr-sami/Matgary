@@ -209,6 +209,2211 @@
         }
       }
     },
+    "sales": {
+      "title": "Sales",
+      "filters": {
+        "searchPlaceholder": "Search product, brand, or note…",
+        "status": {
+          "all": "All",
+          "sold": "Sold",
+          "returned": "Returned"
+        },
+        "allCategories": "All categories",
+        "allGenders": "All",
+        "allBrands": "All brands",
+        "sortPrefix": "Sort: {label}",
+        "sort": {
+          "newest": "Newest",
+          "oldest": "Oldest",
+          "totalDesc": "Total (high to low)",
+          "totalAsc": "Total (low to high)",
+          "qtyDesc": "Quantity (most)",
+          "qtyAsc": "Quantity (least)"
+        },
+        "discountOnly": "Discounted only"
+      },
+      "clearFilters": "Clear filters",
+      "invoiceCount": "{n} invoices",
+      "rangeLabel": {
+        "today": "Today",
+        "yesterday": "Yesterday",
+        "7d": "Last 7 days",
+        "30d": "Last 30 days",
+        "thisMonth": "This month",
+        "all": "All",
+        "custom": "Selected period"
+      },
+      "heatmap": {
+        "title": "Busiest hours",
+        "peak": "Peak: {hour}:00 ({n} invoices)",
+        "cellTitle": "{h}:00 — {n} invoices"
+      },
+      "chart": {
+        "headline": "Sales — last {days} days",
+        "last7": "Last 7 days",
+        "wow": "{arrow} {pct}% vs previous week"
+      },
+      "toast": {
+        "saleSuccess": "Sale recorded",
+        "returnSuccess": "Return recorded and stock updated",
+        "saleUpdated": "Sale updated",
+        "saleDeleted": "Sale deleted",
+        "saleDeletedRestocked": "Sale deleted and stock restored",
+        "deleteFailed": "Couldn't delete",
+        "nothingToPrint": "No printable invoices in selection"
+      },
+      "void": {
+        "title": "Delete sale",
+        "messageReturned": "This sale is already returned. It will be permanently deleted.",
+        "message": "The sale will be deleted and {n} pcs of \"{name}\" will be returned to stock.",
+        "confirm": "Delete"
+      },
+      "kpi": {
+        "invoicesInRange": "Invoices ({range})",
+        "netSales": "Net sales",
+        "netProfit": "Net profit",
+        "profitNeedsReview": "Needs review",
+        "avgBasket": "Average basket",
+        "avgDiscount": "Avg discount"
+      },
+      "deferred": {
+        "title": "Unpaid (on account)",
+        "customerCount": "{n} customers",
+        "hide": "Hide",
+        "showDetails": "Show details",
+        "singleItem": "1 invoice",
+        "multipleItems": "{n} items",
+        "markPaid": "Paid",
+        "noName": "No name"
+      },
+      "summary": {
+        "todaySales": "Today's sales"
+      },
+      "topProducts": {
+        "title": "Top sellers",
+        "empty": "No data yet",
+        "pieces": "{n} pcs"
+      },
+      "topCustomers": {
+        "title": "Top customers by spend",
+        "viewAll": "View all"
+      },
+      "dayCompare": {
+        "header": "This {day} vs last {day}",
+        "todayInvoices": "{n} invoices today",
+        "lastWeekInvoices": "{n} invoices last week"
+      },
+      "table": {
+        "col": {
+          "date": "Date",
+          "product": "Product",
+          "category": "Category",
+          "brand": "Brand",
+          "quantity": "Qty",
+          "price": "Price",
+          "total": "Total",
+          "status": "Status",
+          "action": "Action"
+        },
+        "rowCustomerTooltip": "Show all invoices for this customer",
+        "discountAmount": "Discount {value}",
+        "actions": {
+          "print": "Print",
+          "edit": "Edit",
+          "return": "Return",
+          "void": "Delete sale (return to stock)"
+        }
+      },
+      "status": {
+        "sold": "Sold",
+        "returned": "Returned"
+      },
+      "card": {
+        "soldQty": "Sold quantity",
+        "qtyPieces": "{n} pcs",
+        "unitPrice": "Unit price",
+        "totalLabel": "Total",
+        "voidLong": "Delete sale",
+        "voidTooltip": "Delete sale and return stock"
+      },
+      "bulk": {
+        "selectedCount": "{n} selected",
+        "printSelected": "Print selected",
+        "exportCsv": "Export CSV",
+        "clearSelection": "Clear selection"
+      },
+      "share": {
+        "title": "Share",
+        "copy": "Copy text",
+        "copied": "Copied",
+        "whatsapp": "WhatsApp",
+        "messageTotal": "Total: {amount}"
+      },
+      "editModal": {
+        "title": "Edit sale: {productName}",
+        "quantity": "Quantity",
+        "unitPrice": "Unit price",
+        "discountPercent": "Percent %",
+        "discountFixed": "Fixed amount",
+        "discountValue": "Discount value",
+        "saleDate": "Sale date",
+        "note": "Note",
+        "totals": {
+          "subtotal": "Subtotal",
+          "discount": "Discount",
+          "total": "Total"
+        },
+        "save": "Save changes",
+        "error": "Couldn't update the sale"
+      },
+      "returnModal": {
+        "title": "Record return",
+        "sold": "Sold: {n} pcs",
+        "quantity": "Return quantity",
+        "maxQuantity": "Max: {n}",
+        "reasonLabel": "Return reason",
+        "reasonPlaceholder": "Choose a reason…",
+        "reasons": {
+          "defect": "Product defect",
+          "not_liked": "Customer didn't like it",
+          "wrong_size": "Wrong size",
+          "other": "Other"
+        },
+        "otherLabel": "Describe the reason",
+        "otherPlaceholder": "Return reason…",
+        "confirm": "Confirm return"
+      },
+      "print": {
+        "title": "Print options",
+        "paperLabel": "Paper size",
+        "paper": {
+          "auto_one": "Auto · one copy per sheet (recommended)",
+          "xp330b_80": "XP-330B thermal 80mm",
+          "thermal_58": "Thermal 58mm",
+          "a4": "A4 (210 × 297mm)",
+          "letter": "Letter (216 × 279mm)",
+          "custom": "Custom"
+        },
+        "customWidth": "Width (mm)",
+        "customHeight": "Height (mm, 0 = auto)",
+        "orientationLabel": "Orientation",
+        "orientation": {
+          "portrait": "Portrait",
+          "landscape": "Landscape"
+        },
+        "marginsLabel": "Margins",
+        "margins": {
+          "none": "None",
+          "narrow": "Narrow",
+          "normal": "Normal"
+        },
+        "scaleLabel": "Scale: {pct}%",
+        "copies": "Number of copies",
+        "pagesPerSheetLabel": "Pages per sheet",
+        "fitToPageLabel": "Fit to page (no gap below the receipt)",
+        "fitToPageHint": "Stretches the receipt to fill the full page height.",
+        "tipBold": "Prevent 4-up tiling:",
+        "tipBody": "Pick \"Auto · one copy per sheet\" (the default). This uses the printer's actual paper size so only one receipt prints per page. Use XP-330B only with a thermal printer.",
+        "preview": "Preview",
+        "noData": "No data",
+        "printAction": "Print ({n} copies)"
+      },
+      "form": {
+        "title": "New sale",
+        "itemsInCart": "{n} items in cart",
+        "productSearch": {
+          "label": "Choose product",
+          "placeholder": "Search products…",
+          "inStock": "In stock: {n}"
+        },
+        "recentLabel": "Recent products:",
+        "available": "Available: {n} pcs",
+        "fields": {
+          "quantity": "Quantity",
+          "maxQuantity": "Max: {n}",
+          "pricePerUnit": "Unit price (EGP)",
+          "lineDiscount": "Discount on this item (optional)",
+          "discountPercent": "Percent %",
+          "discountAmount": "Amount EGP",
+          "percent": "Percent",
+          "amount": "Amount"
+        },
+        "addToCart": "Add to cart",
+        "lineDiscountInline": "(discount - {amount})",
+        "orderDiscount": "Order-level discount (optional)",
+        "totals": {
+          "subtotal": "Subtotal",
+          "lineDiscounts": "Line discounts",
+          "orderDiscount": "Order discount",
+          "loyaltyPoints": "Points redeemed ({n} pts)",
+          "loyaltyCredit": "Credit applied",
+          "total": "Total",
+          "loyaltyTrimmedNote": "Redemption was trimmed to match the available wallet balance and order total."
+        },
+        "customer": {
+          "nameLabel": "Customer name (optional)",
+          "namePlaceholder": "Start typing to pick a past customer…",
+          "phoneLabel": "Mobile number",
+          "phonePlaceholder": "Start typing to pick a past number…",
+          "noName": "No name",
+          "fallbackName": "Valued customer"
+        },
+        "loyalty": {
+          "walletLabel": "Customer wallet",
+          "pointsSuffix": "pts",
+          "currencyShort": "EGP",
+          "creditSuffix": "credit",
+          "redeemPoints": "Redeem points",
+          "applyCredit": "Apply credit (EGP)"
+        },
+        "payment": {
+          "label": "Payment method",
+          "deferredNote": "This sale will be recorded as unpaid (on account)."
+        },
+        "note": {
+          "label": "Note (optional)",
+          "placeholder": "Note…"
+        },
+        "backdate": {
+          "label": "Record sale on a past date"
+        },
+        "submit": "Record sale",
+        "printInvoice": "Print invoice",
+        "errors": {
+          "invalidDate": "Invalid date",
+          "futureDate": "Can't record a sale for a future date",
+          "sessionMissing": "Your session is incomplete. Please reload the page."
+        }
+      }
+    },
+    "catalog": {
+      "payment": {
+        "cash": "Cash",
+        "instapay": "InstaPay",
+        "card": "Card",
+        "deferred": "On account"
+      },
+      "uncategorized": "Uncategorized",
+      "expenseCategory": {
+        "rent": "Rent",
+        "salaries": "Salaries",
+        "electricity": "Electricity",
+        "water": "Water",
+        "internet": "Internet",
+        "supplier": "Supplier",
+        "other": "Other"
+      },
+      "brandsAdmin": {
+        "title": "Brands",
+        "noCategoriesHint": "Add a category first, then come back to define brands.",
+        "newPlaceholder": "New brand name",
+        "add": "Add",
+        "loading": "Loading…",
+        "empty": "No brands for this category yet.",
+        "errors": {
+          "addFailed": "Couldn't add"
+        },
+        "confirmDelete": "Delete this brand?",
+        "deleteTitle": "Delete"
+      },
+      "categoriesAdmin": {
+        "title": "Categories",
+        "addCategory": "New category",
+        "cancel": "Cancel",
+        "labelLabel": "Category name",
+        "labelPlaceholder": "e.g. Headphones",
+        "iconLabel": "Icon",
+        "save": "Save",
+        "empty": "No categories yet. Add your first one from the button above.",
+        "deleteTitle": "Delete",
+        "confirmDeleteCategory": "Delete this category?",
+        "toasts": {
+          "categoryAdded": "Category added",
+          "categoryDeleted": "Deleted",
+          "addFailed": "Couldn't add",
+          "deleteFailed": "Couldn't delete"
+        },
+        "attributes": {
+          "loading": "Loading…",
+          "heading": "Attributes",
+          "addAttribute": "Attribute",
+          "cancel": "Cancel",
+          "namePlaceholder": "Attribute name (e.g. Type)",
+          "save": "Save",
+          "empty": "No attributes yet. The wizard will skip step 2 for this category.",
+          "confirmDeleteAttribute": "Delete this attribute?",
+          "confirmDeleteValue": "Delete this value?",
+          "deleteValueTitle": "Delete",
+          "valuePlaceholder": "New value (e.g. Men)",
+          "addValue": "Add"
+        }
+      }
+    },
+    "reports": {
+      "title": "Reports & analytics",
+      "totalSales": "Total sales",
+      "totalQty": "Items sold",
+      "qtySuffix": "{n} pcs",
+      "totalReturns": "Returns",
+      "returnsSubtitle": "returns",
+      "detailsHeading": "Sales details for the selected period"
+    },
+    "activityLabels": {
+      "fields": {
+        "invoiceId": "Invoice ID",
+        "lineCount": "Item count",
+        "totalQuantity": "Total pieces",
+        "paymentMethod": "Payment method",
+        "lines": "Items",
+        "total": "Total",
+        "quantitySold": "Quantity",
+        "pricePerUnit": "Unit price",
+        "customerName": "Customer name",
+        "customerPhone": "Customer phone",
+        "note": "Note",
+        "source": "Source",
+        "attemptType": "Attempt type",
+        "loggedLocation": "Recorded location",
+        "locationAccuracy": "Location accuracy",
+        "username": "Username",
+        "permissionsCount": "Permission count",
+        "changed": "Changed fields",
+        "payType": "Pay type",
+        "baseSalaryMonthly": "Monthly base salary",
+        "hourlyRate": "Hourly rate",
+        "initialQuantity": "Initial quantity",
+        "price": "Price",
+        "delta": "Change",
+        "newQuantity": "New balance",
+        "amount": "Amount",
+        "type": "Type",
+        "startDate": "From",
+        "endDate": "To"
+      },
+      "fieldNames": {
+        "shopName": "Shop name",
+        "shopPhone": "Shop phone",
+        "logoPath": "Shop logo",
+        "messageTemplate": "WhatsApp message text",
+        "greenApiEnabled": "Green API enabled",
+        "greenApiInstanceId": "Instance ID",
+        "greenApiUrl": "Service URL",
+        "whatsappCloudEnabled": "WhatsApp Cloud API enabled",
+        "whatsappCloudPhoneId": "Phone Number ID",
+        "whatsappCloudBusinessId": "WhatsApp Business Account ID",
+        "sendAsPdf": "Send as PDF",
+        "autoOpenWhatsApp": "Auto-open WhatsApp",
+        "workHoursPerDay": "Work hours per day",
+        "weekendDays": "Weekend days",
+        "overtimeMultiplier": "Overtime multiplier",
+        "graceMinutesLate": "Grace minutes for lateness",
+        "displayName": "Display name",
+        "phone": "Phone",
+        "nationalId": "National ID",
+        "address": "Address",
+        "profilePhotoPath": "Profile photo",
+        "idPhotoPath": "ID photo",
+        "brand": "Brand",
+        "costPrice": "Cost price",
+        "lowStockThreshold": "Low-stock threshold",
+        "sku": "SKU",
+        "tags": "Tags",
+        "supplier": "Supplier",
+        "supplierId": "Supplier",
+        "location": "Storage location"
+      },
+      "paymentMethods": {
+        "cash": "Cash",
+        "instapay": "InstaPay",
+        "card": "Card",
+        "deferred": "On account"
+      },
+      "payTypes": {
+        "fixed": "Fixed",
+        "hourly": "Hourly",
+        "hybrid": "Hybrid"
+      },
+      "attendanceTypes": {
+        "check_in": "Check in",
+        "check_out": "Check out"
+      },
+      "attendanceSources": {
+        "manual": "Manual",
+        "geofence": "Auto (location)",
+        "qr": "QR",
+        "manager_attest": "Manager attest"
+      },
+      "expenseCategories": {
+        "rent": "Rent",
+        "salaries": "Salaries",
+        "electricity": "Electricity",
+        "water": "Water",
+        "internet": "Internet",
+        "supplier": "Supplier",
+        "other": "Other"
+      },
+      "accuracySuffix": "±{n}m",
+      "categories": {
+        "auth": "Account",
+        "team": "Team",
+        "settings": "Settings",
+        "leave": "Leaves",
+        "task": "Tasks",
+        "product": "Products",
+        "sale": "Sales",
+        "expense": "Expenses",
+        "supplier": "Suppliers",
+        "purchase": "Purchases",
+        "attendance": "Attendance"
+      },
+      "actions": {
+        "auth.login": "Signed in",
+        "auth.2fa_enable": "Enabled two-factor authentication",
+        "auth.2fa_disable": "Disabled two-factor authentication",
+        "auth.recovery_codes_regenerated": "Regenerated recovery codes",
+        "auth.session_revoke_all": "Signed out of all devices",
+        "auth.data_export": "Downloaded store data",
+        "tenant.deletion_scheduled": "Scheduled store deletion",
+        "tenant.deletion_cancelled": "Cancelled store deletion",
+        "auth.logout": "Signed out",
+        "auth.password_change": "Changed password",
+        "team.add": "Added staff",
+        "team.update": "Updated staff",
+        "team.delete": "Removed staff",
+        "team.password_reset": "Reset staff password",
+        "team.compensation_set": "Updated staff pay",
+        "settings.update": "Updated shop settings",
+        "settings.attendance_update": "Updated attendance settings",
+        "leave.submit": "Submitted leave request",
+        "leave.approve": "Approved leave",
+        "leave.reject": "Rejected leave",
+        "task.create": "Created task",
+        "task.update": "Updated task",
+        "task.delete": "Deleted task",
+        "product.create": "Added product",
+        "product.update": "Updated product",
+        "product.delete": "Deleted product",
+        "product.adjust": "Adjusted stock",
+        "sale.create": "Recorded sale",
+        "sale.update": "Updated sale",
+        "sale.void": "Voided sale",
+        "sale.mark_paid": "Confirmed sale payment",
+        "expense.create": "Recorded expense",
+        "expense.delete": "Deleted expense",
+        "expense.recurring_materialized": "Generated recurring expenses",
+        "supplier.create": "Added supplier",
+        "supplier.update": "Updated supplier",
+        "supplier.delete": "Deleted supplier",
+        "purchase.create": "Created purchase order",
+        "purchase.receive": "Received purchase order",
+        "purchase.cancel": "Cancelled purchase order",
+        "attendance.check_in": "Checked in",
+        "attendance.check_out": "Checked out",
+        "attendance.geofence_rejected": "Check-in attempted from outside the shop area",
+        "billing.checkout_started": "Opened billing checkout",
+        "billing.payment_succeeded": "Subscription payment received",
+        "billing.payment_failed": "Subscription payment failed",
+        "billing.cancelled": "Cancelled subscription",
+        "loyalty.credit_grant": "Granted customer credit",
+        "loyalty.credit_deduct": "Deducted customer credit",
+        "branch.create": "Added branch",
+        "branch.update": "Updated branch",
+        "branch.disable": "Disabled branch",
+        "branch.enable": "Enabled branch",
+        "branch.delete": "Deleted branch",
+        "branch.switch": "Switched current branch"
+      }
+    },
+    "permissions": {
+      "labels": {
+        "view_dashboard": "Dashboard",
+        "view_inventory": "Inventory",
+        "view_sales": "Sales",
+        "view_customers": "Customers",
+        "view_expenses": "Expenses",
+        "view_returns": "Returns",
+        "view_insights": "Insights",
+        "view_settings": "Settings",
+        "view_suppliers": "Suppliers",
+        "view_purchases": "Purchases",
+        "manage_inventory": "Manage products (add / edit / delete)",
+        "record_sales": "Record sales",
+        "modify_sales": "Edit / void invoices",
+        "manage_returns": "Record returns",
+        "manage_expenses": "Manage expenses",
+        "manage_catalog": "Manage categories and brands",
+        "manage_suppliers": "Manage suppliers",
+        "manage_purchases": "Manage purchases (create / receive)",
+        "manage_whatsapp": "Shop & WhatsApp settings",
+        "manage_team": "Manage team",
+        "attendance_self_manual": "Manual attendance entry",
+        "manage_tasks": "Create and assign tasks",
+        "request_leave": "Submit leave requests",
+        "manage_leave": "Approve leave requests",
+        "view_activity_log": "View activity log"
+      },
+      "groups": {
+        "pages": "Page access",
+        "edit": "Edit permissions",
+        "suppliersPurchases": "Suppliers & purchases",
+        "tasksLeaves": "Tasks & leaves",
+        "audit": "Audit & monitoring",
+        "attendance": "Attendance"
+      }
+    },
+    "ui": {
+      "pagination": {
+        "range": "{start}–{end} of {total}",
+        "perPage": "{n} / page"
+      },
+      "empty": {
+        "products": "No products added yet. Start by adding one.",
+        "sales": "No sales recorded yet.",
+        "returns": "No returns yet."
+      },
+      "confirm": {
+        "confirm": "Confirm",
+        "cancel": "Cancel"
+      }
+    },
+    "whatsappInbox": {
+      "title": "WhatsApp",
+      "loading": "Loading…",
+      "notAllowed": "You don't have permission to view WhatsApp conversations.",
+      "selectHint": "Select a conversation to view messages.",
+      "tabs": {
+        "all": "All",
+        "unread": "Unread",
+        "archived": "Archived"
+      },
+      "list": {
+        "loading": "Loading…",
+        "errorPrefix": "Couldn't load conversations:",
+        "emptyAll": "No conversations yet. The first message from a customer will show up here.",
+        "emptyUnread": "No unread messages.",
+        "emptyArchived": "No archived conversations.",
+        "youPrefix": "You: ",
+        "loadMore": "Load more",
+        "loadingMore": "Loading…"
+      },
+      "thread": {
+        "back": "Back",
+        "archive": "Archive",
+        "restore": "Restore",
+        "loading": "Loading…",
+        "loadOlder": "Load older",
+        "loadingOlder": "…",
+        "emptyMessages": "No messages yet.",
+        "composerPlaceholder": "Type a message…",
+        "send": "Send",
+        "windowClosedError": "The 24-hour window is closed. Use an approved template.",
+        "outsideWindowHint": "Free-form messages aren't allowed now — use an approved template. ",
+        "manageTemplates": "Manage templates"
+      },
+      "windowState": {
+        "noChat": "Customer hasn't messaged yet — use a template",
+        "closed": "Conversation window closed — use a template",
+        "endingSoon": "Window closes within an hour — send quickly",
+        "openHours": "Window open ({h}h remaining)"
+      },
+      "relative": {
+        "now": "now",
+        "minutes": "{n}m ago",
+        "hours": "{n}h ago",
+        "days": "{n}d ago"
+      },
+      "messageTypes": {
+        "image": "[image]",
+        "document": "[document]",
+        "video": "[video]",
+        "audio": "[audio]",
+        "sticker": "[sticker]",
+        "location": "[location]",
+        "button_reply": "[button]",
+        "interactive_reply": "[interactive]",
+        "reaction": "[reaction]",
+        "template": "[template]",
+        "unknown": "[message]"
+      },
+      "messageStatus": {
+        "queued": "queued",
+        "sent": "sent",
+        "delivered": "delivered",
+        "read": "read",
+        "failed": "failed"
+      }
+    },
+    "tasks": {
+      "page": {
+        "title": "Tasks",
+        "heading": "Tasks",
+        "subhead": "Track tasks assigned to you and update their status as you start or complete them."
+      },
+      "status": {
+        "open": "Open",
+        "in_progress": "In progress",
+        "done": "Done",
+        "cancelled": "Cancelled"
+      },
+      "priority": {
+        "low": "Low",
+        "normal": "Normal",
+        "high": "Urgent"
+      },
+      "toolbar": {
+        "board": "Board",
+        "list": "List",
+        "newTask": "New task"
+      },
+      "card": {
+        "newBadge": "New",
+        "startAction": "Start",
+        "doneAction": "Mark done",
+        "reopenAction": "Reopen",
+        "editTitle": "Edit",
+        "deleteTitle": "Delete"
+      },
+      "empty": {
+        "loading": "Loading…",
+        "managerTitle": "No tasks yet",
+        "staffTitle": "No tasks assigned to you",
+        "managerHint": "Create tasks, assign them to staff, and set due dates. Staff get a notification as soon as the task is assigned.",
+        "staffHint": "Any task your manager assigns will show up here.",
+        "createButton": "Create task",
+        "columnEmpty": "Nothing here"
+      },
+      "openCount": "{n} open tasks",
+      "toast": {
+        "statusFailed": "Couldn't update status",
+        "statusSuccess": "Status updated",
+        "deleteFailed": "Couldn't delete",
+        "deleted": "Deleted",
+        "edited": "Changes saved",
+        "created": "Task created"
+      },
+      "delete": {
+        "title": "Delete task",
+        "message": "Delete \"{title}\"? This can't be undone.",
+        "confirm": "Delete"
+      },
+      "form": {
+        "editTitle": "Edit task",
+        "createTitle": "New task",
+        "titleLabel": "Title *",
+        "titlePlaceholder": "e.g. Restock the main display",
+        "descriptionLabel": "Description",
+        "descriptionPlaceholder": "Task details, steps…",
+        "assigneeLabel": "Assign to *",
+        "assigneePlaceholder": "Choose a staff member…",
+        "ownerSuffix": " (Owner)",
+        "priorityLabel": "Priority",
+        "dueDateLabel": "Due date",
+        "cancel": "Cancel",
+        "save": "Save",
+        "create": "Create",
+        "errors": {
+          "titleRequired": "Task title is required",
+          "assigneeRequired": "Choose an assignee",
+          "saveFailed": "Save failed"
+        }
+      }
+    },
+    "returns": {
+      "title": "Returns",
+      "monthLabel": "Returns this month"
+    },
+    "activity": {
+      "title": "Activity log",
+      "heading": "Activity log",
+      "subhead": "Every action that happens in the system — who added, edited, or deleted.",
+      "notAllowed": "You don't have permission to view the activity log.",
+      "filters": {
+        "fromLabel": "From date",
+        "toLabel": "To date",
+        "userLabel": "User",
+        "categoryLabel": "Category",
+        "allCategories": "All categories",
+        "allUsers": "All users",
+        "clear": "Clear",
+        "apply": "Apply"
+      },
+      "loading": "Loading…",
+      "loadMore": "Load more",
+      "errors": {
+        "loadFailed": "Couldn't load the log",
+        "loadMoreFailed": "Couldn't load more",
+        "generic": "Unknown error"
+      },
+      "empty": "No actions recorded in this period.",
+      "relative": {
+        "now": "Now",
+        "minutes": "{n}m ago",
+        "hours": "{n}h ago",
+        "days": "{n}d ago"
+      }
+    },
+    "customers": {
+      "title": "Customers",
+      "fallbackShopName": "our shop",
+      "diagnostics": {
+        "noneYetTitle": "No customers yet",
+        "noneYetBody": "You have {total} invoices in the system, but none of them has a customer name or phone recorded.",
+        "noneYetFix": "Fix: when recording a sale, type the customer's name or mobile number in the \"Customer\" fields before pressing \"Record sale\".",
+        "latestLabel": "Latest invoice (diagnostic):",
+        "missing": "(missing)",
+        "refreshHint": "If \"missing\" shows even though you filled the fields: the browser is loading an old copy of the app. Hard refresh: Ctrl+Shift+R (Windows) or Cmd+Shift+R (Mac), or open the page in incognito.",
+        "build": "build: {stamp}",
+        "linkedSummary": "Customer data attached to {n} of {total} invoices. The rest have no name/phone recorded."
+      },
+      "summary": {
+        "total": "Total customers",
+        "repeats": "Repeat customers",
+        "inactive": "Inactive",
+        "outstanding": "Unpaid on account"
+      },
+      "top5": {
+        "title": "Top 5 customers by spend",
+        "invoiceCount": "{n} invoices"
+      },
+      "search": {
+        "placeholder": "Search by name or mobile…"
+      },
+      "filter": {
+        "all": "All customers",
+        "repeat": "Repeat customers",
+        "inactive": "Inactive (60+ days)",
+        "outstanding": "Has on-account balance"
+      },
+      "sort": {
+        "prefix": "Sort: {label}",
+        "options": {
+          "ltv": "Highest spend",
+          "recent": "Most recent visit",
+          "invoices": "Most invoices",
+          "outstanding": "Highest unpaid balance",
+          "name": "Name"
+        }
+      },
+      "bulkInactive": "Message inactive customers",
+      "bulkInactiveTitle": "Copies all inactive numbers and opens WhatsApp on the first one",
+      "bulkInactiveMessage": "Hi! We've missed you at {shop}. Our new collection just arrived — come check it out 🌟",
+      "bulkInactiveClipboard": "{n} numbers:\n{phones}\n\nMessage:\n{message}",
+      "exportCsv": "Export CSV",
+      "count": "{n} customers",
+      "emptyNoSales": "No customers recorded yet. Add the name/phone when recording sales.",
+      "emptyNoResults": "No results",
+      "row": {
+        "repeatBadge": "Repeat",
+        "inactiveBadge": "Inactive ({n} days)",
+        "owedBadge": "On account {amount}",
+        "lifetime": "Lifetime spend",
+        "invoicesLabel": "Invoices",
+        "lastVisit": "Last visit: {date}",
+        "prefersLabel": "Prefers: {category}",
+        "showInvoices": "Show invoices",
+        "hide": "Hide",
+        "manageDebt": "Manage balance",
+        "openProfile": "Open profile",
+        "thanksTitle": "Thank-you message",
+        "thanksButton": "Thanks",
+        "thanksMessage": "Hi {name}! Thanks for shopping at {shop} ❤️ We look forward to seeing you again.",
+        "reminderTitle": "Payment reminder",
+        "reminderButton": "Reminder",
+        "reminderMessage": "Hi {name}, a friendly reminder of the {amount} balance you have at {shop}. Thank you!",
+        "newCollectionTitle": "New collection",
+        "newCollectionButton": "New collection",
+        "newCollectionMessage": "{name}! We just got a new collection of {category} at {shop}. Come check it out 🌟",
+        "defaultCategoryWord": "products",
+        "emptyInvoices": "No invoices",
+        "pieces": "{n} pcs",
+        "paidBadge": "Paid",
+        "deferredBadge": "On account",
+        "markPaidBusy": "…",
+        "markPaid": "Confirm payment"
+      }
+    },
+    "receiptDesigner": {
+      "title": "Receipt designer",
+      "subhead": "Drag any section to reorder it. Hover a section to reveal hide and edit icons.",
+      "logoAlt": "Logo",
+      "logoEmptyTitle": "No logo",
+      "logoEmptySubtitle": "(default used)",
+      "logoUpload": "Upload logo",
+      "logoChange": "Change logo",
+      "logoUploading": "Preparing…",
+      "logoRemove": "Remove logo",
+      "logoFormatHint": "PNG / JPEG / WebP / SVG — auto-resized so it prints sharply. Square aspect works best.",
+      "logoSizeLabel": "Logo size on receipt",
+      "logoSize": {
+        "hidden": "No logo",
+        "small": "Small",
+        "medium": "Medium",
+        "large": "Large"
+      },
+      "fontLabel": "Receipt font",
+      "fontSelected": "Selected ✓",
+      "fonts": {
+        "cairo": "A clear, readable receipt font",
+        "tajawal": "Modern font for headings and shop names",
+        "lemonada": "A playful, distinctive look for shops"
+      },
+      "previewLabel": "↓ Drag sections to reorder ↓",
+      "addCustom": "+ Custom text",
+      "restoreOrder": "Restore order",
+      "emptyReceipt": "Receipt is empty — add sections from \"Hidden sections\" below.",
+      "hiddenTitle": "Hidden sections",
+      "customPlaceholder": "Custom text",
+      "permanentDelete": "Delete permanently",
+      "blockLabels": {
+        "logo": "Logo",
+        "shopInfo": "Shop name and phone",
+        "purchaseDate": "Purchase date and time",
+        "items": "Invoice items",
+        "totals": "Totals",
+        "loyalty": "Points and credit",
+        "footer": "Footer (thank you + QR)"
+      },
+      "blockBody": {
+        "newTextDefault": "New text",
+        "customDeletedMark": "— Deleted text —",
+        "customEmpty": "Empty text",
+        "logoHidden": "— Logo hidden by size setting —",
+        "loyaltyDisabled": "— Loyalty not enabled —"
+      },
+      "drag": {
+        "dragLabel": "Drag to reorder",
+        "editLabel": "Edit text",
+        "deleteLabel": "Delete",
+        "deletePermTitle": "Delete permanently",
+        "hideLabel": "Hide",
+        "hideTitle": "Hide from receipt"
+      },
+      "editor": {
+        "title": "Edit custom text",
+        "done": "Done",
+        "placeholder": "Type any text you want on the receipt",
+        "align": {
+          "right": "Right",
+          "center": "Center",
+          "left": "Left"
+        },
+        "deletePermanently": "Delete this text permanently"
+      },
+      "errors": {
+        "unsupportedType": "File type not supported. Use PNG, JPEG, WebP, or SVG.",
+        "tooLarge": "File too large (over {n}MB). Try a smaller image.",
+        "svgTooLarge": "SVG too large. Try a simplified version.",
+        "readFailed": "Couldn't read the image. Try another file.",
+        "processFailed": "Couldn't process the image. Try another file."
+      }
+    },
+    "teamAdmin": {
+      "fallbackSlug": "yourstore",
+      "toolbar": {
+        "handleTooltip": "Change the store login handle",
+        "handleHint": "— staff login URL",
+        "addEmployee": "New employee"
+      },
+      "list": {
+        "title": "Staff",
+        "loading": "Loading…",
+        "countOne": "account",
+        "countMany": "accounts",
+        "emptyTitle": "No staff added yet",
+        "emptyHint": "Create an account for each staff member to grant them access to the system and let them record sales and attendance.",
+        "addFirst": "Add first employee"
+      },
+      "role": {
+        "owner": "Owner",
+        "staff": "Staff",
+        "mustChange": "Must change password"
+      },
+      "row": {
+        "edit": "Edit",
+        "editDetailsTitle": "Edit details",
+        "permissions": "Permissions",
+        "close": "Close",
+        "resetPassword": "Reset password",
+        "deleteTitle": "Delete",
+        "savePermissions": "Save permissions"
+      },
+      "toast": {
+        "loadFailed": "Couldn't load",
+        "memberAdded": "Staff added",
+        "edited": "Changes saved",
+        "deleted": "Deleted",
+        "deleteFailed": "Couldn't delete",
+        "shortPassword": "Password must be at least 8 characters",
+        "resetFailed": "Couldn't reset",
+        "renameSuccess": "Login handle changed — let your staff know the new address",
+        "renameFailed": "Couldn't change",
+        "savePermsSuccess": "Permissions saved",
+        "saveFailed": "Save failed"
+      },
+      "credModal": {
+        "title": "Staff login credentials",
+        "intro": "Save these now or send them to the employee — the password won't be shown again.",
+        "loginLabel": "Login",
+        "passwordLabel": "Password",
+        "verifyTitle": "Verify the credentials work",
+        "verifyButton": "Test sign-in",
+        "verifyIdle": "Tries the credentials on the server and tells you whether they'd work.",
+        "verifyFail": "Sign-in failed",
+        "networkError": "Network error",
+        "copyBoth": "Copy both",
+        "copied": "Copied",
+        "done": "Done",
+        "copy": "Copy"
+      },
+      "resetModal": {
+        "title": "Reset password",
+        "intro": "{name} will be asked to change the password on next sign-in.",
+        "loginLabel": "Login",
+        "newPasswordLabel": "New password",
+        "newPasswordPlaceholder": "At least 8 characters",
+        "cancel": "Cancel",
+        "confirm": "Set password"
+      },
+      "deleteModal": {
+        "title": "Delete employee",
+        "intro": "Delete {name}?",
+        "warning": "{login} won't be able to sign in anymore. This can't be undone.",
+        "cancel": "Cancel",
+        "confirm": "Delete"
+      },
+      "renameModal": {
+        "title": "Store login handle",
+        "intro": "Your staff sign in as {pattern}. Changing it updates every staff member's address automatically.",
+        "newLabel": "New handle",
+        "currentLabel": "Current:",
+        "cancel": "Cancel",
+        "save": "Save"
+      }
+    },
+    "employeeForm": {
+      "editTitle": "Edit employee",
+      "createTitle": "Add new employee",
+      "basicSection": "Employee info",
+      "nameLabel": "Name *",
+      "namePlaceholder": "Ahmed Mohamed",
+      "usernameLabel": "Username *",
+      "usernamePlaceholder": "ahmed",
+      "usernameLabelDisabled": "Username",
+      "passwordLabel": "Temporary password *",
+      "passwordPlaceholder": "At least 8 characters — staff changes it on first sign-in",
+      "identitySection": "Identity & contact",
+      "phoneLabel": "Phone *",
+      "phonePlaceholder": "01012345678",
+      "nationalIdLabel": "National ID *",
+      "nationalIdPlaceholder": "14 digits",
+      "addressLabel": "Address *",
+      "addressPlaceholder": "City, street, building number",
+      "photosSection": "Photos (optional)",
+      "profilePhotoLabel": "Profile photo",
+      "idPhotoLabel": "National ID photo",
+      "branchSection": "Branch",
+      "branchHint": "Pick the branch this employee works at. They'll only see this branch's data on sign-in.",
+      "branchPlaceholder": "Choose a branch…",
+      "branchPrimarySuffix": " (Primary)",
+      "permissionsSection": "Permissions",
+      "cancel": "Cancel",
+      "saveChanges": "Save changes",
+      "addEmployee": "Add employee",
+      "errors": {
+        "nameRequired": "Employee name is required",
+        "credentialsRequired": "Username and a password of at least 8 characters are required",
+        "identityRequired": "Phone, national ID, and address are required",
+        "uploadFailed": "Couldn't upload the photo",
+        "saveFailed": "Save failed",
+        "addFailed": "Couldn't add"
+      }
+    },
+    "photoUpload": {
+      "dropHint": "Drop the image here or click to choose",
+      "fileTypeHint": "JPG / PNG / WebP — up to 3MB",
+      "changeAria": "Change image",
+      "uploadAria": "Upload image",
+      "change": "Change",
+      "choose": "Choose image",
+      "delete": "Delete"
+    },
+    "branchesPage": {
+      "title": "Branches",
+      "shellTitle": "Branches",
+      "loading": "Loading…",
+      "heading": "Branches",
+      "subhead": "Multiple branches let you track sales and inventory per location.",
+      "add": "Add branch",
+      "editTitle": "Edit branch",
+      "newTitle": "New branch",
+      "nameLabel": "Branch name",
+      "namePlaceholder": "e.g. Maadi branch",
+      "phoneLabel": "Phone number",
+      "addressLabel": "Address",
+      "addressPlaceholder": "Street X, neighborhood Y…",
+      "cancel": "Cancel",
+      "saveChanges": "Save changes",
+      "create": "Create",
+      "empty": "No branches.",
+      "labels": {
+        "primary": "Primary",
+        "current": "Current branch",
+        "suspended": "Suspended"
+      },
+      "actions": {
+        "open": "Open",
+        "edit": "Edit",
+        "suspend": "Suspend branch",
+        "activate": "Activate branch",
+        "delete": "Delete"
+      },
+      "confirmDelete": "Delete branch \"{name}\"? The operation will be refused if the branch has data (sales/expenses/inventory).",
+      "toast": {
+        "nameRequired": "Branch name is required",
+        "saveFailed": "Save failed",
+        "created": "Branch created",
+        "edited": "Changes saved",
+        "genericError": "Something went wrong",
+        "primarySuspend": "Can't suspend the primary branch",
+        "updateFailed": "Update failed",
+        "suspended": "Branch suspended",
+        "activated": "Branch activated",
+        "primaryDelete": "Can't delete the primary branch",
+        "deleteFailed": "Delete failed",
+        "deleted": "Branch deleted",
+        "switchFailed": "Couldn't switch branch"
+      }
+    },
+    "accountSecurity": {
+      "title": "Security",
+      "staffNotice": "Two-factor authentication is available to the store owner only in this version.",
+      "heading": "Two-factor authentication (2FA)",
+      "subhead": "An extra layer of protection on top of your password — an authenticator app on your phone generates a 6-digit code that changes every 30 seconds.",
+      "statusOffLine": "Current status: ",
+      "statusOff": "Disabled",
+      "statusOnLine": "2FA status: ",
+      "statusOn": "Enabled",
+      "enableButton": "Enable two-factor authentication",
+      "enrollStep1": "1) Open an authenticator app on your phone (Google Authenticator / Microsoft Authenticator / Authy), then choose \"Add account → Scan code\":",
+      "qrAlt": "Two-factor authentication QR",
+      "manualSummary": "Can't scan? Enter it manually",
+      "manualHint": "In the authenticator app, choose \"Add account → Manual entry\" and paste this key:",
+      "linkHint": "Or on the same device, tap the link to add the account directly:",
+      "enrollStep2": "2) Enter the 6-digit code your app shows now:",
+      "cancel": "Cancel",
+      "confirmEnroll": "Confirm activation",
+      "codesHeading": "Save these recovery codes in a safe place — they won't be shown again. Each code works once and unlocks your account if you lose your phone.",
+      "codesUnderstood": "Got it, saved them",
+      "regenerateHeading": "Regenerate recovery codes",
+      "regenerate": "Regenerate codes",
+      "currentPasswordPlaceholder": "Current password",
+      "codePlaceholder": "App code (6 digits)",
+      "disableHeading": "Disable two-factor authentication",
+      "disableHint": "This weakens your account protection. Only do this if you're sure.",
+      "disableButton": "Disable (uses the same password + code above)",
+      "errors": {
+        "startFailed": "Couldn't start activation",
+        "unexpected": "Unexpected error",
+        "badCode": "Invalid code",
+        "enableFailed": "Couldn't enable",
+        "badPassword": "Wrong password",
+        "notEnrolled": "2FA isn't enabled",
+        "disableFailed": "Couldn't disable",
+        "regenerateFailed": "Couldn't regenerate"
+      },
+      "delete": {
+        "title": "Delete store permanently",
+        "intro": "Deletes all data (products, sales, staff, logs) after a 30-day grace period. You can cancel during that window.",
+        "scheduledLabel": "Scheduled deletion:",
+        "cancelButton": "Cancel deletion",
+        "confirmHint": "To confirm, type the store slug as it appears in the login URL:",
+        "slugPlaceholder": "my-store",
+        "startButton": "Start deletion (30 days)",
+        "errors": {
+          "slugMismatch": "Store slug doesn't match",
+          "forbidden": "Not allowed",
+          "genericError": "Couldn't schedule"
+        }
+      },
+      "export": {
+        "title": "Download a copy of your store data",
+        "intro": "A JSON file with every table belonging to this store (products, sales, staff, logs…). Downloaded directly to your device.",
+        "button": "Download data",
+        "error": "Download failed. Try again later."
+      },
+      "revoke": {
+        "title": "Sign out of all devices",
+        "intro": "Ends every session for this account immediately, including the current one. Useful if you lost a device or suspect your account is compromised.",
+        "button": "Sign out everywhere"
+      }
+    },
+    "changePassword": {
+      "title": "Change password",
+      "mustChange": "You must change your password before continuing",
+      "current": "Current password",
+      "new": "New password",
+      "newPlaceholder": "At least 8 characters",
+      "confirm": "Confirm new password",
+      "submit": "Save",
+      "tooShort": "The new password must be at least 8 characters",
+      "mismatch": "Passwords don't match",
+      "genericError": "Couldn't change password",
+      "success": "Password changed"
+    },
+    "settingsPage": {
+      "title": "Settings",
+      "loading": "Loading…",
+      "save": "Save settings",
+      "dirty": "You have unsaved changes",
+      "clean": "No changes",
+      "toast": {
+        "saveSuccess": "Settings saved",
+        "saveFailed": "Save failed",
+        "needPhone": "Enter a phone number to test",
+        "needGreenCreds": "Enter instanceId and apiToken first",
+        "needCloudCreds": "Enter Phone Number ID and the token first",
+        "sendOk": "Sent (id: {id})",
+        "sendFailed": "Send failed",
+        "connectOk": "WhatsApp connected",
+        "connectOkDetail": "WhatsApp connected — {detail}",
+        "connectFailed": "Couldn't complete WhatsApp connection",
+        "healthOk": "Connection healthy",
+        "healthFailed": "Health check failed",
+        "confirmDisconnect": "Disconnect WhatsApp? You can reconnect later.",
+        "disconnected": "Disconnected",
+        "disconnectFailed": "Couldn't disconnect",
+        "templatesSynced": "Templates updated — {n} templates",
+        "templatesSyncedFrom": "Templates updated — {n} of {total}"
+      },
+      "branches": {
+        "title": "Branches",
+        "countOne": "branch",
+        "countMany": "branches",
+        "hintOne": "Add a new branch to track sales and inventory per location.",
+        "hintMany": "Manage branches, disable or delete a branch, and update location data."
+      },
+      "loyalty": {
+        "title": "Loyalty programme",
+        "subtitle": "Customer points and credit — each branch has its own programme.",
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "pointsPerEgp": "Points per EGP spent",
+        "pointsPerEgpPlaceholder": "e.g. 0.1 = 1 point per 10 EGP",
+        "egpPerPoint": "Value per point (EGP)",
+        "egpPerPointPlaceholder": "e.g. 0.1 = 1 point worth 10 piasters",
+        "exampleLabel": "Example:",
+        "exampleBody": "A <b>100 EGP</b> invoice earns <b>{earned}</b> points worth <b>{value}</b> off a future invoice.",
+        "exampleWarning": "⚠ Points won't be earned or redeemed until at least one rate is set."
+      },
+      "receiptLogoSize": {
+        "hidden": "No logo",
+        "small": "Small",
+        "medium": "Medium (default)",
+        "large": "Large"
+      },
+      "receiptLanguage": {
+        "ar": "العربية",
+        "en": "English",
+        "bilingual": "Bilingual",
+        "arHint": "الإجمالي، الخصم، شكراً…",
+        "enHint": "TOTAL, DISCOUNT, THANK YOU…",
+        "bilingualHint": "TOTAL · الإجمالي"
+      },
+      "receiptCard": {
+        "heading": "Receipt customisation",
+        "subhead": "Look and language of the printed receipt — each branch has its own settings.",
+        "logoSize": "Logo size",
+        "logoHint": "If your thermal printer renders the logo poorly, choose \"Small\" or \"No logo\".",
+        "language": "Label language",
+        "footerLabel": "Receipt footer text (optional)",
+        "footerPlaceholder": "e.g. Returns within 7 days with the invoice. Follow us on Instagram @yourshop",
+        "footerCount": "{n}/500 — shown under \"Thank you for shopping\".",
+        "showLoyalty": "Show points and credit on the receipt",
+        "showLoyaltyHint": "Prints \"points earned\" and \"wallet balance\" — the strongest nudge for using the loyalty programme. Requires the loyalty programme to be enabled.",
+        "previewLabel": "↓ Preview ↓"
+      },
+      "whatsapp": {
+        "section": "WhatsApp settings",
+        "autoOpen": "Automatically send invoices via WhatsApp",
+        "autoOpenHint": "When you record a sale for a customer with a mobile number, the app opens WhatsApp with the invoice + a thank-you message ready. You just press \"Send\"."
+      },
+      "greenApi": {
+        "section": "Green API — fully automatic sending",
+        "stepsTitle": "Setup steps:",
+        "step1Prefix": "Open an account at ",
+        "step2": "Create a new Instance",
+        "step3": "From the Instance screen, copy the idInstance and apiTokenInstance and paste them into the fields below",
+        "step4": "Scan the QR from the shop phone's WhatsApp once to link the account",
+        "step5": "Enable the option, press \"Save settings\", then try sending from the test section",
+        "warning": "<strong>Heads-up:</strong> Green API uses the unofficial WhatsApp Web protocol. Normal store usage is safe, but bulk or rapid messaging can get the number blocked.",
+        "enable": "Enable automatic sending via Green API",
+        "enableHint": "When enabled, invoices are sent in the background — no tab opens.",
+        "sendAsPdf": "Send invoice as a PDF file instead of a link",
+        "sendAsPdfHint": "When enabled, the customer receives the invoice as a PDF attachment on WhatsApp (with the message text as a caption). Cleaner and more professional than a link. Requires Green API enabled.",
+        "instanceLabel": "idInstance",
+        "tokenLabel": "apiTokenInstance",
+        "tokenPlaceholder": "••••••••••••••••",
+        "urlLabel": "apiUrl (optional — from the Green API screen)",
+        "testHeading": "Test send",
+        "testButton": "Send test",
+        "testHint": "Sends a short \"🧪 test message\" to verify the connection. Save settings after a successful test.",
+        "testMessage": "🧪 Test message from {shop}\nDate: {date}"
+      },
+      "cloudApi": {
+        "section": "WhatsApp Cloud API — Meta's official channel",
+        "checkingConnection": "Checking connection…",
+        "connected": "WhatsApp account connected",
+        "modeLive": "Production",
+        "modeSandbox": "Sandbox",
+        "webhookPending": "Webhook pending",
+        "webhookPendingTitle": "Webhook subscription isn't active yet",
+        "connectedAt": "Connected: {date}",
+        "errorFallback": "Connection alert — review the details.",
+        "reconnect": "Reconnect now",
+        "retry": "Retry",
+        "healthCheck": "Check connection",
+        "reconnectShort": "Reconnect",
+        "disconnect": "Disconnect",
+        "notConnected": "WhatsApp not connected yet",
+        "connectIntro": "Press \"Connect WhatsApp\" to open Meta Embedded Signup. You'll pick a WhatsApp Business account, add/verify a number, approve permissions, and we'll save the token encrypted automatically — no manual copy-paste.",
+        "connectButton": "Connect WhatsApp",
+        "toggleManualShow": "Or manual token setup (temporary)",
+        "toggleManualHide": "Hide manual setup",
+        "lastError": "Last error: {message}",
+        "manualStepsTitle": "Setup steps:",
+        "manualSteps": {
+          "step1": {
+            "prefix": "Create an account at ",
+            "linkText": "Meta Business Manager",
+            "suffixHtml": " and create a <b>WhatsApp Business Account</b> (WABA)"
+          },
+          "step2": {
+            "prefix": "In ",
+            "linkText": "Meta for Developers",
+            "suffixHtml": " create an app of type <code class=\"bg-white px-1 rounded\">Business</code> and add the <code class=\"bg-white px-1 rounded\">WhatsApp</code> product"
+          },
+          "step3Html": "From the WhatsApp &gt; API Setup screen, attach the shop's number (Add phone number) and verify it via SMS/call",
+          "step4Html": "Copy the <code class=\"bg-white px-1 rounded\">Phone number ID</code> and paste it in the field below (it's not the mobile number — the ID is a 15–17 digit number)",
+          "step5": {
+            "prefix": "Create a ",
+            "linkText": "permanent System User Token",
+            "suffixHtml": " with the <code class=\"bg-white px-1 rounded\">whatsapp_business_messaging</code> and <code class=\"bg-white px-1 rounded\">whatsapp_business_management</code> scopes, and paste it in the Access Token field (the temporary 24-hour token won't work in production)"
+          },
+          "step6": "Enable the option and press \"Save settings\", then test sending from the test box"
+        },
+        "manualNotes": {
+          "windowHtml": "Meta only allows free-form messages within a <b>24-hour window</b> after the customer's first message.",
+          "pdf": "PDF sending works either way (inside or outside the window) when the attachment is part of an approved template.",
+          "official": "The channel is official and stable — it won't expose your number to bans the way Green API might."
+        },
+        "manualImportantNotes": "<strong>Important notes:</strong>",
+        "manualEnable": "Enable automatic sending via WhatsApp Cloud API",
+        "manualEnableHint": "When enabled, invoices send in the background via the official channel. If both Green API and Cloud API are enabled, the app uses Cloud API.",
+        "phoneIdLabel": "Phone Number ID",
+        "tokenLabel": "Access Token (System User)",
+        "businessIdLabel": "WhatsApp Business Account ID (optional)",
+        "testHeading": "Test send",
+        "testButton": "Send test",
+        "testHint": "If you see \"Recipient phone number not in allowed list\", you're still in sandbox — add the recipient from the API Setup screen or get the app approved to exit sandbox.",
+        "errorState": {
+          "token_expired": "Token expired. Press \"Reconnect\" to issue a new one.",
+          "token_revoked": "Token was revoked by Meta. Press \"Reconnect\" to re-authenticate.",
+          "scope_missing": "Token is missing required scopes. Reconnect and approve all permissions.",
+          "phone_unverified": "The phone number isn't verified on Meta. Finish verification in Business Manager.",
+          "waba_inaccessible": "Couldn't reach the WhatsApp Business account. Check permissions or reconnect.",
+          "network": "Couldn't reach Meta temporarily. Try again in a moment."
+        }
+      },
+      "templates": {
+        "section": "Message templates (Meta)",
+        "subhead": "Only approved templates can be used to send outside the 24-hour window. Approve templates in Meta Business Manager, then press sync here.",
+        "syncButton": "Sync from Meta",
+        "loading": "Loading…",
+        "empty": "No templates saved yet. Create them in Meta Business Manager and press \"Sync from Meta\".",
+        "receiptTitle": "Receipt template (optional)",
+        "receiptHint": "If a template is selected, the app sends the receipt as a Meta-approved template message instead of a PDF — which works even outside the 24-hour window. The template must have 4 body variables in this order:",
+        "receiptVarCustomer": "Customer name",
+        "receiptVarInvoice": "Invoice code",
+        "receiptVarTotal": "Total",
+        "receiptVarProducts": "Product names",
+        "noTemplate": "— No template (PDF by default) —",
+        "clear": "Clear"
+      },
+      "shopInfo": {
+        "section": "Shop info",
+        "shopNameLabel": "Shop name",
+        "phoneLabel": "Shop WhatsApp number",
+        "phoneHint": "Used in message signatures and the tel: link on customer invoices."
+      },
+      "messageTemplate": {
+        "section": "Message template",
+        "resetDefault": "Restore default",
+        "varsHint": "Available variables (click to insert):",
+        "previewLabel": "Preview (with sample data):",
+        "vars": {
+          "customerName": "Customer name",
+          "customerPhone": "Customer phone",
+          "invoiceId": "Full invoice ID",
+          "invoiceCode": "Last 8 chars of the invoice ID",
+          "totalPrice": "Invoice total",
+          "productNames": "Product names (comma-separated)",
+          "receiptLink": "Receipt link",
+          "date": "Sale date",
+          "shopName": "Shop name",
+          "shopPhone": "Shop phone"
+        },
+        "sampleCustomer": "Amr Sami",
+        "sampleProducts": "Naviforce watch, Ray-Ban sunglasses"
+      }
+    },
+    "team": {
+      "pageTitle": {
+        "manager": "Team",
+        "staff": "Leaves"
+      },
+      "heading": {
+        "manager": "Team",
+        "staff": "Leaves"
+      },
+      "tabs": {
+        "team": "Team & permissions",
+        "attendance": "Attendance",
+        "payroll": "Payroll",
+        "leaves": "Leaves",
+        "settings": "Attendance settings"
+      },
+      "tabDescriptions": {
+        "team": "Add staff, set their permissions, and manage their profiles and photos.",
+        "attendance": "Track check-ins and check-outs throughout the day.",
+        "payroll": "Manage fixed salaries, hourly rates, and earnings.",
+        "leaves": "Leave requests — submit and approve them.",
+        "settings": "Work hours, weekend days, overtime multiplier, and store locations."
+      },
+      "selfCheckIn": {
+        "checkedIn": "You're checked in",
+        "checkInTitle": "Clock in",
+        "sinceLabel": "Checked in since {time}",
+        "lastCheckoutLabel": "Last checkout: {time}",
+        "notYetToday": "You haven't clocked in yet today",
+        "checkOut": "Check out",
+        "checkIn": "Check in",
+        "manualButton": "Manual entry",
+        "needsLocation": "Requires location",
+        "toast": {
+          "geoFailed": "Couldn't read your location — make sure location services are enabled",
+          "saveFailed": "Couldn't record",
+          "checkedIn": "Checked in",
+          "checkedOut": "Checked out"
+        }
+      },
+      "roster": {
+        "loading": "Loading…",
+        "loadFailed": "Couldn't load",
+        "empty": "Add staff from \"Team & permissions\" first.",
+        "todayHeading": "Today's attendance",
+        "pill": {
+          "present": "Present {n}",
+          "out": "Out {n}",
+          "absent": "Absent {n}",
+          "review": "Needs review {n}"
+        },
+        "status": {
+          "notYet": "Not in yet",
+          "checkedInAt": "In at {time}",
+          "checkedOutAt": "Out at {time}"
+        },
+        "action": {
+          "checkIn": "Check in",
+          "checkOut": "Check out"
+        },
+        "toast": {
+          "saveFailed": "Couldn't record",
+          "checkedIn": "Checked in",
+          "checkedOut": "Checked out"
+        }
+      },
+      "dayEvents": {
+        "title": "{name}'s log",
+        "loading": "Loading…",
+        "empty": "No events.",
+        "event": {
+          "checkIn": "Check in",
+          "checkOut": "Check out",
+          "needsReview": "· Needs review"
+        },
+        "source": {
+          "manager_attest": "Recorded by manager",
+          "geofence": "Geolocation",
+          "qr": "QR",
+          "manual": "Manual"
+        },
+        "action": {
+          "clearReview": "Resolve review",
+          "edit": "Edit",
+          "delete": "Delete"
+        },
+        "toast": {
+          "loadFailed": "Couldn't load",
+          "deleteFailed": "Couldn't delete",
+          "updateFailed": "Couldn't update"
+        }
+      },
+      "editEvent": {
+        "title": "Edit event",
+        "typeLabel": "Type",
+        "timeLabel": "Time",
+        "noteLabel": "Note (optional)",
+        "notePlaceholder": "Reason for the change…",
+        "checkIn": "Check in",
+        "checkOut": "Check out",
+        "cancel": "Cancel",
+        "save": "Save",
+        "saveFailed": "Couldn't save",
+        "saveSuccess": "Saved"
+      },
+      "attendanceSettings": {
+        "loading": "Loading…",
+        "workHoursSection": "Work hours and days off",
+        "fields": {
+          "workHoursPerDay": "Work hours per day",
+          "overtimeMultiplier": "Overtime pay multiplier",
+          "graceMinutesLate": "Grace minutes for lateness"
+        },
+        "weekend": {
+          "label": "Weekend days (their hours count as overtime)",
+          "days": {
+            "sun": "Sunday",
+            "mon": "Monday",
+            "tue": "Tuesday",
+            "wed": "Wednesday",
+            "thu": "Thursday",
+            "fri": "Friday",
+            "sat": "Saturday"
+          }
+        },
+        "saveSettings": "Save settings",
+        "locations": {
+          "title": "Store locations",
+          "intro": "When staff clock in from their phones, we verify they're inside one of these locations. Add at least one to enable geolocation check-ins.",
+          "deleteAria": "Delete location",
+          "addHeading": "Add location",
+          "nameLabel": "Location name",
+          "namePlaceholder": "Main branch",
+          "linkLabel": "Google Maps link",
+          "linkPlaceholder": "https://maps.google.com/...  or  30.044420, 31.235712",
+          "linkHelp": "In Google Maps, right-click the spot → copy the coordinates, or share the link and paste it here.",
+          "resolvingShort": "Resolving short link…",
+          "parseFailed": "Couldn't read coordinates from the text.",
+          "radiusLabel": "Radius (meters)",
+          "useMyLocation": "Use my current location",
+          "addButton": "Add"
+        },
+        "footnote": "These settings drive overtime calculation and check-in validation. Changes apply from the next day onwards and don't affect already-saved periods.",
+        "toast": {
+          "loadSettingsFailed": "Couldn't load settings",
+          "loadLocationsFailed": "Couldn't load locations",
+          "loadFailed": "Couldn't load",
+          "saveFailed": "Couldn't save",
+          "saveSuccess": "Settings saved",
+          "geoUnsupported": "This browser doesn't support geolocation",
+          "geoDenied": "Couldn't read your location — check permissions",
+          "nameRequired": "Enter a location name",
+          "coordsRequired": "Paste a Google Maps link or coordinates (e.g. 30.044, 31.235)",
+          "addFailed": "Couldn't add",
+          "addSuccess": "Location added",
+          "deleteFailed": "Couldn't delete",
+          "shortLinkFailed": "Couldn't open the short link",
+          "shortLinkNetwork": "Couldn't reach the service to open the link"
+        }
+      },
+      "compensation": {
+        "ownerOnly": "Payroll management is available to the store owner only.",
+        "loading": "Loading…",
+        "empty": "Add staff from \"Team & permissions\" first.",
+        "listHeading": "Staff salaries",
+        "noCompensation": "No salary set yet",
+        "hide": "Hide",
+        "edit": "Edit",
+        "form": {
+          "payType": "Pay type",
+          "payTypes": {
+            "fixed": "Fixed monthly salary",
+            "hourly": "Hourly only",
+            "hybrid": "Base + hourly overtime"
+          },
+          "baseSalary": "Monthly base salary (EGP)",
+          "baseSalaryPlaceholder": "3000",
+          "hourlyRate": "Hourly rate (EGP)",
+          "hourlyRatePlaceholder": "25",
+          "standardHours": "Hours covered by the base salary / month",
+          "standardHoursPlaceholder": "180",
+          "effectiveFrom": "Effective from",
+          "save": "Save update",
+          "historyHeading": "Change history"
+        },
+        "summary": {
+          "fixed": "Monthly salary {amount}",
+          "hourly": "{amount} / hour",
+          "hybrid": "Base {base} + {hourly}/hour"
+        },
+        "period": {
+          "heading": "Payroll summary — {label}",
+          "exportCsv": "Export CSV",
+          "loading": "Calculating…",
+          "noStaff": "No staff yet.",
+          "stats": {
+            "headcount": "Headcount",
+            "grossTotal": "Total gross",
+            "regularHours": "Regular hours",
+            "overtimeHours": "Overtime hours"
+          },
+          "reviewNotice": "There are <strong>{n}</strong> periods that need review (missed checkout). Resolve them from the \"Attendance\" tab before finalizing payroll."
+        },
+        "toast": {
+          "loadFailed": "Couldn't load",
+          "loadTeamFailed": "Couldn't load team",
+          "saveFailed": "Couldn't save",
+          "saveSuccess": "Salary saved"
+        }
+      }
+    },
+    "leave": {
+      "status": {
+        "pending": "Awaiting response",
+        "approved": "Approved",
+        "rejected": "Rejected"
+      },
+      "tab": {
+        "pendingCount": "{n} pending requests",
+        "request": "Request leave",
+        "loading": "Loading…",
+        "emptyTitle": "No leave requests",
+        "emptyManager": "Staff requests will appear here as they're submitted.",
+        "emptyEmployee": "Submit your first leave request — your manager will see it and you'll be notified of the decision.",
+        "newRequest": "New request",
+        "daysSuffix": "({n} days)",
+        "reasonLabel": "Reason:",
+        "noteLabel": "Note:",
+        "decisionBy": "Decided by {name} · {date}",
+        "anonymousEmployee": "Staff",
+        "approve": "Approve",
+        "reject": "Reject",
+        "deleteTitle": "Delete",
+        "deleteDialog": {
+          "title": "Delete request",
+          "message": "Permanently delete this request?",
+          "confirm": "Delete"
+        },
+        "decision": {
+          "approveTitle": "Approve request",
+          "rejectTitle": "Reject request",
+          "noteOptional": "Note (optional)",
+          "cancel": "Cancel",
+          "approveButton": "Approve",
+          "rejectButton": "Reject"
+        },
+        "toast": {
+          "submitFailed": "Couldn't submit",
+          "submitted": "Request submitted",
+          "saveFailed": "Save failed",
+          "approved": "Approved",
+          "rejected": "Rejected",
+          "deleteFailed": "Couldn't delete",
+          "deleted": "Deleted"
+        }
+      },
+      "form": {
+        "title": "New leave request",
+        "from": "From",
+        "to": "To",
+        "reasonLabel": "Reason (optional)",
+        "reasonPlaceholder": "e.g. family matter, travel…",
+        "cancel": "Cancel",
+        "submit": "Submit request"
+      },
+      "range": {
+        "separator": " – "
+      }
+    },
+    "suppliers": {
+      "title": "Suppliers",
+      "list": {
+        "heading": "Suppliers",
+        "count": "{n} suppliers",
+        "outstanding": "Total outstanding: {amount}",
+        "add": "Add supplier",
+        "searchPlaceholder": "Search by name, phone, or email",
+        "loading": "Loading…",
+        "empty": "No suppliers yet.",
+        "noResults": "No matching results.",
+        "owedLabel": "Owed: {amount}",
+        "editTitle": "Edit",
+        "deleteTitle": "Delete",
+        "deleteDialog": {
+          "title": "Delete supplier",
+          "message": "Delete supplier \"{name}\"? This can't be undone.",
+          "confirm": "Delete"
+        },
+        "toast": {
+          "deleted": "Supplier deleted",
+          "deleteFailed": "Couldn't delete",
+          "added": "Supplier added",
+          "edited": "Changes saved"
+        }
+      },
+      "detail": {
+        "title": "Supplier",
+        "loading": "Loading…",
+        "notFound": "Supplier not found.",
+        "backToList": "Back to suppliers",
+        "edit": "Edit",
+        "stats": {
+          "balance": "Current balance owed",
+          "totalPurchases": "Total purchases",
+          "totalPayments": "Total payments"
+        },
+        "notes": "Notes",
+        "purchaseOrders": "Purchase orders",
+        "purchaseOrdersEmpty": "No purchase orders for this supplier yet.",
+        "itemCount": "{n} items",
+        "payments": "Payments",
+        "paymentsEmpty": "No payments recorded. Add one from the Expenses page using the \"Supplier\" category.",
+        "toast": {
+          "edited": "Changes saved"
+        }
+      },
+      "form": {
+        "createTitle": "New supplier",
+        "editTitle": "Edit supplier",
+        "name": "Name *",
+        "phone": "Phone number",
+        "email": "Email",
+        "address": "Address",
+        "notes": "Notes",
+        "cancel": "Cancel",
+        "save": "Save",
+        "add": "Add",
+        "saving": "Saving…",
+        "errors": {
+          "saveFailed": "Save failed"
+        }
+      },
+      "picker": {
+        "label": "Supplier (optional)",
+        "placeholder": "Choose a supplier…",
+        "clearAria": "Clear supplier",
+        "search": "Search by name or phone",
+        "noResults": "No results",
+        "empty": "No suppliers yet",
+        "addNew": "Add new supplier"
+      }
+    },
+    "purchasesStatus": {
+      "draft": "Draft",
+      "received": "Received",
+      "cancelled": "Cancelled"
+    },
+    "purchases": {
+      "title": "Purchases",
+      "heading": "Purchases",
+      "count": "{n} purchase orders shown",
+      "newOrder": "New purchase order",
+      "loading": "Loading…",
+      "emptyFresh": "No purchase orders yet.",
+      "emptyFiltered": "No purchase orders match these filters.",
+      "loadingPayments": "Loading payments…",
+      "noPayments": "No payments recorded yet.",
+      "kpi": {
+        "received": "Received orders ({range})",
+        "totalPurchases": "Total purchases",
+        "paid": "Paid",
+        "remaining": "Owed to suppliers",
+        "avg": "Average order"
+      },
+      "filters": {
+        "searchPlaceholder": "Search by supplier or note…",
+        "clear": "Clear",
+        "all": "All",
+        "drafts": "Drafts",
+        "received": "Received",
+        "cancelled": "Cancelled",
+        "allSuppliers": "All suppliers",
+        "paymentStatus": {
+          "all": "All payments",
+          "unpaid": "Unpaid",
+          "partial": "Partially paid",
+          "paid": "Fully paid"
+        }
+      },
+      "row": {
+        "itemCount": "{n} items",
+        "total": "Total: {amount}",
+        "paid": "Paid: {amount}",
+        "remaining": "Remaining: {amount}",
+        "received": "Received {date}",
+        "ordered": "Ordered {date}",
+        "pay": "Pay",
+        "receive": "Receive",
+        "cancel": "Cancel",
+        "deleteTitle": "Delete"
+      },
+      "paymentBadge": {
+        "paid": "Paid",
+        "partial": "Partial",
+        "unpaid": "Unpaid"
+      },
+      "actions": {
+        "receive": {
+          "title": "Receive purchase order",
+          "message": "Quantities will be added to inventory and the amount will be recorded as owed to the supplier. Continue?",
+          "confirm": "Receive"
+        },
+        "cancel": {
+          "title": "Cancel purchase order",
+          "message": "This order will be cancelled. Inventory won't be affected. Are you sure?",
+          "confirm": "Cancel order"
+        },
+        "delete": {
+          "title": "Delete purchase order",
+          "message": "This order will be permanently deleted and cannot be recovered.",
+          "confirm": "Delete"
+        },
+        "deletePayment": {
+          "title": "Reverse payment",
+          "message": "This payment will be deleted and the amount returned to the supplier's balance. Continue?",
+          "confirm": "Delete payment",
+          "deleteRowTitle": "Reverse payment"
+        },
+        "defaultConfirm": "Confirm"
+      },
+      "toast": {
+        "created": "Purchase order created",
+        "paymentRecorded": "Payment recorded",
+        "receiveSuccess": "Received and inventory updated",
+        "receiveFailed": "Couldn't receive",
+        "cancelSuccess": "Cancelled",
+        "cancelFailed": "Couldn't cancel",
+        "deleteSuccess": "Deleted",
+        "deleteFailed": "Couldn't delete",
+        "paymentDeleted": "Payment reversed",
+        "paymentDeleteFailed": "Couldn't reverse payment"
+      },
+      "paymentMethod": {
+        "cash": "Cash",
+        "bank": "Bank",
+        "bankTransfer": "Bank transfer",
+        "vfcash": "VF Cash",
+        "instapay": "InstaPay",
+        "other": "Other"
+      },
+      "paymentModal": {
+        "title": "Pay supplier: {name}",
+        "totalLabel": "Total",
+        "paidLabel": "Paid",
+        "remainingLabel": "Remaining",
+        "amountLabel": "Amount",
+        "amountPlaceholder": "Max {amount}",
+        "quickAmounts": {
+          "quarter": "Quarter",
+          "half": "Half",
+          "all": "All remaining"
+        },
+        "methodLabel": "Payment method",
+        "notesLabel": "Notes (optional)",
+        "cancel": "Cancel",
+        "save": "Save payment",
+        "saving": "Saving…",
+        "error": "Couldn't record payment"
+      },
+      "builder": {
+        "title": "New purchase order",
+        "supplierLabel": "Supplier *",
+        "productSearchLabel": "Find a product to add",
+        "productSearchPlaceholder": "Product name or SKU",
+        "costPrefix": "Cost:",
+        "addExternal": "Or add a free-text line (unregistered product)",
+        "table": {
+          "name": "Item",
+          "quantity": "Qty",
+          "unitCost": "Unit cost",
+          "total": "Total",
+          "totalRow": "Total",
+          "deleteTitle": "Delete"
+        },
+        "notesLabel": "Notes",
+        "cancel": "Cancel",
+        "save": "Save as draft",
+        "saving": "Saving…",
+        "errors": {
+          "pickSupplier": "Pick a supplier",
+          "needLine": "Add at least one line item",
+          "saveFailed": "Save failed"
+        }
+      }
+    },
+    "expenses": {
+      "title": "Expenses",
+      "manageTitle": "Manage expenses",
+      "summary": {
+        "label": "Total recorded expenses"
+      },
+      "listHeading": "Expense log",
+      "toast": {
+        "added": "Expense recorded"
+      },
+      "form": {
+        "heading": "Record new expense",
+        "titleLabel": "Description",
+        "titlePlaceholder": "e.g. Shop rent, electricity bill…",
+        "amountLabel": "Amount (EGP)",
+        "amountPlaceholder": "0.00",
+        "categoryLabel": "Category",
+        "supplierLabel": "Supplier *",
+        "recurring": {
+          "title": "Auto-repeat",
+          "hint": "The next copy will appear automatically on its due date — no manual entry.",
+          "monthly": "Monthly",
+          "weekly": "Weekly"
+        },
+        "noteLabel": "Note (optional)",
+        "notePlaceholder": "…",
+        "submit": "Record expense"
+      },
+      "table": {
+        "col": {
+          "date": "Date",
+          "title": "Description",
+          "category": "Category",
+          "amount": "Amount",
+          "actions": "Action"
+        },
+        "recurringTitle": "Recurring expense — generated automatically",
+        "generated": "Auto-generated",
+        "generatedTitle": "Copy of a recurring expense",
+        "weekly": "Weekly",
+        "monthly": "Monthly",
+        "deleteTitle": "Delete",
+        "confirmDelete": "Are you sure you want to delete this expense?",
+        "empty": "No expenses recorded yet"
+      }
+    },
+    "inventory": {
+      "title": "Inventory",
+      "search": {
+        "placeholder": "Search by name, barcode, tag, brand, or supplier…"
+      },
+      "summary": {
+        "totalProducts": "Total products",
+        "lowStock": "Low stock",
+        "outOfStock": "Out of stock",
+        "stockValue": "Stock value"
+      },
+      "filters": {
+        "allCategories": "All categories",
+        "allGenders": "All",
+        "allStatuses": "All statuses",
+        "allBrands": "All brands",
+        "allSuppliers": "All suppliers",
+        "minPrice": "Min price",
+        "maxPrice": "Max price",
+        "allTags": "All tags",
+        "stockStatus": {
+          "in": "In stock",
+          "low": "Low stock",
+          "out": "Out of stock"
+        }
+      },
+      "sort": {
+        "label": "Sort:",
+        "options": {
+          "newest": "Newest",
+          "oldest": "Oldest",
+          "name": "Name (A–Z)",
+          "priceAsc": "Price (low to high)",
+          "priceDesc": "Price (high to low)",
+          "qtyAsc": "Quantity (low to high)",
+          "qtyDesc": "Quantity (high to low)",
+          "marginAsc": "Margin (low to high)",
+          "marginDesc": "Margin (high to low)"
+        }
+      },
+      "tools": {
+        "deadStock": "Dead stock",
+        "deadStockTitle": "Products not sold in 60 days",
+        "clearFilters": "Clear filters",
+        "densityTitle": "Table density",
+        "compact": "Compact",
+        "comfortable": "Comfortable",
+        "import": "Import",
+        "exportCsv": "Export CSV"
+      },
+      "count": "{n} products in inventory",
+      "table": {
+        "col": {
+          "name": "Product",
+          "category": "Category",
+          "gender": "Gender",
+          "brand": "Brand",
+          "quantity": "Qty",
+          "price": "Price",
+          "margin": "Margin",
+          "stockValue": "Stock value",
+          "updatedAt": "Updated",
+          "actions": "Actions"
+        },
+        "footer": {
+          "totalLabel": "Total ({n} products)",
+          "retailValueLabel": "Retail value:"
+        },
+        "actions": {
+          "decrease": "Decrease",
+          "increase": "Increase",
+          "sell": "Sell",
+          "edit": "Edit",
+          "history": "Product history",
+          "delete": "Delete"
+        }
+      },
+      "card": {
+        "marginLabel": "Margin {pct}%",
+        "quantityLabel": "Quantity",
+        "priceLabel": "Price",
+        "sellAction": "Sell",
+        "editAction": "Edit",
+        "historyTitle": "Product history"
+      },
+      "empty": {
+        "search": "No results for \"{q}\"",
+        "filters": "No results match the current filters",
+        "fresh": "No products yet. Start by adding one."
+      },
+      "toast": {
+        "productDeleted": "Product deleted",
+        "deleteFailed": "Something went wrong",
+        "productUpdated": "Product updated",
+        "qtyAdjusted": "Adjusted \"{name}\" quantity to {n}",
+        "qtyAdjustFailed": "Couldn't adjust quantity",
+        "tagAdded": "Tag added to {n} products",
+        "priceUpdated": "Updated price for {n} products",
+        "categoryUpdated": "Changed category for {n} products",
+        "genderUpdated": "Changed gender for {n} products",
+        "supplierUpdated": "Set supplier for {n} products",
+        "locationUpdated": "Set location for {n} products",
+        "actionFailed": "Couldn't perform the action",
+        "bulkDeleted": "Deleted {n} products",
+        "bulkDeleteFailed": "Couldn't delete the selection",
+        "importRefreshed": "List refreshed"
+      },
+      "confirmDelete": {
+        "title": "Delete product",
+        "message": "Are you sure you want to delete \"{name}\"?",
+        "confirm": "Delete"
+      },
+      "confirmBulkDelete": {
+        "title": "Bulk delete",
+        "message": "Are you sure you want to delete {n} products? This can't be undone.",
+        "confirm": "Delete all"
+      },
+      "bulkActions": {
+        "selectedCount": "{n} selected",
+        "addTag": "Add tag",
+        "tagInputPlaceholder": "Tag name",
+        "apply": "Apply",
+        "priceAdjust": "Adjust price",
+        "pricePlaceholder": "Percent (e.g. 10 or -5)",
+        "applyPercent": "Apply %",
+        "category": "Category",
+        "gender": "Gender",
+        "supplier": "Supplier",
+        "supplierPlaceholder": "Supplier name",
+        "location": "Location",
+        "locationPlaceholder": "Storage location",
+        "export": "Export",
+        "delete": "Delete",
+        "clearTitle": "Clear selection"
+      },
+      "searchBar": {
+        "placeholder": "Search products, brands, or categories…"
+      },
+      "editForm": {
+        "title": "Edit product",
+        "fields": {
+          "name": "Product name",
+          "brand": "Brand",
+          "quantity": "Quantity",
+          "price": "Selling price (EGP)",
+          "costPrice": "Cost price (EGP)",
+          "lowStockThreshold": "Low-stock alert threshold",
+          "sku": "SKU / Barcode",
+          "supplier": "Supplier",
+          "legacySupplier": "Supplier (legacy text)",
+          "location": "Storage location",
+          "tags": "Tags (comma-separated)",
+          "tagsPlaceholder": "sale, new, clearance"
+        },
+        "errors": {
+          "nameRequired": "Product name is required",
+          "updateFailed": "Something went wrong while updating"
+        },
+        "save": "Save"
+      },
+      "history": {
+        "title": "History: {name}",
+        "empty": "No history for this product yet",
+        "events": {
+          "created": "Added",
+          "updated": "Updated",
+          "restocked": "Restocked",
+          "decreased": "Quantity decreased",
+          "sold": "Sold",
+          "returned": "Returned"
+        },
+        "qtyAfter": "→ Qty: {n}"
+      },
+      "import": {
+        "title": "Import products from CSV",
+        "result": {
+          "success": "Import completed",
+          "summary": "Added <b>{created}</b> new products and updated <b>{updated}</b>",
+          "summaryWithFailed": "Added <b>{created}</b> new products, updated <b>{updated}</b>, and <b>{failed}</b> rows failed",
+          "close": "Close"
+        },
+        "guide": {
+          "heading": "File columns (order doesn't matter, but the names are case-sensitive):",
+          "required": "— required.",
+          "skuHint": "— optional; if present it's used to update an existing product instead of creating a new one.",
+          "optional": "— optional.",
+          "attributeValuesHint": "— category attributes in the format",
+          "attributeValuesExample": ", e.g.",
+          "categoryHint": "— accepts the category key",
+          "categoryHintOr": "or the Arabic name",
+          "templateLink": "Download a template pre-filled with this branch's categories"
+        },
+        "drop": {
+          "instructionLine": "Drop a CSV file here or",
+          "chooseFile": "Choose a file",
+          "checking": "Checking…",
+          "footnote": "CSV only · up to 2 MB · UTF-8 (Excel: save as \"CSV UTF-8\")"
+        },
+        "errors": {
+          "tooLarge": "File is larger than 2 MB. Split it into smaller files.",
+          "readFailed": "Couldn't read the file",
+          "importFailed": "Import failed"
+        },
+        "preview": {
+          "fileLabel": "File:",
+          "resetCta": "Choose a different file",
+          "stats": {
+            "create": "To add",
+            "update": "To update",
+            "error": "With errors"
+          },
+          "table": {
+            "row": "Row",
+            "status": "Status",
+            "name": "Name",
+            "category": "Category",
+            "price": "Price",
+            "quantity": "Qty",
+            "notes": "Notes"
+          },
+          "errorBanner": "{n} rows have errors. Fix the file and re-upload — we won't commit a partial import.",
+          "commit": "Confirm import ({n} rows)"
+        },
+        "action": {
+          "create": "Create",
+          "update": "Update",
+          "error": "Error"
+        }
+      },
+      "addProduct": {
+        "title": "Add new product",
+        "heading": "Add a new product",
+        "subtitle": "Three quick steps: pick a category, set attributes, then fill in the details.",
+        "footer": {
+          "back": "Back",
+          "next": "Next",
+          "save": "Save product",
+          "stepCounter": "Step {n} of 3",
+          "readyHint": "Ready to save? Check the preview on the side."
+        },
+        "toast": {
+          "success": "Product added",
+          "error": "Something went wrong"
+        },
+        "indicator": {
+          "ariaLabel": "Product add wizard steps",
+          "steps": {
+            "category": { "label": "Category", "helper": "Pick a category" },
+            "attributes": { "label": "Attributes", "helper": "Set details" },
+            "details": { "label": "Details", "helper": "Price and quantity" }
+          }
+        },
+        "step1": {
+          "heading": "Choose a category",
+          "loading": "Loading…",
+          "addCategory": "Add category",
+          "newCategory": {
+            "title": "Add new category",
+            "label": "Category name",
+            "placeholder": "e.g. Leather",
+            "save": "Save category",
+            "error": "Couldn't add the category"
+          }
+        },
+        "step2": {
+          "heading": "Set product attributes",
+          "subhead": "These attributes appear in reports and filters — pick them carefully."
+        },
+        "step3": {
+          "heading": "Product details",
+          "subhead": "Review before saving — changes appear in the live preview on the side.",
+          "sections": {
+            "basics": {
+              "title": "Basics",
+              "subtitle": "What staff and customers see on the invoice."
+            },
+            "pricing": {
+              "title": "Pricing and stock",
+              "subtitle": "Cost price drives profit calculation in reports."
+            },
+            "extras": {
+              "title": "Additional details",
+              "subtitle": "Optional — improves search and reporting."
+            }
+          },
+          "fields": {
+            "brand": "Brand (optional)",
+            "brandPlaceholder": "Choose a brand…",
+            "brandOther": "Other (add a new brand)",
+            "newBrand": "New brand name",
+            "newBrandPlaceholder": "Brand name…",
+            "name": "Product name",
+            "namePlaceholder": "e.g. Brown leather casual watch",
+            "price": "Selling price",
+            "costPrice": "Cost price",
+            "quantity": "Starting quantity",
+            "lowStockThreshold": "Low-stock alert threshold",
+            "sku": "SKU / Barcode",
+            "skuPlaceholder": "SKU or barcode",
+            "location": "Storage location",
+            "locationPlaceholder": "Shelf 3, Display B",
+            "tags": "Tags (comma-separated)",
+            "tagsPlaceholder": "sale, new, clearance",
+            "currencySuffix": "EGP"
+          },
+          "preview": {
+            "title": "Live preview",
+            "namePlaceholder": "Product name",
+            "costLine": "Cost: {cost}",
+            "quantity": "Quantity",
+            "lowStock": "Low-stock alert",
+            "margin": "Profit margin",
+            "footnote": "The preview updates as you type."
+          }
+        }
+      }
+    },
     "shell": {
       "primary": {
         "dashboard": "Dashboard",

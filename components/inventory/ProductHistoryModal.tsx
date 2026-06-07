@@ -5,7 +5,6 @@ import { Modal } from "../ui/Modal";
 import { Skeleton } from "../ui/Skeleton";
 import type { ProductHistoryEvent as _PHE } from "@/lib/types";
 import type { Product, ProductHistoryEvent } from "@/lib/types";
-import { formatDateTime } from "@/lib/utils";
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -14,21 +13,14 @@ import {
   ShoppingCart,
   Undo2,
 } from "@/lib/icons";
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
+import { formatDateTime } from "@/lib/i18n/format";
 
 interface ProductHistoryModalProps {
   isOpen: boolean;
   onClose: () => void;
   product: Product | null;
 }
-
-const EVENT_LABELS: Record<ProductHistoryEvent["type"], string> = {
-  created: "تمت الإضافة",
-  updated: "تعديل بيانات",
-  restocked: "زيادة كمية",
-  decreased: "إنقاص كمية",
-  sold: "بيع",
-  returned: "مرتجع",
-};
 
 function eventIcon(type: ProductHistoryEvent["type"]) {
   switch (type) {
@@ -48,6 +40,9 @@ function eventIcon(type: ProductHistoryEvent["type"]) {
 }
 
 export function ProductHistoryModal({ isOpen, onClose, product }: ProductHistoryModalProps) {
+  const dict = useDictionary();
+  const locale = useLocale();
+  const t = dict.app.inventory.history;
   const [events, setEvents] = useState<ProductHistoryEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -79,7 +74,11 @@ export function ProductHistoryModal({ isOpen, onClose, product }: ProductHistory
   if (!product) return null;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`سجل: ${product.name}`}>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={t.title.replace("{name}", product.name)}
+    >
       <div className="space-y-3">
         {loading ? (
           <ul className="space-y-2">
@@ -99,7 +98,7 @@ export function ProductHistoryModal({ isOpen, onClose, product }: ProductHistory
           </ul>
         ) : events.length === 0 ? (
           <p className="text-center text-text-secondary py-8">
-            لا يوجد سجل سابق لهذا المنتج
+            {t.empty}
           </p>
         ) : (
           <ul className="space-y-2">
@@ -111,9 +110,9 @@ export function ProductHistoryModal({ isOpen, onClose, product }: ProductHistory
                 <div className="mt-0.5">{eventIcon(e.type)}</div>
                 <div className="flex-1">
                   <div className="flex items-center justify-between flex-wrap gap-1">
-                    <span className="font-medium text-sm">{EVENT_LABELS[e.type]}</span>
+                    <span className="font-medium text-sm">{t.events[e.type]}</span>
                     <span className="text-xs text-text-secondary">
-                      {formatDateTime(e.createdAt)}
+                      {formatDateTime(e.createdAt, locale)}
                     </span>
                   </div>
                   <div className="text-xs text-text-secondary mt-0.5">
@@ -123,9 +122,11 @@ export function ProductHistoryModal({ isOpen, onClose, product }: ProductHistory
                       </span>
                     )}
                     {typeof e.quantityAfter === "number" && (
-                      <span className="ms-2">→ الكمية: {e.quantityAfter}</span>
+                      <span className="ms-2">
+                        {t.qtyAfter.replace("{n}", String(e.quantityAfter))}
+                      </span>
                     )}
-                    {e.note && <span className="ms-2">— {e.note}</span>}
+                    {e.note && <span className="ms-2" dir="auto">— {e.note}</span>}
                   </div>
                 </div>
               </li>

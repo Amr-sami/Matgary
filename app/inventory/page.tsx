@@ -33,12 +33,14 @@ import {
 import { useCategories } from "@/hooks/useCategories";
 import { productsToCsv, downloadCsv } from "@/lib/csv";
 import type { Product, Category, Gender } from "@/lib/types";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 export default function InventoryPage() {
+  const dict = useDictionary();
   return (
     <Suspense
       fallback={
-        <AppShell title="المخزن">
+        <AppShell title={dict.app.inventory.title}>
           <PageSkeleton variant="grid" rows={8} cards={false} />
         </AppShell>
       }
@@ -51,6 +53,8 @@ export default function InventoryPage() {
 function InventoryPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const dict = useDictionary();
+  const t = dict.app.inventory;
   const { products, loading, refresh: refreshProducts } = useProducts();
   const { sales } = useSales();
   const { byId: categoryById, data: categoryList } = useCategories();
@@ -307,10 +311,10 @@ function InventoryPageInner() {
     if (!deleteProductData) return;
     try {
       await deleteProduct(deleteProductData.id);
-      setToast({ type: "success", message: "تم حذف المنتج بنجاح" });
+      setToast({ type: "success", message: t.toast.productDeleted });
       await refreshProducts();
     } catch (error: any) {
-      setToast({ type: "error", message: error.message || "حدث خطأ" });
+      setToast({ type: "error", message: error.message || t.toast.deleteFailed });
     }
   };
 
@@ -326,14 +330,16 @@ function InventoryPageInner() {
         const next = await adjustProductQuantity(product.id, delta);
         setToast({
           type: "success",
-          message: `تم تعديل كمية "${product.name}" إلى ${next}`,
+          message: t.toast.qtyAdjusted
+            .replace("{name}", product.name)
+            .replace("{n}", String(next)),
         });
         await refreshProducts();
       } catch (error: any) {
-        setToast({ type: "error", message: error.message || "تعذر تعديل الكمية" });
+        setToast({ type: "error", message: error.message || t.toast.qtyAdjustFailed });
       }
     },
-    [refreshProducts]
+    [refreshProducts, t.toast]
   );
 
   const handleExportCsv = useCallback(() => {
@@ -347,6 +353,7 @@ function InventoryPageInner() {
       const ids = Array.from(selectedIds);
       const items = filteredProducts.filter((p) => selectedIds.has(p.id));
       if (items.length === 0) return;
+      const n = String(items.length);
       try {
         switch (action.type) {
           case "delete":
@@ -354,30 +361,30 @@ function InventoryPageInner() {
             return;
           case "addTag":
             await bulkUpdateProducts(items, { type: "addTag", value: action.tag });
-            setToast({ type: "success", message: `تمت إضافة التاج لـ ${items.length} منتج` });
+            setToast({ type: "success", message: t.toast.tagAdded.replace("{n}", n) });
             break;
           case "priceMultiplier":
             await bulkUpdateProducts(items, {
               type: "priceMultiplier",
               value: action.multiplier,
             });
-            setToast({ type: "success", message: `تم تعديل سعر ${items.length} منتج` });
+            setToast({ type: "success", message: t.toast.priceUpdated.replace("{n}", n) });
             break;
           case "category":
             await bulkUpdateProducts(items, { type: "category", value: action.value });
-            setToast({ type: "success", message: `تم تغيير الصنف لـ ${items.length} منتج` });
+            setToast({ type: "success", message: t.toast.categoryUpdated.replace("{n}", n) });
             break;
           case "gender":
             await bulkUpdateProducts(items, { type: "gender", value: action.value });
-            setToast({ type: "success", message: `تم تغيير النوع لـ ${items.length} منتج` });
+            setToast({ type: "success", message: t.toast.genderUpdated.replace("{n}", n) });
             break;
           case "supplier":
             await bulkUpdateProducts(items, { type: "supplier", value: action.value });
-            setToast({ type: "success", message: `تم تحديد المورد لـ ${items.length} منتج` });
+            setToast({ type: "success", message: t.toast.supplierUpdated.replace("{n}", n) });
             break;
           case "location":
             await bulkUpdateProducts(items, { type: "location", value: action.value });
-            setToast({ type: "success", message: `تم تحديد المكان لـ ${items.length} منتج` });
+            setToast({ type: "success", message: t.toast.locationUpdated.replace("{n}", n) });
             break;
           case "exportCsv": {
             const csv = productsToCsv(items);
@@ -388,10 +395,10 @@ function InventoryPageInner() {
         }
         await refreshProducts();
       } catch (e: any) {
-        setToast({ type: "error", message: e.message || "تعذر تنفيذ الإجراء" });
+        setToast({ type: "error", message: e.message || t.toast.actionFailed });
       }
     },
-    [selectedIds, filteredProducts, refreshProducts]
+    [selectedIds, filteredProducts, refreshProducts, t.toast]
   );
 
   const handleBulkDeleteConfirm = useCallback(async () => {
@@ -400,14 +407,17 @@ function InventoryPageInner() {
     try {
       await bulkDeleteProducts(ids);
       setSelectedIds(new Set());
-      setToast({ type: "success", message: `تم حذف ${ids.length} منتج` });
+      setToast({
+        type: "success",
+        message: t.toast.bulkDeleted.replace("{n}", String(ids.length)),
+      });
       await refreshProducts();
     } catch (e: any) {
-      setToast({ type: "error", message: e.message || "تعذر الحذف الجماعي" });
+      setToast({ type: "error", message: e.message || t.toast.bulkDeleteFailed });
     } finally {
       setBulkConfirm(null);
     }
-  }, [selectedIds]);
+  }, [selectedIds, t.toast]);
 
   const hasAnyFilter =
     !!selectedCategory ||
@@ -436,14 +446,14 @@ function InventoryPageInner() {
 
   if (loading) {
     return (
-      <AppShell title="المخزن">
+      <AppShell title={t.title}>
         <PageSkeleton variant="grid" rows={8} cards={false} />
       </AppShell>
     );
   }
 
   return (
-    <AppShell title="المخزن">
+    <AppShell title={t.title}>
       <div className="space-y-4">
         {/* Summary cards */}
         <InventorySummary
@@ -455,10 +465,10 @@ function InventoryPageInner() {
         {/* Search */}
         <input
           type="text"
-          placeholder="ابحث بالاسم، الباركود، التاج، البراند، أو المورد..."
+          placeholder={t.search.placeholder}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          dir="rtl"
+          dir="auto"
           className="w-full px-4 py-3 rounded-xl border border-border bg-white focus:outline-none focus:ring-2 focus:ring-accent"
         />
 
@@ -498,17 +508,17 @@ function InventoryPageInner() {
                   ? "bg-orange-100 border-orange-300 text-orange-700"
                   : "border-border bg-white text-text-secondary hover:border-accent"
               }`}
-              title="منتجات لم تُبَع في 60 يوم"
+              title={t.tools.deadStockTitle}
             >
               <Skull className="w-4 h-4" />
-              مخزون راكد
+              {t.tools.deadStock}
             </button>
             {hasAnyFilter && (
               <button
                 onClick={handleResetFilters}
                 className="px-3 py-2 rounded-lg text-sm text-text-secondary hover:text-accent border border-border bg-white"
               >
-                مسح الفلاتر
+                {t.tools.clearFilters}
               </button>
             )}
           </div>
@@ -518,21 +528,21 @@ function InventoryPageInner() {
                 setDensity(density === "compact" ? "comfortable" : "compact")
               }
               className="hidden md:flex items-center gap-2 px-3 py-2 rounded-lg text-sm border border-border bg-white text-text-secondary hover:border-accent"
-              title="كثافة الجدول"
+              title={t.tools.densityTitle}
             >
               {density === "compact" ? (
                 <Rows3 className="w-4 h-4" />
               ) : (
                 <LayoutGrid className="w-4 h-4" />
               )}
-              {density === "compact" ? "موسّع" : "مدمج"}
+              {density === "compact" ? t.tools.comfortable : t.tools.compact}
             </button>
             <button
               onClick={() => setImportOpen(true)}
               className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm border border-border bg-white text-text-secondary hover:border-accent"
             >
               <Upload className="w-4 h-4" />
-              استيراد
+              {t.tools.import}
             </button>
             <button
               onClick={handleExportCsv}
@@ -540,7 +550,7 @@ function InventoryPageInner() {
               className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm border border-border bg-white text-text-secondary hover:border-accent disabled:opacity-50"
             >
               <Download className="w-4 h-4" />
-              تصدير CSV
+              {t.tools.exportCsv}
             </button>
           </div>
         </div>
@@ -554,7 +564,7 @@ function InventoryPageInner() {
 
         {/* Product Count */}
         <p className="text-sm text-text-secondary">
-          {filteredProducts.length} منتج في المخزن
+          {t.count.replace("{n}", String(filteredProducts.length))}
         </p>
 
         {/* Empty State */}
@@ -563,10 +573,10 @@ function InventoryPageInner() {
             type="products"
             message={
               query
-                ? `لا توجد نتائج للبحث عن "${query}"`
+                ? t.empty.search.replace("{q}", query)
                 : hasAnyFilter
-                  ? "لا توجد نتائج تطابق الفلاتر الحالية"
-                  : "لم تتم إضافة أي أصناف بعد. ابدأ بإضافة صنف جديد."
+                  ? t.empty.filters
+                  : t.empty.fresh
             }
           />
         )}
@@ -627,7 +637,7 @@ function InventoryPageInner() {
         isOpen={!!editProduct}
         onClose={() => setEditProduct(null)}
         product={editProduct}
-        onSuccess={() => setToast({ type: "success", message: "تم تحديث المنتج بنجاح" })}
+        onSuccess={() => setToast({ type: "success", message: t.toast.productUpdated })}
       />
 
       {/* History Modal */}
@@ -644,7 +654,7 @@ function InventoryPageInner() {
         onClose={() => setImportOpen(false)}
         onImported={async () => {
           await refreshProducts();
-          setToast({ type: "success", message: "تم تحديث القائمة" });
+          setToast({ type: "success", message: t.toast.importRefreshed });
         }}
       />
 
@@ -653,9 +663,9 @@ function InventoryPageInner() {
         isOpen={!!deleteProductData}
         onClose={() => setDeleteProductData(null)}
         onConfirm={handleDelete}
-        title="حذف المنتج"
-        message={`هل أنت متأكد من حذف "${deleteProductData?.name}"؟`}
-        confirmText="حذف"
+        title={t.confirmDelete.title}
+        message={t.confirmDelete.message.replace("{name}", deleteProductData?.name || "")}
+        confirmText={t.confirmDelete.confirm}
         variant="danger"
       />
 
@@ -664,9 +674,9 @@ function InventoryPageInner() {
         isOpen={!!bulkConfirm}
         onClose={() => setBulkConfirm(null)}
         onConfirm={handleBulkDeleteConfirm}
-        title="حذف جماعي"
-        message={`هل أنت متأكد من حذف ${bulkConfirm?.count || 0} منتج؟ لا يمكن التراجع.`}
-        confirmText="حذف الكل"
+        title={t.confirmBulkDelete.title}
+        message={t.confirmBulkDelete.message.replace("{n}", String(bulkConfirm?.count || 0))}
+        confirmText={t.confirmBulkDelete.confirm}
         variant="danger"
       />
 

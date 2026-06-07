@@ -4,8 +4,9 @@ import { RotateCcw, Printer, Pencil, Trash2 } from "@/lib/icons";
 import { ShareReceiptButton } from "./ShareReceiptButton";
 import type { Sale } from "@/lib/types";
 import { Badge } from "../ui/Badge";
-import { CATEGORY_LABELS, GENDER_LABELS, PAYMENT_METHOD_LABELS } from "@/lib/types";
-import { formatPrice, formatDate } from "@/lib/utils";
+import { CATEGORY_LABELS } from "@/lib/types";
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
+import { formatCurrency, formatDate, formatTime } from "@/lib/i18n/format";
 
 interface SalesTableRowProps {
   sale: Sale;
@@ -28,7 +29,17 @@ export function SalesTableRow({
   selected,
   onToggleSelect,
 }: SalesTableRowProps) {
+  const dict = useDictionary();
+  const locale = useLocale();
+  const t = dict.app.sales.table;
+  const status = dict.app.sales.status;
   const saleDate = new Date(sale.saleDate);
+  const discountLabel =
+    sale.discountAmount && sale.discountAmount > 0
+      ? sale.discountType === "percentage"
+        ? `${sale.discountValue}%`
+        : formatCurrency(sale.discountAmount, locale)
+      : null;
 
   return (
     <tr
@@ -47,26 +58,24 @@ export function SalesTableRow({
       <td className="py-4 px-4 text-sm">
         <div className="flex flex-col gap-0.5">
           <span className="font-bold text-text-primary whitespace-nowrap">
-            {formatDate(saleDate)}
+            {formatDate(saleDate, locale)}
           </span>
           <span className="text-xs text-text-secondary opacity-80">
-            {saleDate.toLocaleTimeString("ar-EG", {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
+            {formatTime(saleDate, locale)}
           </span>
         </div>
       </td>
       <td className="py-4 px-4 font-medium">
         <div>
-          {sale.productName}
+          <span dir="auto">{sale.productName}</span>
           <div className="flex flex-wrap gap-1 mt-0.5">
             {sale.customerName && (
               <button
                 type="button"
                 onClick={() => onCustomerClick?.(sale)}
                 className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-text-secondary hover:bg-accent hover:text-white transition-colors"
-                title="عرض كل فواتير هذا العميل"
+                title={t.rowCustomerTooltip}
+                dir="auto"
               >
                 {sale.customerName}
               </button>
@@ -81,7 +90,7 @@ export function SalesTableRow({
                       : "bg-accent-light text-accent"
                 }`}
               >
-                {PAYMENT_METHOD_LABELS[sale.paymentMethod]}
+                {dict.app.catalog.payment[sale.paymentMethod]}
                 {sale.paymentMethod === "deferred" && (sale.isPaid ? " ✓" : "")}
               </span>
             )}
@@ -91,19 +100,19 @@ export function SalesTableRow({
       <td className="py-4 px-4">
         <Badge variant={sale.category}>{CATEGORY_LABELS[sale.category]}</Badge>
       </td>
-      <td className="py-4 px-4 text-sm text-text-secondary">{sale.brand || "-"}</td>
+      <td className="py-4 px-4 text-sm text-text-secondary" dir="auto">{sale.brand || "-"}</td>
       <td className="py-4 px-4 text-center font-semibold">{sale.quantitySold}</td>
-      <td className="py-4 px-4 text-sm font-medium">{formatPrice(sale.pricePerUnit)}</td>
+      <td className="py-4 px-4 text-sm font-medium">{formatCurrency(sale.pricePerUnit, locale)}</td>
       <td className="py-4 px-4">
         <div className="flex flex-col">
-          <span className="font-bold text-accent">{formatPrice(sale.totalPrice)}</span>
-          {sale.discountAmount && sale.discountAmount > 0 && (
+          <span className="font-bold text-accent">{formatCurrency(sale.totalPrice, locale)}</span>
+          {discountLabel && (
             <div className="flex flex-col text-[10px] items-start mt-0.5">
               <span className="text-text-secondary line-through italic opacity-60">
-                {formatPrice(sale.subtotal)}
+                {formatCurrency(sale.subtotal, locale)}
               </span>
               <span className="text-danger font-bold">
-                خصم {sale.discountType === "percentage" ? `${sale.discountValue}%` : formatPrice(sale.discountAmount)}
+                {t.discountAmount.replace("{value}", discountLabel)}
               </span>
             </div>
           )}
@@ -111,9 +120,9 @@ export function SalesTableRow({
       </td>
       <td className="py-4 px-4">
         {sale.isReturned ? (
-          <Badge variant="returned">مرتجع</Badge>
+          <Badge variant="returned">{status.returned}</Badge>
         ) : (
-          <Badge variant="sold">مباع</Badge>
+          <Badge variant="sold">{status.sold}</Badge>
         )}
       </td>
       <td className="py-4 px-4">
@@ -122,7 +131,7 @@ export function SalesTableRow({
             <button
               onClick={() => onPrint(sale)}
               className="p-1.5 bg-accent-light text-accent rounded-lg hover:bg-accent hover:text-white border border-accent/20"
-              title="طباعة"
+              title={t.actions.print}
             >
               <Printer className="w-4 h-4" />
             </button>
@@ -132,7 +141,7 @@ export function SalesTableRow({
             onClick={() => onEdit(sale)}
             disabled={sale.isReturned}
             className="p-1.5 bg-gray-100 text-text-secondary rounded-lg hover:bg-gray-200 disabled:opacity-40"
-            title="تعديل"
+            title={t.actions.edit}
           >
             <Pencil className="w-4 h-4" />
           </button>
@@ -140,14 +149,14 @@ export function SalesTableRow({
             onClick={() => onReturn(sale)}
             disabled={sale.isReturned}
             className="p-1.5 bg-danger-light text-danger rounded-lg hover:bg-danger hover:text-white disabled:opacity-40 border border-danger/20"
-            title="مرتجع"
+            title={t.actions.return}
           >
             <RotateCcw className="w-4 h-4" />
           </button>
           <button
             onClick={() => onVoid(sale)}
             className="p-1.5 bg-gray-100 text-text-secondary rounded-lg hover:bg-danger hover:text-white"
-            title="حذف الفاتورة (إرجاع للمخزن)"
+            title={t.actions.void}
           >
             <Trash2 className="w-4 h-4" />
           </button>

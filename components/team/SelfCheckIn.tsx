@@ -13,6 +13,8 @@ import { Button } from "@/components/ui/Button";
 import { Toast } from "@/components/ui/Toast";
 import { can } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
+import { formatTime } from "@/lib/i18n/format";
 
 type ToastT = { type: "success" | "error"; message: string };
 
@@ -32,6 +34,9 @@ interface LastEvent {
  * tenant has at least one configured location.
  */
 export function SelfCheckIn() {
+  const dict = useDictionary();
+  const locale = useLocale();
+  const t = dict.app.team.selfCheckIn;
   const { data: session } = useSession();
   const principal = session?.user
     ? { role: session.user.role, permissions: session.user.permissions }
@@ -84,7 +89,7 @@ export function SelfCheckIn() {
         if (!coords) {
           setToast({
             type: "error",
-            message: "تعذر قراءة الموقع — تأكد من تفعيل تحديد الموقع",
+            message: t.toast.geoFailed,
           });
           return;
         }
@@ -99,19 +104,20 @@ export function SelfCheckIn() {
       });
       const json = await res.json();
       if (!res.ok) {
-        setToast({ type: "error", message: json.error || "تعذر التسجيل" });
+        setToast({ type: "error", message: json.error || t.toast.saveFailed });
         return;
       }
       setToast({
         type: "success",
-        message:
-          action === "check_in" ? "تم تسجيل الحضور" : "تم تسجيل الانصراف",
+        message: action === "check_in" ? t.toast.checkedIn : t.toast.checkedOut,
       });
       await refresh();
     } finally {
       setBusy(null);
     }
   };
+
+  const lastTime = last ? formatTime(last.occurredAt, locale) : "";
 
   return (
     <>
@@ -136,14 +142,14 @@ export function SelfCheckIn() {
           </span>
           <div className="min-w-0">
             <p className="font-bold text-text-primary text-sm sm:text-base">
-              {isCheckedIn ? "أنت حاضر الآن" : "تسجيل الحضور"}
+              {isCheckedIn ? t.checkedIn : t.checkInTitle}
             </p>
             <p className="text-xs text-text-secondary mt-0.5">
               {isCheckedIn
-                ? `حضور منذ ${formatTime(last!.occurredAt)}`
+                ? t.sinceLabel.replace("{time}", lastTime)
                 : last
-                  ? `آخر انصراف: ${formatTime(last.occurredAt)}`
-                  : "لم تسجل حضورك بعد اليوم"}
+                  ? t.lastCheckoutLabel.replace("{time}", lastTime)
+                  : t.notYetToday}
             </p>
           </div>
         </div>
@@ -162,7 +168,7 @@ export function SelfCheckIn() {
               <Check className="w-4 h-4" />
             )}
             <span>
-              {isCheckedIn ? "انصراف" : "حضور"}
+              {isCheckedIn ? t.checkOut : t.checkIn}
             </span>
             <MapPin className="w-3.5 h-3.5 opacity-80" />
           </Button>
@@ -173,7 +179,7 @@ export function SelfCheckIn() {
               disabled={busy !== null}
               className="text-xs font-medium text-text-secondary hover:text-accent disabled:opacity-50 px-2 py-2"
             >
-              تسجيل يدوي
+              {t.manualButton}
             </button>
           )}
         </div>
@@ -181,7 +187,7 @@ export function SelfCheckIn() {
         {!allowManual && (
           <span className="absolute top-2 end-2 text-[10px] text-text-secondary inline-flex items-center gap-1">
             <AlertCircle className="w-3 h-3" />
-            يتطلب الموقع
+            {t.needsLocation}
           </span>
         )}
       </div>
@@ -194,13 +200,6 @@ export function SelfCheckIn() {
       )}
     </>
   );
-}
-
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString("ar-EG", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }
 
 function getCoords(): Promise<GeolocationCoordinates | null> {

@@ -4,8 +4,9 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { Users, Star } from "@/lib/icons";
 import type { Sale } from "@/lib/types";
-import { formatPrice } from "@/lib/utils";
 import { buildCustomerAggregates } from "@/lib/customers";
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
+import { formatCurrency } from "@/lib/i18n/format";
 
 interface TopCustomersCardProps {
   sales: Sale[];
@@ -13,6 +14,10 @@ interface TopCustomersCardProps {
 }
 
 export function TopCustomersCard({ sales, limit = 5 }: TopCustomersCardProps) {
+  const dict = useDictionary();
+  const locale = useLocale();
+  const t = dict.app.sales.topCustomers;
+  const invoiceCountTpl = dict.app.sales.invoiceCount;
   const top = useMemo(() => {
     const customers = buildCustomerAggregates(sales);
     return customers
@@ -27,13 +32,13 @@ export function TopCustomersCard({ sales, limit = 5 }: TopCustomersCardProps) {
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Users className="w-5 h-5 text-accent" />
-          <p className="font-medium">أعلى العملاء إنفاقاً</p>
+          <p className="font-medium">{t.title}</p>
         </div>
         <Link
           href="/customers"
           className="text-xs text-accent hover:underline"
         >
-          عرض الكل
+          {t.viewAll}
         </Link>
       </div>
       <ul className="space-y-2">
@@ -43,15 +48,15 @@ export function TopCustomersCard({ sales, limit = 5 }: TopCustomersCardProps) {
               <span className="w-5 h-5 rounded-full bg-accent-light text-accent text-xs flex items-center justify-center font-bold shrink-0">
                 {idx + 1}
               </span>
-              <span className="truncate">{c.name}</span>
+              <span className="truncate" dir="auto">{c.name}</span>
               {c.invoiceCount >= 3 && (
                 <Star className="w-3 h-3 text-accent shrink-0" />
               )}
             </div>
             <div className="text-end shrink-0">
-              <p className="font-bold text-sm">{formatPrice(c.lifetimeValue)}</p>
+              <p className="font-bold text-sm">{formatCurrency(c.lifetimeValue, locale)}</p>
               <p className="text-[10px] text-text-secondary">
-                {c.invoiceCount} فاتورة
+                {invoiceCountTpl.replace("{n}", String(c.invoiceCount))}
               </p>
             </div>
           </li>

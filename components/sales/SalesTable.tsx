@@ -2,6 +2,7 @@
 
 import type { Sale } from "@/lib/types";
 import { SalesTableRow } from "./SalesTableRow";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 interface SalesTableProps {
   sales: Sale[];
@@ -26,6 +27,8 @@ export function SalesTable({
   onToggleSelect,
   onToggleSelectAll,
 }: SalesTableProps) {
+  const dict = useDictionary();
+  const col = dict.app.sales.table.col;
   const allSelected = sales.length > 0 && sales.every((s) => selectedIds.has(s.id));
   const someSelected = !allSelected && sales.some((s) => selectedIds.has(s.id));
 
@@ -45,15 +48,15 @@ export function SalesTable({
                 className="w-4 h-4 accent-accent cursor-pointer"
               />
             </th>
-            <th className="text-start pb-3 px-4 py-3">التاريخ</th>
-            <th className="text-start pb-3 px-4 py-3">المنتج</th>
-            <th className="text-start pb-3 px-4 py-3">الصنف</th>
-            <th className="text-start pb-3 px-4 py-3">البراند</th>
-            <th className="text-start pb-3 px-4 py-3">الكمية</th>
-            <th className="text-start pb-3 px-4 py-3">السعر</th>
-            <th className="text-start pb-3 px-4 py-3">الإجمالي</th>
-            <th className="text-start pb-3 px-4 py-3">الحالة</th>
-            <th className="text-start pb-3 px-4 py-3">إجراء</th>
+            <th className="text-start pb-3 px-4 py-3">{col.date}</th>
+            <th className="text-start pb-3 px-4 py-3">{col.product}</th>
+            <th className="text-start pb-3 px-4 py-3">{col.category}</th>
+            <th className="text-start pb-3 px-4 py-3">{col.brand}</th>
+            <th className="text-start pb-3 px-4 py-3">{col.quantity}</th>
+            <th className="text-start pb-3 px-4 py-3">{col.price}</th>
+            <th className="text-start pb-3 px-4 py-3">{col.total}</th>
+            <th className="text-start pb-3 px-4 py-3">{col.status}</th>
+            <th className="text-start pb-3 px-4 py-3">{col.action}</th>
           </tr>
         </thead>
         <tbody>

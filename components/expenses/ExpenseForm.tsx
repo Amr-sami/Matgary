@@ -5,14 +5,28 @@ import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { SupplierPicker } from "../suppliers/SupplierPicker";
 import { addExpense } from "@/lib/api/expenses";
-import { EXPENSE_CATEGORY_LABELS, type ExpenseCategory } from "@/lib/types";
+import type { ExpenseCategory } from "@/lib/types";
 import { Wallet, Plus } from "@/lib/icons";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 interface ExpenseFormProps {
   onSuccess: () => void;
 }
 
+const CATEGORY_ORDER: ExpenseCategory[] = [
+  "rent",
+  "salaries",
+  "electricity",
+  "water",
+  "internet",
+  "supplier",
+  "other",
+];
+
 export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
+  const dict = useDictionary();
+  const t = dict.app.expenses.form;
+  const categoryLabels = dict.app.catalog.expenseCategory;
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState<number | "">("");
   const [category, setCategory] = useState<ExpenseCategory>("other");
@@ -56,31 +70,31 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
     <form onSubmit={handleSubmit} className="bg-white rounded-xl p-5 shadow-sm border border-border">
       <div className="flex items-center gap-2 mb-6 text-accent">
         <Wallet className="w-5 h-5" />
-        <h3 className="font-bold text-lg">تسجيل مصروف جديد</h3>
+        <h3 className="font-bold text-lg">{t.heading}</h3>
       </div>
 
       <div className="space-y-4">
         <Input
-          label="بيان المصروف"
-          placeholder="مثلاً: إيجار المحل، فاتورة الكهرباء..."
+          label={t.titleLabel}
+          placeholder={t.titlePlaceholder}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           required
         />
 
         <Input
-          label="المبلغ (جنيه)"
+          label={t.amountLabel}
           type="number"
-          placeholder="0.00"
+          placeholder={t.amountPlaceholder}
           value={amount}
           onChange={(e) => setAmount(e.target.value === "" ? "" : Number(e.target.value))}
           required
         />
 
         <div className="space-y-1.5">
-          <label className="text-sm font-medium text-text-secondary pr-1">التصنيف</label>
+          <label className="text-sm font-medium text-text-secondary pe-1">{t.categoryLabel}</label>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {(Object.entries(EXPENSE_CATEGORY_LABELS) as [ExpenseCategory, string][]).map(([val, label]) => (
+            {CATEGORY_ORDER.map((val) => (
               <button
                 key={val}
                 type="button"
@@ -91,7 +105,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
                     : "bg-white border-border text-text-secondary hover:bg-gray-50"
                 }`}
               >
-                {label}
+                {categoryLabels[val]}
               </button>
             ))}
           </div>
@@ -101,7 +115,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
           <SupplierPicker
             value={supplierId}
             onChange={setSupplierId}
-            label="المورد *"
+            label={t.supplierLabel}
           />
         )}
 
@@ -116,10 +130,10 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
             />
             <div>
               <span className="font-medium text-text-primary">
-                تكرار تلقائي
+                {t.recurring.title}
               </span>
               <p className="text-xs text-text-secondary mt-0.5">
-                ستظهر النسخة التالية تلقائياً في موعدها بدون إدخال يدوي.
+                {t.recurring.hint}
               </p>
             </div>
           </label>
@@ -134,7 +148,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
                     : "bg-white border-border text-text-secondary hover:border-accent"
                 }`}
               >
-                شهري
+                {t.recurring.monthly}
               </button>
               <button
                 type="button"
@@ -145,22 +159,22 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
                     : "bg-white border-border text-text-secondary hover:border-accent"
                 }`}
               >
-                أسبوعي
+                {t.recurring.weekly}
               </button>
             </div>
           )}
         </div>
 
         <Input
-          label="ملاحظة (اختياري)"
-          placeholder="..."
+          label={t.noteLabel}
+          placeholder={t.notePlaceholder}
           value={note}
           onChange={(e) => setNote(e.target.value)}
         />
 
         <Button type="submit" loading={loading} className="w-full mt-2 gap-2">
           <Plus className="w-4 h-4" />
-          تسجيل المصروف
+          {t.submit}
         </Button>
       </div>
     </form>

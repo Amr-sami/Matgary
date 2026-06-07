@@ -15,10 +15,10 @@ import { useShopSettings } from "@/hooks/useShopSettings";
 import { buildWhatsAppLink, substitute } from "@/lib/settings";
 import { sendViaGreenApi, sendViaWhatsAppCloud } from "@/lib/whatsapp";
 import type { Product, DiscountType, PaymentMethod } from "@/lib/types";
-import { PAYMENT_METHOD_LABELS } from "@/lib/types";
-import { formatPrice } from "@/lib/utils";
 import { Printer, Percent, DollarSign, Calendar, Plus, Trash2, ShoppingCart } from "@/lib/icons";
 import { CustomerAutocomplete, type CustomerSuggestion } from "./CustomerAutocomplete";
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
+import { formatCurrency } from "@/lib/i18n/format";
 
 export interface ReceiptSaleData {
   saleId?: string;
@@ -92,6 +92,11 @@ export function SaleForm({
   onPrintLastInvoice,
   preselectedProduct,
 }: SaleFormProps) {
+  const dict = useDictionary();
+  const locale = useLocale();
+  const t = dict.app.sales.form;
+  const fmt = (n: number) => formatCurrency(n, locale);
+  const fallbackName = t.customer.fallbackName;
   const { sales } = useSales();
   const { records: customerRecords } = useCustomersData();
   const { products } = useProducts();
@@ -312,7 +317,7 @@ export function SaleForm({
   })();
 
   // Include the in-progress line (selected product + qty/price) in the live preview
-  // so users see totals before clicking "إضافة للفاتورة".
+  // so users see totals before clicking "Add to cart".
   const previewLines: CartLineState[] = (() => {
     if (!selectedProduct || quantity < 1 || pricePerUnit <= 0) return cart;
     return [
@@ -459,18 +464,18 @@ export function SaleForm({
     if (useCustomDate && customDate) {
       const parsed = new Date(`${customDate}T12:00:00`);
       if (Number.isNaN(parsed.getTime())) {
-        alert("تاريخ غير صحيح");
+        alert(t.errors.invalidDate);
         return;
       }
       if (parsed.getTime() > Date.now() + 24 * 60 * 60 * 1000) {
-        alert("لا يمكن تسجيل بيع في تاريخ مستقبلي");
+        alert(t.errors.futureDate);
         return;
       }
       saleDate = parsed;
     }
 
     if (!tenantId || !branchId) {
-      alert("جلسة غير مكتملة. أعد تحميل الصفحة.");
+      alert(t.errors.sessionMissing);
       return;
     }
 
@@ -589,14 +594,17 @@ export function SaleForm({
         // but always resolves to "" so the line drops out of the message.
         const receiptLink = "";
         const message = substitute(settings.messageTemplate, {
-          customerName: customerName.trim() || "عميلنا الكريم",
+          customerName: customerName.trim() || fallbackName,
           customerPhone: trimmedPhone,
           invoiceId: result.invoiceId,
           invoiceCode: result.invoiceId.slice(-8).toUpperCase(),
-          totalPrice: formatPrice(total),
+          totalPrice: fmt(total),
           productNames: lines.map((l) => l.product.name).join("، "),
           receiptLink,
-          date: saleDate.toLocaleDateString("ar-EG"),
+          date: saleDate.toLocaleDateString(
+            locale === "en" ? "en-EG" : "ar-EG",
+            { numberingSystem: "latn" } as Intl.DateTimeFormatOptions,
+          ),
           shopName: settings.shopName,
           shopPhone: settings.shopPhone,
         });
@@ -638,13 +646,13 @@ export function SaleForm({
                   parameters: [
                     {
                       type: "text",
-                      text: customerName.trim() || "عميلنا الكريم",
+                      text: customerName.trim() || fallbackName,
                     },
                     {
                       type: "text",
                       text: result.invoiceId.slice(-8).toUpperCase(),
                     },
-                    { type: "text", text: formatPrice(total) },
+                    { type: "text", text: fmt(total) },
                     { type: "text", text: productNames },
                   ],
                 },
@@ -669,14 +677,17 @@ export function SaleForm({
           // PDF caption builder — same logic as the Green API branch.
           const buildCaption = () =>
             substitute(settings.messageTemplate, {
-              customerName: customerName.trim() || "عميلنا الكريم",
+              customerName: customerName.trim() || fallbackName,
               customerPhone: trimmedPhone,
               invoiceId: result.invoiceId,
               invoiceCode: result.invoiceId.slice(-8).toUpperCase(),
-              totalPrice: formatPrice(total),
+              totalPrice: fmt(total),
               productNames: lines.map((l) => l.product.name).join("، "),
               receiptLink: "",
-              date: saleDate.toLocaleDateString("ar-EG"),
+              date: saleDate.toLocaleDateString(
+                locale === "en" ? "en-EG" : "ar-EG",
+                { numberingSystem: "latn" } as Intl.DateTimeFormatOptions,
+              ),
               shopName: settings.shopName,
               shopPhone: settings.shopPhone,
             })
@@ -763,14 +774,17 @@ export function SaleForm({
             // PDF mode: build a clean caption WITHOUT the receipt link
             // (the customer is getting the PDF itself, no link needed).
             const captionRaw = substitute(settings.messageTemplate, {
-              customerName: customerName.trim() || "عميلنا الكريم",
+              customerName: customerName.trim() || fallbackName,
               customerPhone: trimmedPhone,
               invoiceId: result.invoiceId,
               invoiceCode: result.invoiceId.slice(-8).toUpperCase(),
-              totalPrice: formatPrice(total),
+              totalPrice: fmt(total),
               productNames: lines.map((l) => l.product.name).join("، "),
               receiptLink: "",
-              date: saleDate.toLocaleDateString("ar-EG"),
+              date: saleDate.toLocaleDateString(
+                locale === "en" ? "en-EG" : "ar-EG",
+                { numberingSystem: "latn" } as Intl.DateTimeFormatOptions,
+              ),
               shopName: settings.shopName,
               shopPhone: settings.shopPhone,
             });
@@ -877,10 +891,10 @@ export function SaleForm({
   return (
     <div className="bg-white rounded-xl p-5 shadow-sm border border-border">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold">تسجيل بيع جديد</h3>
+        <h3 className="font-semibold">{t.title}</h3>
         {cart.length > 0 && (
           <span className="text-xs px-2 py-1 rounded-full bg-accent-light text-accent font-medium">
-            {cart.length} منتج في الفاتورة
+            {t.itemsInCart.replace("{n}", String(cart.length))}
           </span>
         )}
       </div>
@@ -890,7 +904,7 @@ export function SaleForm({
 
         {!selectedProduct && cart.length === 0 && recentProducts.length > 0 && (
           <div>
-            <p className="text-xs text-text-secondary mb-2">منتجات حديثة:</p>
+            <p className="text-xs text-text-secondary mb-2">{t.recentLabel}</p>
             <div className="flex flex-wrap gap-2">
               {recentProducts.map((p) => (
                 <button
@@ -909,11 +923,11 @@ export function SaleForm({
         {selectedProduct && (
           <div className="space-y-3 p-3 rounded-lg border border-border">
             <p className="text-sm text-text-secondary">
-              المتاح: {remainingStockForCurrent} قطعة
+              {t.available.replace("{n}", String(remainingStockForCurrent))}
             </p>
 
             <Input
-              label="الكمية"
+              label={t.fields.quantity}
               type="number"
               value={quantity}
               onChange={(e) => setQuantity(Number(e.target.value))}
@@ -921,13 +935,13 @@ export function SaleForm({
               max={remainingStockForCurrent}
               error={
                 quantity > remainingStockForCurrent
-                  ? `الحد الأقصى: ${remainingStockForCurrent}`
+                  ? t.fields.maxQuantity.replace("{n}", String(remainingStockForCurrent))
                   : undefined
               }
             />
 
             <Input
-              label="سعر الوحدة (جنيه)"
+              label={t.fields.pricePerUnit}
               type="number"
               value={pricePerUnit}
               onChange={(e) => setPricePerUnit(Number(e.target.value))}
@@ -935,7 +949,7 @@ export function SaleForm({
             />
 
             <div className="space-y-2 p-3 bg-gray-50 rounded-lg border border-gray-100">
-              <p className="text-xs font-medium text-text-secondary">خصم على هذا المنتج (اختياري)</p>
+              <p className="text-xs font-medium text-text-secondary">{t.fields.lineDiscount}</p>
               <div className="flex rounded-lg overflow-hidden border border-border">
                 <button
                   type="button"
@@ -947,7 +961,7 @@ export function SaleForm({
                   }`}
                 >
                   <Percent className="w-3 h-3" />
-                  نسبة
+                  {t.fields.percent}
                 </button>
                 <button
                   type="button"
@@ -959,11 +973,11 @@ export function SaleForm({
                   }`}
                 >
                   <DollarSign className="w-3 h-3" />
-                  مبلغ
+                  {t.fields.amount}
                 </button>
               </div>
               <Input
-                label={lineDiscountType === "percentage" ? "نسبة %" : "مبلغ ج.م"}
+                label={lineDiscountType === "percentage" ? t.fields.discountPercent : t.fields.discountAmount}
                 type="number"
                 value={lineDiscountValue}
                 onChange={(e) => setLineDiscountValue(Number(e.target.value))}
@@ -979,7 +993,7 @@ export function SaleForm({
               className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-accent-light text-accent hover:bg-accent hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
             >
               <Plus className="w-4 h-4" />
-              إضافة للفاتورة
+              {t.addToCart}
             </button>
           </div>
         )}
@@ -999,18 +1013,18 @@ export function SaleForm({
                 <div key={idx} className="flex items-center gap-2 p-3 text-sm">
                   <ShoppingCart className="w-4 h-4 text-text-secondary shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{line.product.name}</p>
+                    <p className="font-medium truncate" dir="auto">{line.product.name}</p>
                     <p className="text-xs text-text-secondary">
-                      {line.quantity} × {formatPrice(line.pricePerUnit)}
+                      {line.quantity} × {fmt(line.pricePerUnit)}
                       {ld > 0 && (
                         <span className="text-danger ms-1">
-                          (خصم - {formatPrice(ld)})
+                          {t.lineDiscountInline.replace("{amount}", fmt(ld))}
                         </span>
                       )}
                     </p>
                   </div>
                   <span className="font-bold whitespace-nowrap">
-                    {formatPrice(lineSubtotal - ld)}
+                    {fmt(lineSubtotal - ld)}
                   </span>
                   <button
                     type="button"
@@ -1030,7 +1044,7 @@ export function SaleForm({
           <>
             <div className="space-y-2 p-3 bg-gray-50 rounded-lg border border-gray-100">
               <p className="text-sm font-medium text-text-secondary">
-                خصم على إجمالي الفاتورة (اختياري)
+                {t.orderDiscount}
               </p>
               <div className="flex rounded-lg overflow-hidden border border-border">
                 <button
@@ -1043,7 +1057,7 @@ export function SaleForm({
                   }`}
                 >
                   <Percent className="w-3 h-3" />
-                  نسبة
+                  {t.fields.percent}
                 </button>
                 <button
                   type="button"
@@ -1055,11 +1069,11 @@ export function SaleForm({
                   }`}
                 >
                   <DollarSign className="w-3 h-3" />
-                  مبلغ
+                  {t.fields.amount}
                 </button>
               </div>
               <Input
-                label={orderDiscountType === "percentage" ? "نسبة %" : "مبلغ ج.م"}
+                label={orderDiscountType === "percentage" ? t.fields.discountPercent : t.fields.discountAmount}
                 type="number"
                 value={orderDiscountValue}
                 onChange={(e) => setOrderDiscountValue(Number(e.target.value))}
@@ -1071,29 +1085,32 @@ export function SaleForm({
             {/* Totals preview */}
             <div className="p-4 bg-accent-light rounded-lg space-y-1 text-sm">
               <div className="flex justify-between">
-                <span className="text-text-secondary">المجموع الفرعي</span>
-                <span>{formatPrice(cartSubtotalGross)}</span>
+                <span className="text-text-secondary">{t.totals.subtotal}</span>
+                <span>{fmt(cartSubtotalGross)}</span>
               </div>
               {cartLineDiscountTotal > 0 && (
                 <div className="flex justify-between text-danger">
-                  <span>خصومات بنود</span>
-                  <span>- {formatPrice(cartLineDiscountTotal)}</span>
+                  <span>{t.totals.lineDiscounts}</span>
+                  <span>- {fmt(cartLineDiscountTotal)}</span>
                 </div>
               )}
               {orderDiscountAmount > 0 && (
                 <div className="flex justify-between text-danger">
-                  <span>خصم الفاتورة</span>
-                  <span>- {formatPrice(orderDiscountAmount)}</span>
+                  <span>{t.totals.orderDiscount}</span>
+                  <span>- {fmt(orderDiscountAmount)}</span>
                 </div>
               )}
               {loyaltyPointsAppliedDisplay > 0 && (
                 <div className="flex justify-between text-orange-600">
                   <span>
-                    خصم نقاط ({loyaltyPointsAppliedDisplay} نقطة)
+                    {t.totals.loyaltyPoints.replace(
+                      "{n}",
+                      String(loyaltyPointsAppliedDisplay),
+                    )}
                   </span>
                   <span>
                     -{" "}
-                    {formatPrice(
+                    {fmt(
                       Math.round(
                         loyaltyPointsAppliedDisplay *
                           (settings.loyaltyEgpPerPoint || 0) *
@@ -1105,13 +1122,13 @@ export function SaleForm({
               )}
               {loyaltyCreditAppliedDisplay > 0 && (
                 <div className="flex justify-between text-success">
-                  <span>خصم الرصيد</span>
-                  <span>- {formatPrice(loyaltyCreditAppliedDisplay)}</span>
+                  <span>{t.totals.loyaltyCredit}</span>
+                  <span>- {fmt(loyaltyCreditAppliedDisplay)}</span>
                 </div>
               )}
               <div className="border-t border-accent/20 pt-1 flex justify-between font-bold">
-                <span>الإجمالي</span>
-                <span className="text-2xl text-accent">{formatPrice(cartTotal)}</span>
+                <span>{t.totals.total}</span>
+                <span className="text-2xl text-accent">{fmt(cartTotal)}</span>
               </div>
               {loyaltyDiscountAmount > 0 &&
                 (requestedRedeemPoints > cappedRedeemPoints ||
@@ -1120,8 +1137,7 @@ export function SaleForm({
                     requestedApplyCredit >
                     cartAfterOrderDiscount) && (
                   <p className="text-[11px] text-orange-700 leading-relaxed pt-1">
-                    تم تعديل قيمة الخصم تلقائياً لتطابق الحد المتاح من
-                    المحفظة و رصيد الفاتورة.
+                    {t.totals.loyaltyTrimmedNote}
                   </p>
                 )}
             </div>
@@ -1129,8 +1145,8 @@ export function SaleForm({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <CustomerAutocomplete
                 field="name"
-                label="اسم العميل (اختياري)"
-                placeholder="ابدأ الكتابة لاختيار عميل سابق..."
+                label={t.customer.nameLabel}
+                placeholder={t.customer.namePlaceholder}
                 value={customerName}
                 onChange={setCustomerName}
                 onPick={handleCustomerPick}
@@ -1138,8 +1154,8 @@ export function SaleForm({
               />
               <CustomerAutocomplete
                 field="phone"
-                label="رقم الموبايل"
-                placeholder="ابدأ الكتابة لاختيار رقم سابق..."
+                label={t.customer.phoneLabel}
+                placeholder={t.customer.phonePlaceholder}
                 value={customerPhone}
                 onChange={setCustomerPhone}
                 onPick={handleCustomerPick}
@@ -1154,28 +1170,26 @@ export function SaleForm({
               <div className="rounded-xl border border-accent-light bg-accent-light/30 p-3 space-y-2">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-semibold text-text-primary">
-                    محفظة العميل
+                    {t.loyalty.walletLabel}
                   </span>
                   <div className="flex items-center gap-3 tabular-nums">
                     <span>
-                      <b className="text-orange-600">{walletPoints}</b> نقطة
+                      <b className="text-orange-600">{walletPoints}</b> {t.loyalty.pointsSuffix}
                       {walletPoints > 0 && settings.loyaltyEgpPerPoint > 0 && (
                         <span className="text-text-secondary">
                           {" "}
                           (={" "}
-                          {(walletPoints * settings.loyaltyEgpPerPoint).toFixed(
-                            2,
-                          )}{" "}
-                          ج)
+                          {fmt(walletPoints * settings.loyaltyEgpPerPoint)}
+                          )
                         </span>
                       )}
                     </span>
                     <span className="text-text-secondary">·</span>
                     <span>
                       <b className="text-success">
-                        {walletCredit.toFixed(2)} ج
+                        {fmt(walletCredit)}
                       </b>{" "}
-                      رصيد
+                      {t.loyalty.creditSuffix}
                     </span>
                   </div>
                 </div>
@@ -1183,7 +1197,7 @@ export function SaleForm({
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label className="block text-[11px] text-text-secondary mb-0.5">
-                        خصم نقاط
+                        {t.loyalty.redeemPoints}
                       </label>
                       <input
                         type="number"
@@ -1198,7 +1212,7 @@ export function SaleForm({
                     </div>
                     <div>
                       <label className="block text-[11px] text-text-secondary mb-0.5">
-                        استخدام رصيد (ج)
+                        {t.loyalty.applyCredit}
                       </label>
                       <input
                         type="number"
@@ -1218,10 +1232,10 @@ export function SaleForm({
 
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-1.5">
-                طريقة الدفع
+                {t.payment.label}
               </label>
               <div className="grid grid-cols-4 gap-1 rounded-lg overflow-hidden border border-border">
-                {(Object.keys(PAYMENT_METHOD_LABELS) as PaymentMethod[]).map((m) => (
+                {(["cash", "instapay", "card", "deferred"] as PaymentMethod[]).map((m) => (
                   <button
                     key={m}
                     type="button"
@@ -1234,22 +1248,22 @@ export function SaleForm({
                         : "bg-white text-text-secondary"
                     }`}
                   >
-                    {PAYMENT_METHOD_LABELS[m]}
+                    {dict.app.catalog.payment[m]}
                   </button>
                 ))}
               </div>
               {paymentMethod === "deferred" && (
                 <p className="mt-1 text-xs text-orange-600">
-                  ستُسجَّل الفاتورة كآجل غير مدفوع.
+                  {t.payment.deferredNote}
                 </p>
               )}
             </div>
 
             <Input
-              label="ملاحظة (اختياري)"
+              label={t.note.label}
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="ملاحظة..."
+              placeholder={t.note.placeholder}
             />
 
             <div className="space-y-2 p-3 bg-gray-50 rounded-lg border border-gray-100">
@@ -1262,7 +1276,7 @@ export function SaleForm({
                 />
                 <Calendar className="w-4 h-4 text-text-secondary" />
                 <span className="text-sm font-medium text-text-secondary">
-                  تسجيل الفاتورة بتاريخ سابق
+                  {t.backdate.label}
                 </span>
               </label>
               {useCustomDate && (
@@ -1282,7 +1296,7 @@ export function SaleForm({
               loading={loading}
               className="w-full"
             >
-              تسجيل الفاتورة
+              {t.submit}
             </Button>
           </>
         )}
@@ -1297,7 +1311,7 @@ export function SaleForm({
             className="w-full flex items-center justify-center gap-2"
           >
             <Printer className="w-5 h-5" />
-            طباعة الفاتورة
+            {t.printInvoice}
           </Button>
         </div>
       )}

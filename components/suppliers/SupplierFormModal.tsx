@@ -5,6 +5,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import type { SupplierDescriptor } from "@/lib/types";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 interface Props {
   isOpen: boolean;
@@ -16,6 +17,8 @@ interface Props {
 }
 
 export function SupplierFormModal({ isOpen, onClose, supplier, onSaved, onError }: Props) {
+  const dict = useDictionary();
+  const t = dict.app.suppliers.form;
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -53,7 +56,7 @@ export function SupplierFormModal({ isOpen, onClose, supplier, onSaved, onError 
       });
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
-        onError(json.error || "تعذر الحفظ");
+        onError(json.error || t.errors.saveFailed);
         return;
       }
       const data = supplier ? { id: supplier.id } : await res.json();
@@ -65,38 +68,38 @@ export function SupplierFormModal({ isOpen, onClose, supplier, onSaved, onError 
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={supplier ? "تعديل مورد" : "مورد جديد"}>
+    <Modal isOpen={isOpen} onClose={onClose} title={supplier ? t.editTitle : t.createTitle}>
       <form onSubmit={submit} className="space-y-4">
         <Input
-          label="الاسم *"
+          label={t.name}
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
           autoFocus
         />
         <Input
-          label="رقم الهاتف"
+          label={t.phone}
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           inputMode="tel"
         />
         <Input
-          label="البريد الإلكتروني"
+          label={t.email}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           type="email"
         />
         <Input
-          label="العنوان"
+          label={t.address}
           value={address}
           onChange={(e) => setAddress(e.target.value)}
         />
         <div>
           <label className="block text-sm font-medium text-text-secondary mb-1.5">
-            ملاحظات
+            {t.notes}
           </label>
           <textarea
-            dir="rtl"
+            dir="auto"
             rows={3}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
@@ -105,10 +108,10 @@ export function SupplierFormModal({ isOpen, onClose, supplier, onSaved, onError 
         </div>
         <div className="flex gap-2 justify-end pt-2">
           <Button type="button" variant="secondary" onClick={onClose} disabled={submitting}>
-            إلغاء
+            {t.cancel}
           </Button>
           <Button type="submit" disabled={!name.trim() || submitting}>
-            {submitting ? "جاري الحفظ…" : supplier ? "حفظ" : "إضافة"}
+            {submitting ? t.saving : supplier ? t.save : t.add}
           </Button>
         </div>
       </form>

@@ -32,13 +32,15 @@ import { Toast } from "@/components/ui/Toast";
 import { Pagination } from "@/components/ui/Pagination";
 import { voidSale } from "@/lib/api/sales";
 import { salesToCsv, downloadCsv } from "@/lib/csv";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 import type { Sale, Category, Gender } from "@/lib/types";
 
 export default function SalesPage() {
+  const dict = useDictionary();
   return (
     <Suspense
       fallback={
-        <AppShell title="المبيعات">
+        <AppShell title={dict.app.sales.title}>
           <PageSkeleton rows={8} chart={false} />
         </AppShell>
       }
@@ -102,6 +104,8 @@ function rangeToDates(
 function SalesPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const dict = useDictionary();
+  const t = dict.app.sales;
 
   const { sales, loading: salesLoading } = useSales();
   const { returns: _returns } = useReturns();
@@ -329,7 +333,7 @@ function SalesPageInner() {
     });
   };
   const handleReturnSuccess = () => {
-    setToast({ type: "success", message: "تم تسجيل المرتجع وتحديث المخزن" });
+    setToast({ type: "success", message: t.toast.returnSuccess });
   };
 
   const handleVoidConfirm = useCallback(async () => {
@@ -339,15 +343,15 @@ function SalesPageInner() {
       setToast({
         type: "success",
         message: voidSaleData.isReturned
-          ? "تم حذف الفاتورة"
-          : "تم حذف الفاتورة وإرجاع المخزون",
+          ? t.toast.saleDeleted
+          : t.toast.saleDeletedRestocked,
       });
     } catch (e: any) {
-      setToast({ type: "error", message: e.message || "تعذر الحذف" });
+      setToast({ type: "error", message: e.message || t.toast.deleteFailed });
     } finally {
       setVoidSaleData(null);
     }
-  }, [voidSaleData]);
+  }, [voidSaleData, t.toast]);
 
   const handleBulkExport = useCallback(() => {
     if (selectedSales.length === 0) return;
@@ -361,11 +365,11 @@ function SalesPageInner() {
     if (selectedSales.length === 0) return;
     const valid = selectedSales.filter((s) => !s.isReturned);
     if (valid.length === 0) {
-      setToast({ type: "error", message: "لا توجد فواتير صالحة للطباعة في التحديد" });
+      setToast({ type: "error", message: t.toast.nothingToPrint });
       return;
     }
     setPrintQueue(valid);
-  }, [selectedSales]);
+  }, [selectedSales, t.toast.nothingToPrint]);
 
   // Drive the print queue: when receiptData closes, advance
   useEffect(() => {
@@ -402,29 +406,16 @@ function SalesPageInner() {
 
   if (salesLoading) {
     return (
-      <AppShell title="المبيعات">
+      <AppShell title={t.title}>
         <PageSkeleton rows={8} />
       </AppShell>
     );
   }
 
-  const rangeLabel =
-    dateRange === "today"
-      ? "اليوم"
-      : dateRange === "yesterday"
-        ? "أمس"
-        : dateRange === "7d"
-          ? "آخر 7 أيام"
-          : dateRange === "30d"
-            ? "آخر 30 يوم"
-            : dateRange === "thisMonth"
-              ? "الشهر"
-              : dateRange === "custom"
-                ? "الفترة المختارة"
-                : "الكل";
+  const rangeLabel = t.rangeLabel[dateRange];
 
   return (
-    <AppShell title="المبيعات">
+    <AppShell title={t.title}>
       <div className="space-y-4">
         {/* KPIs over the date-ranged sales */}
         <SalesKpiCards sales={dateRangedSales} rangeLabel={rangeLabel} />
@@ -434,7 +425,7 @@ function SalesPageInner() {
 
         {/* Sale Form */}
         <SaleForm
-          onSuccess={() => setToast({ type: "success", message: "تم تسجيل البيع بنجاح" })}
+          onSuccess={() => setToast({ type: "success", message: t.toast.saleSuccess })}
           onPrintLastSale={setReceiptData}
           onPrintLastInvoice={setInvoiceReceipt}
         />
@@ -484,10 +475,10 @@ function SalesPageInner() {
             onClick={handleResetFilters}
             className="px-3 py-1.5 rounded-lg text-sm text-text-secondary hover:text-accent border border-border bg-white"
           >
-            مسح الفلاتر
+            {t.clearFilters}
           </button>
           <span className="text-sm text-text-secondary">
-            {filteredSales.length} فاتورة
+            {t.invoiceCount.replace("{n}", String(filteredSales.length))}
           </span>
         </div>
 
@@ -563,20 +554,22 @@ function SalesPageInner() {
         isOpen={!!editSale}
         onClose={() => setEditSale(null)}
         sale={editSale}
-        onSuccess={() => setToast({ type: "success", message: "تم تحديث الفاتورة" })}
+        onSuccess={() => setToast({ type: "success", message: t.toast.saleUpdated })}
       />
 
       <ConfirmDialog
         isOpen={!!voidSaleData}
         onClose={() => setVoidSaleData(null)}
         onConfirm={handleVoidConfirm}
-        title="حذف الفاتورة"
+        title={t.void.title}
         message={
           voidSaleData?.isReturned
-            ? "هذه الفاتورة مرتجعة بالفعل. سيتم حذفها بشكل نهائي."
-            : `سيتم حذف الفاتورة وإرجاع ${voidSaleData?.quantitySold || 0} قطعة من "${voidSaleData?.productName}" إلى المخزن.`
+            ? t.void.messageReturned
+            : t.void.message
+                .replace("{n}", String(voidSaleData?.quantitySold || 0))
+                .replace("{name}", voidSaleData?.productName || "")
         }
-        confirmText="حذف"
+        confirmText={t.void.confirm}
         variant="danger"
       />
 

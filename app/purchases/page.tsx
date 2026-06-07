@@ -1,60 +1,55 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
-import { Plus, Receipt, CheckCircle, XCircle, Trash2 } from "@/lib/icons";
+import {
+  Plus,
+  Receipt,
+  CheckCircle,
+  XCircle,
+  Trash2,
+  ChevronDown,
+  ChevronUp,
+  Wallet,
+} from "@/lib/icons";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/Button";
 import { Toast } from "@/components/ui/Toast";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { PurchaseOrderBuilder } from "@/components/purchases/PurchaseOrderBuilder";
+import { PurchasesKpiCards } from "@/components/purchases/PurchasesKpiCards";
+import {
+  PurchasesFilters,
+  type PaymentStatusKey,
+} from "@/components/purchases/PurchasesFilters";
+import { PaymentModal } from "@/components/purchases/PaymentModal";
 import {
   usePurchaseOrders,
   type PurchaseOrderStatus,
+  type PurchaseOrderSummary,
 } from "@/hooks/usePurchaseOrders";
+import { useSuppliers } from "@/hooks/useSuppliers";
 import { can } from "@/lib/permissions";
-import { formatPrice } from "@/lib/utils";
-import {
-  DATE_RANGE_LABELS,
-  type DateRangeKey,
-} from "@/components/sales/SalesFilters";
+import { type DateRangeKey } from "@/components/sales/SalesFilters";
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
+import { formatCurrency, formatDate } from "@/lib/i18n/format";
 
 type ToastState = { type: "success" | "error"; message: string } | null;
 type PendingAction =
   | { kind: "receive"; id: string }
   | { kind: "cancel"; id: string }
   | { kind: "delete"; id: string }
+  | { kind: "deletePayment"; orderId: string; paymentId: string }
   | null;
 
-const ACTION_COPY: Record<
+const ACTION_VARIANT: Record<
   Exclude<PendingAction, null>["kind"],
-  { title: string; message: string; confirmText: string; variant: "danger" | "primary" }
+  "danger" | "primary"
 > = {
-  receive: {
-    title: "استلام أمر الشراء",
-    message:
-      "سيتم إضافة الكميات إلى المخزن وتسجيل المبلغ كمستحق على المورد. هل تريد المتابعة؟",
-    confirmText: "استلام",
-    variant: "primary",
-  },
-  cancel: {
-    title: "إلغاء أمر الشراء",
-    message: "سيتم إلغاء هذا الأمر. لن يتأثر المخزن. هل أنت متأكد؟",
-    confirmText: "إلغاء الأمر",
-    variant: "danger",
-  },
-  delete: {
-    title: "حذف أمر الشراء",
-    message: "سيتم حذف هذا الأمر نهائياً ولا يمكن التراجع عنه.",
-    confirmText: "حذف",
-    variant: "danger",
-  },
-};
-
-const STATUS_LABELS: Record<PurchaseOrderStatus, string> = {
-  draft: "مسودة",
-  received: "تم الاستلام",
-  cancelled: "ملغي",
+  receive: "primary",
+  cancel: "danger",
+  delete: "danger",
+  deletePayment: "danger",
 };
 
 const STATUS_STYLES: Record<PurchaseOrderStatus, string> = {
@@ -63,22 +58,13 @@ const STATUS_STYLES: Record<PurchaseOrderStatus, string> = {
   cancelled: "bg-gray-100 text-gray-500",
 };
 
-const FILTER_TABS: { value: PurchaseOrderStatus | "all"; label: string }[] = [
-  { value: "all", label: "الكل" },
-  { value: "draft", label: "مسودات" },
-  { value: "received", label: "مستلمة" },
-  { value: "cancelled", label: "ملغية" },
-];
-
-const DATE_FILTER_ORDER: DateRangeKey[] = [
-  "all",
-  "today",
-  "yesterday",
-  "7d",
-  "30d",
-  "thisMonth",
-  "custom",
-];
+interface PaymentRow {
+  id: string;
+  amount: number;
+  method: string;
+  paidAt: Date;
+  notes: string | null;
+}
 
 /**
  * Resolve a date-range preset to an inclusive [from, to] window. Returns null
@@ -133,49 +119,120 @@ function resolveDateWindow(
   }
 }
 
+function classifyPayment(po: PurchaseOrderSummary): PaymentStatusKey {
+  if (po.paidAmount <= 0.001) return "unpaid";
+  if (po.paidAmount + 0.001 >= po.total) return "paid";
+  return "partial";
+}
+
 export default function PurchasesPage() {
+  const dict = useDictionary();
+  const locale = useLocale();
+  const t = dict.app.purchases;
+  const statusLabels = dict.app.purchasesStatus;
   const { data: session } = useSession();
   const principal = session?.user
     ? { role: session.user.role, permissions: session.user.permissions }
     : null;
   const canManage = can(principal, "manage_purchases");
 
-  const [filter, setFilter] = useState<PurchaseOrderStatus | "all">("all");
+  // Fetch all orders client-side once; filtering happens in memory so KPI
+  // cards reflect the same dataset users see. Volume is typically small.
+  const { data: orders, loading, refresh } = usePurchaseOrders();
+  const { data: suppliers } = useSuppliers();
+
+  const [query, setQuery] = useState("");
   const [dateRange, setDateRange] = useState<DateRangeKey>("all");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
-  const { data: orders, loading, refresh } = usePurchaseOrders(
-    filter === "all" ? undefined : { status: filter },
+  const [selectedSupplier, setSelectedSupplier] = useState<string | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<PurchaseOrderStatus | "all">(
+    "all",
   );
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatusKey>("all");
 
   const [builderOpen, setBuilderOpen] = useState(false);
   const [pending, setPending] = useState<PendingAction>(null);
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<ToastState>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [payOpen, setPayOpen] = useState<PurchaseOrderSummary | null>(null);
+  const [paymentsByPo, setPaymentsByPo] = useState<Record<string, PaymentRow[]>>({});
 
-  // Filter orders by the chosen date window. The "date" of an order is its
-  // received date when it has one (matches the display label), otherwise its
-  // order date — same convention as the existing list rendering.
   const filteredOrders = useMemo(() => {
     const window = resolveDateWindow(dateRange, customFrom, customTo);
-    if (!window) return orders;
+    const q = query.trim().toLowerCase();
     return orders.filter((o) => {
-      const d = o.receivedDate ?? o.orderDate;
-      return d >= window.from && d <= window.to;
+      if (window) {
+        const d = o.receivedDate ?? o.orderDate;
+        if (d < window.from || d > window.to) return false;
+      }
+      if (selectedSupplier && o.supplierId !== selectedSupplier) return false;
+      if (selectedStatus !== "all" && o.status !== selectedStatus) return false;
+      if (paymentStatus !== "all" && o.status === "received") {
+        if (classifyPayment(o) !== paymentStatus) return false;
+      } else if (paymentStatus !== "all") {
+        // Non-received POs have no payment status — exclude when filtered.
+        return false;
+      }
+      if (q) {
+        const haystack = `${o.supplierName} ${o.notes ?? ""}`.toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      return true;
     });
-  }, [orders, dateRange, customFrom, customTo]);
+  }, [
+    orders,
+    dateRange,
+    customFrom,
+    customTo,
+    selectedSupplier,
+    selectedStatus,
+    paymentStatus,
+    query,
+  ]);
 
-  const draftCount = useMemo(
-    () => filteredOrders.filter((o) => o.status === "draft").length,
-    [filteredOrders],
-  );
-  const monthSpend = useMemo(() => {
-    const since = new Date();
-    since.setDate(since.getDate() - 30);
-    return filteredOrders
-      .filter((o) => o.status === "received" && o.receivedDate && o.receivedDate >= since)
-      .reduce((sum, o) => sum + o.total, 0);
-  }, [filteredOrders]);
+  const rangeLabel = useMemo(() => {
+    if (dateRange === "custom") return "";
+    return dict.app.dateRange[dateRange];
+  }, [dateRange, dict.app.dateRange]);
+
+  // Lazy-load payments for a PO when its row expands.
+  const loadPayments = async (poId: string) => {
+    if (paymentsByPo[poId]) return;
+    try {
+      const res = await fetch(`/api/purchase-orders/${poId}/payments`, {
+        cache: "no-store",
+      });
+      if (!res.ok) return;
+      const json: {
+        data: Array<{
+          id: string;
+          amount: number;
+          method: string;
+          paidAt: string;
+          notes: string | null;
+        }>;
+      } = await res.json();
+      setPaymentsByPo((prev) => ({
+        ...prev,
+        [poId]: json.data.map((p) => ({
+          id: p.id,
+          amount: p.amount,
+          method: p.method,
+          paidAt: new Date(p.paidAt),
+          notes: p.notes,
+        })),
+      }));
+    } catch {
+      // silent — row will just show "—"
+    }
+  };
+
+  useEffect(() => {
+    if (expanded) loadPayments(expanded);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expanded]);
 
   const runPending = async () => {
     if (!pending) return;
@@ -190,16 +247,25 @@ export default function PurchasesPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ updateCost: true }),
         });
-        successMsg = "تم الاستلام وتحديث المخزن";
-        errorMsg = "تعذر الاستلام";
+        successMsg = t.toast.receiveSuccess;
+        errorMsg = t.toast.receiveFailed;
       } else if (pending.kind === "cancel") {
-        res = await fetch(`/api/purchase-orders/${pending.id}/cancel`, { method: "POST" });
-        successMsg = "تم الإلغاء";
-        errorMsg = "تعذر الإلغاء";
-      } else {
+        res = await fetch(`/api/purchase-orders/${pending.id}/cancel`, {
+          method: "POST",
+        });
+        successMsg = t.toast.cancelSuccess;
+        errorMsg = t.toast.cancelFailed;
+      } else if (pending.kind === "delete") {
         res = await fetch(`/api/purchase-orders/${pending.id}`, { method: "DELETE" });
-        successMsg = "تم الحذف";
-        errorMsg = "تعذر الحذف";
+        successMsg = t.toast.deleteSuccess;
+        errorMsg = t.toast.deleteFailed;
+      } else {
+        res = await fetch(
+          `/api/purchase-orders/${pending.orderId}/payments/${pending.paymentId}`,
+          { method: "DELETE" },
+        );
+        successMsg = t.toast.paymentDeleted;
+        errorMsg = t.toast.paymentDeleteFailed;
       }
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
@@ -207,7 +273,16 @@ export default function PurchasesPage() {
         return;
       }
       setToast({ type: "success", message: successMsg });
+      const wasPayment =
+        pending.kind === "deletePayment" ? pending.orderId : null;
       setPending(null);
+      if (wasPayment) {
+        setPaymentsByPo((prev) => {
+          const next = { ...prev };
+          delete next[wasPayment];
+          return next;
+        });
+      }
       await refresh();
     } finally {
       setSubmitting(false);
@@ -215,173 +290,170 @@ export default function PurchasesPage() {
   };
 
   return (
-    <AppShell title="المشتريات">
+    <AppShell title={t.title}>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-text-primary">المشتريات</h1>
+            <h1 className="text-2xl font-bold text-text-primary">{t.heading}</h1>
             <p className="text-sm text-text-secondary mt-1">
-              {draftCount > 0 && (
-                <>
-                  {draftCount} مسودة بانتظار الاستلام
-                  {monthSpend > 0 && " · "}
-                </>
-              )}
-              {monthSpend > 0 && (
-                <>إجمالي 30 يوم: {formatPrice(monthSpend)}</>
-              )}
+              {t.count.replace("{n}", String(filteredOrders.length))}
             </p>
           </div>
           {canManage && (
             <Button onClick={() => setBuilderOpen(true)}>
               <Plus className="w-4 h-4 me-1" />
-              أمر شراء جديد
+              {t.newOrder}
             </Button>
           )}
         </div>
 
-        {/* Status filter tabs */}
-        <div className="flex flex-wrap gap-2">
-          {FILTER_TABS.map((t) => (
-            <button
-              key={t.value}
-              type="button"
-              onClick={() => setFilter(t.value)}
-              className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${
-                filter === t.value
-                  ? "bg-accent text-white border-accent"
-                  : "bg-white border-border text-text-secondary hover:border-accent"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+        {/* KPI cards driven by filtered data */}
+        <PurchasesKpiCards orders={filteredOrders} rangeLabel={rangeLabel} />
 
-        {/* Date range filter */}
-        <div className="space-y-2">
-          <div className="flex flex-wrap gap-2">
-            {DATE_FILTER_ORDER.map((key) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setDateRange(key)}
-                className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${
-                  dateRange === key
-                    ? "bg-accent text-white border-accent"
-                    : "bg-white border-border text-text-secondary hover:border-accent"
-                }`}
-              >
-                {DATE_RANGE_LABELS[key]}
-              </button>
-            ))}
-          </div>
-          {dateRange === "custom" && (
-            <div className="flex flex-wrap items-end gap-3 bg-white border border-border rounded-lg p-3">
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-text-secondary">من</label>
-                <input
-                  type="date"
-                  value={customFrom}
-                  onChange={(e) => setCustomFrom(e.target.value)}
-                  className="px-3 py-1.5 rounded-md border border-border focus:outline-none focus:border-accent"
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-text-secondary">إلى</label>
-                <input
-                  type="date"
-                  value={customTo}
-                  onChange={(e) => setCustomTo(e.target.value)}
-                  className="px-3 py-1.5 rounded-md border border-border focus:outline-none focus:border-accent"
-                />
-              </div>
-              {(customFrom || customTo) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCustomFrom("");
-                    setCustomTo("");
-                  }}
-                  className="text-xs text-text-secondary hover:text-danger px-2 py-1.5"
-                >
-                  مسح
-                </button>
-              )}
-            </div>
-          )}
-        </div>
+        {/* Filters */}
+        <PurchasesFilters
+          query={query}
+          onQueryChange={setQuery}
+          dateRange={dateRange}
+          onDateRangeChange={setDateRange}
+          customFrom={customFrom}
+          customTo={customTo}
+          onCustomFromChange={setCustomFrom}
+          onCustomToChange={setCustomTo}
+          selectedSupplier={selectedSupplier}
+          onSupplierChange={setSelectedSupplier}
+          suppliers={suppliers}
+          selectedStatus={selectedStatus}
+          onStatusChange={setSelectedStatus}
+          paymentStatus={paymentStatus}
+          onPaymentStatusChange={setPaymentStatus}
+        />
 
         {/* List */}
         {loading ? (
-          <p className="text-sm text-text-secondary">جاري التحميل…</p>
+          <p className="text-sm text-text-secondary">{t.loading}</p>
         ) : filteredOrders.length === 0 ? (
           <div className="bg-white rounded-2xl border border-border py-12 text-center">
             <Receipt className="w-9 h-9 mx-auto mb-4 text-text-secondary" />
             <p className="text-text-secondary">
-              {orders.length === 0
-                ? "لا توجد أوامر شراء بعد."
-                : "لا توجد أوامر شراء في هذه الفترة."}
+              {orders.length === 0 ? t.emptyFresh : t.emptyFiltered}
             </p>
           </div>
         ) : (
           <div className="bg-white rounded-2xl border border-border divide-y divide-border">
-            {filteredOrders.map((o) => (
-              <div key={o.id} className="p-4 flex flex-col sm:flex-row gap-3 sm:items-center">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium text-text-primary truncate">
-                      {o.supplierName}
-                    </span>
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${
-                        STATUS_STYLES[o.status]
-                      }`}
-                    >
-                      {STATUS_LABELS[o.status]}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-text-secondary">
-                    <span>{o.itemCount} صنف</span>
-                    <span>{formatPrice(o.total)}</span>
-                    <span>
-                      {o.status === "received" && o.receivedDate
-                        ? `استُلم ${o.receivedDate.toLocaleDateString("ar-EG")}`
-                        : `طُلب ${o.orderDate.toLocaleDateString("ar-EG")}`}
-                    </span>
-                  </div>
-                  {o.notes && (
-                    <p className="text-xs text-text-secondary mt-1 truncate">{o.notes}</p>
-                  )}
-                </div>
-
-                {canManage && o.status === "draft" && (
-                  <div className="flex gap-2 shrink-0">
-                    <Button size="sm" onClick={() => setPending({ kind: "receive", id: o.id })}>
-                      <CheckCircle className="w-4 h-4 me-1" />
-                      استلام
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setPending({ kind: "cancel", id: o.id })}
-                    >
-                      <XCircle className="w-4 h-4 me-1" />
-                      إلغاء
-                    </Button>
+            {filteredOrders.map((o) => {
+              const remaining = Math.max(0, o.total - o.paidAmount);
+              const isExpanded = expanded === o.id;
+              const paid = o.paidAmount;
+              const showPay = canManage && o.status === "received" && remaining > 0.001;
+              return (
+                <div key={o.id} className="p-4">
+                  <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
                     <button
                       type="button"
-                      onClick={() => setPending({ kind: "delete", id: o.id })}
-                      className="p-2 rounded-md text-text-secondary hover:bg-danger-light hover:text-danger"
-                      title="حذف"
+                      onClick={() => setExpanded(isExpanded ? null : o.id)}
+                      className="flex-1 min-w-0 text-right"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium text-text-primary truncate" dir="auto">
+                          {o.supplierName}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${
+                            STATUS_STYLES[o.status]
+                          }`}
+                        >
+                          {statusLabels[o.status]}
+                        </span>
+                        {o.status === "received" && (
+                          <PaymentBadge total={o.total} paid={paid} labels={t.paymentBadge} />
+                        )}
+                        {isExpanded ? (
+                          <ChevronUp className="w-4 h-4 text-text-secondary me-auto" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-text-secondary me-auto" />
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-text-secondary">
+                        <span>{t.row.itemCount.replace("{n}", String(o.itemCount))}</span>
+                        <span>
+                          {t.row.total.replace("{amount}", formatCurrency(o.total, locale))}
+                        </span>
+                        {o.status === "received" && (
+                          <>
+                            <span className="text-success">
+                              {t.row.paid.replace("{amount}", formatCurrency(paid, locale))}
+                            </span>
+                            <span className={remaining > 0 ? "text-danger" : ""}>
+                              {t.row.remaining.replace("{amount}", formatCurrency(remaining, locale))}
+                            </span>
+                          </>
+                        )}
+                        <span>
+                          {o.status === "received" && o.receivedDate
+                            ? t.row.received.replace("{date}", formatDate(o.receivedDate, locale))
+                            : t.row.ordered.replace("{date}", formatDate(o.orderDate, locale))}
+                        </span>
+                      </div>
+                      {o.notes && (
+                        <p className="text-xs text-text-secondary mt-1 truncate" dir="auto">
+                          {o.notes}
+                        </p>
+                      )}
                     </button>
+
+                    {canManage && (
+                      <div className="flex gap-2 shrink-0">
+                        {showPay && (
+                          <Button size="sm" onClick={() => setPayOpen(o)}>
+                            <Wallet className="w-4 h-4 me-1" />
+                            {t.row.pay}
+                          </Button>
+                        )}
+                        {o.status === "draft" && (
+                          <>
+                            <Button
+                              size="sm"
+                              onClick={() => setPending({ kind: "receive", id: o.id })}
+                            >
+                              <CheckCircle className="w-4 h-4 me-1" />
+                              {t.row.receive}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setPending({ kind: "cancel", id: o.id })}
+                            >
+                              <XCircle className="w-4 h-4 me-1" />
+                              {t.row.cancel}
+                            </Button>
+                            <button
+                              type="button"
+                              onClick={() => setPending({ kind: "delete", id: o.id })}
+                              className="p-2 rounded-md text-text-secondary hover:bg-danger-light hover:text-danger"
+                              title={t.row.deleteTitle}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            ))}
+
+                  {isExpanded && o.status === "received" && (
+                    <PaymentsList
+                      payments={paymentsByPo[o.id]}
+                      canManage={canManage}
+                      onDelete={(paymentId) =>
+                        setPending({ kind: "deletePayment", orderId: o.id, paymentId })
+                      }
+                    />
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -390,20 +462,41 @@ export default function PurchasesPage() {
         isOpen={builderOpen}
         onClose={() => setBuilderOpen(false)}
         onSaved={async () => {
-          setToast({ type: "success", message: "تم إنشاء أمر الشراء" });
+          setToast({ type: "success", message: t.toast.created });
           await refresh();
         }}
         onError={(message) => setToast({ type: "error", message })}
       />
 
+      {payOpen && (
+        <PaymentModal
+          isOpen={!!payOpen}
+          onClose={() => setPayOpen(null)}
+          purchaseOrderId={payOpen.id}
+          supplierName={payOpen.supplierName}
+          total={payOpen.total}
+          paidAmount={payOpen.paidAmount}
+          onSaved={async () => {
+            setToast({ type: "success", message: t.toast.paymentRecorded });
+            setPaymentsByPo((prev) => {
+              const next = { ...prev };
+              delete next[payOpen.id];
+              return next;
+            });
+            await refresh();
+          }}
+          onError={(message) => setToast({ type: "error", message })}
+        />
+      )}
+
       <ConfirmDialog
         isOpen={!!pending}
         onClose={() => !submitting && setPending(null)}
         onConfirm={runPending}
-        title={pending ? ACTION_COPY[pending.kind].title : ""}
-        message={pending ? ACTION_COPY[pending.kind].message : ""}
-        confirmText={pending ? ACTION_COPY[pending.kind].confirmText : "تأكيد"}
-        variant={pending ? ACTION_COPY[pending.kind].variant : "danger"}
+        title={pending ? t.actions[pending.kind].title : ""}
+        message={pending ? t.actions[pending.kind].message : ""}
+        confirmText={pending ? t.actions[pending.kind].confirm : t.actions.defaultConfirm}
+        variant={pending ? ACTION_VARIANT[pending.kind] : "danger"}
         loading={submitting}
       />
 
@@ -411,5 +504,93 @@ export default function PurchasesPage() {
         <Toast type={toast.type} message={toast.message} onClose={() => setToast(null)} />
       )}
     </AppShell>
+  );
+}
+
+function PaymentBadge({
+  total,
+  paid,
+  labels,
+}: {
+  total: number;
+  paid: number;
+  labels: { paid: string; partial: string; unpaid: string };
+}) {
+  const status = paid <= 0.001 ? "unpaid" : paid + 0.001 >= total ? "paid" : "partial";
+  const styles =
+    status === "paid"
+      ? "bg-success-light text-success"
+      : status === "partial"
+        ? "bg-orange-100 text-orange-700"
+        : "bg-gray-100 text-gray-600";
+  return (
+    <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium shrink-0 ${styles}`}>
+      {labels[status]}
+    </span>
+  );
+}
+
+function PaymentsList({
+  payments,
+  canManage,
+  onDelete,
+}: {
+  payments: PaymentRow[] | undefined;
+  canManage: boolean;
+  onDelete: (paymentId: string) => void;
+}) {
+  const dict = useDictionary();
+  const locale = useLocale();
+  const t = dict.app.purchases;
+  if (payments === undefined) {
+    return <p className="text-xs text-text-secondary mt-3">{t.loadingPayments}</p>;
+  }
+  if (payments.length === 0) {
+    return (
+      <p className="text-xs text-text-secondary mt-3">
+        {t.noPayments}
+      </p>
+    );
+  }
+  return (
+    <div className="mt-3 rounded-lg border border-border bg-gray-50 divide-y divide-border">
+      {payments.map((p) => {
+        const methodLabel =
+          (t.paymentMethod as Record<string, string>)[p.method] ?? p.method;
+        return (
+          <div
+            key={p.id}
+            className="flex items-center justify-between gap-2 p-2.5 text-xs"
+          >
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-wrap gap-x-2 gap-y-0.5">
+                <span className="font-bold text-success">
+                  {formatCurrency(p.amount, locale)}
+                </span>
+                <span className="text-text-secondary">· {methodLabel}</span>
+                <span className="text-text-secondary">
+                  · {formatDate(p.paidAt, locale)}
+                </span>
+              </div>
+              {p.notes && (
+                <p className="text-text-secondary mt-0.5 truncate" dir="auto">
+                  {p.notes}
+                </p>
+              )}
+            </div>
+            {canManage && (
+              <button
+                type="button"
+                onClick={() => onDelete(p.id)}
+                className="p-1.5 rounded-md text-text-secondary hover:bg-danger-light hover:text-danger shrink-0"
+                title={t.actions.deletePayment.deleteRowTitle}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }

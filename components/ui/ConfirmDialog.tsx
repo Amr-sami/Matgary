@@ -3,6 +3,7 @@
 import { Modal } from "./Modal";
 import { Button } from "./Button";
 import { AlertTriangle } from "@/lib/icons";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -22,11 +23,13 @@ export function ConfirmDialog({
   onConfirm,
   title,
   message,
-  confirmText = "تأكيد",
-  cancelText = "إلغاء",
+  confirmText,
+  cancelText,
   variant = "danger",
   loading,
 }: ConfirmDialogProps) {
+  const dict = useDictionary();
+  const t = dict.app.ui.confirm;
   const handleConfirm = async () => {
     await onConfirm();
     onClose();
@@ -41,10 +44,10 @@ export function ConfirmDialog({
         <p className="text-text-secondary mb-6">{message}</p>
         <div className="flex gap-3 justify-center">
           <Button variant="ghost" onClick={onClose} disabled={loading}>
-            {cancelText}
+            {cancelText ?? t.cancel}
           </Button>
           <Button variant={variant} onClick={handleConfirm} loading={loading}>
-            {confirmText}
+            {confirmText ?? t.confirm}
           </Button>
         </div>
       </div>

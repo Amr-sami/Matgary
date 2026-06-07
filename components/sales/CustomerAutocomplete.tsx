@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Phone, User, X } from "@/lib/icons";
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
+import { formatCurrency } from "@/lib/i18n/format";
 
 export interface CustomerSuggestion {
   name: string;
@@ -29,6 +31,10 @@ export function CustomerAutocomplete({
   placeholder,
   label,
 }: CustomerAutocompleteProps) {
+  const dict = useDictionary();
+  const locale = useLocale();
+  const noName = dict.app.sales.form.customer.noName;
+  const invoiceCountTpl = dict.app.sales.invoiceCount;
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState(0);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -96,7 +102,7 @@ export function CustomerAutocomplete({
           onFocus={() => setOpen(true)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          dir="rtl"
+          dir={field === "phone" ? "ltr" : "auto"}
           autoComplete="off"
           className="w-full px-4 py-2.5 rounded-lg border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-accent"
         />
@@ -136,21 +142,21 @@ export function CustomerAutocomplete({
                   ) : (
                     <User className="w-3.5 h-3.5 text-text-secondary shrink-0" />
                   )}
-                  <span className="truncate">
-                    {field === "name" ? s.name || "بدون اسم" : s.phone}
+                  <span className="truncate" dir="auto">
+                    {field === "name" ? s.name || noName : s.phone}
                   </span>
                 </div>
-                <span className="text-[11px] text-text-secondary shrink-0">
-                  {field === "name" ? s.phone : s.name || "بدون اسم"}
+                <span className="text-[11px] text-text-secondary shrink-0" dir="auto">
+                  {field === "name" ? s.phone : s.name || noName}
                 </span>
               </div>
               {(s.invoiceCount || s.lifetimeValue) && (
                 <div className="flex gap-2 text-[10px] text-text-secondary mt-0.5">
                   {s.invoiceCount !== undefined && (
-                    <span>{s.invoiceCount} فاتورة</span>
+                    <span>{invoiceCountTpl.replace("{n}", String(s.invoiceCount))}</span>
                   )}
                   {s.lifetimeValue !== undefined && s.lifetimeValue > 0 && (
-                    <span>· {s.lifetimeValue.toLocaleString("ar-EG")} ج.م</span>
+                    <span>· {formatCurrency(s.lifetimeValue, locale)}</span>
                   )}
                 </div>
               )}

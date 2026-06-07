@@ -5,6 +5,8 @@ import { Select } from "../ui/Select";
 import { SupplierPicker } from "../suppliers/SupplierPicker";
 import { Eye, ListChecks, MapPin, Package, Tag } from "@/lib/icons";
 import type { BrandDescriptor } from "@/lib/types";
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
+import { formatCurrency } from "@/lib/i18n/format";
 
 interface Step3DetailsProps {
   brands: BrandDescriptor[];
@@ -54,18 +56,20 @@ function SectionHeader({
   );
 }
 
-// Money input — regular Input with a non-interactive ج.م suffix layered on
-// top. The underlying value stays a plain number.
+// Money input — regular Input with a non-interactive currency suffix layered
+// on top. The underlying value stays a plain number.
 function MoneyInput({
   label,
   value,
   onChange,
   min = 0,
+  currencySuffix,
 }: {
   label: string;
   value: number;
   onChange: (v: number) => void;
   min?: number;
+  currencySuffix: string;
 }) {
   return (
     <div className="relative">
@@ -78,7 +82,7 @@ function MoneyInput({
         className="pe-12"
       />
       <span className="pointer-events-none absolute end-4 top-[34px] text-xs font-medium text-text-secondary">
-        ج.م
+        {currencySuffix}
       </span>
     </div>
   );
@@ -93,6 +97,9 @@ export function Step3Details({
 }: Step3DetailsProps) {
   void onSubmit;
   void loading; // submission lives in the page's sticky footer
+  const dict = useDictionary();
+  const locale = useLocale();
+  const t = dict.app.inventory.addProduct.step3;
 
   const brandOptions = [
     ...brands.map((b) => b.name).filter((n) => n.toLowerCase() !== "other"),
@@ -108,7 +115,7 @@ export function Step3Details({
 
   const previewBrand =
     form.brand === "Other" ? form.customBrand.trim() : form.brand.trim();
-  const previewName = form.name.trim() || "اسم المنتج";
+  const previewName = form.name.trim() || t.preview.namePlaceholder;
 
   // Plain <div>, not <form>: SupplierPicker can open a modal with its own
   // <form> inline (Modal renders without a portal), and nested forms are
@@ -118,45 +125,45 @@ export function Step3Details({
       {/* Form column (left, 2/3 on desktop) */}
       <div className="lg:col-span-2 space-y-6">
         <div>
-          <h2 className="text-lg font-bold text-text-primary">تفاصيل المنتج</h2>
+          <h2 className="text-lg font-bold text-text-primary">{t.heading}</h2>
           <p className="text-sm text-text-secondary mt-0.5">
-            راجع التفاصيل قبل الحفظ — تظهر في المعاينة على الجانب.
+            {t.subhead}
           </p>
         </div>
 
         <section className="space-y-4">
           <SectionHeader
             icon={Package}
-            title="بيانات أساسية"
-            subtitle="ما يظهر للموظف وللعميل في الفاتورة."
+            title={t.sections.basics.title}
+            subtitle={t.sections.basics.subtitle}
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Select
-              label="البراند (اختياري)"
+              label={t.fields.brand}
               options={brandOptions.map((b) => ({
                 value: b,
-                label: b === "Other" ? "أخرى (إضافة براند جديد)" : b,
+                label: b === "Other" ? t.fields.brandOther : b,
               }))}
               value={form.brand}
               onChange={(e) => onChange("brand", e.target.value)}
-              placeholder="اختر البراند..."
+              placeholder={t.fields.brandPlaceholder}
             />
             {form.brand === "Other" ? (
               <Input
-                label="اسم البراند الجديد"
+                label={t.fields.newBrand}
                 value={form.customBrand}
                 onChange={(e) => onChange("customBrand", e.target.value)}
-                placeholder="اسم البراند..."
+                placeholder={t.fields.newBrandPlaceholder}
               />
             ) : (
               <div className="hidden sm:block" aria-hidden />
             )}
             <div className="sm:col-span-2">
               <Input
-                label="اسم المنتج"
+                label={t.fields.name}
                 value={form.name}
                 onChange={(e) => onChange("name", e.target.value)}
-                placeholder="مثال: ساعة كاجوال جلد بني"
+                placeholder={t.fields.namePlaceholder}
               />
             </div>
           </div>
@@ -165,24 +172,26 @@ export function Step3Details({
         <section className="space-y-4">
           <SectionHeader
             icon={Tag}
-            title="التسعير والمخزون"
-            subtitle="سعر الشراء يستخدم لحساب الربح في التقارير."
+            title={t.sections.pricing.title}
+            subtitle={t.sections.pricing.subtitle}
           />
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <MoneyInput
-              label="سعر البيع"
+              label={t.fields.price}
               value={form.price}
               onChange={(v) => onChange("price", v)}
               min={1}
+              currencySuffix={t.fields.currencySuffix}
             />
             <MoneyInput
-              label="سعر الشراء"
+              label={t.fields.costPrice}
               value={form.costPrice}
               onChange={(v) => onChange("costPrice", v)}
               min={0}
+              currencySuffix={t.fields.currencySuffix}
             />
             <Input
-              label="الكمية الابتدائية"
+              label={t.fields.quantity}
               type="number"
               value={form.quantity}
               onChange={(e) => onChange("quantity", Number(e.target.value))}
@@ -190,7 +199,7 @@ export function Step3Details({
             />
           </div>
           <Input
-            label="حد التنبيه عند انخفاض الكمية"
+            label={t.fields.lowStockThreshold}
             type="number"
             value={form.lowStockThreshold}
             onChange={(e) =>
@@ -203,21 +212,21 @@ export function Step3Details({
         <section className="space-y-4">
           <SectionHeader
             icon={ListChecks}
-            title="بيانات إضافية"
-            subtitle="اختياري — يُحسِّن البحث والتقارير."
+            title={t.sections.extras.title}
+            subtitle={t.sections.extras.subtitle}
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
-              label="كود المنتج / باركود"
+              label={t.fields.sku}
               value={form.sku}
               onChange={(e) => onChange("sku", e.target.value)}
-              placeholder="SKU أو باركود"
+              placeholder={t.fields.skuPlaceholder}
             />
             <Input
-              label="مكان التخزين"
+              label={t.fields.location}
               value={form.location}
               onChange={(e) => onChange("location", e.target.value)}
-              placeholder="رف 3، فاترينة B"
+              placeholder={t.fields.locationPlaceholder}
             />
           </div>
           <SupplierPicker
@@ -225,10 +234,10 @@ export function Step3Details({
             onChange={(id) => onChange("supplierId", id)}
           />
           <Input
-            label="تاجات (افصل بفاصلة)"
+            label={t.fields.tags}
             value={form.tags}
             onChange={(e) => onChange("tags", e.target.value)}
-            placeholder="عرض، جديد، تصفية"
+            placeholder={t.fields.tagsPlaceholder}
           />
         </section>
       </div>
@@ -239,41 +248,43 @@ export function Step3Details({
           <div className="bg-bg-main/40 rounded-2xl p-5 border border-border">
             <p className="text-xs text-text-secondary mb-3 flex items-center gap-1.5">
               <Eye className="w-3.5 h-3.5" />
-              معاينة سريعة
+              {t.preview.title}
             </p>
 
             <div className="bg-white rounded-xl p-4 border border-border shadow-sm">
               {previewBrand && (
-                <p className="text-[11px] uppercase tracking-wide text-accent font-bold mb-1">
+                <p className="text-[11px] uppercase tracking-wide text-accent font-bold mb-1" dir="auto">
                   {previewBrand}
                 </p>
               )}
-              <h4 className="text-base font-bold text-text-primary leading-snug">
+              <h4 className="text-base font-bold text-text-primary leading-snug" dir="auto">
                 {previewName}
               </h4>
 
               <div className="mt-3 flex items-baseline gap-2">
                 <span className="text-2xl font-extrabold text-text-primary">
-                  {form.price > 0 ? form.price.toLocaleString("ar-EG") : "—"}
+                  {form.price > 0 ? formatCurrency(form.price, locale) : "—"}
                 </span>
-                <span className="text-xs text-text-secondary">ج.م</span>
               </div>
 
               {form.costPrice > 0 && (
                 <p className="text-[11px] text-text-secondary mt-0.5">
-                  سعر الشراء: {form.costPrice.toLocaleString("ar-EG")} ج.م
+                  {t.preview.costLine.replace(
+                    "{cost}",
+                    formatCurrency(form.costPrice, locale),
+                  )}
                 </p>
               )}
 
               <div className="mt-4 grid grid-cols-2 gap-2 text-[11px]">
                 <div className="bg-bg-main rounded-lg px-2.5 py-1.5">
-                  <p className="text-text-secondary">الكمية</p>
+                  <p className="text-text-secondary">{t.preview.quantity}</p>
                   <p className="font-bold text-text-primary mt-0.5">
                     {form.quantity || 0}
                   </p>
                 </div>
                 <div className="bg-bg-main rounded-lg px-2.5 py-1.5">
-                  <p className="text-text-secondary">حد التنبيه</p>
+                  <p className="text-text-secondary">{t.preview.lowStock}</p>
                   <p className="font-bold text-text-primary mt-0.5">
                     {form.lowStockThreshold || 0}
                   </p>
@@ -283,10 +294,10 @@ export function Step3Details({
               {margin != null && marginPct != null && (
                 <div className="mt-3 flex items-center justify-between bg-success-light/60 rounded-lg px-3 py-2">
                   <span className="text-[11px] font-medium text-success">
-                    هامش الربح
+                    {t.preview.margin}
                   </span>
                   <span className="text-sm font-bold text-success">
-                    {margin.toLocaleString("ar-EG")} ج.م
+                    {formatCurrency(margin, locale)}
                     <span className="text-[11px] font-normal mx-1 opacity-80">
                       ({marginPct.toFixed(0)}%)
                     </span>
@@ -295,7 +306,7 @@ export function Step3Details({
               )}
 
               {form.location && (
-                <p className="mt-3 text-[11px] text-text-secondary flex items-center gap-1">
+                <p className="mt-3 text-[11px] text-text-secondary flex items-center gap-1" dir="auto">
                   <MapPin className="w-3.5 h-3.5" />
                   {form.location}
                 </p>
@@ -312,7 +323,7 @@ export function Step3Details({
             </div>
 
             <p className="text-[11px] text-text-secondary mt-3 leading-relaxed">
-              تتغير المعاينة لحظياً مع كل حقل تكمله.
+              {t.preview.footnote}
             </p>
           </div>
         </div>

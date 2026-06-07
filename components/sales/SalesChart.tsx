@@ -2,7 +2,8 @@
 
 import { useMemo } from "react";
 import type { Sale } from "@/lib/types";
-import { formatPrice } from "@/lib/utils";
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
+import { formatCurrency } from "@/lib/i18n/format";
 
 interface SalesChartProps {
   sales: Sale[];
@@ -10,7 +11,17 @@ interface SalesChartProps {
 }
 
 export function SalesChart({ sales, days = 30 }: SalesChartProps) {
+  const dict = useDictionary();
+  const locale = useLocale();
+  const t = dict.app.sales.chart;
+
   const buckets = useMemo(() => {
+    const tag = locale === "en" ? "en-EG" : "ar-EG";
+    const fmt = new Intl.DateTimeFormat(tag, {
+      numberingSystem: "latn",
+      month: "short",
+      day: "numeric",
+    });
     const out: { label: string; date: Date; total: number }[] = [];
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -18,7 +29,7 @@ export function SalesChart({ sales, days = 30 }: SalesChartProps) {
       const d = new Date(today);
       d.setDate(today.getDate() - i);
       out.push({
-        label: d.toLocaleDateString("ar-EG", { month: "short", day: "numeric" }),
+        label: fmt.format(d),
         date: d,
         total: 0,
       });
@@ -31,7 +42,7 @@ export function SalesChart({ sales, days = 30 }: SalesChartProps) {
       if (idx >= 0) out[idx].total += s.totalPrice;
     }
     return out;
-  }, [sales, days]);
+  }, [sales, days, locale]);
 
   const max = Math.max(1, ...buckets.map((b) => b.total));
   const grandTotal = buckets.reduce((s, b) => s + b.total, 0);
@@ -47,15 +58,19 @@ export function SalesChart({ sales, days = 30 }: SalesChartProps) {
     <div className="bg-white rounded-xl border border-border p-4">
       <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
         <div>
-          <p className="text-sm text-text-secondary">مبيعات آخر {days} يوم</p>
-          <p className="text-xl font-bold">{formatPrice(grandTotal)}</p>
+          <p className="text-sm text-text-secondary">
+            {t.headline.replace("{days}", String(days))}
+          </p>
+          <p className="text-xl font-bold">{formatCurrency(grandTotal, locale)}</p>
         </div>
         <div className="flex flex-col items-end text-xs">
-          <span className="text-text-secondary">آخر 7 أيام</span>
-          <span className="font-bold">{formatPrice(lastWeekTotal)}</span>
+          <span className="text-text-secondary">{t.last7}</span>
+          <span className="font-bold">{formatCurrency(lastWeekTotal, locale)}</span>
           {wow !== null && (
             <span className={wow >= 0 ? "text-success" : "text-danger"}>
-              {wow >= 0 ? "↑" : "↓"} {Math.abs(wow).toFixed(0)}% مقارنة بالأسبوع السابق
+              {t.wow
+                .replace("{arrow}", wow >= 0 ? "↑" : "↓")
+                .replace("{pct}", Math.abs(wow).toFixed(0))}
             </span>
           )}
         </div>
@@ -67,7 +82,7 @@ export function SalesChart({ sales, days = 30 }: SalesChartProps) {
             <div
               key={i}
               className="flex flex-col items-center gap-1 min-w-[14px] group"
-              title={`${b.label}: ${formatPrice(b.total)}`}
+              title={`${b.label}: ${formatCurrency(b.total, locale)}`}
             >
               <div
                 className="w-3 bg-accent/30 group-hover:bg-accent rounded-t transition-colors"

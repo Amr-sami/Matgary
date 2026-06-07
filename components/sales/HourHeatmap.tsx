@@ -3,12 +3,15 @@
 import { useMemo } from "react";
 import type { Sale } from "@/lib/types";
 import { Clock } from "@/lib/icons";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 interface HourHeatmapProps {
   sales: Sale[];
 }
 
 export function HourHeatmap({ sales }: HourHeatmapProps) {
+  const dict = useDictionary();
+  const t = dict.app.sales.heatmap;
   const hours = useMemo(() => {
     const out = Array.from({ length: 24 }, (_, h) => ({
       hour: h,
@@ -32,11 +35,13 @@ export function HourHeatmap({ sales }: HourHeatmapProps) {
       <div className="flex items-center justify-between mb-3 flex-wrap gap-1">
         <div className="flex items-center gap-2">
           <Clock className="w-5 h-5 text-accent" />
-          <p className="font-medium">الساعات الأكثر ازدحاماً</p>
+          <p className="font-medium">{t.title}</p>
         </div>
         {peak.count > 0 && (
           <p className="text-xs text-text-secondary">
-            ذروة: {peak.hour}:00 ({peak.count} فاتورة)
+            {t.peak
+              .replace("{hour}", String(peak.hour))
+              .replace("{n}", String(peak.count))}
           </p>
         )}
       </div>
@@ -52,7 +57,9 @@ export function HourHeatmap({ sales }: HourHeatmapProps) {
                 background: h.count > 0 ? `rgba(160, 130, 80, ${opacity})` : "#f3f4f6",
                 color: intensity > 0.6 ? "white" : undefined,
               }}
-              title={`${h.hour}:00 — ${h.count} فاتورة`}
+              title={t.cellTitle
+                .replace("{h}", String(h.hour))
+                .replace("{n}", String(h.count))}
             >
               {h.hour}
             </div>

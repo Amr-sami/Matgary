@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import type { TaskItem, TaskPriority } from "@/hooks/useTasks";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 interface TeamMemberOption {
   userId: string;
@@ -16,7 +17,6 @@ interface TeamMemberOption {
 
 interface Props {
   isOpen: boolean;
-  /** Existing task to edit; null = create. */
   task: TaskItem | null;
   members: TeamMemberOption[];
   onClose: () => void;
@@ -24,19 +24,18 @@ interface Props {
   onError: (msg: string) => void;
 }
 
-const PRIORITY_OPTIONS: { value: TaskPriority; label: string }[] = [
-  { value: "low", label: "منخفضة" },
-  { value: "normal", label: "عادية" },
-  { value: "high", label: "عاجلة" },
-];
+const PRIORITY_KEYS: TaskPriority[] = ["low", "normal", "high"];
 
 export function TaskFormModal({ isOpen, task, members, onClose, onSaved, onError }: Props) {
+  const dict = useDictionary();
+  const t = dict.app.tasks.form;
+  const priorityLabels = dict.app.tasks.priority;
   const isEdit = !!task;
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [assigneeId, setAssigneeId] = useState<string>("");
   const [priority, setPriority] = useState<TaskPriority>("normal");
-  const [dueDate, setDueDate] = useState<string>(""); // yyyy-mm-ddThh:mm
+  const [dueDate, setDueDate] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -56,11 +55,11 @@ export function TaskFormModal({ isOpen, task, members, onClose, onSaved, onError
 
   const submit = async () => {
     if (!title.trim()) {
-      onError("عنوان المهمة مطلوب");
+      onError(t.errors.titleRequired);
       return;
     }
     if (!assigneeId) {
-      onError("اختر الموظف المُسند إليه");
+      onError(t.errors.assigneeRequired);
       return;
     }
     setSubmitting(true);
@@ -81,7 +80,7 @@ export function TaskFormModal({ isOpen, task, members, onClose, onSaved, onError
       });
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
-        onError(json.error || "تعذر الحفظ");
+        onError(json.error || t.errors.saveFailed);
         return;
       }
       await onSaved();
@@ -95,12 +94,12 @@ export function TaskFormModal({ isOpen, task, members, onClose, onSaved, onError
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={isEdit ? "تعديل المهمة" : "مهمة جديدة"}
+      title={isEdit ? t.editTitle : t.createTitle}
     >
       <div className="space-y-4">
         <Input
-          label="العنوان *"
-          placeholder="مثلاً: ترتيب الفترينة الرئيسية"
+          label={t.titleLabel}
+          placeholder={t.titlePlaceholder}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           autoFocus
@@ -108,12 +107,12 @@ export function TaskFormModal({ isOpen, task, members, onClose, onSaved, onError
 
         <div>
           <label className="block text-sm font-medium text-text-secondary mb-1.5">
-            الوصف
+            {t.descriptionLabel}
           </label>
           <textarea
-            dir="rtl"
+            dir="auto"
             rows={3}
-            placeholder="تفاصيل المهمة، خطوات التنفيذ..."
+            placeholder={t.descriptionPlaceholder}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             className="w-full px-4 py-2.5 rounded-lg border border-border bg-white text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-accent resize-none"
@@ -121,26 +120,26 @@ export function TaskFormModal({ isOpen, task, members, onClose, onSaved, onError
         </div>
 
         <Select
-          label="إسناد إلى *"
+          label={t.assigneeLabel}
           options={members.map((m) => ({
             value: m.userId,
-            label: `${m.displayName}${m.role === "owner" ? " (المالك)" : ""}`,
+            label: `${m.displayName}${m.role === "owner" ? t.ownerSuffix : ""}`,
           }))}
           value={assigneeId}
           onChange={(e) => setAssigneeId(e.target.value)}
-          placeholder="اختر موظف..."
+          placeholder={t.assigneePlaceholder}
         />
 
         <div className="grid grid-cols-2 gap-3">
           <Select
-            label="الأولوية"
-            options={PRIORITY_OPTIONS.map((p) => ({ value: p.value, label: p.label }))}
+            label={t.priorityLabel}
+            options={PRIORITY_KEYS.map((p) => ({ value: p, label: priorityLabels[p] }))}
             value={priority}
             onChange={(e) => setPriority(e.target.value as TaskPriority)}
           />
           <div>
             <label className="block text-sm font-medium text-text-secondary mb-1.5">
-              التاريخ المستحق
+              {t.dueDateLabel}
             </label>
             <input
               type="datetime-local"
@@ -154,18 +153,18 @@ export function TaskFormModal({ isOpen, task, members, onClose, onSaved, onError
 
         <div className="flex gap-2 justify-end pt-2 border-t border-border">
           <Button variant="secondary" onClick={onClose} disabled={submitting}>
-            إلغاء
+            {t.cancel}
           </Button>
           <Button onClick={submit} loading={submitting}>
             {isEdit ? (
               <>
                 <Save className="w-4 h-4 me-1" />
-                حفظ
+                {t.save}
               </>
             ) : (
               <>
                 <Plus className="w-4 h-4 me-1" />
-                إنشاء
+                {t.create}
               </>
             )}
           </Button>
