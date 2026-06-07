@@ -12,8 +12,11 @@ import { StaffPerformance } from "@/components/insights/StaffPerformance";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { Tabs } from "@/components/ui/Tabs";
+import { UserText } from "@/components/ui/UserText";
 import { CATEGORY_LABELS, type Category } from "@/lib/types";
-import { formatPrice } from "@/lib/utils";
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
+import { formatCurrency } from "@/lib/i18n/format";
+import type { Locale } from "@/lib/i18n/config";
 import {
   TrendingUp,
   TrendingDown,
@@ -21,17 +24,9 @@ import {
   Percent,
   ShoppingCart,
 } from "@/lib/icons";
-import {
-  DATE_RANGE_LABELS,
-  type DateRangeKey,
-} from "@/components/sales/SalesFilters";
+import { type DateRangeKey } from "@/components/sales/SalesFilters";
 
 type TabKey = "overview" | "staff";
-
-const INSIGHTS_TABS = [
-  { key: "overview" as const, label: "نظرة عامة" },
-  { key: "staff" as const, label: "الموظفون" },
-];
 
 const DATE_FILTER_ORDER: DateRangeKey[] = [
   "all",
@@ -93,20 +88,21 @@ function resolveInsightsWindow(
   }
 }
 
-const COMPARISON_LABEL: Record<DateRangeKey, string> = {
-  all: "عن الشهر السابق",
-  today: "عن الأمس",
-  yesterday: "عن اليوم السابق",
-  "7d": "عن الـ 7 أيام السابقة",
-  "30d": "عن الـ 30 يوم السابقة",
-  thisMonth: "عن نفس الفترة من الشهر السابق",
-  custom: "عن الفترة السابقة بنفس المدة",
-};
-
 export default function InsightsPage() {
   const { data: session } = useSession();
   const isOwner = session?.user?.role === "owner";
   const { branches: accessibleBranches, current: activeBranch } = useBranches();
+  const dict = useDictionary();
+  const locale = useLocale();
+  const t = dict.app.insights;
+  // Localized date-range labels + comparison phrases come from the dict,
+  // shared with the sales filter UI (Phase 2.2c will re-use these).
+  const dateLabels = dict.app.dateRange as Record<DateRangeKey, string>;
+  const comparison = t.comparison as Record<DateRangeKey, string>;
+  const INSIGHTS_TABS = [
+    { key: "overview" as const, label: t.tabs.overview },
+    { key: "staff" as const, label: t.tabs.staff },
+  ];
 
   const [tab, setTab] = useState<TabKey>("overview");
   const [dateRange, setDateRange] = useState<DateRangeKey>("all");
@@ -127,12 +123,12 @@ export default function InsightsPage() {
   const { data, loading } = useInsights(insightsWindow, branchScopeParam);
   const headlineLabel =
     dateRange === "all"
-      ? "مبيعات الشهر الحالي"
-      : `مبيعات الفترة (${DATE_RANGE_LABELS[dateRange]})`;
+      ? t.headline.monthCurrent
+      : t.headline.period.replace("{label}", dateLabels[dateRange]);
 
   if (loading) {
     return (
-      <AppShell title="الإحصائيات">
+      <AppShell title={t.loadingTitle}>
         <PageSkeleton chart rows={5} />
       </AppShell>
     );
@@ -143,16 +139,22 @@ export default function InsightsPage() {
   const { metrics, trendData, topProducts, categoryChartData } = data;
   const isPositive = metrics.revenueGrowth >= 0;
 
-  const highlights = computeHighlights(trendData, topProducts, categoryChartData);
+  const highlights = computeHighlights(
+    trendData,
+    topProducts,
+    categoryChartData,
+    locale,
+    t.highlights,
+  );
 
   return (
-    <AppShell title="تحليلات العمل">
+    <AppShell title={t.title}>
       <div className="space-y-5">
         <Tabs items={INSIGHTS_TABS} active={tab} onChange={setTab} />
 
         {showBranchToggle && (
           <div className="flex items-center gap-2">
-            <span className="text-xs text-text-secondary">النطاق:</span>
+            <span className="text-xs text-text-secondary">{t.scope.label}:</span>
             <div className="inline-flex rounded-lg border border-border bg-white overflow-hidden text-xs">
               <button
                 type="button"
@@ -163,7 +165,7 @@ export default function InsightsPage() {
                     : "text-text-secondary hover:bg-bg-main"
                 }`}
               >
-                {activeBranch?.name ?? "الفرع الحالي"}
+                <UserText>{activeBranch?.name ?? t.scope.currentFallback}</UserText>
               </button>
               <button
                 type="button"
@@ -174,7 +176,7 @@ export default function InsightsPage() {
                     : "text-text-secondary hover:bg-bg-main"
                 }`}
               >
-                كل الفروع
+                {t.scope.all}
               </button>
             </div>
           </div>
@@ -193,14 +195,16 @@ export default function InsightsPage() {
                     : "bg-white border-border text-text-secondary hover:border-accent"
                 }`}
               >
-                {DATE_RANGE_LABELS[key]}
+                {dateLabels[key]}
               </button>
             ))}
           </div>
           {dateRange === "custom" && (
             <div className="flex flex-wrap items-end gap-3 bg-white border border-border rounded-lg p-3">
               <div className="flex flex-col gap-1">
-                <label className="text-xs text-text-secondary">من</label>
+                <label className="text-xs text-text-secondary">
+                  {dict.app.dateRange.from}
+                </label>
                 <input
                   type="date"
                   value={customFrom}
@@ -209,7 +213,9 @@ export default function InsightsPage() {
                 />
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-xs text-text-secondary">إلى</label>
+                <label className="text-xs text-text-secondary">
+                  {dict.app.dateRange.to}
+                </label>
                 <input
                   type="date"
                   value={customTo}
@@ -226,7 +232,7 @@ export default function InsightsPage() {
                   }}
                   className="text-xs text-text-secondary hover:text-danger px-2 py-1.5"
                 >
-                  مسح
+                  {dict.app.dateRange.clear}
                 </button>
               )}
             </div>
@@ -237,9 +243,7 @@ export default function InsightsPage() {
           <StaffPerformance
             window={insightsWindow}
             rangeLabel={
-              dateRange === "all"
-                ? "آخر 30 يوم (افتراضي)"
-                : DATE_RANGE_LABELS[dateRange]
+              dateRange === "all" ? t.staff.rangeFallback : dateLabels[dateRange]
             }
           />
         ) : (
@@ -251,29 +255,32 @@ export default function InsightsPage() {
                 value={metrics.currentRevenue}
                 growth={metrics.revenueGrowth}
                 isPositive={isPositive}
-                comparison={COMPARISON_LABEL[dateRange]}
+                comparison={comparison[dateRange]}
               />
 
               <StatCard
-                title="إجمالي المبيعات"
+                title={t.kpi.totalSales}
                 value={metrics.totalSales}
-                subtitle="عملية بيع"
+                subtitle={t.kpi.totalSalesSubtitle}
                 icon={ShoppingCart}
                 color="accent"
               />
 
               <StatCard
-                title="صافي الربح"
-                value={formatPrice(metrics.netProfit)}
-                subtitle="بعد المصاريف والتكلفة"
+                title={t.kpi.netProfit}
+                value={formatCurrency(metrics.netProfit, locale)}
+                subtitle={t.kpi.netProfitSubtitle}
                 icon={TrendingUp}
                 color={metrics.netProfit >= 0 ? "success" : "danger"}
               />
 
               <StatCard
-                title="إجمالي الخصومات"
-                value={formatPrice(metrics.totalDiscounts)}
-                subtitle={`${metrics.discountPercent.toFixed(1)}% من القيمة`}
+                title={t.kpi.totalDiscounts}
+                value={formatCurrency(metrics.totalDiscounts, locale)}
+                subtitle={t.kpi.discountsPctSubtitle.replace(
+                  "{pct}",
+                  metrics.discountPercent.toFixed(1),
+                )}
                 icon={Percent}
                 color="danger"
               />
@@ -286,8 +293,11 @@ export default function InsightsPage() {
                   data={trendData}
                   title={
                     dateRange === "all"
-                      ? "اتجاه المبيعات (آخر 30 يوم)"
-                      : `اتجاه المبيعات (${DATE_RANGE_LABELS[dateRange]})`
+                      ? t.trend.titleDefault
+                      : t.trend.titleWithRange.replace(
+                          "{label}",
+                          dateLabels[dateRange],
+                        )
                   }
                 />
               </div>
@@ -326,13 +336,14 @@ function RevenueCard({
   isPositive: boolean;
   comparison: string;
 }) {
+  const locale = useLocale();
   return (
     <div className="bg-white rounded-xl p-5 shadow-sm border border-border h-full">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm text-text-secondary">{label}</p>
           <p className="text-2xl font-bold mt-1 tabular-nums">
-            {formatPrice(value)}
+            {formatCurrency(value, locale)}
           </p>
         </div>
         <DollarSign className="w-6 h-6 text-accent shrink-0" />
@@ -351,7 +362,7 @@ function RevenueCard({
         )}
         {isPositive ? "+" : ""}
         {growth.toFixed(1)}%
-        <span className="font-normal opacity-80 mr-1">{comparison}</span>
+        <span className="font-normal opacity-80 ms-1">{comparison}</span>
       </div>
     </div>
   );
@@ -363,10 +374,25 @@ interface Highlight {
   hint?: string;
 }
 
+interface HighlightLabels {
+  best: string;
+  avg: string;
+  avgHint: string;
+  topProduct: string;
+  topProductHint: string;
+  topCategory: string;
+  topCategoryHint: string;
+  // The dict shape has more keys (subtitle/empty/financial); we only read
+  // the seven above. Keep loose so future additions don't break us.
+  [key: string]: unknown;
+}
+
 function computeHighlights(
   trendData: { date: string; revenue: number; count?: number }[],
   topProducts: { name: string; revenue: number; qty: number }[],
   categoryChartData: { name: string; value: number }[],
+  locale: Locale,
+  labels: HighlightLabels,
 ): Highlight[] {
   const result: Highlight[] = [];
 
@@ -379,16 +405,16 @@ function computeHighlights(
     for (const d of trendData) if (d.revenue > peak.revenue) peak = d;
     if (peak.revenue > 0) {
       result.push({
-        label: "أفضل يوم مبيعات",
-        value: formatPrice(peak.revenue),
+        label: labels.best,
+        value: formatCurrency(peak.revenue, locale),
         hint: peak.date,
       });
     }
     if (avg > 0) {
       result.push({
-        label: "المتوسط اليومي",
-        value: formatPrice(Math.round(avg)),
-        hint: `على ${denom} يوم`,
+        label: labels.avg,
+        value: formatCurrency(Math.round(avg), locale),
+        hint: labels.avgHint.replace("{days}", String(denom)),
       });
     }
   }
@@ -397,9 +423,9 @@ function computeHighlights(
     const total = topProducts.reduce((s, p) => s + p.revenue, 0);
     const share = total === 0 ? 0 : (topProducts[0].revenue / total) * 100;
     result.push({
-      label: "أعلى منتج",
+      label: labels.topProduct,
       value: topProducts[0].name,
-      hint: `${share.toFixed(1)}% من أعلى 5`,
+      hint: labels.topProductHint.replace("{pct}", share.toFixed(1)),
     });
   }
 
@@ -411,9 +437,9 @@ function computeHighlights(
       const share = (top.value / total) * 100;
       const label = CATEGORY_LABELS[top.name as Category] || top.name;
       result.push({
-        label: "أعلى صنف",
+        label: labels.topCategory,
         value: label,
-        hint: `${share.toFixed(1)}% من الإيراد`,
+        hint: labels.topCategoryHint.replace("{pct}", share.toFixed(1)),
       });
     }
   }
@@ -432,32 +458,34 @@ function HighlightsPanel({
   totalExpenses: number;
   grossProfit: number;
 }) {
+  const dict = useDictionary();
+  const locale = useLocale();
+  const t = dict.app.insights.highlights;
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-border overflow-hidden h-full flex flex-col">
       <div className="px-5 pt-5 pb-3 border-b border-border">
-        <h3 className="text-sm font-semibold text-text-primary">
-          ملخص الفترة
-        </h3>
-        <p className="text-[11px] text-text-secondary mt-0.5">
-          نقاط رئيسية مستخرجة من بيانات الفترة المختارة
-        </p>
+        <h3 className="text-sm font-semibold text-text-primary">{t.title}</h3>
+        <p className="text-[11px] text-text-secondary mt-0.5">{t.subtitle}</p>
       </div>
 
       {items.length === 0 ? (
         <div className="flex-1 flex items-center justify-center p-8">
-          <p className="text-sm text-text-secondary">
-            لا توجد بيانات كافية لإنتاج ملخص.
-          </p>
+          <p className="text-sm text-text-secondary">{t.empty}</p>
         </div>
       ) : (
         <>
-          <ul className="grid grid-cols-2 divide-x divide-y divide-border [direction:rtl]">
+          {/* The grid mirrored direction was hard-forced rtl before i18n;
+              now we let it follow the html dir so EN reads left-to-right. */}
+          <ul className="grid grid-cols-2 divide-x divide-y divide-border">
             {items.map((h) => (
               <li key={h.label} className="p-4">
                 <p className="text-[10px] uppercase tracking-wider text-text-secondary">
                   {h.label}
                 </p>
-                <p className="text-sm font-semibold text-text-primary mt-1 truncate tabular-nums">
+                <p
+                  dir="auto"
+                  className="text-sm font-semibold text-text-primary mt-1 truncate tabular-nums"
+                >
                   {h.value}
                 </p>
                 {h.hint && (
@@ -471,17 +499,17 @@ function HighlightsPanel({
 
           <div className="mt-auto px-5 py-4 border-t border-border bg-bg-main/40 space-y-2">
             <FinancialRow
-              label="إجمالي الربح"
-              value={formatPrice(grossProfit)}
+              label={t.financial.gross}
+              value={formatCurrency(grossProfit, locale)}
             />
             <FinancialRow
-              label="مصاريف تشغيلية"
-              value={formatPrice(totalExpenses)}
+              label={t.financial.expenses}
+              value={formatCurrency(totalExpenses, locale)}
               negative
             />
             <FinancialRow
-              label="صافي الربح"
-              value={formatPrice(netProfit)}
+              label={t.financial.net}
+              value={formatCurrency(netProfit, locale)}
               emphasized
               positive={netProfit >= 0}
             />

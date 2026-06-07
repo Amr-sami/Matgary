@@ -11,11 +11,12 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
-import { formatPrice } from "@/lib/utils";
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
+import { formatCurrency } from "@/lib/i18n/format";
 
 interface TrendChartProps {
   data: { date: string; revenue: number; count?: number }[];
-  /** Override the default heading. Falls back to "آخر 30 يوم". */
+  /** Override the default heading. Falls back to the dictionary's default. */
   title?: string;
 }
 
@@ -26,6 +27,9 @@ function formatCompact(value: number): string {
 }
 
 export function TrendChart({ data, title }: TrendChartProps) {
+  const dict = useDictionary();
+  const locale = useLocale();
+  const t = dict.app.insights.trend;
   const stats = useMemo(() => {
     const revenues = data.map((d) => d.revenue);
     const total = revenues.reduce((a, b) => a + b, 0);
@@ -52,20 +56,20 @@ export function TrendChart({ data, title }: TrendChartProps) {
       <div className="px-5 pt-5 pb-3 flex flex-wrap items-start justify-between gap-4 border-b border-border">
         <div>
           <h3 className="text-sm font-semibold text-text-primary">
-            {title ?? "اتجاه المبيعات (آخر 30 يوم)"}
+            {title ?? t.titleDefault}
           </h3>
           <p className="text-[11px] text-text-secondary mt-0.5">
-            متوسط يومي · ذروة الفترة · إجمالي
+            {t.subtitle}
           </p>
         </div>
         <div className="flex items-center gap-5 tabular-nums">
-          <Stat label="الإجمالي" value={formatPrice(stats.total)} />
+          <Stat label={t.stat.total} value={formatCurrency(stats.total, locale)} />
           <Divider />
-          <Stat label="المتوسط" value={formatPrice(Math.round(stats.avg))} />
+          <Stat label={t.stat.avg} value={formatCurrency(Math.round(stats.avg), locale)} />
           <Divider />
           <Stat
-            label="الذروة"
-            value={formatPrice(stats.peak)}
+            label={t.stat.peak}
+            value={formatCurrency(stats.peak, locale)}
             hint={stats.peakDate}
           />
         </div>
@@ -128,8 +132,8 @@ export function TrendChart({ data, title }: TrendChartProps) {
                 marginBottom: 2,
               }}
               formatter={(value) => [
-                formatPrice(Number(value || 0)),
-                "المبيعات",
+                formatCurrency(Number(value || 0), locale),
+                t.tooltipLabel,
               ]}
             />
             <Area
@@ -162,7 +166,7 @@ function Stat({
   hint?: string;
 }) {
   return (
-    <div className="text-right">
+    <div className="text-end">
       <p className="text-[10px] uppercase tracking-wider text-text-secondary">
         {label}
       </p>

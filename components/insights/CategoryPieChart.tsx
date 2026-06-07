@@ -9,7 +9,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { CATEGORY_LABELS, type Category } from "@/lib/types";
-import { formatPrice } from "@/lib/utils";
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
+import { formatCurrency } from "@/lib/i18n/format";
 
 const PALETTE = ["#1203E3", "#5B4DEC", "#9C92F3", "#C7C0F8", "#1A1A1A"];
 
@@ -18,6 +19,9 @@ interface CategoryPieChartProps {
 }
 
 export function CategoryPieChart({ data }: CategoryPieChartProps) {
+  const dict = useDictionary();
+  const locale = useLocale();
+  const t = dict.app.insights.categoryPie;
   const { chartData, total } = useMemo(() => {
     const sorted = [...data].sort((a, b) => b.value - a.value);
     const total = sorted.reduce((s, d) => s + d.value, 0);
@@ -37,17 +41,13 @@ export function CategoryPieChart({ data }: CategoryPieChartProps) {
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-border overflow-hidden h-full flex flex-col">
       <div className="px-5 pt-5 pb-3 border-b border-border">
-        <h3 className="text-sm font-semibold text-text-primary">
-          توزيع المبيعات حسب الصنف
-        </h3>
-        <p className="text-[11px] text-text-secondary mt-0.5">
-          المساهمة النسبية لكل صنف في الإيراد
-        </p>
+        <h3 className="text-sm font-semibold text-text-primary">{t.title}</h3>
+        <p className="text-[11px] text-text-secondary mt-0.5">{t.subtitle}</p>
       </div>
 
       {isEmpty ? (
         <div className="flex-1 flex items-center justify-center p-8">
-          <p className="text-sm text-text-secondary">لا توجد مبيعات في الفترة</p>
+          <p className="text-sm text-text-secondary">{t.empty}</p>
         </div>
       ) : (
         <>
@@ -79,18 +79,18 @@ export function CategoryPieChart({ data }: CategoryPieChartProps) {
                     padding: "8px 10px",
                   }}
                   formatter={(value) => [
-                    formatPrice(Number(value || 0)),
-                    "المبيعات",
+                    formatCurrency(Number(value || 0), locale),
+                    t.tooltipLabel,
                   ]}
                 />
               </PieChart>
             </ResponsiveContainer>
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
               <p className="text-[10px] uppercase tracking-wider text-text-secondary">
-                الإجمالي
+                {t.total}
               </p>
               <p className="text-sm font-semibold text-text-primary tabular-nums">
-                {formatPrice(total)}
+                {formatCurrency(total, locale)}
               </p>
             </div>
           </div>
@@ -106,14 +106,17 @@ export function CategoryPieChart({ data }: CategoryPieChartProps) {
                   style={{ backgroundColor: entry.color }}
                   aria-hidden
                 />
-                <span className="flex-1 truncate text-text-primary">
+                <span
+                  dir="auto"
+                  className="flex-1 truncate text-text-primary"
+                >
                   {entry.displayName}
                 </span>
                 <span className="text-text-secondary tabular-nums text-xs">
                   {entry.share.toFixed(1)}%
                 </span>
-                <span className="font-semibold text-text-primary tabular-nums w-24 text-left">
-                  {formatPrice(entry.value)}
+                <span className="font-semibold text-text-primary tabular-nums w-24 text-end">
+                  {formatCurrency(entry.value, locale)}
                 </span>
               </li>
             ))}

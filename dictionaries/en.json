@@ -63,6 +63,117 @@
       "openMenu": "Open menu",
       "closeMenu": "Close menu"
     },
+    "dateRange": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "7d": "Last 7 days",
+      "30d": "Last 30 days",
+      "thisMonth": "This month",
+      "all": "All",
+      "custom": "Custom",
+      "from": "From",
+      "to": "To",
+      "clear": "Clear"
+    },
+    "insights": {
+      "loadingTitle": "Insights",
+      "title": "Business analytics",
+      "tabs": {
+        "overview": "Overview",
+        "staff": "Team"
+      },
+      "scope": {
+        "label": "Scope",
+        "currentFallback": "Current branch",
+        "all": "All branches"
+      },
+      "headline": {
+        "monthCurrent": "This month's sales",
+        "period": "Sales for the period ({label})"
+      },
+      "comparison": {
+        "all": "vs last month",
+        "today": "vs yesterday",
+        "yesterday": "vs the day before",
+        "7d": "vs the previous 7 days",
+        "30d": "vs the previous 30 days",
+        "thisMonth": "vs the same period last month",
+        "custom": "vs the previous span of the same length"
+      },
+      "kpi": {
+        "totalSales": "Total sales",
+        "totalSalesSubtitle": "transactions",
+        "netProfit": "Net profit",
+        "netProfitSubtitle": "after expenses and cost",
+        "totalDiscounts": "Total discounts",
+        "discountsPctSubtitle": "{pct}% of value"
+      },
+      "trend": {
+        "titleDefault": "Sales trend (last 30 days)",
+        "titleWithRange": "Sales trend ({label})",
+        "subtitle": "Daily average · peak · total",
+        "stat": {
+          "total": "Total",
+          "avg": "Average",
+          "peak": "Peak"
+        },
+        "tooltipLabel": "Sales"
+      },
+      "categoryPie": {
+        "title": "Sales by category",
+        "subtitle": "Each category's share of revenue",
+        "empty": "No sales in this period",
+        "total": "Total",
+        "tooltipLabel": "Sales"
+      },
+      "topProducts": {
+        "title": "Top-selling products",
+        "subtitle": "Ranked by total sales value",
+        "top5": "Top 5",
+        "empty": "Not enough data yet",
+        "pieces": "{n} pcs"
+      },
+      "highlights": {
+        "title": "Period summary",
+        "subtitle": "Key signals from the selected period",
+        "empty": "Not enough data to summarise yet.",
+        "best": "Best sales day",
+        "avg": "Daily average",
+        "avgHint": "across {days} days",
+        "topProduct": "Top product",
+        "topProductHint": "{pct}% of the top 5",
+        "topCategory": "Top category",
+        "topCategoryHint": "{pct}% of revenue",
+        "financial": {
+          "gross": "Gross profit",
+          "expenses": "Operating expenses",
+          "net": "Net profit"
+        }
+      },
+      "staff": {
+        "title": "Team performance",
+        "rangeFallback": "Last 30 days (default)",
+        "loading": "Loading…",
+        "empty": {
+          "title": "No data for this period",
+          "subtitle": "Numbers show up once a staff member records the first sale."
+        },
+        "summary": {
+          "active": "Active staff",
+          "totalRevenue": "Total sales",
+          "ops": "Transactions"
+        },
+        "leaderboard": "Staff leaderboard",
+        "metric": {
+          "ops": "{n} transactions",
+          "returns": "{n} returns"
+        },
+        "unattributed": {
+          "title": "Sales with no assigned staff",
+          "body": "{count} transactions worth {amount} had no recording staff member (legacy sales from before this feature was enabled)."
+        }
+      }
+    },
     "dashboard": {
       "title": "Dashboard",
       "greeting": "Welcome back, {name}",

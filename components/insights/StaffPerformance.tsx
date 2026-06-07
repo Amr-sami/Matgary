@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { UsersGroup, RotateCcw, ShoppingCart, AlertCircle } from "@/lib/icons";
-import { formatPrice } from "@/lib/utils";
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
+import { formatCurrency } from "@/lib/i18n/format";
+import { UserText } from "@/components/ui/UserText";
 
 interface StaffStat {
   userId: string;
@@ -19,13 +21,16 @@ interface StaffPerformanceProps {
    * - When omitted (or empty), the API falls back to its default (last 30 days).
    */
   window?: { from?: Date; to?: Date };
-  /** Optional Arabic label for the active range, shown under the title. */
+  /** Optional label for the active range, shown under the title. */
   rangeLabel?: string;
 }
 
 export function StaffPerformance({ window, rangeLabel }: StaffPerformanceProps) {
   const [data, setData] = useState<StaffStat[]>([]);
   const [loading, setLoading] = useState(true);
+  const dict = useDictionary();
+  const locale = useLocale();
+  const t = dict.app.insights.staff;
 
   // Stable dependency keys so we don't refetch on every render when the parent
   // passes a new Date object with the same timestamp.
@@ -74,7 +79,7 @@ export function StaffPerformance({ window, rangeLabel }: StaffPerformanceProps) 
         <div>
           <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
             <UsersGroup className="w-5 h-5 text-accent" />
-            أداء الموظفين
+            {t.title}
           </h2>
           {rangeLabel && (
             <p className="text-xs text-text-secondary mt-0.5">{rangeLabel}</p>
@@ -83,37 +88,39 @@ export function StaffPerformance({ window, rangeLabel }: StaffPerformanceProps) 
       </div>
 
       {loading ? (
-        <p className="text-sm text-text-secondary text-center py-12">جاري التحميل…</p>
+        <p className="text-sm text-text-secondary text-center py-12">
+          {t.loading}
+        </p>
       ) : knownData.length === 0 && !unattributed ? (
         <div className="bg-white rounded-2xl border border-border py-12 text-center">
           <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-accent-light text-accent flex items-center justify-center">
             <UsersGroup className="w-7 h-7" />
           </div>
           <p className="text-sm font-medium text-text-primary mb-1">
-            لا توجد بيانات في هذه الفترة
+            {t.empty.title}
           </p>
-          <p className="text-xs text-text-secondary">
-            ستظهر الأرقام عند تسجيل أول مبيعة من قبل أحد الموظفين.
-          </p>
+          <p className="text-xs text-text-secondary">{t.empty.subtitle}</p>
         </div>
       ) : (
         <>
           {/* Summary cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="bg-white rounded-2xl border border-border p-4">
-              <p className="text-xs text-text-secondary">عدد الموظفين النشطين</p>
+              <p className="text-xs text-text-secondary">{t.summary.active}</p>
               <p className="text-2xl font-bold mt-1 text-text-primary">
                 {knownData.length}
               </p>
             </div>
             <div className="bg-white rounded-2xl border border-border p-4">
-              <p className="text-xs text-text-secondary">إجمالي المبيعات</p>
+              <p className="text-xs text-text-secondary">
+                {t.summary.totalRevenue}
+              </p>
               <p className="text-2xl font-bold mt-1 text-text-primary">
-                {formatPrice(totalRevenue)}
+                {formatCurrency(totalRevenue, locale)}
               </p>
             </div>
             <div className="bg-white rounded-2xl border border-border p-4">
-              <p className="text-xs text-text-secondary">عدد العمليات</p>
+              <p className="text-xs text-text-secondary">{t.summary.ops}</p>
               <p className="text-2xl font-bold mt-1 text-text-primary">
                 {data.reduce((s, d) => s + d.salesCount, 0)}
               </p>
@@ -124,7 +131,7 @@ export function StaffPerformance({ window, rangeLabel }: StaffPerformanceProps) 
           <div className="bg-white rounded-2xl border border-border overflow-hidden">
             <div className="px-5 py-3 border-b border-border bg-bg-main/40">
               <h3 className="text-sm font-semibold text-text-primary">
-                ترتيب الموظفين
+                {t.leaderboard}
               </h3>
             </div>
             <ul className="divide-y divide-border">
@@ -146,11 +153,14 @@ export function StaffPerformance({ window, rangeLabel }: StaffPerformanceProps) 
                       </span>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 mb-1">
-                          <p className="font-medium text-text-primary truncate">
+                          <UserText
+                            as="p"
+                            className="font-medium text-text-primary truncate"
+                          >
                             {s.name}
-                          </p>
+                          </UserText>
                           <p className="text-sm font-bold text-text-primary shrink-0">
-                            {formatPrice(s.salesRevenue)}
+                            {formatCurrency(s.salesRevenue, locale)}
                           </p>
                         </div>
                         <div className="h-2 bg-bg-main rounded-full overflow-hidden">
@@ -162,12 +172,12 @@ export function StaffPerformance({ window, rangeLabel }: StaffPerformanceProps) 
                         <div className="flex items-center gap-3 mt-1.5 text-[11px] text-text-secondary">
                           <span className="inline-flex items-center gap-1">
                             <ShoppingCart className="w-3 h-3" />
-                            {s.salesCount} عملية
+                            {t.metric.ops.replace("{n}", String(s.salesCount))}
                           </span>
                           {s.returnsCount > 0 && (
                             <span className="inline-flex items-center gap-1 text-danger">
                               <RotateCcw className="w-3 h-3" />
-                              {s.returnsCount} مرتجع
+                              {t.metric.returns.replace("{n}", String(s.returnsCount))}
                             </span>
                           )}
                         </div>
@@ -185,12 +195,15 @@ export function StaffPerformance({ window, rangeLabel }: StaffPerformanceProps) 
               <AlertCircle className="w-5 h-5 text-orange-700 shrink-0 mt-0.5" />
               <div className="flex-1">
                 <p className="text-sm font-medium text-orange-900">
-                  مبيعات بدون موظف معروف
+                  {t.unattributed.title}
                 </p>
                 <p className="text-xs text-orange-700 mt-0.5">
-                  {unattributed.salesCount} عملية بقيمة{" "}
-                  {formatPrice(unattributed.salesRevenue)} لم يكن لها موظف
-                  مسجِّل (عمليات قديمة قبل تفعيل هذه الميزة).
+                  {t.unattributed.body
+                    .replace("{count}", String(unattributed.salesCount))
+                    .replace(
+                      "{amount}",
+                      formatCurrency(unattributed.salesRevenue, locale),
+                    )}
                 </p>
               </div>
             </div>

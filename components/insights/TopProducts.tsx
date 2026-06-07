@@ -1,7 +1,9 @@
 "use client";
 
 import { Tag } from "@/lib/icons";
-import { formatPrice } from "@/lib/utils";
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
+import { formatCurrency } from "@/lib/i18n/format";
+import { UserText } from "@/components/ui/UserText";
 
 interface TopProduct {
   id: string;
@@ -16,6 +18,9 @@ interface TopProductsProps {
 }
 
 export function TopProducts({ products }: TopProductsProps) {
+  const dict = useDictionary();
+  const locale = useLocale();
+  const t = dict.app.insights.topProducts;
   const maxRevenue = products.reduce(
     (max, p) => (p.revenue > max ? p.revenue : max),
     0,
@@ -26,22 +31,20 @@ export function TopProducts({ products }: TopProductsProps) {
       <div className="px-5 pt-5 pb-3 border-b border-border flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-text-primary">
-            أكثر المنتجات مبيعاً
+            {t.title}
           </h3>
           <p className="text-[11px] text-text-secondary mt-0.5">
-            مرتبة حسب القيمة الإجمالية للمبيعات
+            {t.subtitle}
           </p>
         </div>
         <span className="text-[10px] uppercase tracking-wider text-text-secondary">
-          أعلى 5
+          {t.top5}
         </span>
       </div>
 
       {products.length === 0 ? (
         <div className="flex-1 flex items-center justify-center p-8">
-          <p className="text-sm text-text-secondary">
-            لا توجد بيانات كافية حالياً
-          </p>
+          <p className="text-sm text-text-secondary">{t.empty}</p>
         </div>
       ) : (
         <ul className="divide-y divide-border">
@@ -57,22 +60,25 @@ export function TopProducts({ products }: TopProductsProps) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2 mb-1.5">
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-text-primary truncate">
+                        <UserText
+                          as="p"
+                          className="text-sm font-medium text-text-primary truncate"
+                        >
                           {product.name}
-                        </p>
+                        </UserText>
                         {product.brand && (
                           <p className="text-[11px] text-text-secondary flex items-center gap-1 mt-0.5">
                             <Tag className="w-3 h-3 text-accent" />
-                            {product.brand}
+                            <UserText>{product.brand}</UserText>
                           </p>
                         )}
                       </div>
-                      <div className="text-left shrink-0">
+                      <div className="text-end shrink-0">
                         <p className="text-sm font-semibold text-text-primary tabular-nums">
-                          {formatPrice(product.revenue)}
+                          {formatCurrency(product.revenue, locale)}
                         </p>
                         <p className="text-[10px] text-text-secondary tabular-nums">
-                          {product.qty} قطعة
+                          {t.pieces.replace("{n}", String(product.qty))}
                         </p>
                       </div>
                     </div>
