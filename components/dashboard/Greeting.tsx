@@ -2,10 +2,13 @@
 
 import { useSession } from "next-auth/react";
 import { useSettings } from "@/components/settings-context";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 export function Greeting() {
   const { data: session, status } = useSession();
   const { settings } = useSettings();
+  const dict = useDictionary();
+  const t = dict.app.dashboard;
 
   if (status === "loading" || !session?.user) {
     return <div className="h-9" aria-hidden />;
@@ -20,10 +23,10 @@ export function Greeting() {
   return (
     <div>
       <h1 className="text-2xl font-bold text-text-primary">
-        أهلاً، {target}
+        {t.greeting.replace("{name}", target)}
       </h1>
       <p className="text-sm text-text-secondary mt-1">
-        {isOwner ? "نتمنى لك يوم عمل موفق" : "يسعدنا وجودك معنا اليوم"}
+        {isOwner ? t.greetingOwner : t.greetingStaff}
       </p>
     </div>
   );

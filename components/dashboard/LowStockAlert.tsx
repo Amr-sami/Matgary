@@ -2,11 +2,15 @@
 
 import { useProducts } from "@/hooks/useProducts";
 import { Badge } from "../ui/Badge";
+import { UserText } from "../ui/UserText";
 import { CATEGORY_LABELS, GENDER_LABELS } from "@/lib/types";
 import { AlertTriangle, CheckCircle } from "@/lib/icons";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 export function LowStockAlert() {
   const { products, loading } = useProducts();
+  const dict = useDictionary();
+  const t = dict.app.dashboard.lowStock;
 
   if (loading) {
     return (
@@ -34,12 +38,12 @@ export function LowStockAlert() {
 
   return (
     <div className="bg-white rounded-xl p-5 shadow-sm border border-border">
-      <h3 className="font-semibold mb-4">تنبيهات المخزون</h3>
+      <h3 className="font-semibold mb-4">{t.title}</h3>
 
       {lowStockProducts.length === 0 ? (
         <div className="flex items-center gap-2 text-success">
           <CheckCircle className="w-5 h-5" />
-          <span>المخزن بخير</span>
+          <span>{t.allGood}</span>
         </div>
       ) : (
         <div className="space-y-3">
@@ -49,13 +53,15 @@ export function LowStockAlert() {
               className="flex items-center justify-between p-3 rounded-lg bg-danger-light/50 border border-danger/10"
             >
               <div>
-                <p className="font-medium text-sm">{product.name}</p>
+                <UserText as="p" className="font-medium text-sm">
+                  {product.name}
+                </UserText>
                 <div className="flex items-center gap-2 mt-1">
-                  <Badge variant="outofstock">نفذ</Badge>
-                  <span className="text-xs text-text-secondary">
+                  <Badge variant="outofstock">{t.outOfStock}</Badge>
+                  <UserText className="text-xs text-text-secondary">
                     {CATEGORY_LABELS[product.category]} •{" "}
                     {GENDER_LABELS[product.gender]}
-                  </span>
+                  </UserText>
                 </div>
               </div>
               <AlertTriangle className="w-4 h-4 text-danger" />
@@ -67,12 +73,16 @@ export function LowStockAlert() {
               className="flex items-center justify-between p-3 rounded-lg bg-orange-50 border border-orange-100"
             >
               <div>
-                <p className="font-medium text-sm">{product.name}</p>
+                <UserText as="p" className="font-medium text-sm">
+                  {product.name}
+                </UserText>
                 <div className="flex items-center gap-2 mt-1">
-                  <Badge variant="lowstock">{product.quantity} قطعة</Badge>
-                  <span className="text-xs text-text-secondary">
+                  <Badge variant="lowstock">
+                    {t.pieces.replace("{n}", String(product.quantity))}
+                  </Badge>
+                  <UserText className="text-xs text-text-secondary">
                     {CATEGORY_LABELS[product.category]}
-                  </span>
+                  </UserText>
                 </div>
               </div>
               <AlertTriangle className="w-4 h-4 text-orange-500" />
@@ -80,7 +90,7 @@ export function LowStockAlert() {
           ))}
           {lowStockProducts.length > 6 && (
             <p className="text-xs text-text-secondary text-center">
-              +{lowStockProducts.length - 6} منتج آخر
+              {t.more.replace("{n}", String(lowStockProducts.length - 6))}
             </p>
           )}
         </div>

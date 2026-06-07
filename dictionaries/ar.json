@@ -63,6 +63,41 @@
       "openMenu": "فتح القائمة",
       "closeMenu": "إغلاق القائمة"
     },
+    "dashboard": {
+      "title": "لوحة التحكم",
+      "greeting": "أهلاً، {name}",
+      "greetingOwner": "نتمنى لك يوم عمل موفق",
+      "greetingStaff": "يسعدنا وجودك معنا اليوم",
+      "stats": {
+        "todaySales": "مبيعات اليوم",
+        "itemCount": "عدد الأصناف",
+        "monthSales": "مبيعات الشهر",
+        "monthReturns": "مرتجعات الشهر",
+        "returnsSuffix": "مرتجع"
+      },
+      "lowStock": {
+        "title": "تنبيهات المخزون",
+        "allGood": "المخزن بخير",
+        "outOfStock": "نفذ",
+        "pieces": "{n} قطعة",
+        "more": "+{n} منتج آخر"
+      },
+      "recentSales": {
+        "title": "آخر المبيعات",
+        "empty": "لا توجد مبيعات بعد",
+        "col": {
+          "date": "التاريخ",
+          "product": "المنتج",
+          "quantity": "الكمية",
+          "total": "الإجمالي",
+          "status": "الحالة"
+        },
+        "status": {
+          "sold": "مباع",
+          "returned": "مرتجع"
+        }
+      }
+    },
     "shell": {
       "primary": {
         "dashboard": "لوحة التحكم",

@@ -63,6 +63,41 @@
       "openMenu": "Open menu",
       "closeMenu": "Close menu"
     },
+    "dashboard": {
+      "title": "Dashboard",
+      "greeting": "Welcome back, {name}",
+      "greetingOwner": "Wishing you a great day",
+      "greetingStaff": "Glad to have you with us today",
+      "stats": {
+        "todaySales": "Today's sales",
+        "itemCount": "Products",
+        "monthSales": "This month's sales",
+        "monthReturns": "Returns this month",
+        "returnsSuffix": "returns"
+      },
+      "lowStock": {
+        "title": "Inventory alerts",
+        "allGood": "Inventory looks good",
+        "outOfStock": "Out of stock",
+        "pieces": "{n} left",
+        "more": "+{n} more"
+      },
+      "recentSales": {
+        "title": "Recent sales",
+        "empty": "No sales yet",
+        "col": {
+          "date": "Date",
+          "product": "Product",
+          "quantity": "Qty",
+          "total": "Total",
+          "status": "Status"
+        },
+        "status": {
+          "sold": "Sold",
+          "returned": "Returned"
+        }
+      }
+    },
     "shell": {
       "primary": {
         "dashboard": "Dashboard",

@@ -5,12 +5,16 @@ import { StatCard } from "./StatCard";
 import { useProducts } from "@/hooks/useProducts";
 import { useSales } from "@/hooks/useSales";
 import { useReturns } from "@/hooks/useReturns";
-import { formatPrice } from "@/lib/utils";
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
+import { formatCurrency } from "@/lib/i18n/format";
 
 export function StatsGrid() {
   const { products, loading: productsLoading } = useProducts();
   const { sales, loading: salesLoading } = useSales();
   const { returns, loading: returnsLoading } = useReturns();
+  const dict = useDictionary();
+  const locale = useLocale();
+  const t = dict.app.dashboard.stats;
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -45,30 +49,30 @@ export function StatsGrid() {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       <StatCard
-        title="مبيعات اليوم"
-        value={formatPrice(todaySales)}
+        title={t.todaySales}
+        value={formatCurrency(todaySales, locale)}
         icon={DollarSign}
         color="success"
         href="/reports?range=today"
       />
       <StatCard
-        title="عدد الأصناف"
+        title={t.itemCount}
         value={products.length}
         icon={Package}
         color="accent"
         href="/inventory"
       />
       <StatCard
-        title="مبيعات الشهر"
-        value={formatPrice(monthSales)}
+        title={t.monthSales}
+        value={formatCurrency(monthSales, locale)}
         icon={ShoppingCart}
         color="accent"
         href="/reports?range=this-month"
       />
       <StatCard
-        title="مرتجعات الشهر"
+        title={t.monthReturns}
         value={monthReturns}
-        subtitle="مرتجع"
+        subtitle={t.returnsSuffix}
         icon={RotateCcw}
         color="danger"
         href="/reports?range=returns-this-month"

@@ -2,11 +2,16 @@
 
 import { useSales } from "@/hooks/useSales";
 import { Badge } from "../ui/Badge";
+import { UserText } from "../ui/UserText";
 import { CATEGORY_LABELS, GENDER_LABELS } from "@/lib/types";
-import { formatPrice, formatDate } from "@/lib/utils";
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
+import { formatCurrency, formatDate } from "@/lib/i18n/format";
 
 export function RecentSalesList() {
   const { sales, loading } = useSales();
+  const dict = useDictionary();
+  const locale = useLocale();
+  const t = dict.app.dashboard.recentSales;
 
   if (loading) {
     return (
@@ -27,21 +32,19 @@ export function RecentSalesList() {
 
   return (
     <div className="bg-white rounded-xl p-5 shadow-sm border border-border overflow-x-auto">
-      <h3 className="font-semibold mb-4">آخر المبيعات</h3>
+      <h3 className="font-semibold mb-4">{t.title}</h3>
 
       {recentSales.length === 0 ? (
-        <p className="text-text-secondary text-center py-8">
-          لا توجد مبيعات بعد
-        </p>
+        <p className="text-text-secondary text-center py-8">{t.empty}</p>
       ) : (
         <table className="w-full min-w-[600px]">
           <thead>
             <tr className="text-sm text-text-secondary border-b border-border">
-              <th className="text-start pb-3 px-2">التاريخ</th>
-              <th className="text-start pb-3 px-2">المنتج</th>
-              <th className="text-start pb-3 px-2">الكمية</th>
-              <th className="text-start pb-3 px-2">الإجمالي</th>
-              <th className="text-start pb-3 px-2">الحالة</th>
+              <th className="text-start pb-3 px-2">{t.col.date}</th>
+              <th className="text-start pb-3 px-2">{t.col.product}</th>
+              <th className="text-start pb-3 px-2">{t.col.quantity}</th>
+              <th className="text-start pb-3 px-2">{t.col.total}</th>
+              <th className="text-start pb-3 px-2">{t.col.status}</th>
             </tr>
           </thead>
           <tbody>
@@ -51,26 +54,28 @@ export function RecentSalesList() {
                 className="border-b border-border last:border-0"
               >
                 <td className="py-3 px-2 text-sm">
-                  {formatDate(new Date(sale.saleDate))}
+                  {formatDate(new Date(sale.saleDate), locale)}
                 </td>
                 <td className="py-3 px-2">
                   <div>
-                    <p className="font-medium">{sale.productName}</p>
-                    <p className="text-xs text-text-secondary">
+                    <UserText as="p" className="font-medium">
+                      {sale.productName}
+                    </UserText>
+                    <UserText as="p" className="text-xs text-text-secondary">
                       {CATEGORY_LABELS[sale.category]} •{" "}
                       {GENDER_LABELS[sale.gender]}
-                    </p>
+                    </UserText>
                   </div>
                 </td>
                 <td className="py-3 px-2">{sale.quantitySold}</td>
                 <td className="py-3 px-2 font-medium">
-                  {formatPrice(sale.totalPrice)}
+                  {formatCurrency(sale.totalPrice, locale)}
                 </td>
                 <td className="py-3 px-2">
                   {sale.isReturned ? (
-                    <Badge variant="returned">مرتجع</Badge>
+                    <Badge variant="returned">{t.status.returned}</Badge>
                   ) : (
-                    <Badge variant="sold">مباع</Badge>
+                    <Badge variant="sold">{t.status.sold}</Badge>
                   )}
                 </td>
               </tr>
