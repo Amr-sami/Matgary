@@ -19,11 +19,16 @@ if (process.env.SENTRY_DSN) {
     // request headers (Authorization, Cookie, etc.), request body keys
     // (password, totp, secret, ...), Sentry `extra`/`contexts`, and
     // sensitive query params on URL-bearing breadcrumbs.
+    // `as` casts: Sentry's ErrorEvent is a wider union than the structural
+    // shape our scrubber accepts; the scrubber only reads the fields it
+    // declares and ignores the rest, so the cast is safe at runtime.
     beforeSend(event) {
-      return scrubSentryEvent(event);
+      const scrubbed = scrubSentryEvent(event as unknown as Record<string, unknown>);
+      return scrubbed as unknown as typeof event;
     },
     beforeBreadcrumb(crumb) {
-      return scrubSentryBreadcrumb(crumb);
+      const scrubbed = scrubSentryBreadcrumb(crumb as unknown as Record<string, unknown>);
+      return scrubbed as unknown as typeof crumb;
     },
     // Don't ship local-only failures (DB down on a dev box, etc.) to prod Sentry.
     enabled: process.env.NODE_ENV !== "test",

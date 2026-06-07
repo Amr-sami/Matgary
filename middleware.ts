@@ -150,8 +150,22 @@ export default auth((req) => {
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set("x-nonce", nonce);
 
+  // Locale resolution for the `x-locale` header that the root layout reads:
+  //  1. If the URL has /ar/ or /en/, that wins (pre-login surface).
+  //  2. Otherwise prefer the user's saved preference from the JWT (the
+  //     logged-in app uses unprefixed URLs per i18n-app-phase2.md §3.1).
+  //  3. Otherwise the cookie (returning visitor on a public route).
+  //  4. Otherwise defaultLocale.
+  const sessionLocale =
+    req.auth?.user?.locale === "ar" || req.auth?.user?.locale === "en"
+      ? req.auth.user.locale
+      : null;
+  const cookieLocale = req.cookies.get(LOCALE_COOKIE)?.value;
+  const cookieFallback =
+    cookieLocale === "ar" || cookieLocale === "en" ? cookieLocale : null;
   const localeInPath = pathLocale(pathname);
-  const activeLocale = localeInPath ?? defaultLocale;
+  const activeLocale =
+    localeInPath ?? sessionLocale ?? cookieFallback ?? defaultLocale;
   requestHeaders.set("x-locale", activeLocale);
 
   const passThrough = () => {

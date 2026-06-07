@@ -4,6 +4,8 @@ import { Cairo, Tajawal, Lemonada } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
 import { IconProvider } from "@/components/IconProvider";
 import { defaultLocale, dirOf, isLocale } from "@/lib/i18n/config";
+import { getDictionary } from "@/lib/i18n/get-dictionary";
+import { DictionaryProvider } from "@/components/i18n/DictionaryProvider";
 import "./globals.css";
 
 const cairo = Cairo({
@@ -41,17 +43,28 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Middleware writes x-locale on every request based on the URL path
-  // (`/ar/*` → ar, `/en/*` → en, anything else → defaultLocale).
+  // Middleware writes x-locale on every request: URL path locale > session
+  // user.locale > cookie > defaultLocale. Root layout reads from header
+  // only — no auth() call here so we stay edge-fast.
   const hdrs = await headers();
   const raw = hdrs.get("x-locale");
   const locale = raw && isLocale(raw) ? raw : defaultLocale;
   const dir = dirOf(locale);
+  // Phase 2 — load the dictionary at the root so the entire app (logged-in
+  // pages + the pre-login [lang] tree) sees it via React context.
+  // Pre-login pages still nest their own DictionaryProvider with the
+  // URL-derived locale; the nested provider wins (React context shadow),
+  // so this root one is the fallback for any page outside [lang].
+  const dict = await getDictionary(locale);
   return (
     <html lang={locale} dir={dir} className={`${cairo.variable} ${tajawal.variable} ${lemonada.variable}`}>
       <body className="min-h-screen flex flex-col antialiased">
         <SessionProvider>
-          <IconProvider>{children}</IconProvider>
+          <IconProvider>
+            <DictionaryProvider locale={locale} dict={dict}>
+              {children}
+            </DictionaryProvider>
+          </IconProvider>
         </SessionProvider>
       </body>
     </html>

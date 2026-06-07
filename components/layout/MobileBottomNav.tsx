@@ -28,44 +28,52 @@ import { logoutAction } from "@/app/[lang]/(auth)/actions";
 import { can, canAny, type Permission } from "@/lib/permissions";
 import { useUnreadTaskCount } from "@/hooks/useUnreadTaskCount";
 import { useLeaveUnread } from "@/hooks/useLeaveUnread";
+import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 interface NavItem {
   href: string;
-  label: string;
+  /** Key into the dictionary's `app.shell.primary` or `secondary` namespace. */
+  labelKey: string;
   icon: typeof LayoutDashboard;
   requires: Permission;
 }
 
 const primaryItems: NavItem[] = [
-  { href: "/", label: "لوحة", icon: LayoutDashboard, requires: "view_dashboard" },
-  { href: "/inventory", label: "المخزن", icon: Package, requires: "view_inventory" },
-  { href: "/sales", label: "المبيعات", icon: ShoppingCart, requires: "view_sales" },
-  { href: "/add-product", label: "إضافة صنف", icon: PlusSquare, requires: "manage_inventory" },
-  { href: "/purchases", label: "المشتريات", icon: Receipt, requires: "view_purchases" },
-  { href: "/insights", label: "إحصائيات", icon: BarChart3, requires: "view_insights" },
+  // Mobile uses the SHORT label for "/" since vertical space is tight.
+  { href: "/", labelKey: "dashboardShort", icon: LayoutDashboard, requires: "view_dashboard" },
+  { href: "/inventory", labelKey: "inventory", icon: Package, requires: "view_inventory" },
+  { href: "/sales", labelKey: "sales", icon: ShoppingCart, requires: "view_sales" },
+  { href: "/add-product", labelKey: "addProduct", icon: PlusSquare, requires: "manage_inventory" },
+  { href: "/purchases", labelKey: "purchases", icon: Receipt, requires: "view_purchases" },
+  { href: "/insights", labelKey: "insights", icon: BarChart3, requires: "view_insights" },
 ];
 
 const moreItems: NavItem[] = [
-  { href: "/tasks", label: "المهام", icon: ListChecks, requires: "view_dashboard" },
-  { href: "/customers", label: "العملاء", icon: Users, requires: "view_customers" },
-  { href: "/expenses", label: "المصاريف", icon: Wallet, requires: "view_expenses" },
-  { href: "/suppliers", label: "الموردين", icon: Truck, requires: "view_suppliers" },
-  { href: "/returns", label: "المرتجعات", icon: RotateCcw, requires: "view_returns" },
-  { href: "/team", label: "الموظفون", icon: UsersGroup, requires: "manage_team" },
-  { href: "/activity", label: "السجل", icon: History, requires: "view_activity_log" },
-  { href: "/settings", label: "الإعدادات", icon: Settings, requires: "view_settings" },
+  { href: "/tasks", labelKey: "tasks", icon: ListChecks, requires: "view_dashboard" },
+  { href: "/customers", labelKey: "customers", icon: Users, requires: "view_customers" },
+  { href: "/expenses", labelKey: "expenses", icon: Wallet, requires: "view_expenses" },
+  { href: "/suppliers", labelKey: "suppliers", icon: Truck, requires: "view_suppliers" },
+  { href: "/returns", labelKey: "returns", icon: RotateCcw, requires: "view_returns" },
+  { href: "/team", labelKey: "team", icon: UsersGroup, requires: "manage_team" },
+  { href: "/activity", labelKey: "activity", icon: History, requires: "view_activity_log" },
+  { href: "/settings", labelKey: "settings", icon: Settings, requires: "view_settings" },
 ];
 
 export function MobileBottomNav() {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
   const { data: session } = useSession();
+  const dict = useDictionary();
+  const shellT = dict.app.shell;
+  const primaryLabels = shellT.primary as Record<string, string>;
+  const secondaryLabels = shellT.secondary as Record<string, string>;
+  const labelOf = (item: NavItem): string =>
+    primaryLabels[item.labelKey] ?? secondaryLabels[item.labelKey] ?? item.labelKey;
   const principal = session?.user
     ? { role: session.user.role, permissions: session.user.permissions }
     : null;
   const visiblePrimary = primaryItems.filter((i) => can(principal, i.requires));
   const visibleMore = moreItems.filter((i) => {
-    // /tasks is reachable by every logged-in member.
     if (i.href === "/tasks") return !!principal;
     if (i.href === "/team") {
       return canAny(principal, ["manage_team", "request_leave", "manage_leave"]);
@@ -109,9 +117,6 @@ export function MobileBottomNav() {
   }, [moreOpen]);
 
   // Hide-on-scroll-down / show-on-scroll-up — Facebook-style.
-  // We only hide the bar itself, not the slide-up sheet (which is fixed and
-  // siblings the nav). When the sheet is open we force the bar visible so
-  // the user can still close it.
   const [hidden, setHidden] = useState(false);
   const lastY = useRef(0);
   const ticking = useRef(false);
@@ -123,8 +128,6 @@ export function MobileBottomNav() {
       window.requestAnimationFrame(() => {
         const y = window.scrollY;
         const delta = y - lastY.current;
-        // Always show in the first 60px of the page so the bar isn't missing
-        // when the user is just casually opening a screen.
         if (y < 60) {
           setHidden(false);
         } else if (delta > 8) {
@@ -163,11 +166,11 @@ export function MobileBottomNav() {
         )}
       >
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-text-primary">المزيد</h3>
+          <h3 className="text-sm font-semibold text-text-primary">{shellT.more}</h3>
           <button
             type="button"
             onClick={() => setMoreOpen(false)}
-            aria-label="إغلاق"
+            aria-label={dict.app.common.close}
             className="w-8 h-8 rounded-full flex items-center justify-center text-text-secondary hover:bg-bg-main"
           >
             <X className="w-5 h-5" />
@@ -178,6 +181,7 @@ export function MobileBottomNav() {
             const isActive = pathname === item.href;
             const Icon = item.icon;
             const badge = badgeFor(item.href);
+            const label = labelOf(item);
             return (
               <Link
                 key={item.href}
@@ -197,7 +201,7 @@ export function MobileBottomNav() {
                     </span>
                   )}
                 </span>
-                <span className="text-[11px] font-medium">{item.label}</span>
+                <span className="text-[11px] font-medium">{label}</span>
               </Link>
             );
           })}
@@ -205,7 +209,7 @@ export function MobileBottomNav() {
 
         {email && (
           <div className="mt-3 pt-3 border-t border-border flex items-center justify-between gap-2">
-            <p className="text-xs text-text-secondary truncate">{email}</p>
+            <p dir="ltr" className="text-xs text-text-secondary truncate">{email}</p>
             <button
               type="button"
               onClick={handleSignOut}
@@ -213,14 +217,13 @@ export function MobileBottomNav() {
               className="flex items-center gap-1.5 text-xs font-medium text-danger hover:bg-danger-light rounded-lg px-3 py-1.5 disabled:opacity-50"
             >
               <LogOut className="w-4 h-4" />
-              {isSigningOut ? "…" : "تسجيل الخروج"}
+              {isSigningOut ? "…" : shellT.userMenu.signOut}
             </button>
           </div>
         )}
       </div>
 
-      {/* Bottom bar — slides off-screen on scroll-down. The sheet above is a
-          sibling so it stays untouched when the bar hides. */}
+      {/* Bottom bar */}
       <nav
         className={cn(
           "flex items-stretch justify-around bg-bg-card border-t border-border px-1 pt-1.5 pb-[calc(env(safe-area-inset-bottom)+0.375rem)]",
@@ -232,6 +235,7 @@ export function MobileBottomNav() {
           const isActive = pathname === item.href;
           const Icon = item.icon;
           const badge = badgeFor(item.href);
+          const label = labelOf(item);
           return (
             <Link
               key={item.href}
@@ -245,14 +249,14 @@ export function MobileBottomNav() {
                 <Icon className="w-5 h-5" />
                 {badge !== null && (
                   <span
-                    aria-label={`${badge} عناصر جديدة`}
+                    aria-label={`${badge} ${shellT.newItems}`}
                     className="absolute -top-1.5 -end-2 min-w-[16px] h-[16px] rounded-full bg-danger text-white text-[9px] font-bold flex items-center justify-center px-1"
                   >
                     {badge > 9 ? "9+" : badge}
                   </span>
                 )}
               </span>
-              <span className="text-[10px] leading-tight whitespace-nowrap">{item.label}</span>
+              <span className="text-[10px] leading-tight whitespace-nowrap">{label}</span>
               <span
                 aria-hidden
                 className={cn(
@@ -266,7 +270,7 @@ export function MobileBottomNav() {
         <button
           type="button"
           onClick={() => setMoreOpen((v) => !v)}
-          aria-label="المزيد"
+          aria-label={shellT.moreA11y}
           aria-expanded={moreOpen}
           className={cn(
             "relative flex flex-col items-center justify-center gap-0.5 px-1 py-1 rounded-lg flex-1 min-w-[48px] transition-colors",
@@ -287,7 +291,7 @@ export function MobileBottomNav() {
               )}
             />
           </span>
-          <span className="text-[10px] leading-tight whitespace-nowrap">المزيد</span>
+          <span className="text-[10px] leading-tight whitespace-nowrap">{shellT.more}</span>
           <span
             aria-hidden
             className={cn(

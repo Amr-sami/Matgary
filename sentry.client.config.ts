@@ -12,11 +12,14 @@ if (process.env.NEXT_PUBLIC_SENTRY_DSN) {
     replaysSessionSampleRate: 0,
     // F-02 — same scrubber as server. Catches fetch/xhr breadcrumb URLs
     // and any client-side `Sentry.captureException(err, { extra: ... })`.
+    // Same cast as the server config — see sentry.server.config.ts.
     beforeSend(event) {
-      return scrubSentryEvent(event);
+      const scrubbed = scrubSentryEvent(event as unknown as Record<string, unknown>);
+      return scrubbed as unknown as typeof event;
     },
     beforeBreadcrumb(crumb) {
-      return scrubSentryBreadcrumb(crumb);
+      const scrubbed = scrubSentryBreadcrumb(crumb as unknown as Record<string, unknown>);
+      return scrubbed as unknown as typeof crumb;
     },
     enabled: process.env.NODE_ENV !== "test",
   });

@@ -31,6 +31,11 @@ export const authConfig = {
             : !!token.subscriptionAccessActive;
         session.user.subscriptionStatus =
           (token.subscriptionStatus as string | null) ?? null;
+        // Phase 2 — locale claim. Older tokens (issued before this column
+        // existed) fall through to 'ar' to keep existing behaviour.
+        session.user.locale = (token.locale === "en" ? "en" : "ar") as
+          | "ar"
+          | "en";
       }
       return session;
     },

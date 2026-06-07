@@ -69,6 +69,10 @@ declare module "next-auth" {
       /** Whether the tenant's subscription currently grants access to the app. */
       subscriptionAccessActive: boolean;
       subscriptionStatus: string | null;
+      /** Phase 2 — UI language preference (set at signup, mutable from
+       *  /settings → Language). Drives <html lang/dir> + the logged-in
+       *  app dictionary. Always 'ar' | 'en' (CHECK-constrained at DB). */
+      locale: "ar" | "en";
     } & DefaultSession["user"];
   }
 }
@@ -86,6 +90,8 @@ declare module "@auth/core/jwt" {
     subscriptionStatus: string | null;
     /** H09 token version at issue time; rejected on mismatch with users.token_version. */
     tv: number;
+    /** Phase 2 — see session declaration above. */
+    locale: "ar" | "en";
   }
 }
 
@@ -129,6 +135,8 @@ interface UserContext {
   subscriptionStatus: string | null;
   /** H09 — incremented on password change / 2FA toggle / "sign out all". */
   tokenVersion: number;
+  /** Phase 2 — UI locale, persisted on the user row. */
+  locale: "ar" | "en";
 }
 
 async function resolveTenantContext(userId: string): Promise<UserContext> {
@@ -152,6 +160,7 @@ async function resolveTenantContext(userId: string): Promise<UserContext> {
       .select({
         mustChangePassword: users.mustChangePassword,
         tokenVersion: users.tokenVersion,
+        locale: users.locale,
       })
       .from(users)
       .where(eq(users.id, userId))
@@ -162,6 +171,7 @@ async function resolveTenantContext(userId: string): Promise<UserContext> {
     const permissions = (membership?.permissions ?? []) as Permission[];
     const mustChangePassword = !!user?.mustChangePassword;
     const tokenVersion = user?.tokenVersion ?? 0;
+    const locale: "ar" | "en" = user?.locale === "en" ? "en" : "ar";
 
     let onboardingComplete = false;
     let tenantSlug: string | null = null;
@@ -222,6 +232,7 @@ async function resolveTenantContext(userId: string): Promise<UserContext> {
       subscriptionAccessActive,
       subscriptionStatus,
       tokenVersion,
+      locale,
     };
   });
 }
@@ -354,6 +365,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.subscriptionAccessActive = ctx.subscriptionAccessActive;
         token.subscriptionStatus = ctx.subscriptionStatus;
         token.tv = ctx.tokenVersion;
+        token.locale = ctx.locale;
         if (ctx.tenantId) {
           logActivity({
             tenantId: ctx.tenantId,
@@ -392,6 +404,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.subscriptionAccessActive = ctx.subscriptionAccessActive;
         token.subscriptionStatus = ctx.subscriptionStatus;
         token.tv = ctx.tokenVersion;
+        token.locale = ctx.locale;
       }
       return token;
     },
