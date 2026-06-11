@@ -10,8 +10,7 @@
 import "server-only";
 import { DollarSign, Package, ShoppingCart, RotateCcw } from "@/lib/icons";
 import { StatCard } from "./StatCard";
-import { listSales, listReturns } from "@/lib/repo/operations";
-import { listProducts } from "@/lib/repo/catalog";
+import { loadDashboardStats } from "@/lib/repo/insights";
 import type { Dictionary } from "@/lib/i18n/get-dictionary";
 import type { Locale } from "@/lib/i18n/config";
 import { formatCurrency } from "@/lib/i18n/format";
@@ -30,58 +29,39 @@ export async function StatsGridServer({
   dict,
   locale,
 }: StatsGridServerProps) {
-  // Three repo reads in parallel inside the same component scope. Each
-  // opens its own `withTenant` transaction; this matches what the API
-  // route does today and keeps RLS as the safety net.
-  const [products, sales, returns] = await Promise.all([
-    listProducts(tenantId, branchId),
-    listSales(tenantId, branchId),
-    listReturns(tenantId, branchId),
-  ]);
+  // Single SQL aggregation inside one withTenant tx, behind a 60 s Redis
+  // cache. Replaces the old fetch-every-row-and-reduce-in-JS path that
+  // shipped multi-MB JSON to compute four numbers. Cache is busted by
+  // bustInsightsCache() on every sale/return/expense mutation.
+  const stats = await loadDashboardStats(tenantId, branchId);
   const t = dict.app.dashboard.stats;
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const thisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-
-  const todaySales = sales
-    .filter((s) => new Date(s.saleDate) >= today)
-    .reduce((sum, s) => sum + s.totalPrice, 0);
-
-  const monthSales = sales
-    .filter((s) => new Date(s.saleDate) >= thisMonth)
-    .reduce((sum, s) => sum + s.totalPrice, 0);
-
-  const monthReturns = returns.filter(
-    (r) => new Date(r.returnDate) >= thisMonth,
-  ).length;
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       <StatCard
         title={t.todaySales}
-        value={formatCurrency(todaySales, locale)}
+        value={formatCurrency(stats.todayRevenue, locale)}
         icon={DollarSign}
         color="success"
         href="/reports?range=today"
       />
       <StatCard
         title={t.itemCount}
-        value={products.length}
+        value={stats.productCount}
         icon={Package}
         color="accent"
         href="/inventory"
       />
       <StatCard
         title={t.monthSales}
-        value={formatCurrency(monthSales, locale)}
+        value={formatCurrency(stats.monthRevenue, locale)}
         icon={ShoppingCart}
         color="accent"
         href="/sales"
       />
       <StatCard
         title={t.monthReturns}
-        value={monthReturns}
+        value={stats.monthReturns}
         icon={RotateCcw}
         color="danger"
         href="/returns"

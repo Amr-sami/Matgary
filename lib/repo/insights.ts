@@ -83,9 +83,130 @@ function endOfDay(d: Date): Date {
  * Drop every cached overview slice for a tenant. Call from any mutation that
  * could shift one of the underlying numbers (sale, return, expense, product
  * cost change, sale void, etc.).
+ *
+ * Busts both the per-window overview cache AND the dashboard headline
+ * snapshot below — they share the same write set, so the same writers
+ * already call us.
  */
 export async function bustInsightsCache(tenantId: string): Promise<void> {
-  await cacheBustPrefix(tenantKey(tenantId, OVERVIEW_PREFIX));
+  await Promise.all([
+    cacheBustPrefix(tenantKey(tenantId, OVERVIEW_PREFIX)),
+    cacheBustPrefix(tenantKey(tenantId, DASHBOARD_STATS_PREFIX)),
+  ]);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Dashboard headline stats. The four numbers the SC dashboard shows: today's
+// revenue, this-month revenue, this-month return count, product count. We
+// cache because:
+//   - The dashboard is the platform's most-hit read.
+//   - Every sale/return/product mutation already calls bustInsightsCache,
+//     so the cache stays correct.
+//   - The aggregation runs as SQL inside one withTenant tx, so it doesn't
+//     ship every row to the app server like the old client-side widgets did.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const DASHBOARD_STATS_PREFIX = "dashboard:stats";
+const DASHBOARD_STATS_TTL_SEC = 60;
+
+export interface DashboardStats {
+  /** Sum of total_price for sales with sale_date >= today (00:00 local). */
+  todayRevenue: number;
+  /** Sum of total_price for sales with sale_date >= 1st of current month. */
+  monthRevenue: number;
+  /** Returns recorded since 1st of current month. */
+  monthReturns: number;
+  /** Total products in catalog (after branch filter, if any). */
+  productCount: number;
+}
+
+export async function loadDashboardStats(
+  tenantId: string,
+  branchId: string | null,
+): Promise<DashboardStats> {
+  // Day boundaries change every hour anyway; key on the calendar date so
+  // a tenant operating across midnight gets a fresh slice rather than a
+  // stale "yesterday" reading.
+  const now = new Date();
+  const dayKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+  const branchKey = branchId ?? ALL_BRANCHES_SENTINEL;
+  return cacheRemember(
+    tenantKey(tenantId, DASHBOARD_STATS_PREFIX, dayKey, branchKey),
+    DASHBOARD_STATS_TTL_SEC,
+    () => computeDashboardStats(tenantId, branchId),
+  );
+}
+
+async function computeDashboardStats(
+  tenantId: string,
+  branchId: string | null,
+): Promise<DashboardStats> {
+  return withTenant(tenantId, async (tx) => {
+    const now = new Date();
+    const today = new Date(now);
+    today.setHours(0, 0, 0, 0);
+    const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    // SQL aggregation rather than fetching every row + reducing in JS.
+    // Money columns are stored as numeric but typed text in Drizzle — sum()
+    // on numeric works without an explicit cast.
+    const [todayRow] = await tx
+      .select({
+        total: sql<string>`coalesce(sum(${sales.totalPrice}), 0)::text`,
+      })
+      .from(sales)
+      .where(
+        and(
+          eq(sales.tenantId, tenantId),
+          gte(sales.saleDate, today),
+          ...(branchId ? [eq(sales.branchId, branchId)] : []),
+        ),
+      );
+
+    const [monthRow] = await tx
+      .select({
+        total: sql<string>`coalesce(sum(${sales.totalPrice}), 0)::text`,
+      })
+      .from(sales)
+      .where(
+        and(
+          eq(sales.tenantId, tenantId),
+          gte(sales.saleDate, thisMonth),
+          ...(branchId ? [eq(sales.branchId, branchId)] : []),
+        ),
+      );
+
+    const [returnsRow] = await tx
+      .select({
+        count: sql<number>`count(*)::int`,
+      })
+      .from(returnsTable)
+      .where(
+        and(
+          eq(returnsTable.tenantId, tenantId),
+          gte(returnsTable.returnDate, thisMonth),
+        ),
+      );
+
+    const [productsRow] = await tx
+      .select({
+        count: sql<number>`count(*)::int`,
+      })
+      .from(products)
+      .where(
+        and(
+          eq(products.tenantId, tenantId),
+          ...(branchId ? [eq(products.branchId, branchId)] : []),
+        ),
+      );
+
+    return {
+      todayRevenue: Number(todayRow?.total ?? 0),
+      monthRevenue: Number(monthRow?.total ?? 0),
+      monthReturns: returnsRow?.count ?? 0,
+      productCount: productsRow?.count ?? 0,
+    };
+  });
 }
 
 /** Load an overview slice. Caller is trusted to be tenant-scoped.
