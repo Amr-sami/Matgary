@@ -1,0 +1,67 @@
+{
+  "name": "insights-overview",
+  "connections": 250,
+  "durationSec": 15,
+  "requests_per_sec": 463,
+  "latency_p50_ms": 527,
+  "latency_p95_ms": 998,
+  "latency_p99_ms": 1210,
+  "latency_max_ms": 1213,
+  "errors": 0,
+  "timeouts": 0,
+  "non_2xx": 0,
+  "ops_before": {
+    "ts": 1781205129720,
+    "pg": {
+      "connections": 11,
+      "active": 1,
+      "idle_in_tx": 0,
+      "idle": 10
+    },
+    "redis": {
+      "instantaneous_ops_per_sec": 0,
+      "connected_clients": 6,
+      "used_memory_human": "1.66M"
+    },
+    "node": {
+      "rss_mb": 11,
+      "cpu_percent": 0
+    }
+  },
+  "ops_after": {
+    "ts": 1781205145166,
+    "pg": {
+      "connections": 11,
+      "active": 1,
+      "idle_in_tx": 0,
+      "idle": 10
+    },
+    "redis": {
+      "instantaneous_ops_per_sec": 1201,
+      "connected_clients": 6,
+      "used_memory_human": "1.66M"
+    },
+    "node": {
+      "rss_mb": 11,
+      "cpu_percent": 0
+    }
+  },
+  "ops_peak": {
+    "ts": 1781205138925,
+    "pg": {
+      "connections": 11,
+      "active": 5,
+      "idle_in_tx": 5,
+      "idle": 1
+    },
+    "redis": {
+      "instantaneous_ops_per_sec": 1686,
+      "connected_clients": 6,
+      "used_memory_human": "1.66M"
+    },
+    "node": {
+      "rss_mb": 11,
+      "cpu_percent": 0
+    }
+  }
+}

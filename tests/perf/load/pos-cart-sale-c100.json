@@ -1,0 +1,67 @@
+{
+  "name": "pos-cart-sale",
+  "connections": 100,
+  "durationSec": 15,
+  "requests_per_sec": 147.27,
+  "latency_p50_ms": 675,
+  "latency_p95_ms": 847,
+  "latency_p99_ms": 877,
+  "latency_max_ms": 982,
+  "errors": 0,
+  "timeouts": 0,
+  "non_2xx": 0,
+  "ops_before": {
+    "ts": 1781205200282,
+    "pg": {
+      "connections": 11,
+      "active": 1,
+      "idle_in_tx": 0,
+      "idle": 10
+    },
+    "redis": {
+      "instantaneous_ops_per_sec": 0,
+      "connected_clients": 6,
+      "used_memory_human": "1.60M"
+    },
+    "node": {
+      "rss_mb": 11,
+      "cpu_percent": 0
+    }
+  },
+  "ops_after": {
+    "ts": 1781205215762,
+    "pg": {
+      "connections": 11,
+      "active": 8,
+      "idle_in_tx": 2,
+      "idle": 1
+    },
+    "redis": {
+      "instantaneous_ops_per_sec": 674,
+      "connected_clients": 6,
+      "used_memory_human": "1.65M"
+    },
+    "node": {
+      "rss_mb": 11,
+      "cpu_percent": 0
+    }
+  },
+  "ops_peak": {
+    "ts": 1781205208474,
+    "pg": {
+      "connections": 11,
+      "active": 10,
+      "idle_in_tx": 1,
+      "idle": 0
+    },
+    "redis": {
+      "instantaneous_ops_per_sec": 779,
+      "connected_clients": 6,
+      "used_memory_human": "1.62M"
+    },
+    "node": {
+      "rss_mb": 11,
+      "cpu_percent": 0
+    }
+  }
+}

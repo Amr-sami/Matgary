@@ -19,6 +19,27 @@ export async function register(): Promise<void> {
     await import("./sentry.edge.config");
   }
 
+  // OpenTelemetry — opt-in via OTEL_SERVICE_NAME (or any standard
+  // OTEL_EXPORTER_OTLP_* env var). Off by default so local dev stays
+  // quiet. When enabled, `@vercel/otel` installs the standard tracer +
+  // OTLP exporter, instruments fetch / node:http / postgres-js, and
+  // emits spans that any OTEL collector (Jaeger, Tempo, Honeycomb,
+  // Datadog) can ingest.
+  if (
+    process.env.NEXT_RUNTIME === "nodejs" &&
+    process.env.OTEL_SERVICE_NAME
+  ) {
+    const { registerOTel } = await import("@vercel/otel");
+    registerOTel({
+      serviceName: process.env.OTEL_SERVICE_NAME,
+      // Auto-detects OTLP endpoint + headers from OTEL_EXPORTER_OTLP_*
+      // env vars. No collector → exporter is a no-op.
+      // We DON'T auto-instrument every fetch because we'd then trace the
+      // outbound calls to Meta / Paymob / Sentry too — that's a lot of
+      // noise. Future: add explicit fetch instrumentation with allow-list.
+    });
+  }
+
   // Background workers — Node only, opt-in via REDIS_URL.
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
   if (!process.env.REDIS_URL) return;

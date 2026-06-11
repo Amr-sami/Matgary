@@ -3,6 +3,7 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { db, withTenant } from "@/lib/db";
 import { branches, tenantMembers } from "@/lib/db/schema";
 import { cacheRemember, globalKey } from "@/lib/cache";
+import { withSpan } from "@/lib/observability/tracing";
 
 // Active-branch session model.
 //
@@ -111,6 +112,19 @@ export async function getAccessibleBranches(
  * because the migration seeds a primary branch per tenant.
  */
 export async function resolveActiveBranch(
+  ctx: ResolveInput,
+): Promise<BranchContext | null> {
+  return withSpan(
+    "api.branch.resolve_active",
+    {
+      "matgary.tenant_id": ctx.tenantId,
+      "matgary.user_id": ctx.userId,
+    },
+    () => resolveActiveBranchImpl(ctx),
+  );
+}
+
+async function resolveActiveBranchImpl(
   ctx: ResolveInput,
 ): Promise<BranchContext | null> {
   const allowedBranchIds = await getAccessibleBranches(ctx);

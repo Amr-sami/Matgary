@@ -21,6 +21,7 @@ import type {
 import { calcLineDiscount, calcOrderDiscount } from "@/lib/repo/sale-discounts";
 import { bustInsightsCache } from "@/lib/repo/insights";
 import { DomainError } from "@/lib/errors";
+import { withSpan } from "@/lib/observability/tracing";
 import {
   applyCredit as walletApplyCredit,
   earnPoints as walletEarnPoints,
@@ -542,6 +543,23 @@ export interface CartSaleResult {
 }
 
 export async function recordCartSale(
+  tenantId: string,
+  lines: CartSaleLineInput[],
+  options: CartSaleOptions,
+): Promise<CartSaleResult> {
+  return withSpan(
+    "repo.sale.record_cart",
+    {
+      "matgary.tenant_id": tenantId,
+      "matgary.branch_id": options.branchId,
+      "matgary.cart.line_count": lines.length,
+      "matgary.cart.payment_method": options.paymentMethod ?? "cash",
+    },
+    () => recordCartSaleImpl(tenantId, lines, options),
+  );
+}
+
+async function recordCartSaleImpl(
   tenantId: string,
   lines: CartSaleLineInput[],
   options: CartSaleOptions,

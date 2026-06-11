@@ -9,6 +9,7 @@ import {
   categories,
 } from "@/lib/db/schema";
 import { cacheBustPrefix, cacheRemember, tenantKey } from "@/lib/cache";
+import { withSpan } from "@/lib/observability/tracing";
 
 // Server-side replacement for the old client `useInsights` aggregation. Every
 // figure that used to be computed in the browser is now SQL-aggregated inside
@@ -124,16 +125,25 @@ export async function loadDashboardStats(
   tenantId: string,
   branchId: string | null,
 ): Promise<DashboardStats> {
-  // Day boundaries change every hour anyway; key on the calendar date so
-  // a tenant operating across midnight gets a fresh slice rather than a
-  // stale "yesterday" reading.
-  const now = new Date();
-  const dayKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
-  const branchKey = branchId ?? ALL_BRANCHES_SENTINEL;
-  return cacheRemember(
-    tenantKey(tenantId, DASHBOARD_STATS_PREFIX, dayKey, branchKey),
-    DASHBOARD_STATS_TTL_SEC,
-    () => computeDashboardStats(tenantId, branchId),
+  return withSpan(
+    "repo.dashboard.stats",
+    {
+      "matgary.tenant_id": tenantId,
+      "matgary.branch_id": branchId,
+    },
+    async () => {
+      // Day boundaries change every hour anyway; key on the calendar date
+      // so a tenant operating across midnight gets a fresh slice rather
+      // than a stale "yesterday" reading.
+      const now = new Date();
+      const dayKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+      const branchKey = branchId ?? ALL_BRANCHES_SENTINEL;
+      return cacheRemember(
+        tenantKey(tenantId, DASHBOARD_STATS_PREFIX, dayKey, branchKey),
+        DASHBOARD_STATS_TTL_SEC,
+        () => computeDashboardStats(tenantId, branchId),
+      );
+    },
   );
 }
 

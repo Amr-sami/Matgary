@@ -1,0 +1,67 @@
+{
+  "name": "products-list",
+  "connections": 250,
+  "durationSec": 15,
+  "requests_per_sec": 130.4,
+  "latency_p50_ms": 1700,
+  "latency_p95_ms": 3892,
+  "latency_p99_ms": 4008,
+  "latency_max_ms": 4467,
+  "errors": 0,
+  "timeouts": 0,
+  "non_2xx": 0,
+  "ops_before": {
+    "ts": 1781204773875,
+    "pg": {
+      "connections": 11,
+      "active": 1,
+      "idle_in_tx": 0,
+      "idle": 10
+    },
+    "redis": {
+      "instantaneous_ops_per_sec": 4,
+      "connected_clients": 5,
+      "used_memory_human": "1.64M"
+    },
+    "node": {
+      "rss_mb": 12,
+      "cpu_percent": 0
+    }
+  },
+  "ops_after": {
+    "ts": 1781204790021,
+    "pg": {
+      "connections": 11,
+      "active": 6,
+      "idle_in_tx": 5,
+      "idle": 0
+    },
+    "redis": {
+      "instantaneous_ops_per_sec": 368,
+      "connected_clients": 5,
+      "used_memory_human": "1.63M"
+    },
+    "node": {
+      "rss_mb": 12,
+      "cpu_percent": 0
+    }
+  },
+  "ops_peak": {
+    "ts": 1781204785207,
+    "pg": {
+      "connections": 11,
+      "active": 5,
+      "idle_in_tx": 4,
+      "idle": 2
+    },
+    "redis": {
+      "instantaneous_ops_per_sec": 361,
+      "connected_clients": 5,
+      "used_memory_human": "1.62M"
+    },
+    "node": {
+      "rss_mb": 12,
+      "cpu_percent": 0
+    }
+  }
+}

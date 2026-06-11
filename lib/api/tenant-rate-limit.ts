@@ -72,6 +72,13 @@ export async function checkTenantRateLimit(
   tenantId: string,
   scope: string,
 ): Promise<AllowedTenantRateLimit | BlockedTenantRateLimit> {
+  // Escape hatch for the load-test rig (Phase 5A). NEVER set in production.
+  // The per-tenant limiter is a safety rail against runaway clients, not a
+  // pricing tier — but driving sustained load against it from one tenant
+  // is exactly what the rig does, so we honour the env flag.
+  if (process.env.TENANT_RATE_LIMIT_DISABLED === "1") {
+    return { ok: true, count: 0, resetAt: Date.now() + 60_000 };
+  }
   const cfg = bucketFor(scope);
   const res = await rateLimit(`tenant.${scope}`, tenantId, {
     ...cfg,

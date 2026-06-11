@@ -1,0 +1,2023 @@
+{
+  "base": "http://localhost:3100",
+  "connsLevels": [
+    10,
+    25,
+    50,
+    100,
+    250
+  ],
+  "durationSec": 15,
+  "results": [
+    {
+      "name": "products-list",
+      "connections": 10,
+      "durationSec": 15,
+      "requests_per_sec": 153.2,
+      "latency_p50_ms": 40,
+      "latency_p95_ms": 341,
+      "latency_p99_ms": 472,
+      "latency_max_ms": 498,
+      "errors": 0,
+      "timeouts": 0,
+      "non_2xx": 0,
+      "ops_before": {
+        "ts": 1781204702463,
+        "pg": {
+          "connections": 2,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 1
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 4,
+          "connected_clients": 5,
+          "used_memory_human": "1.64M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      },
+      "ops_after": {
+        "ts": 1781204718205,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 333,
+          "connected_clients": 5,
+          "used_memory_human": "1.69M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      },
+      "ops_peak": {
+        "ts": 1781204715636,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 492,
+          "connected_clients": 5,
+          "used_memory_human": "1.65M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      }
+    },
+    {
+      "name": "products-list",
+      "connections": 25,
+      "durationSec": 15,
+      "requests_per_sec": 158.6,
+      "latency_p50_ms": 124,
+      "latency_p95_ms": 498,
+      "latency_p99_ms": 646,
+      "latency_max_ms": 992,
+      "errors": 0,
+      "timeouts": 0,
+      "non_2xx": 0,
+      "ops_before": {
+        "ts": 1781204720515,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 0,
+          "connected_clients": 5,
+          "used_memory_human": "1.63M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      },
+      "ops_after": {
+        "ts": 1781204736228,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 369,
+          "connected_clients": 5,
+          "used_memory_human": "1.67M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      },
+      "ops_peak": {
+        "ts": 1781204735696,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 410,
+          "connected_clients": 5,
+          "used_memory_human": "1.67M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      }
+    },
+    {
+      "name": "products-list",
+      "connections": 50,
+      "durationSec": 15,
+      "requests_per_sec": 224.87,
+      "latency_p50_ms": 207,
+      "latency_p95_ms": 446,
+      "latency_p99_ms": 483,
+      "latency_max_ms": 704,
+      "errors": 0,
+      "timeouts": 0,
+      "non_2xx": 0,
+      "ops_before": {
+        "ts": 1781204738455,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 4,
+          "connected_clients": 5,
+          "used_memory_human": "1.69M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      },
+      "ops_after": {
+        "ts": 1781204753873,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 463,
+          "connected_clients": 5,
+          "used_memory_human": "1.63M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      },
+      "ops_peak": {
+        "ts": 1781204753630,
+        "pg": {
+          "connections": 11,
+          "active": 3,
+          "idle_in_tx": 6,
+          "idle": 2
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 500,
+          "connected_clients": 5,
+          "used_memory_human": "1.63M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      }
+    },
+    {
+      "name": "products-list",
+      "connections": 100,
+      "durationSec": 15,
+      "requests_per_sec": 244.14,
+      "latency_p50_ms": 396,
+      "latency_p95_ms": 747,
+      "latency_p99_ms": 847,
+      "latency_max_ms": 1086,
+      "errors": 0,
+      "timeouts": 0,
+      "non_2xx": 0,
+      "ops_before": {
+        "ts": 1781204756089,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 0,
+          "connected_clients": 5,
+          "used_memory_human": "1.57M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      },
+      "ops_after": {
+        "ts": 1781204771585,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 464,
+          "connected_clients": 5,
+          "used_memory_human": "1.61M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      },
+      "ops_peak": {
+        "ts": 1781204763302,
+        "pg": {
+          "connections": 11,
+          "active": 3,
+          "idle_in_tx": 7,
+          "idle": 1
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 562,
+          "connected_clients": 5,
+          "used_memory_human": "1.63M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      }
+    },
+    {
+      "name": "products-list",
+      "connections": 250,
+      "durationSec": 15,
+      "requests_per_sec": 130.4,
+      "latency_p50_ms": 1700,
+      "latency_p95_ms": 3892,
+      "latency_p99_ms": 4008,
+      "latency_max_ms": 4467,
+      "errors": 0,
+      "timeouts": 0,
+      "non_2xx": 0,
+      "ops_before": {
+        "ts": 1781204773875,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 4,
+          "connected_clients": 5,
+          "used_memory_human": "1.64M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      },
+      "ops_after": {
+        "ts": 1781204790021,
+        "pg": {
+          "connections": 11,
+          "active": 6,
+          "idle_in_tx": 5,
+          "idle": 0
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 368,
+          "connected_clients": 5,
+          "used_memory_human": "1.63M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      },
+      "ops_peak": {
+        "ts": 1781204785207,
+        "pg": {
+          "connections": 11,
+          "active": 5,
+          "idle_in_tx": 4,
+          "idle": 2
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 361,
+          "connected_clients": 5,
+          "used_memory_human": "1.62M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      }
+    },
+    {
+      "name": "sales-list",
+      "connections": 10,
+      "durationSec": 15,
+      "requests_per_sec": 217.07,
+      "latency_p50_ms": 32,
+      "latency_p95_ms": 211,
+      "latency_p99_ms": 334,
+      "latency_max_ms": 434,
+      "errors": 0,
+      "timeouts": 0,
+      "non_2xx": 0,
+      "ops_before": {
+        "ts": 1781204792330,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 0,
+          "connected_clients": 5,
+          "used_memory_human": "1.57M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      },
+      "ops_after": {
+        "ts": 1781204807895,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 282,
+          "connected_clients": 5,
+          "used_memory_human": "1.59M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      },
+      "ops_peak": {
+        "ts": 1781204802524,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 577,
+          "connected_clients": 5,
+          "used_memory_human": "1.59M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      }
+    },
+    {
+      "name": "sales-list",
+      "connections": 25,
+      "durationSec": 15,
+      "requests_per_sec": 140.79,
+      "latency_p50_ms": 117,
+      "latency_p95_ms": 759,
+      "latency_p99_ms": 1291,
+      "latency_max_ms": 1415,
+      "errors": 0,
+      "timeouts": 0,
+      "non_2xx": 0,
+      "ops_before": {
+        "ts": 1781204810137,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 4,
+          "connected_clients": 5,
+          "used_memory_human": "1.61M"
+        },
+        "node": {
+          "rss_mb": 17,
+          "cpu_percent": 0
+        }
+      },
+      "ops_after": {
+        "ts": 1781204825563,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 122,
+          "connected_clients": 5,
+          "used_memory_human": "1.64M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      },
+      "ops_peak": {
+        "ts": 1781204819424,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 390,
+          "connected_clients": 5,
+          "used_memory_human": "1.64M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      }
+    },
+    {
+      "name": "sales-list",
+      "connections": 50,
+      "durationSec": 15,
+      "requests_per_sec": 228.2,
+      "latency_p50_ms": 194,
+      "latency_p95_ms": 476,
+      "latency_p99_ms": 588,
+      "latency_max_ms": 749,
+      "errors": 0,
+      "timeouts": 0,
+      "non_2xx": 0,
+      "ops_before": {
+        "ts": 1781204827871,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 0,
+          "connected_clients": 5,
+          "used_memory_human": "1.62M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      },
+      "ops_after": {
+        "ts": 1781204843607,
+        "pg": {
+          "connections": 11,
+          "active": 3,
+          "idle_in_tx": 3,
+          "idle": 5
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 460,
+          "connected_clients": 5,
+          "used_memory_human": "1.62M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      },
+      "ops_peak": {
+        "ts": 1781204843169,
+        "pg": {
+          "connections": 11,
+          "active": 3,
+          "idle_in_tx": 5,
+          "idle": 3
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 504,
+          "connected_clients": 5,
+          "used_memory_human": "1.62M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      }
+    },
+    {
+      "name": "sales-list",
+      "connections": 100,
+      "durationSec": 15,
+      "requests_per_sec": 273.87,
+      "latency_p50_ms": 371,
+      "latency_p95_ms": 602,
+      "latency_p99_ms": 642,
+      "latency_max_ms": 722,
+      "errors": 0,
+      "timeouts": 0,
+      "non_2xx": 0,
+      "ops_before": {
+        "ts": 1781204845869,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 0,
+          "connected_clients": 5,
+          "used_memory_human": "1.66M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      },
+      "ops_after": {
+        "ts": 1781204861351,
+        "pg": {
+          "connections": 11,
+          "active": 2,
+          "idle_in_tx": 8,
+          "idle": 1
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 573,
+          "connected_clients": 5,
+          "used_memory_human": "1.66M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      },
+      "ops_peak": {
+        "ts": 1781204852064,
+        "pg": {
+          "connections": 11,
+          "active": 2,
+          "idle_in_tx": 2,
+          "idle": 7
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 565,
+          "connected_clients": 5,
+          "used_memory_human": "1.62M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      }
+    },
+    {
+      "name": "sales-list",
+      "connections": 250,
+      "durationSec": 15,
+      "requests_per_sec": 286.87,
+      "latency_p50_ms": 857,
+      "latency_p95_ms": 1199,
+      "latency_p99_ms": 1201,
+      "latency_max_ms": 1202,
+      "errors": 0,
+      "timeouts": 0,
+      "non_2xx": 0,
+      "ops_before": {
+        "ts": 1781204863583,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 0,
+          "connected_clients": 5,
+          "used_memory_human": "1.61M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      },
+      "ops_after": {
+        "ts": 1781204879060,
+        "pg": {
+          "connections": 11,
+          "active": 5,
+          "idle_in_tx": 4,
+          "idle": 2
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 462,
+          "connected_clients": 5,
+          "used_memory_human": "1.62M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      },
+      "ops_peak": {
+        "ts": 1781204865787,
+        "pg": {
+          "connections": 11,
+          "active": 2,
+          "idle_in_tx": 3,
+          "idle": 6
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 586,
+          "connected_clients": 5,
+          "used_memory_human": "1.66M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      }
+    },
+    {
+      "name": "customer-lookup",
+      "connections": 10,
+      "durationSec": 15,
+      "requests_per_sec": 311.4,
+      "latency_p50_ms": 26,
+      "latency_p95_ms": 181,
+      "latency_p99_ms": 193,
+      "latency_max_ms": 220,
+      "errors": 0,
+      "timeouts": 0,
+      "non_2xx": 0,
+      "ops_before": {
+        "ts": 1781204881303,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 0,
+          "connected_clients": 5,
+          "used_memory_human": "1.64M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      },
+      "ops_after": {
+        "ts": 1781204896683,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 548,
+          "connected_clients": 5,
+          "used_memory_human": "1.67M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      },
+      "ops_peak": {
+        "ts": 1781204886479,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 678,
+          "connected_clients": 5,
+          "used_memory_human": "1.67M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      }
+    },
+    {
+      "name": "customer-lookup",
+      "connections": 25,
+      "durationSec": 15,
+      "requests_per_sec": 271.67,
+      "latency_p50_ms": 79,
+      "latency_p95_ms": 241,
+      "latency_p99_ms": 258,
+      "latency_max_ms": 294,
+      "errors": 0,
+      "timeouts": 0,
+      "non_2xx": 0,
+      "ops_before": {
+        "ts": 1781204898922,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 0,
+          "connected_clients": 5,
+          "used_memory_human": "1.63M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      },
+      "ops_after": {
+        "ts": 1781204914311,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 437,
+          "connected_clients": 5,
+          "used_memory_human": "1.67M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      },
+      "ops_peak": {
+        "ts": 1781204903085,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 582,
+          "connected_clients": 5,
+          "used_memory_human": "1.64M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      }
+    },
+    {
+      "name": "customer-lookup",
+      "connections": 50,
+      "durationSec": 15,
+      "requests_per_sec": 291.34,
+      "latency_p50_ms": 160,
+      "latency_p95_ms": 324,
+      "latency_p99_ms": 349,
+      "latency_max_ms": 397,
+      "errors": 0,
+      "timeouts": 0,
+      "non_2xx": 0,
+      "ops_before": {
+        "ts": 1781204916548,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 4,
+          "connected_clients": 5,
+          "used_memory_human": "1.66M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      },
+      "ops_after": {
+        "ts": 1781204931935,
+        "pg": {
+          "connections": 11,
+          "active": 3,
+          "idle_in_tx": 5,
+          "idle": 3
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 524,
+          "connected_clients": 5,
+          "used_memory_human": "1.69M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      },
+      "ops_peak": {
+        "ts": 1781204928723,
+        "pg": {
+          "connections": 11,
+          "active": 7,
+          "idle_in_tx": 0,
+          "idle": 4
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 615,
+          "connected_clients": 5,
+          "used_memory_human": "1.66M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      }
+    },
+    {
+      "name": "customer-lookup",
+      "connections": 100,
+      "durationSec": 15,
+      "requests_per_sec": 251.58,
+      "latency_p50_ms": 365,
+      "latency_p95_ms": 1436,
+      "latency_p99_ms": 1573,
+      "latency_max_ms": 1676,
+      "errors": 0,
+      "timeouts": 0,
+      "non_2xx": 0,
+      "ops_before": {
+        "ts": 1781204934156,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 0,
+          "connected_clients": 5,
+          "used_memory_human": "1.63M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      },
+      "ops_after": {
+        "ts": 1781204949611,
+        "pg": {
+          "connections": 11,
+          "active": 4,
+          "idle_in_tx": 3,
+          "idle": 4
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 465,
+          "connected_clients": 5,
+          "used_memory_human": "1.69M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      },
+      "ops_peak": {
+        "ts": 1781204946696,
+        "pg": {
+          "connections": 11,
+          "active": 4,
+          "idle_in_tx": 4,
+          "idle": 3
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 577,
+          "connected_clients": 5,
+          "used_memory_human": "1.69M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      }
+    },
+    {
+      "name": "customer-lookup",
+      "connections": 250,
+      "durationSec": 15,
+      "requests_per_sec": 315.8,
+      "latency_p50_ms": 750,
+      "latency_p95_ms": 1056,
+      "latency_p99_ms": 1222,
+      "latency_max_ms": 1223,
+      "errors": 0,
+      "timeouts": 0,
+      "non_2xx": 0,
+      "ops_before": {
+        "ts": 1781204951844,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 0,
+          "connected_clients": 5,
+          "used_memory_human": "1.69M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      },
+      "ops_after": {
+        "ts": 1781204967330,
+        "pg": {
+          "connections": 11,
+          "active": 6,
+          "idle_in_tx": 4,
+          "idle": 1
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 502,
+          "connected_clients": 5,
+          "used_memory_human": "1.61M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      },
+      "ops_peak": {
+        "ts": 1781204956042,
+        "pg": {
+          "connections": 11,
+          "active": 4,
+          "idle_in_tx": 6,
+          "idle": 1
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 797,
+          "connected_clients": 5,
+          "used_memory_human": "1.69M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      }
+    },
+    {
+      "name": "dashboard-render",
+      "connections": 10,
+      "durationSec": 15,
+      "requests_per_sec": 56.4,
+      "latency_p50_ms": 149,
+      "latency_p95_ms": 384,
+      "latency_p99_ms": 515,
+      "latency_max_ms": 528,
+      "errors": 0,
+      "timeouts": 0,
+      "non_2xx": 0,
+      "ops_before": {
+        "ts": 1781204969508,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 0,
+          "connected_clients": 5,
+          "used_memory_human": "1.61M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      },
+      "ops_after": {
+        "ts": 1781204984957,
+        "pg": {
+          "connections": 21,
+          "active": 5,
+          "idle_in_tx": 4,
+          "idle": 12
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 158,
+          "connected_clients": 6,
+          "used_memory_human": "1.64M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      },
+      "ops_peak": {
+        "ts": 1781204979691,
+        "pg": {
+          "connections": 21,
+          "active": 2,
+          "idle_in_tx": 6,
+          "idle": 13
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 206,
+          "connected_clients": 6,
+          "used_memory_human": "1.64M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      }
+    },
+    {
+      "name": "dashboard-render",
+      "connections": 25,
+      "durationSec": 15,
+      "requests_per_sec": 59.47,
+      "latency_p50_ms": 382,
+      "latency_p95_ms": 814,
+      "latency_p99_ms": 1100,
+      "latency_max_ms": 1609,
+      "errors": 0,
+      "timeouts": 0,
+      "non_2xx": 0,
+      "ops_before": {
+        "ts": 1781204987268,
+        "pg": {
+          "connections": 21,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 20
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 0,
+          "connected_clients": 6,
+          "used_memory_human": "1.58M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      },
+      "ops_after": {
+        "ts": 1781205003088,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 73,
+          "connected_clients": 6,
+          "used_memory_human": "1.58M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      },
+      "ops_peak": {
+        "ts": 1781204990492,
+        "pg": {
+          "connections": 11,
+          "active": 4,
+          "idle_in_tx": 3,
+          "idle": 4
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 214,
+          "connected_clients": 6,
+          "used_memory_human": "1.64M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      }
+    },
+    {
+      "name": "dashboard-render",
+      "connections": 50,
+      "durationSec": 15,
+      "requests_per_sec": 61.07,
+      "latency_p50_ms": 765,
+      "latency_p95_ms": 1446,
+      "latency_p99_ms": 1528,
+      "latency_max_ms": 1654,
+      "errors": 0,
+      "timeouts": 0,
+      "non_2xx": 0,
+      "ops_before": {
+        "ts": 1781205005329,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 9,
+          "connected_clients": 6,
+          "used_memory_human": "1.60M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      },
+      "ops_after": {
+        "ts": 1781205021064,
+        "pg": {
+          "connections": 11,
+          "active": 5,
+          "idle_in_tx": 5,
+          "idle": 1
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 151,
+          "connected_clients": 6,
+          "used_memory_human": "1.63M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      },
+      "ops_peak": {
+        "ts": 1781205007534,
+        "pg": {
+          "connections": 11,
+          "active": 5,
+          "idle_in_tx": 4,
+          "idle": 2
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 259,
+          "connected_clients": 6,
+          "used_memory_human": "1.60M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      }
+    },
+    {
+      "name": "dashboard-render",
+      "connections": 100,
+      "durationSec": 15,
+      "requests_per_sec": 59.67,
+      "latency_p50_ms": 1564,
+      "latency_p95_ms": 2591,
+      "latency_p99_ms": 2771,
+      "latency_max_ms": 2910,
+      "errors": 0,
+      "timeouts": 0,
+      "non_2xx": 0,
+      "ops_before": {
+        "ts": 1781205023310,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 0,
+          "connected_clients": 6,
+          "used_memory_human": "1.59M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      },
+      "ops_after": {
+        "ts": 1781205038999,
+        "pg": {
+          "connections": 11,
+          "active": 6,
+          "idle_in_tx": 5,
+          "idle": 0
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 191,
+          "connected_clients": 6,
+          "used_memory_human": "1.60M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      },
+      "ops_peak": {
+        "ts": 1781205032512,
+        "pg": {
+          "connections": 11,
+          "active": 8,
+          "idle_in_tx": 3,
+          "idle": 0
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 232,
+          "connected_clients": 6,
+          "used_memory_human": "1.60M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      }
+    },
+    {
+      "name": "dashboard-render",
+      "connections": 250,
+      "durationSec": 15,
+      "requests_per_sec": 54.14,
+      "latency_p50_ms": 4048,
+      "latency_p95_ms": 6662,
+      "latency_p99_ms": 6894,
+      "latency_max_ms": 7195,
+      "errors": 0,
+      "timeouts": 0,
+      "non_2xx": 0,
+      "ops_before": {
+        "ts": 1781205041275,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 5,
+          "connected_clients": 6,
+          "used_memory_human": "1.64M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      },
+      "ops_after": {
+        "ts": 1781205056804,
+        "pg": {
+          "connections": 11,
+          "active": 3,
+          "idle_in_tx": 5,
+          "idle": 3
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 130,
+          "connected_clients": 6,
+          "used_memory_human": "1.65M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      },
+      "ops_peak": {
+        "ts": 1781205044460,
+        "pg": {
+          "connections": 11,
+          "active": 7,
+          "idle_in_tx": 1,
+          "idle": 3
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 262,
+          "connected_clients": 6,
+          "used_memory_human": "1.60M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      }
+    },
+    {
+      "name": "insights-overview",
+      "connections": 10,
+      "durationSec": 15,
+      "requests_per_sec": 381.07,
+      "latency_p50_ms": 20,
+      "latency_p95_ms": 165,
+      "latency_p99_ms": 195,
+      "latency_max_ms": 352,
+      "errors": 0,
+      "timeouts": 0,
+      "non_2xx": 0,
+      "ops_before": {
+        "ts": 1781205059091,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 3,
+          "connected_clients": 6,
+          "used_memory_human": "1.61M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      },
+      "ops_after": {
+        "ts": 1781205074491,
+        "pg": {
+          "connections": 21,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 20
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 1036,
+          "connected_clients": 6,
+          "used_memory_human": "1.63M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      },
+      "ops_peak": {
+        "ts": 1781205068297,
+        "pg": {
+          "connections": 21,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 20
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 1306,
+          "connected_clients": 6,
+          "used_memory_human": "1.63M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      }
+    },
+    {
+      "name": "insights-overview",
+      "connections": 25,
+      "durationSec": 15,
+      "requests_per_sec": 367.07,
+      "latency_p50_ms": 57,
+      "latency_p95_ms": 212,
+      "latency_p99_ms": 226,
+      "latency_max_ms": 248,
+      "errors": 0,
+      "timeouts": 0,
+      "non_2xx": 0,
+      "ops_before": {
+        "ts": 1781205076742,
+        "pg": {
+          "connections": 21,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 20
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 5,
+          "connected_clients": 6,
+          "used_memory_human": "1.66M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      },
+      "ops_after": {
+        "ts": 1781205092164,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 995,
+          "connected_clients": 6,
+          "used_memory_human": "1.68M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      },
+      "ops_peak": {
+        "ts": 1781205085933,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 1183,
+          "connected_clients": 6,
+          "used_memory_human": "1.68M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      }
+    },
+    {
+      "name": "insights-overview",
+      "connections": 50,
+      "durationSec": 15,
+      "requests_per_sec": 375.47,
+      "latency_p50_ms": 119,
+      "latency_p95_ms": 284,
+      "latency_p99_ms": 306,
+      "latency_max_ms": 362,
+      "errors": 0,
+      "timeouts": 0,
+      "non_2xx": 0,
+      "ops_before": {
+        "ts": 1781205094390,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 0,
+          "connected_clients": 6,
+          "used_memory_human": "1.62M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      },
+      "ops_after": {
+        "ts": 1781205109808,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 1160,
+          "connected_clients": 6,
+          "used_memory_human": "1.65M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      },
+      "ops_peak": {
+        "ts": 1781205109584,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 1263,
+          "connected_clients": 6,
+          "used_memory_human": "1.65M"
+        },
+        "node": {
+          "rss_mb": 12,
+          "cpu_percent": 0
+        }
+      }
+    },
+    {
+      "name": "insights-overview",
+      "connections": 100,
+      "durationSec": 15,
+      "requests_per_sec": 385.74,
+      "latency_p50_ms": 239,
+      "latency_p95_ms": 454,
+      "latency_p99_ms": 520,
+      "latency_max_ms": 688,
+      "errors": 0,
+      "timeouts": 0,
+      "non_2xx": 0,
+      "ops_before": {
+        "ts": 1781205112076,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 5,
+          "connected_clients": 6,
+          "used_memory_human": "1.67M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      },
+      "ops_after": {
+        "ts": 1781205127492,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 1152,
+          "connected_clients": 6,
+          "used_memory_human": "1.69M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      },
+      "ops_peak": {
+        "ts": 1781205118244,
+        "pg": {
+          "connections": 11,
+          "active": 2,
+          "idle_in_tx": 6,
+          "idle": 3
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 1307,
+          "connected_clients": 6,
+          "used_memory_human": "1.65M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      }
+    },
+    {
+      "name": "insights-overview",
+      "connections": 250,
+      "durationSec": 15,
+      "requests_per_sec": 463,
+      "latency_p50_ms": 527,
+      "latency_p95_ms": 998,
+      "latency_p99_ms": 1210,
+      "latency_max_ms": 1213,
+      "errors": 0,
+      "timeouts": 0,
+      "non_2xx": 0,
+      "ops_before": {
+        "ts": 1781205129720,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 0,
+          "connected_clients": 6,
+          "used_memory_human": "1.66M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      },
+      "ops_after": {
+        "ts": 1781205145166,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 1201,
+          "connected_clients": 6,
+          "used_memory_human": "1.66M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      },
+      "ops_peak": {
+        "ts": 1781205138925,
+        "pg": {
+          "connections": 11,
+          "active": 5,
+          "idle_in_tx": 5,
+          "idle": 1
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 1686,
+          "connected_clients": 6,
+          "used_memory_human": "1.66M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      }
+    },
+    {
+      "name": "pos-cart-sale",
+      "connections": 10,
+      "durationSec": 15,
+      "requests_per_sec": 133.81,
+      "latency_p50_ms": 63,
+      "latency_p95_ms": 217,
+      "latency_p99_ms": 238,
+      "latency_max_ms": 289,
+      "errors": 0,
+      "timeouts": 0,
+      "non_2xx": 0,
+      "ops_before": {
+        "ts": 1781205147388,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 0,
+          "connected_clients": 6,
+          "used_memory_human": "1.67M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      },
+      "ops_after": {
+        "ts": 1781205162749,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 590,
+          "connected_clients": 6,
+          "used_memory_human": "1.72M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      },
+      "ops_peak": {
+        "ts": 1781205156561,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 714,
+          "connected_clients": 6,
+          "used_memory_human": "1.72M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      }
+    },
+    {
+      "name": "pos-cart-sale",
+      "connections": 25,
+      "durationSec": 15,
+      "requests_per_sec": 146.6,
+      "latency_p50_ms": 159,
+      "latency_p95_ms": 329,
+      "latency_p99_ms": 348,
+      "latency_max_ms": 377,
+      "errors": 0,
+      "timeouts": 0,
+      "non_2xx": 0,
+      "ops_before": {
+        "ts": 1781205164981,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 0,
+          "connected_clients": 6,
+          "used_memory_human": "1.68M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      },
+      "ops_after": {
+        "ts": 1781205180366,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 657,
+          "connected_clients": 6,
+          "used_memory_human": "1.68M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      },
+      "ops_peak": {
+        "ts": 1781205169186,
+        "pg": {
+          "connections": 11,
+          "active": 8,
+          "idle_in_tx": 3,
+          "idle": 0
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 763,
+          "connected_clients": 6,
+          "used_memory_human": "1.68M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      }
+    },
+    {
+      "name": "pos-cart-sale",
+      "connections": 50,
+      "durationSec": 15,
+      "requests_per_sec": 145.07,
+      "latency_p50_ms": 337,
+      "latency_p95_ms": 542,
+      "latency_p99_ms": 583,
+      "latency_max_ms": 651,
+      "errors": 0,
+      "timeouts": 0,
+      "non_2xx": 0,
+      "ops_before": {
+        "ts": 1781205182619,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 0,
+          "connected_clients": 6,
+          "used_memory_human": "1.66M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      },
+      "ops_after": {
+        "ts": 1781205198051,
+        "pg": {
+          "connections": 11,
+          "active": 8,
+          "idle_in_tx": 1,
+          "idle": 2
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 710,
+          "connected_clients": 6,
+          "used_memory_human": "1.66M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      },
+      "ops_peak": {
+        "ts": 1781205191820,
+        "pg": {
+          "connections": 11,
+          "active": 8,
+          "idle_in_tx": 3,
+          "idle": 0
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 754,
+          "connected_clients": 6,
+          "used_memory_human": "1.66M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      }
+    },
+    {
+      "name": "pos-cart-sale",
+      "connections": 100,
+      "durationSec": 15,
+      "requests_per_sec": 147.27,
+      "latency_p50_ms": 675,
+      "latency_p95_ms": 847,
+      "latency_p99_ms": 877,
+      "latency_max_ms": 982,
+      "errors": 0,
+      "timeouts": 0,
+      "non_2xx": 0,
+      "ops_before": {
+        "ts": 1781205200282,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 0,
+          "connected_clients": 6,
+          "used_memory_human": "1.60M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      },
+      "ops_after": {
+        "ts": 1781205215762,
+        "pg": {
+          "connections": 11,
+          "active": 8,
+          "idle_in_tx": 2,
+          "idle": 1
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 674,
+          "connected_clients": 6,
+          "used_memory_human": "1.65M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      },
+      "ops_peak": {
+        "ts": 1781205208474,
+        "pg": {
+          "connections": 11,
+          "active": 10,
+          "idle_in_tx": 1,
+          "idle": 0
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 779,
+          "connected_clients": 6,
+          "used_memory_human": "1.62M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      }
+    },
+    {
+      "name": "pos-cart-sale",
+      "connections": 250,
+      "durationSec": 15,
+      "requests_per_sec": 141.14,
+      "latency_p50_ms": 1691,
+      "latency_p95_ms": 2179,
+      "latency_p99_ms": 2261,
+      "latency_max_ms": 2399,
+      "errors": 0,
+      "timeouts": 0,
+      "non_2xx": 0,
+      "ops_before": {
+        "ts": 1781205218106,
+        "pg": {
+          "connections": 11,
+          "active": 1,
+          "idle_in_tx": 0,
+          "idle": 10
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 0,
+          "connected_clients": 6,
+          "used_memory_human": "1.65M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      },
+      "ops_after": {
+        "ts": 1781205233629,
+        "pg": {
+          "connections": 11,
+          "active": 8,
+          "idle_in_tx": 2,
+          "idle": 1
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 729,
+          "connected_clients": 6,
+          "used_memory_human": "1.61M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      },
+      "ops_peak": {
+        "ts": 1781205221296,
+        "pg": {
+          "connections": 11,
+          "active": 9,
+          "idle_in_tx": 2,
+          "idle": 0
+        },
+        "redis": {
+          "instantaneous_ops_per_sec": 781,
+          "connected_clients": 6,
+          "used_memory_human": "1.65M"
+        },
+        "node": {
+          "rss_mb": 11,
+          "cpu_percent": 0
+        }
+      }
+    }
+  ]
+}
