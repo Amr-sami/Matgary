@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useActiveBranchName } from "./ActiveBranchProvider";
 import {
   LayoutDashboard,
   Package,
@@ -100,13 +101,30 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   // the active store. Show the active branch as the headline and the
   // tenant as a thin subtitle so the user always knows which store they're
   // operating in.
+  //
+  // The branch heading is server-driven now: the root layout reads the
+  // `mg.branch_name` companion cookie and passes it through context. SSR
+  // and the first client render see the SAME value, so the heading is
+  // pixel-stable from the very first paint — no swap, no layout shift.
+  // The live useBranches() result is preferred when it lands (e.g. you
+  // switched branches in this tab) but its identity matches the cookie
+  // value 99% of the time, so there's nothing visible to swap.
+  const ssrBranchName = useActiveBranchName();
   const tenantName =
     session?.user?.tenantSlug?.replace(/-/g, " ") || shellT.storeFallback;
-  const { current: activeBranch, branches: allBranches } = useBranches();
-  const branchLabel = activeBranch?.name?.trim();
+  const { current: activeBranch } = useBranches();
+  const branchLabel =
+    activeBranch?.name?.trim() || ssrBranchName?.trim() || undefined;
   const storeName =
     branchLabel || settings.shopName?.trim() || tenantName;
-  const showSubtenant = !!branchLabel && allBranches.length > 1;
+  // Show the tenant subtitle whenever the branch name is meaningfully
+  // different from the tenant name. Both inputs are resolvable on the
+  // server (cookie + JWT slug) so the result is identical between SSR
+  // and the first client render — the line no longer disappears on
+  // hard refresh and then reappears after the branches API resolves.
+  const showSubtenant =
+    !!branchLabel &&
+    branchLabel.toLowerCase() !== tenantName.toLowerCase();
   const { count: unreadTasks } = useUnreadTaskCount();
   const { counts: leaveUnread } = useLeaveUnread();
 
@@ -203,21 +221,29 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             م
           </span>
         ) : (
-          <div>
+          // suppressHydrationWarning on the wrapper silences CONTENT
+          // mismatches (storeName resolves from client-only caches). The
+          // <p> below is ALWAYS rendered — its `hidden` class flips on/off
+          // — so the DOM STRUCTURE is identical on server and client. React
+          // 19 treats structural mismatches as recoverable errors even with
+          // suppressHydrationWarning, so we sidestep that by keeping every
+          // child node stable across renders.
+          <div suppressHydrationWarning>
             <h2
               dir="auto"
               className="font-display font-extrabold text-text-primary text-lg truncate leading-tight tracking-tight"
             >
               {storeName}
             </h2>
-            {showSubtenant && (
-              <p
-                dir="auto"
-                className="text-[10px] text-text-secondary mt-0.5 truncate uppercase tracking-wider"
-              >
-                {tenantName}
-              </p>
-            )}
+            <p
+              dir="auto"
+              className={cn(
+                "text-[10px] text-text-secondary mt-0.5 truncate uppercase tracking-wider",
+                !showSubtenant && "hidden",
+              )}
+            >
+              {tenantName}
+            </p>
             <span className="mt-1.5 block h-[3px] w-8 rounded-full bg-accent" />
           </div>
         )}
@@ -245,7 +271,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         <div className="px-1 space-y-1 pb-2">{visibleSecondary.map(renderItem)}</div>
       </div>
 
-      {/* Footer: user menu + version (always pinned to bottom) */}
+      {/* Footer: user menu (always pinned to bottom) */}
       <div
         className={cn(
           "border-t border-border pt-2 mt-2 transition-all duration-200 shrink-0",
@@ -253,14 +279,6 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         )}
       >
         <UserMenu collapsed={collapsed} />
-        <p
-          className={cn(
-            "text-[10px] text-text-secondary whitespace-nowrap text-center mt-1 mb-1",
-            collapsed && "opacity-0"
-          )}
-        >
-          {shellT.version}
-        </p>
       </div>
     </nav>
   );

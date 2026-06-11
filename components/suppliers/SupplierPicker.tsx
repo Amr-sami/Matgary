@@ -121,7 +121,6 @@ export function SupplierPicker({ value, onChange, label, canCreate = true }: Pro
               <Search className="w-4 h-4 absolute top-1/2 -translate-y-1/2 end-3 text-text-secondary" />
               <input
                 type="search"
-                dir="auto"
                 autoFocus
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}

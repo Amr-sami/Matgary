@@ -7,6 +7,7 @@ import {
 } from "@/lib/api/branch-context";
 import { createBranch, listBranches } from "@/lib/repo/branches";
 import { logActivity } from "@/lib/repo/activity";
+import { setBranchNameCookie } from "@/lib/api/branch-name-cookie";
 
 export const runtime = "nodejs";
 
@@ -28,17 +29,20 @@ export async function GET() {
     listBranches(r.ctx.tenantId),
     resolveActiveBranch(r.ctx),
   ]);
-  if (r.ctx.role === "owner") {
-    return NextResponse.json({
-      data: all,
-      currentBranchId: current?.branchId ?? null,
-    });
+  let filtered = all;
+  if (r.ctx.role !== "owner") {
+    const allowed = new Set(await getAccessibleBranches(r.ctx));
+    filtered = all.filter((b) => allowed.has(b.id));
   }
-  const allowed = new Set(await getAccessibleBranches(r.ctx));
-  return NextResponse.json({
-    data: all.filter((b) => allowed.has(b.id)),
+  const res = NextResponse.json({
+    data: filtered,
     currentBranchId: current?.branchId ?? null,
   });
+  // Refresh the SSR cookie so subsequent server renders show the right
+  // branch heading on first paint (no client-side flicker through the
+  // dictionary fallback / tenant slug). See branch-name-cookie.ts.
+  setBranchNameCookie(res, current?.branchName ?? null);
+  return res;
 }
 
 export async function POST(req: NextRequest) {

@@ -44,6 +44,7 @@ export function UserMenu({ collapsed }: Props) {
     startTransition(async () => {
       try {
         window.localStorage.removeItem("shop:settings:v1");
+        window.localStorage.removeItem("branches:v1");
       } catch {}
       await logoutAction();
     });

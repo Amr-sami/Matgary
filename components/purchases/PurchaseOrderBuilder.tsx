@@ -159,7 +159,6 @@ export function PurchaseOrderBuilder({ isOpen, onClose, onSaved, onError }: Prop
             <Search className="w-4 h-4 absolute top-1/2 -translate-y-1/2 end-3 text-text-secondary" />
             <input
               type="search"
-              dir="auto"
               value={productQuery}
               onChange={(e) => setProductQuery(e.target.value)}
               placeholder={t.productSearchPlaceholder}

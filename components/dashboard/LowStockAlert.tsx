@@ -46,8 +46,13 @@ export function LowStockAlert() {
           <span>{t.allGood}</span>
         </div>
       ) : (
-        <div className="space-y-3">
-          {outOfStock.slice(0, 3).map((product) => (
+        // Scrollable list: out-of-stock first (more urgent), low-stock
+        // below. Capped height keeps the dashboard tile a predictable
+        // size even when the catalogue has dozens of alerts; the owner
+        // scrolls inside the tile to see them all instead of having
+        // the page stretch indefinitely.
+        <div className="space-y-3 max-h-[360px] overflow-y-auto pe-1 [scrollbar-width:thin]">
+          {outOfStock.map((product) => (
             <div
               key={product.id}
               className="flex items-center justify-between p-3 rounded-lg bg-danger-light/50 border border-danger/10"
@@ -64,10 +69,10 @@ export function LowStockAlert() {
                   </UserText>
                 </div>
               </div>
-              <AlertTriangle className="w-4 h-4 text-danger" />
+              <AlertTriangle className="w-4 h-4 text-danger shrink-0" />
             </div>
           ))}
-          {lowStock.slice(0, 3).map((product) => (
+          {lowStock.map((product) => (
             <div
               key={product.id}
               className="flex items-center justify-between p-3 rounded-lg bg-orange-50 border border-orange-100"
@@ -85,14 +90,9 @@ export function LowStockAlert() {
                   </UserText>
                 </div>
               </div>
-              <AlertTriangle className="w-4 h-4 text-orange-500" />
+              <AlertTriangle className="w-4 h-4 text-orange-500 shrink-0" />
             </div>
           ))}
-          {lowStockProducts.length > 6 && (
-            <p className="text-xs text-text-secondary text-center">
-              {t.more.replace("{n}", String(lowStockProducts.length - 6))}
-            </p>
-          )}
         </div>
       )}
     </div>

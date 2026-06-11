@@ -75,7 +75,6 @@ export function ProductSearchSelect({ value, onChange }: ProductSearchSelectProp
           }}
           onFocus={() => setIsOpen(true)}
           placeholder={t.placeholder}
-          dir="auto"
           className="w-full ps-12 pe-10 py-3 rounded-lg border border-border bg-white focus:outline-none focus:ring-2 focus:ring-accent"
         />
         {value && (

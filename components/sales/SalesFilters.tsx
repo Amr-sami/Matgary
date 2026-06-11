@@ -114,7 +114,6 @@ export function SalesFilters({
         placeholder={t.searchPlaceholder}
         value={query}
         onChange={(e) => onQueryChange(e.target.value)}
-        dir="auto"
         className="w-full px-4 py-2.5 rounded-lg border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-accent"
       />
 

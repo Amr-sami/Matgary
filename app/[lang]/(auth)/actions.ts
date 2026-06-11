@@ -4,7 +4,8 @@ import bcrypt from "bcryptjs";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
+import { headers, cookies } from "next/headers";
+import { BRANCH_NAME_COOKIE } from "@/lib/api/branch-name-cookie";
 import { db, withTenant } from "@/lib/db";
 import {
   users,
@@ -401,6 +402,11 @@ export async function logoutAction() {
       entityId: session.user.id,
     });
   }
+  // Clear the SSR branch-name cookie so the next user on this browser
+  // doesn't see the previous tenant's branch heading flashed during
+  // the next login's SSR render.
+  const cookieStore = await cookies();
+  cookieStore.delete(BRANCH_NAME_COOKIE);
   await signOut({ redirect: false });
   redirect("/login");
 }

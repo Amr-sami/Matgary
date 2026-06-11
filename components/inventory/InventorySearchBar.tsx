@@ -20,7 +20,6 @@ export function InventorySearchBar({ onSearch }: InventorySearchBarProps) {
         placeholder={t.placeholder}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        dir="auto"
         className="w-full ps-12 pe-10 py-3 rounded-xl border border-border bg-white focus:outline-none focus:ring-2 focus:ring-accent"
       />
       {query && (

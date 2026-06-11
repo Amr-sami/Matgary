@@ -18,35 +18,106 @@ interface BranchesResponse {
   currentBranchId: string | null;
 }
 
+/** localStorage cache of the last-resolved branch list + active branch id.
+ *  Seeds initial state on mount so the sidebar's store name doesn't flash
+ *  through "متجري" → settings.shopName → branch name on every tab change.
+ *  See the cache comments inside readCache / writeCache for the contract. */
+const CACHE_KEY = "branches:v1";
+
+interface CachedBranches {
+  branches: BranchSummary[];
+  currentBranchId: string | null;
+}
+
+const readCachedBranches = (): CachedBranches | null => {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CachedBranches;
+    // Defensive shape check — old cache shapes shouldn't crash the hook.
+    if (!Array.isArray(parsed.branches)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const writeCachedBranches = (next: CachedBranches) => {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(CACHE_KEY, JSON.stringify(next));
+  } catch {
+    // Quota / private mode — ignore; the network refresh below still
+    // hydrates the UI within ~100ms.
+  }
+};
+
 /**
  * Single source of truth for branch UI state on the client. Loads the user's
  * accessible branches plus which one is currently active (the active branch
  * lives in an HttpOnly cookie, so the server has to tell us). `switchTo`
  * flips the cookie and reloads the page so server-rendered pieces (sidebar
  * counts, server components) pick up the new context.
+ *
+ * Initial state is seeded from a localStorage cache (`branches:v1`) so the
+ * sidebar's store name and the branch picker render the correct branch on
+ * the very first paint after a navigation — no more
+ * "متجري" → "Elhenawy Stores" → "Main" flicker on every tab change.
  */
+/** Atomic state container — keeping branches + currentId in one object
+ *  means `current = branches.find(b => b.id === currentId)` can never see
+ *  a half-updated state where the array was swapped but the id wasn't
+ *  (or vice versa). A naïve two-setState refresh occasionally rendered
+ *  `current === null` for one frame, which made the sidebar's store name
+ *  briefly fall back from "Main" to settings.shopName ("Elhenawy Stores")
+ *  on every hard refresh. */
+interface BranchesState {
+  branches: BranchSummary[];
+  currentId: string | null;
+}
+
 export function useBranches() {
-  const [branches, setBranches] = useState<BranchSummary[]>([]);
-  const [currentId, setCurrentId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const seed = typeof window !== "undefined" ? readCachedBranches() : null;
+  const [state, setState] = useState<BranchesState>(() => ({
+    branches: seed?.branches ?? [],
+    currentId: seed?.currentBranchId ?? null,
+  }));
+  // We only show the skeleton spinner on the very first ever load (no
+  // cache yet). Subsequent navigations show the cached branch immediately
+  // and silently refresh in the background.
+  const [loading, setLoading] = useState(() => seed === null);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
     setError(null);
     try {
       const res = await fetch("/api/branches", { cache: "no-store" });
       if (!res.ok) {
         if (res.status === 401) {
-          setBranches([]);
-          setCurrentId(null);
+          setState({ branches: [], currentId: null });
+          // Invalidate the cache so a logged-out tab doesn't carry the
+          // previous user's branches into a future session.
+          try {
+            window.localStorage.removeItem(CACHE_KEY);
+          } catch {
+            /* ignore */
+          }
           return;
         }
         throw new Error(`failed (${res.status})`);
       }
       const json = (await res.json()) as BranchesResponse;
-      setBranches(json.data);
-      setCurrentId(json.currentBranchId);
+      // Single setState = single re-render = no flicker through a
+      // half-applied state.
+      setState({
+        branches: json.data,
+        currentId: json.currentBranchId,
+      });
+      writeCachedBranches({
+        branches: json.data,
+        currentBranchId: json.currentBranchId,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "حدث خطأ");
     } finally {
@@ -57,6 +128,8 @@ export function useBranches() {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  const { branches, currentId } = state;
 
   const switchTo = useCallback(
     async (branchId: string) => {

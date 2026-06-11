@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import {
   Download,
   Users,
@@ -11,7 +12,6 @@ import {
   AlertCircle,
   Clock,
 } from "@/lib/icons";
-import { CustomerSettleModal } from "@/components/customers/CustomerSettleModal";
 import { AppShell } from "@/components/layout/AppShell";
 import { useCustomersData } from "@/hooks/useCustomersData";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
@@ -137,13 +137,6 @@ export default function CustomersPage() {
     return { total, repeats, inactive, outstanding };
   }, [customers]);
 
-  /** Customer the cashier picked from a "تسجيل دفعة" button. The settle
-   *  modal lazily mounts when this is non-null. */
-  const [settleCustomerKey, setSettleCustomerKey] = useState<string | null>(null);
-  const settleCustomer = useMemo(
-    () => debtors.find((c) => c.key === settleCustomerKey) ?? null,
-    [debtors, settleCustomerKey]
-  );
 
   const handleExport = () => {
     if (filtered.length === 0) return;
@@ -307,10 +300,11 @@ export default function CustomersPage() {
           </div>
         )}
 
-        {/* Receivables panel — only renders when at least one customer has a
-            positive balance. Mirrors the structure of Top-5: KPI strip across
-            the top, ranked list below. The "تسجيل دفعة" action opens the
-            CustomerSettleModal which writes back via the settle endpoint. */}
+        {/* Receivables panel — preview only. KPI strip across the top,
+            ranked top-debtors list below. Each row links to the customer
+            detail page (إدارة الآجل) where real settlements happen via
+            InvoiceSettleModal. We deliberately don't expose the inline
+            settle action here — keeps the customers index informational. */}
         {debtors.length > 0 && (
           <div className="bg-white rounded-xl border border-orange-200 overflow-hidden">
             <div className="px-4 py-3 bg-gradient-to-br from-orange-50 to-orange-50/40 border-b border-orange-100">
@@ -374,11 +368,15 @@ export default function CustomersPage() {
                       : days >= 14
                         ? "text-amber-700 bg-amber-100"
                         : "text-text-secondary bg-bg-main";
-                return (
-                  <li
-                    key={c.key}
-                    className="px-4 py-3 flex items-center gap-3"
-                  >
+                // Preview-only row: panel summarises receivables but
+                // payments themselves are recorded on the customer detail
+                // page ("إدارة الآجل"). Whole row links there so a tap
+                // on any debtor lands the owner on the right ledger.
+                const href = c.phone
+                  ? `/customers/${encodeURIComponent(c.phone)}`
+                  : null;
+                const RowInner = (
+                  <>
                     <span className="w-7 h-7 rounded-full bg-orange-100 text-orange-700 text-xs flex items-center justify-center font-bold shrink-0">
                       {idx + 1}
                     </span>
@@ -418,15 +416,23 @@ export default function CustomersPage() {
                       <p className="font-extrabold text-orange-700 text-base">
                         {formatCurrency(c.outstandingBalance, locale)}
                       </p>
-                      <button
-                        type="button"
-                        onClick={() => setSettleCustomerKey(c.key)}
-                        className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-accent hover:underline"
-                      >
-                        <Wallet className="w-3 h-3" />
-                        {t.receivables.recordPayment}
-                      </button>
                     </div>
+                  </>
+                );
+                return (
+                  <li key={c.key}>
+                    {href ? (
+                      <Link
+                        href={href}
+                        className="px-4 py-3 flex items-center gap-3 hover:bg-orange-50/40 transition-colors"
+                      >
+                        {RowInner}
+                      </Link>
+                    ) : (
+                      <div className="px-4 py-3 flex items-center gap-3">
+                        {RowInner}
+                      </div>
+                    )}
                   </li>
                 );
               })}
@@ -449,7 +455,6 @@ export default function CustomersPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t.search.placeholder}
-            dir="auto"
             className="w-full px-4 py-2.5 rounded-lg border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-accent"
           />
           <div className="flex flex-wrap items-center gap-2 justify-between">
@@ -522,16 +527,6 @@ export default function CustomersPage() {
             />
           ))}
         </div>
-
-        <CustomerSettleModal
-          customer={settleCustomer}
-          records={records}
-          onClose={() => setSettleCustomerKey(null)}
-          onSettled={async () => {
-            setSettleCustomerKey(null);
-            await refreshRecords(false);
-          }}
-        />
       </div>
     </AppShell>
   );

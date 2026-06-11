@@ -1561,7 +1561,7 @@
       },
       "receivables": {
         "title": "On-account balances",
-        "subtitle": "Customers who still owe money. Tap a row to record a payment.",
+        "subtitle": "Customers who still owe money. Collect payments from the customer detail page (Manage on-account).",
         "totalLabel": "Total owed",
         "debtorCountLabel": "Customers",
         "oldestLabel": "Oldest unpaid",

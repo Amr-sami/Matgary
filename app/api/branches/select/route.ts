@@ -11,6 +11,7 @@ import {
 import { withTenant } from "@/lib/db";
 import { branches } from "@/lib/db/schema";
 import { logActivity } from "@/lib/repo/activity";
+import { setBranchNameCookie } from "@/lib/api/branch-name-cookie";
 
 // Switch the active branch. Validates:
 //   - the requested branch belongs to the caller's tenant,
@@ -84,8 +85,13 @@ export async function POST(req: NextRequest) {
     branchId: branch.id,
   });
 
-  return NextResponse.json({
+  // Also write the non-HttpOnly companion cookie so SSR can render the
+  // new branch heading on the very next page load — no client-side
+  // flicker. See lib/api/branch-name-cookie.ts.
+  const res = NextResponse.json({
     ok: true,
     branch: { id: branch.id, name: branch.name },
   });
+  setBranchNameCookie(res, branch.name);
+  return res;
 }

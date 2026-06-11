@@ -103,11 +103,11 @@ export function FilterSelect({
         aria-expanded={open}
         aria-label={ariaLabel ?? allLabel ?? activeLabel}
         className={cn(
-          "inline-flex items-center justify-between gap-2 min-w-[140px] px-3 py-2 rounded-lg border bg-white text-sm transition-colors",
-          hasSelection
-            ? "border-accent/40 text-text-primary"
-            : "border-border text-text-secondary hover:border-accent/50",
-          open && "border-accent/60 ring-2 ring-accent/15",
+          "inline-flex items-center justify-between gap-2 min-w-[140px] px-3 py-2 rounded-lg border border-border bg-white text-sm transition-colors hover:border-text-secondary/40",
+          // Neutral colour only — selection state shows via the active row's
+          // accent + check in the menu, not via the trigger's border. Matches
+          // the rest of the filter chips on /customers, /sales etc.
+          hasSelection ? "text-text-primary" : "text-text-secondary",
         )}
         dir="auto"
       >

@@ -462,13 +462,15 @@ function InventoryPageInner() {
           onFilterOut={() => setSelectedStockStatus("out")}
         />
 
-        {/* Search */}
+        {/* Search — no explicit `dir`: inherits from <html dir> so the
+            placeholder follows the document language (RTL for Arabic,
+            LTR for English). `dir="auto"` here would mis-render Arabic
+            placeholders LTR until the user typed a strong-RTL character. */}
         <input
           type="text"
           placeholder={t.search.placeholder}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          dir="auto"
           className="w-full px-4 py-3 rounded-xl border border-border bg-white focus:outline-none focus:ring-2 focus:ring-accent"
         />
 

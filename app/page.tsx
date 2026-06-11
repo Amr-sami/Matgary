@@ -24,7 +24,12 @@ export default function DashboardPage() {
         <SelfCheckIn />
         <StatsGrid />
 
-        <div className="grid md:grid-cols-2 gap-6">
+        {/* `items-start` so each tile sizes to its own content instead of
+            the grid stretching the shorter card to match the taller one
+            — keeps LowStockAlert compact when there are only a few
+            alerts (no empty white half) and lets the inner scroll only
+            kick in when the list actually overflows. */}
+        <div className="grid md:grid-cols-2 gap-6 items-start">
           <LowStockAlert />
           <RecentSalesList />
         </div>
