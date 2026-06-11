@@ -116,13 +116,19 @@ export async function pruneActivityAllTenants(
   return { totalDeleted, tenants: rows.length, failures };
 }
 
-export async function logActivity(input: LogActivityInput): Promise<void> {
+/**
+ * Performs the actual activity_logs insert + name backfill. Public so the
+ * BullMQ activity worker can call it directly (see lib/queue/activity-queue.ts
+ * and instrumentation.ts). End-user code should call `logActivity` instead,
+ * which routes through the queue when ACTIVITY_LOG_QUEUE=1.
+ */
+export async function insertActivityRow(input: LogActivityInput): Promise<void> {
   try {
     let actorName = input.actorName ?? null;
-    // Spec 07 — when the current request is an impersonation session,
-    // every activity row picks up an `impersonatedBy` marker in metadata.
-    // Best-effort: silently skip when there's no active request / session.
     let metadata = input.metadata ?? null;
+    // Spec 07 — when the current request is an impersonation session,
+    // tag the row in metadata. Skipped when there's no active session
+    // (cron / queue worker).
     try {
       const { auth } = await import("@/lib/auth");
       const session = await auth();
@@ -134,7 +140,7 @@ export async function logActivity(input: LogActivityInput): Promise<void> {
         };
       }
     } catch {
-      // No request context (e.g. cron-driven write) — leave metadata alone.
+      /* no request context — leave metadata alone */
     }
     await withTenant(input.tenantId, async (tx) => {
       if (!actorName && input.actorUserId) {
@@ -178,6 +184,49 @@ export async function logActivity(input: LogActivityInput): Promise<void> {
       reason: err instanceof Error ? err.message : String(err),
     });
   }
+}
+
+/**
+ * Public surface — what every mutation calls. When ACTIVITY_LOG_QUEUE=1 and
+ * Redis is available, the write is enqueued (BullMQ); otherwise it runs
+ * inline. Either way the call is fire-and-forget — failures are logged and
+ * cannot break the parent mutation.
+ */
+export async function logActivity(input: LogActivityInput): Promise<void> {
+  // Dynamic import so the activity queue module (which pulls in bullmq +
+  // ioredis) doesn't end up in the Edge bundle of any caller.
+  try {
+    const { isActivityQueueEnabled, enqueueActivity } = await import(
+      "@/lib/queue/activity-queue"
+    );
+    if (isActivityQueueEnabled()) {
+      // Pre-resolve impersonation metadata here (the worker has no request
+      // session) so the queued payload is self-contained.
+      let metadata = input.metadata ?? null;
+      try {
+        const { auth } = await import("@/lib/auth");
+        const session = await auth();
+        if (session && session.impersonation) {
+          metadata = {
+            ...(metadata ?? {}),
+            impersonatedBy: session.impersonation.adminId,
+            impersonatedByEmail: session.impersonation.adminEmail,
+          };
+        }
+      } catch {
+        /* no request context */
+      }
+      await enqueueActivity({ ...input, metadata });
+      return;
+    }
+  } catch (err) {
+    logger.warn({
+      event: "activity.queue.dispatch_failed",
+      reason: err instanceof Error ? err.message : String(err),
+    });
+    // Fall through to inline.
+  }
+  await insertActivityRow(input);
 }
 
 export interface ListActivityFilters {

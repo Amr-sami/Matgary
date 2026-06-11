@@ -19,11 +19,21 @@ export async function register(): Promise<void> {
     await import("./sentry.edge.config");
   }
 
-  // Background worker — Node only, opt-in via REDIS_URL.
+  // Background workers — Node only, opt-in via REDIS_URL.
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
   if (!process.env.REDIS_URL) return;
   const { bootWorker } = await import("./lib/whatsapp/worker-bootstrap");
   await bootWorker();
+
+  // Activity-log worker — additional opt-in flag because flipping it on
+  // makes audit writes eventually-consistent. The worker is also Node-only;
+  // dynamic import keeps the Edge bundle clean.
+  if (process.env.ACTIVITY_LOG_QUEUE === "1") {
+    const { bootActivityWorker } = await import(
+      "./lib/queue/activity-worker-bootstrap"
+    );
+    await bootActivityWorker();
+  }
 }
 
 /**
