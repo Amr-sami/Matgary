@@ -274,6 +274,13 @@
       "when": 1781200000000,
       "tag": "0038_sale_payments",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1781300000000,
+      "tag": "0039_pg_stat_statements",
+      "breakpoints": true
     }
   ]
 }

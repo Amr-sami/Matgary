@@ -7,6 +7,7 @@ import {
 import { resolveBranchFilter } from "@/lib/api/branch-context";
 import { listSales, recordSale } from "@/lib/repo/operations";
 import { logActivity } from "@/lib/repo/activity";
+import { isDomainError, domainErrorBody } from "@/lib/errors";
 
 export async function GET(req: NextRequest) {
   const r = await requireTenant();
@@ -68,9 +69,12 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json(result, { status: 201 });
   } catch (err) {
+    if (isDomainError(err)) {
+      return NextResponse.json(domainErrorBody(err), { status: err.httpStatus });
+    }
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "خطأ" },
-      { status: 400 },
+      { error: "INTERNAL", detail: err instanceof Error ? err.message : String(err) },
+      { status: 500 },
     );
   }
 }

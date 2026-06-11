@@ -4,6 +4,7 @@ import { requireTenantWithBranch } from "@/lib/api/auth-helpers";
 import { NoOpenShiftError, recordCartSale } from "@/lib/repo/operations";
 import { logActivity } from "@/lib/repo/activity";
 import { normalizeEgyptPhone } from "@/lib/validators/egypt";
+import { isDomainError, domainErrorBody } from "@/lib/errors";
 import {
   getCachedResponse,
   rememberResponse,
@@ -138,13 +139,22 @@ export async function POST(req: NextRequest) {
         { status: 409 },
       );
     }
-    const errorBody = { error: err instanceof Error ? err.message : "خطأ" };
-    // Cache 4xx-style failures too so a stuck outbox row doesn't keep
-    // failing forever — the same key returns the same error every time.
-    // Outbox owner can edit + resubmit with a fresh key if needed.
-    if (idemp) {
-      await rememberResponse(r.ctx.tenantId, idemp, 400, errorBody);
+    if (isDomainError(err)) {
+      const body = domainErrorBody(err);
+      // Cache 4xx failures too so a stuck outbox row doesn't keep failing
+      // forever — same key returns the same error every time. Outbox owner
+      // can edit + resubmit with a fresh key if needed.
+      if (idemp) {
+        await rememberResponse(r.ctx.tenantId, idemp, err.httpStatus, body);
+      }
+      return NextResponse.json(body, { status: err.httpStatus });
     }
-    return NextResponse.json(errorBody, { status: 400 });
+    // Truly unexpected — log and 500. Sentry breadcrumb already captured
+    // by the global handler.
+    const errorBody = { error: "INTERNAL", detail: err instanceof Error ? err.message : String(err) };
+    if (idemp) {
+      await rememberResponse(r.ctx.tenantId, idemp, 500, errorBody);
+    }
+    return NextResponse.json(errorBody, { status: 500 });
   }
 }

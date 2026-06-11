@@ -1,11 +1,47 @@
 import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
+import { headers } from "next/headers";
 import type { Permission } from "@/lib/permissions";
 import { can } from "@/lib/permissions";
+import {
+  enterRequestContext,
+  getRequestContext,
+  setRequestContext,
+} from "@/lib/request-context";
 import {
   resolveActiveBranch,
   type BranchContext,
 } from "./branch-context";
+
+/**
+ * Ensure the in-flight request has an AsyncLocalStorage context. The
+ * middleware stamps `x-request-id` on the request headers; if no context
+ * is already active for this async-boundary, we open one with `enterWith`
+ * so every downstream await in the same handler sees the same request id.
+ *
+ * Idempotent — `requireTenant` (called by every route) invokes this, and
+ * `requireTenantWithBranch` / `requirePermission` re-call without re-entry.
+ */
+async function ensureRequestContext(
+  patch?: Partial<{ tenantId: string; userId: string }>,
+): Promise<void> {
+  const existing = getRequestContext();
+  if (existing) {
+    if (patch) setRequestContext(patch);
+    return;
+  }
+  let reqId: string | null = null;
+  try {
+    const h = await headers();
+    reqId = h.get("x-request-id");
+  } catch {
+    reqId = null;
+  }
+  enterRequestContext({
+    requestId: reqId || crypto.randomUUID(),
+    ...(patch ?? {}),
+  });
+}
 
 export type AuthedContext = {
   userId: string;
@@ -28,10 +64,17 @@ export async function requireTenant(): Promise<
   | { ok: true; ctx: AuthedContext }
   | { ok: false; response: NextResponse }
 > {
+  // Open the per-request ALS scope so every downstream log line carries
+  // the request id (+ tenantId/userId once we know them).
+  await ensureRequestContext();
   const session = await auth();
   if (!session?.user?.id || !session.user.tenantId) {
     return { ok: false, response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   }
+  setRequestContext({
+    tenantId: session.user.tenantId,
+    userId: session.user.id,
+  });
   return {
     ok: true,
     ctx: {

@@ -23,6 +23,7 @@ import type {
 } from "@/lib/types";
 import { calcLineDiscount, calcOrderDiscount } from "@/lib/repo/sale-discounts";
 import { bustInsightsCache } from "@/lib/repo/insights";
+import { DomainError } from "@/lib/errors";
 import {
   applyCredit as walletApplyCredit,
   earnPoints as walletEarnPoints,
@@ -222,6 +223,51 @@ async function loadAttributeSnapshot(
   return snap;
 }
 
+/**
+ * Bulk version of loadAttributeSnapshot. One query for an array of product
+ * ids, returning a Map keyed by product id. Used by recordCartSale to avoid
+ * N queries inside the cart pre-loop.
+ */
+async function loadAttributeSnapshotsBulk(
+  tx: Parameters<Parameters<typeof withTenant>[1]>[0],
+  tenantId: string,
+  productIds: string[],
+): Promise<Map<string, Record<string, string>>> {
+  const out = new Map<string, Record<string, string>>();
+  if (productIds.length === 0) return out;
+  const rows = await tx
+    .select({
+      productId: productAttributeValues.productId,
+      key: categoryAttributes.key,
+      label: productAttributeValues.valueLabel,
+    })
+    .from(productAttributeValues)
+    .innerJoin(
+      categoryAttributes,
+      eq(categoryAttributes.id, productAttributeValues.attributeId),
+    )
+    .where(
+      and(
+        eq(productAttributeValues.tenantId, tenantId),
+        inArray(productAttributeValues.productId, productIds),
+      ),
+    );
+  for (const r of rows) {
+    let snap = out.get(r.productId);
+    if (!snap) {
+      snap = {};
+      out.set(r.productId, snap);
+    }
+    snap[r.key] = r.label;
+  }
+  // Ensure every requested product has an entry, even if empty — callers can
+  // then read without a presence check.
+  for (const pid of productIds) {
+    if (!out.has(pid)) out.set(pid, {});
+  }
+  return out;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Sales — read paths
 // ─────────────────────────────────────────────────────────────────────────────
@@ -295,7 +341,11 @@ export async function recordSale(
       .from(products)
       .where(and(eq(products.tenantId, tenantId), eq(products.id, input.productId)))
       .limit(1);
-    if (!product) throw new Error("المنتج غير موجود");
+    if (!product) {
+      throw new DomainError("PRODUCT_NOT_FOUND", 400, {
+        productId: input.productId,
+      });
+    }
 
     const subtotal = input.quantitySold * input.pricePerUnit;
     const discountAmount = calcLineDiscount(
@@ -441,7 +491,7 @@ export async function recordCartSale(
   lines: CartSaleLineInput[],
   options: CartSaleOptions,
 ): Promise<CartSaleResult> {
-  if (lines.length === 0) throw new Error("الفاتورة فارغة");
+  if (lines.length === 0) throw new DomainError("CART_EMPTY", 400);
   // Honour a client-supplied invoice id when valid (offline POS uses this
   // so the receipt the cashier handed the customer matches the eventual
   // server record). Falls back to a fresh server-generated id otherwise.
@@ -461,30 +511,63 @@ export async function recordCartSale(
       lineDiscount: number;
     };
 
+    // Bulk-load every product + every attribute snapshot in two queries
+    // instead of two per line. Mixed product IDs collapse via the Map; a
+    // duplicate line just hits the same Map entry without an extra read.
+    const productIds = Array.from(new Set(lines.map((l) => l.productId)));
+    const productRows = await tx
+      .select()
+      .from(products)
+      .where(
+        and(eq(products.tenantId, tenantId), inArray(products.id, productIds)),
+      );
+    const productById = new Map(productRows.map((p) => [p.id, p] as const));
+    const attrsByProductId = await loadAttributeSnapshotsBulk(
+      tx,
+      tenantId,
+      productIds,
+    );
+
+    // Aggregate the requested quantity per product across all cart lines.
+    // We compare TOTAL request vs available stock — splitting a "buy 5"
+    // across two cart lines must still respect the 4-in-stock limit.
+    const requestedByProductId = new Map<string, number>();
+    for (const line of lines) {
+      requestedByProductId.set(
+        line.productId,
+        (requestedByProductId.get(line.productId) ?? 0) + line.quantity,
+      );
+    }
+
     const pre: Pre[] = [];
     let cartGross = 0;
 
     for (const line of lines) {
-      const [p] = await tx
-        .select()
-        .from(products)
-        .where(and(eq(products.tenantId, tenantId), eq(products.id, line.productId)))
-        .limit(1);
-      if (!p) throw new Error(`المنتج غير موجود (${line.productId})`);
+      const p = productById.get(line.productId);
+      if (!p) {
+        throw new DomainError("PRODUCT_NOT_FOUND", 400, {
+          productId: line.productId,
+        });
+      }
 
       // Multi-store: each product belongs to exactly one branch. Refuse a
       // cart line that mixes branches with the active sale context — that
       // would silently move inventory across stores.
       if (p.branchId !== options.branchId) {
-        throw new Error(
-          `المنتج "${p.name}" لا ينتمي لهذا الفرع — لا يمكن بيعه من هنا`,
-        );
+        throw new DomainError("PRODUCT_WRONG_BRANCH", 400, {
+          productId: p.id,
+          productName: p.name,
+        });
       }
 
-      if (p.quantity < line.quantity) {
-        throw new Error(
-          `الكمية المطلوبة من "${p.name}" غير متوفرة (المتاح ${p.quantity})`,
-        );
+      const totalRequested = requestedByProductId.get(line.productId) ?? line.quantity;
+      if (p.quantity < totalRequested) {
+        throw new DomainError("INSUFFICIENT_STOCK", 400, {
+          productId: p.id,
+          productName: p.name,
+          requested: totalRequested,
+          available: p.quantity,
+        });
       }
 
       const lineSubtotal = line.quantity * line.pricePerUnit;
@@ -495,7 +578,7 @@ export async function recordCartSale(
       );
       cartGross += lineSubtotal - lineDiscount;
 
-      const attrs = await loadAttributeSnapshot(tx, tenantId, line.productId);
+      const attrs = attrsByProductId.get(line.productId) ?? {};
       pre.push({ line, product: p, attrs, lineSubtotal, lineDiscount });
     }
 
@@ -524,7 +607,7 @@ export async function recordCartSale(
     let loyaltyDiscountEgp = 0;
     if (requestedPoints > 0 || requestedCredit > 0) {
       if (!customerPhoneNorm) {
-        throw new Error("لا يمكن خصم نقاط أو رصيد بدون رقم العميل");
+        throw new DomainError("LOYALTY_REQUIRES_CUSTOMER_PHONE", 400);
       }
       // Read the active branch's loyalty config + the customer's wallet
       // in the same tx so we don't race a concurrent grant/redeem.
@@ -542,7 +625,7 @@ export async function recordCartSale(
         )
         .limit(1);
       if (!setting?.enabled) {
-        throw new Error("برنامج الولاء غير مفعل لهذا الفرع");
+        throw new DomainError("LOYALTY_DISABLED_FOR_BRANCH", 400);
       }
       const egpPerPoint = Number(setting.egpPerPoint ?? 0);
       pointsToRedeem = requestedPoints;
@@ -1312,10 +1395,14 @@ export async function materializeDueRecurringExpenses(
 
     for (const tpl of due) {
       let occurrence = tpl.nextOccurrenceDate ?? new Date();
-      // Catch up: spawn one child per missed period until we're back in the future.
-      // Cap at 12 iterations defensively in case the template was dormant a long time.
+      // Catch up: spawn one child per missed period until we're back in the
+      // future. Cap at 12 iterations defensively in case the template was
+      // dormant a long time. We batch the rows + the (single) supplier
+      // debit so the catch-up costs O(1) writes per template instead of
+      // O(periods).
+      const childRows: typeof expensesTable.$inferInsert[] = [];
       for (let i = 0; i < 12 && occurrence <= new Date(); i += 1) {
-        await tx.insert(expensesTable).values({
+        childRows.push({
           tenantId,
           title: tpl.title,
           amount: tpl.amount,
@@ -1327,17 +1414,6 @@ export async function materializeDueRecurringExpenses(
           // Children themselves are not recurring.
           isRecurring: false,
         });
-        spawned += 1;
-
-        // Optional: debit supplier balance for the child too.
-        if (tpl.supplierId) {
-          await tx.execute(sql`
-            update suppliers
-            set balance = (balance)::numeric - ${tpl.amount}::numeric,
-                updated_at = now()
-            where tenant_id = ${tenantId} and id = ${tpl.supplierId}
-          `);
-        }
 
         // Advance.
         const next = new Date(occurrence);
@@ -1348,6 +1424,23 @@ export async function materializeDueRecurringExpenses(
           next.setMonth(next.getMonth() + 1);
         }
         occurrence = next;
+      }
+
+      if (childRows.length > 0) {
+        await tx.insert(expensesTable).values(childRows);
+        spawned += childRows.length;
+
+        // Aggregate the supplier debit: childCount × tpl.amount in one
+        // UPDATE instead of one UPDATE per child.
+        if (tpl.supplierId) {
+          const totalDebit = Number(tpl.amount) * childRows.length;
+          await tx.execute(sql`
+            update suppliers
+            set balance = (balance)::numeric - ${String(totalDebit)}::numeric,
+                updated_at = now()
+            where tenant_id = ${tenantId} and id = ${tpl.supplierId}
+          `);
+        }
       }
 
       await tx

@@ -177,6 +177,18 @@ export default auth((req) => {
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set("x-nonce", nonce);
 
+  // Request id: prefer an upstream-supplied one (load balancer / proxy)
+  // so distributed traces match. Otherwise mint a fresh uuid. Propagated
+  // forward via the modified request headers so route handlers can read
+  // it via `headers()`, and stamped on the response so a client ticket
+  // can be cross-referenced with server logs.
+  const incomingReqId = req.headers.get("x-request-id");
+  const requestId =
+    incomingReqId && /^[A-Za-z0-9._\-:]{1,128}$/.test(incomingReqId)
+      ? incomingReqId
+      : crypto.randomUUID();
+  requestHeaders.set("x-request-id", requestId);
+
   // Locale resolution for the `x-locale` header that the root layout reads:
   //  1. If the URL has /ar/ or /en/, that wins (pre-login surface).
   //  2. Otherwise prefer the user's saved preference from the JWT (the
@@ -201,6 +213,7 @@ export default auth((req) => {
       nonce,
       NextResponse.next({ request: { headers: requestHeaders } }),
     );
+    res.headers.set("x-request-id", requestId);
     if (localeInPath) {
       const existing = req.cookies.get(LOCALE_COOKIE)?.value;
       if (existing !== localeInPath) {

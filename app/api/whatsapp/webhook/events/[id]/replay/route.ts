@@ -53,6 +53,14 @@ export async function POST(
   if (!row) {
     return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   }
+  // Tenant guard. A quarantined row has tenantId = null (the whole point of
+  // quarantine is the inbound message couldn't be routed to a tenant), so we
+  // allow that case. But if a row IS tagged to a tenant, the caller must be
+  // an owner of THAT tenant — owner of a different tenant must not be able
+  // to replay it.
+  if (row.tenantId && row.tenantId !== auth.ctx.tenantId) {
+    return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+  }
   if (row.processingStatus !== "quarantined") {
     return NextResponse.json(
       { ok: false, error: `Cannot replay a ${row.processingStatus} event` },

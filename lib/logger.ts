@@ -15,6 +15,7 @@
 // shape so swapping later is one PR.
 
 import "server-only";
+import { getRequestContext } from "./request-context";
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
@@ -97,9 +98,20 @@ export interface LogFields {
 function emit(level: LogLevel, fields: LogFields): void {
   if (!shouldEmit(level)) return;
   const ts = new Date().toISOString();
+  // Auto-decorate every line with the current request id (and tenantId/
+  // userId once auth resolves). Per-call fields take precedence so a
+  // caller can still override or omit them explicitly.
+  const reqCtx = getRequestContext();
   const payload: Record<string, unknown> = {
     ts,
     level,
+    ...(reqCtx
+      ? {
+          requestId: reqCtx.requestId,
+          ...(reqCtx.tenantId ? { tenantId: reqCtx.tenantId } : {}),
+          ...(reqCtx.userId ? { userId: reqCtx.userId } : {}),
+        }
+      : {}),
     ...(sanitiseValue(fields) as Record<string, unknown>),
   };
   // Stream selection: warn/error → stderr, info/debug → stdout. Matches
