@@ -7,7 +7,6 @@ import {
   productHistory,
   sales,
   returns as returnsTable,
-  expenses as expensesTable,
   shopSettings,
   cashShifts,
   cashMovements,
@@ -16,10 +15,8 @@ import {
 import type {
   Sale,
   Return,
-  Expense,
   DiscountType,
   PaymentMethod,
-  ExpenseCategory,
 } from "@/lib/types";
 import { calcLineDiscount, calcOrderDiscount } from "@/lib/repo/sale-discounts";
 import { bustInsightsCache } from "@/lib/repo/insights";
@@ -94,23 +91,6 @@ function rowToReturn(r: typeof returnsTable.$inferSelect): Return {
     returnedQuantity: r.returnedQuantity,
     returnDate: r.returnDate,
     reason: r.reason ?? "",
-  };
-}
-
-function rowToExpense(r: typeof expensesTable.$inferSelect): Expense {
-  return {
-    id: r.id,
-    title: r.title,
-    amount: Number(r.amount),
-    category: r.category as ExpenseCategory,
-    supplierId: r.supplierId ?? null,
-    isRecurring: r.isRecurring,
-    recurrencePeriod:
-      (r.recurrencePeriod as "monthly" | "weekly" | null) ?? null,
-    nextOccurrenceDate: r.nextOccurrenceDate ?? null,
-    parentExpenseId: r.parentExpenseId ?? null,
-    date: r.date,
-    note: r.note ?? undefined,
   };
 }
 
@@ -286,6 +266,81 @@ export async function listSales(
       .where(and(...filters))
       .orderBy(desc(sales.saleDate));
     return rows.map(rowToSale);
+  });
+}
+
+// Cursor-paginated read. The legacy `listSales` returns every row for the
+// branch and is fine for small tenants; at 10K invoices the offset/full
+// scan starts to bite. Callers that want predictable latency at scale
+// should use this variant.
+//
+// Cursor format: `<saleDate ISO>:<saleId>` — saleDate is the primary
+// sort key, saleId breaks ties so the cursor is unambiguous even when
+// two sales land in the same millisecond.
+
+export interface ListSalesPageInput {
+  /** When set, restrict to that branch. */
+  branchId?: string | null;
+  /** Page size. Defaults to 50; capped at 200 by the route. */
+  limit?: number;
+  /** Opaque cursor from a previous page. Null/missing = first page. */
+  cursor?: string | null;
+}
+
+export interface ListSalesPageResult {
+  data: Sale[];
+  /** Pass back as `cursor` to fetch the next page. Null = last page. */
+  nextCursor: string | null;
+}
+
+function encodeSaleCursor(row: { saleDate: Date; id: string }): string {
+  return `${row.saleDate.toISOString()}:${row.id}`;
+}
+
+function decodeSaleCursor(
+  raw: string | null | undefined,
+): { saleDate: Date; id: string } | null {
+  if (!raw) return null;
+  const i = raw.indexOf(":");
+  if (i < 0) return null;
+  const iso = raw.slice(0, i);
+  const id = raw.slice(i + 1);
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime()) || !id) return null;
+  return { saleDate: d, id };
+}
+
+export async function listSalesPage(
+  tenantId: string,
+  input: ListSalesPageInput = {},
+): Promise<ListSalesPageResult> {
+  const limit = Math.max(1, Math.min(200, input.limit ?? 50));
+  const cursor = decodeSaleCursor(input.cursor ?? null);
+  return withTenant(tenantId, async (tx) => {
+    // Pull `limit + 1` so we can determine if there's a next page without
+    // a separate count query.
+    const filters = [eq(sales.tenantId, tenantId)];
+    if (input.branchId) filters.push(eq(sales.branchId, input.branchId));
+    if (cursor) {
+      // (saleDate, id) < (cursor.saleDate, cursor.id) — strict tuple compare
+      // so a sale with the SAME date as the cursor row but later id is also
+      // skipped (it was on the previous page).
+      filters.push(
+        sql`(${sales.saleDate}, ${sales.id}) < (${cursor.saleDate.toISOString()}::timestamptz, ${cursor.id})`,
+      );
+    }
+    const rows = await tx
+      .select()
+      .from(sales)
+      .where(and(...filters))
+      .orderBy(desc(sales.saleDate), desc(sales.id))
+      .limit(limit + 1);
+    const hasMore = rows.length > limit;
+    const page = hasMore ? rows.slice(0, limit) : rows;
+    const nextCursor = hasMore
+      ? encodeSaleCursor(page[page.length - 1]!)
+      : null;
+    return { data: page.map(rowToSale), nextCursor };
   });
 }
 
@@ -1360,247 +1415,18 @@ export async function recordReturn(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Expenses
+// Expenses — moved to lib/repo/expenses.ts in the Phase 2 god-module split.
+// Re-exported here so the existing 50+ call-sites that import from
+// "@/lib/repo/operations" keep working. New code should import directly
+// from "@/lib/repo/expenses".
 // ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Spawn child instances for any recurring expense template whose
- * next_occurrence_date has passed, then bump the template's next date forward.
- *
- * Two callers today:
- *   1. `listExpenses` — lazy catch-up when an owner opens /expenses.
- *   2. `/api/cron/recurring-expenses` — periodic sweep so the bill appears
- *      even if no one has visited the page that month.
- *
- * Idempotent: each iteration advances `next_occurrence_date`, so a re-run
- * within the same minute spawns nothing extra.
- */
-export async function materializeDueRecurringExpenses(
-  tenantId: string,
-): Promise<{ spawned: number }> {
-  let spawned = 0;
-  await withTenant(tenantId, async (tx) => {
-    const due = await tx
-      .select()
-      .from(expensesTable)
-      .where(
-        and(
-          eq(expensesTable.tenantId, tenantId),
-          eq(expensesTable.isRecurring, true),
-          // next_occurrence_date IS NOT NULL AND <= now()
-          sql`${expensesTable.nextOccurrenceDate} is not null`,
-          sql`${expensesTable.nextOccurrenceDate} <= now()`,
-        ),
-      );
-
-    for (const tpl of due) {
-      let occurrence = tpl.nextOccurrenceDate ?? new Date();
-      // Catch up: spawn one child per missed period until we're back in the
-      // future. Cap at 12 iterations defensively in case the template was
-      // dormant a long time. We batch the rows + the (single) supplier
-      // debit so the catch-up costs O(1) writes per template instead of
-      // O(periods).
-      const childRows: typeof expensesTable.$inferInsert[] = [];
-      for (let i = 0; i < 12 && occurrence <= new Date(); i += 1) {
-        childRows.push({
-          tenantId,
-          title: tpl.title,
-          amount: tpl.amount,
-          category: tpl.category,
-          supplierId: tpl.supplierId,
-          date: occurrence,
-          note: tpl.note,
-          parentExpenseId: tpl.id,
-          // Children themselves are not recurring.
-          isRecurring: false,
-        });
-
-        // Advance.
-        const next = new Date(occurrence);
-        if (tpl.recurrencePeriod === "weekly") {
-          next.setDate(next.getDate() + 7);
-        } else {
-          // default monthly
-          next.setMonth(next.getMonth() + 1);
-        }
-        occurrence = next;
-      }
-
-      if (childRows.length > 0) {
-        await tx.insert(expensesTable).values(childRows);
-        spawned += childRows.length;
-
-        // Aggregate the supplier debit: childCount × tpl.amount in one
-        // UPDATE instead of one UPDATE per child.
-        if (tpl.supplierId) {
-          const totalDebit = Number(tpl.amount) * childRows.length;
-          await tx.execute(sql`
-            update suppliers
-            set balance = (balance)::numeric - ${String(totalDebit)}::numeric,
-                updated_at = now()
-            where tenant_id = ${tenantId} and id = ${tpl.supplierId}
-          `);
-        }
-      }
-
-      await tx
-        .update(expensesTable)
-        .set({ nextOccurrenceDate: occurrence })
-        .where(
-          and(
-            eq(expensesTable.tenantId, tenantId),
-            eq(expensesTable.id, tpl.id),
-          ),
-        );
-    }
-  });
-  if (spawned > 0) await bustInsightsCache(tenantId);
-  return { spawned };
-}
-
-export async function listExpenses(
-  tenantId: string,
-  /** When set, restrict to that branch (excludes tenant-wide null-branch
-   *  expenses). Null = every branch + tenant-wide. */
-  branchId?: string | null,
-): Promise<Expense[]> {
-  // Lazy: catch up any due recurring instances before listing.
-  await materializeDueRecurringExpenses(tenantId);
-
-  return withTenant(tenantId, async (tx) => {
-    const filters = [eq(expensesTable.tenantId, tenantId)];
-    if (branchId) filters.push(eq(expensesTable.branchId, branchId));
-    const rows = await tx
-      .select()
-      .from(expensesTable)
-      .where(and(...filters))
-      .orderBy(desc(expensesTable.date));
-    return rows.map(rowToExpense);
-  });
-}
-
-export interface AddExpenseInput {
-  title: string;
-  amount: number;
-  category: ExpenseCategory;
-  supplierId?: string | null;
-  isRecurring?: boolean;
-  recurrencePeriod?: "monthly" | "weekly" | null;
-  date?: Date;
-  note?: string;
-  /** Branch this expense was incurred at. Null = tenant-wide (e.g. SaaS
-   *  subscription, accounting fees) — caller is responsible for the
-   *  semantic. */
-  branchId?: string | null;
-  /** Who recorded the expense. When the branch has cash reconciliation
-   *  enabled and the recorder has an open shift, the expense is stamped
-   *  with that shift_id so its amount flows into expected_cash. */
-  recordedByUserId?: string | null;
-  recordedByRole?: "owner" | "staff" | null;
-}
-
-export async function addExpense(
-  tenantId: string,
-  input: AddExpenseInput,
-): Promise<{ id: string }> {
-  const result = await withTenant(tenantId, async (tx) => {
-    const startDate = input.date ?? new Date();
-    // For a recurring template, the first occurrence is "now" (recorded as the
-    // parent), and the next_occurrence_date is one period after.
-    let nextOccurrenceDate: Date | null = null;
-    if (input.isRecurring && input.recurrencePeriod) {
-      nextOccurrenceDate = new Date(startDate);
-      if (input.recurrencePeriod === "weekly") {
-        nextOccurrenceDate.setDate(nextOccurrenceDate.getDate() + 7);
-      } else {
-        nextOccurrenceDate.setMonth(nextOccurrenceDate.getMonth() + 1);
-      }
-    }
-
-    // Stamp the open cash shift (if reconciliation is enabled for this
-    // branch and the caller has one). Recurring template parents are NOT
-    // stamped — only the spawned cash-impacting instances would be, and
-    // even those are out of scope for v1 (handled by the cron sidecar
-    // which has no shift context).
-    const cashShiftId =
-      input.branchId && input.recordedByUserId && !input.isRecurring
-        ? await resolveShiftStampForSale(tx, {
-            tenantId,
-            branchId: input.branchId,
-            recordedByUserId: input.recordedByUserId,
-            isOwner: input.recordedByRole === "owner",
-            paymentMethod: "cash",
-          }).catch((err) => {
-            // For expenses we don't 409 on no-open-shift — we silently skip
-            // the stamp. Cashiers rarely record expenses; owners do, and
-            // their auto-desk shift handles it. Re-raise other errors.
-            if (err instanceof NoOpenShiftError) return null;
-            throw err;
-          })
-        : null;
-
-    const [created] = await tx
-      .insert(expensesTable)
-      .values({
-        tenantId,
-        branchId: input.branchId ?? null,
-        title: input.title,
-        amount: String(input.amount),
-        category: input.category,
-        supplierId: input.supplierId ?? null,
-        isRecurring: !!input.isRecurring,
-        recurrencePeriod: input.isRecurring
-          ? input.recurrencePeriod ?? "monthly"
-          : null,
-        nextOccurrenceDate,
-        date: startDate,
-        note: input.note ?? null,
-        cashShiftId,
-      })
-      .returning({ id: expensesTable.id });
-
-    // When this expense is a payment to a supplier, debit their running balance.
-    if (input.supplierId) {
-      await tx.execute(sql`
-        update suppliers
-        set balance = (balance)::numeric - ${input.amount.toFixed(2)}::numeric,
-            updated_at = now()
-        where tenant_id = ${tenantId} and id = ${input.supplierId}
-      `);
-    }
-    return { id: created.id };
-  });
-  await bustInsightsCache(tenantId);
-  return result;
-}
-
-export async function deleteExpense(tenantId: string, id: string): Promise<void> {
-  await withTenant(tenantId, async (tx) => {
-    // Reverse any supplier balance change first so the running total stays correct.
-    const [existing] = await tx
-      .select({
-        amount: expensesTable.amount,
-        supplierId: expensesTable.supplierId,
-      })
-      .from(expensesTable)
-      .where(and(eq(expensesTable.tenantId, tenantId), eq(expensesTable.id, id)))
-      .limit(1);
-
-    if (existing?.supplierId) {
-      await tx.execute(sql`
-        update suppliers
-        set balance = (balance)::numeric + ${existing.amount}::numeric,
-            updated_at = now()
-        where tenant_id = ${tenantId} and id = ${existing.supplierId}
-      `);
-    }
-
-    await tx
-      .delete(expensesTable)
-      .where(and(eq(expensesTable.tenantId, tenantId), eq(expensesTable.id, id)));
-  });
-  await bustInsightsCache(tenantId);
-}
+export {
+  materializeDueRecurringExpenses,
+  listExpenses,
+  addExpense,
+  deleteExpense,
+} from "@/lib/repo/expenses";
+export type { AddExpenseInput } from "@/lib/repo/expenses";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Bulk delete sales (used by sales page)

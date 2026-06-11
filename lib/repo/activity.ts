@@ -3,6 +3,7 @@ import { withTenant } from "@/lib/db";
 import { activityLogs, tenantMembers, tenants, users } from "@/lib/db/schema";
 import type { ActivityLogRow } from "@/lib/db/schema";
 import type { ActivityCategory } from "@/lib/activity-labels";
+import { logger } from "@/lib/logger";
 
 export type { ActivityCategory } from "@/lib/activity-labels";
 export {
@@ -105,10 +106,11 @@ export async function pruneActivityAllTenants(
       totalDeleted += deleted;
     } catch (err) {
       failures += 1;
-      console.error(
-        `[activity/prune] tenant ${t.id} failed:`,
-        err instanceof Error ? err.message : err,
-      );
+      logger.error({
+        event: "activity.prune.tenant_failed",
+        tenantId: t.id,
+        reason: err instanceof Error ? err.message : String(err),
+      });
     }
   }
   return { totalDeleted, tenants: rows.length, failures };
@@ -171,7 +173,10 @@ export async function logActivity(input: LogActivityInput): Promise<void> {
       });
     });
   } catch (err) {
-    console.error("[activity] log insert failed", err);
+    logger.error({
+      event: "activity.log.insert_failed",
+      reason: err instanceof Error ? err.message : String(err),
+    });
   }
 }
 

@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { logger } from "./logger";
 
 // Tiny SMTP wrapper. Production points SMTP_* at any provider (Resend SMTP,
 // Mailgun, AWS SES, Brevo — all work). In dev with no SMTP_HOST configured
@@ -67,7 +68,12 @@ export async function sendMail(input: SendInput): Promise<MailerSendResult> {
     });
     return { delivered: true };
   } catch (err) {
-    console.error("[mailer] sendMail failed:", err);
+    logger.error({
+      event: "mailer.send_failed",
+      to: input.to,
+      subject: input.subject,
+      reason: err instanceof Error ? err.message : String(err),
+    });
     return {
       delivered: false,
       reason: "send_failed",

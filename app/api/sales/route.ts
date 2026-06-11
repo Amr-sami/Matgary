@@ -5,9 +5,10 @@ import {
   requireTenantWithBranch,
 } from "@/lib/api/auth-helpers";
 import { resolveBranchFilter } from "@/lib/api/branch-context";
-import { listSales, recordSale } from "@/lib/repo/operations";
+import { listSales, listSalesPage, recordSale } from "@/lib/repo/operations";
 import { logActivity } from "@/lib/repo/activity";
 import { isDomainError, domainErrorBody } from "@/lib/errors";
+import { checkTenantRateLimit } from "@/lib/api/tenant-rate-limit";
 
 export async function GET(req: NextRequest) {
   const r = await requireTenant();
@@ -18,6 +19,24 @@ export async function GET(req: NextRequest) {
   );
   if (!filter.ok) {
     return NextResponse.json({ error: filter.error }, { status: filter.status });
+  }
+  // Cursor mode: opt-in via `?paginated=1`. Returns { data, nextCursor }.
+  // Default (no param) keeps the legacy unpaginated shape so existing
+  // clients work unchanged. New UIs should call with paginated=1.
+  if (req.nextUrl.searchParams.get("paginated") === "1") {
+    const cursor = req.nextUrl.searchParams.get("cursor");
+    const limitRaw = req.nextUrl.searchParams.get("limit");
+    const limit = limitRaw ? Math.min(200, Math.max(1, Number(limitRaw))) : 50;
+    const page = await listSalesPage(r.ctx.tenantId, {
+      branchId: filter.branchId,
+      cursor,
+      limit,
+    });
+    return NextResponse.json({
+      data: page.data,
+      nextCursor: page.nextCursor,
+      branchId: filter.branchId,
+    });
   }
   const data = await listSales(r.ctx.tenantId, filter.branchId);
   return NextResponse.json({ data, branchId: filter.branchId });
@@ -40,6 +59,8 @@ const recordSchema = z.object({
 export async function POST(req: NextRequest) {
   const r = await requireTenantWithBranch();
   if (!r.ok) return r.response;
+  const rl = await checkTenantRateLimit(r.ctx.tenantId, "write.default");
+  if (!rl.ok) return rl.response;
   const body = await req.json().catch(() => null);
   const parsed = recordSchema.safeParse(body);
   if (!parsed.success) {

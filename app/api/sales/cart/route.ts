@@ -5,6 +5,7 @@ import { NoOpenShiftError, recordCartSale } from "@/lib/repo/operations";
 import { logActivity } from "@/lib/repo/activity";
 import { normalizeEgyptPhone } from "@/lib/validators/egypt";
 import { isDomainError, domainErrorBody } from "@/lib/errors";
+import { checkTenantRateLimit } from "@/lib/api/tenant-rate-limit";
 import {
   getCachedResponse,
   rememberResponse,
@@ -53,6 +54,11 @@ export async function POST(req: NextRequest) {
   const r = await requireTenantWithBranch();
   if (!r.ok) return r.response;
 
+  // Per-tenant rate guard. Cap a runaway POS or leaked-cookie attack to a
+  // few hundred carts/min before it can DoS the DB pool. Checked AFTER
+  // idempotency so a legitimate retry on the same key doesn't burn a
+  // bucket slot.
+
   // Offline POS: replays of the same outbox row carry the same
   // Idempotency-Key. Short-circuit on a known key so the second POST
   // returns the original response without re-running the sale.
@@ -63,6 +69,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(cached.body, { status: cached.status });
     }
   }
+
+  const rl = await checkTenantRateLimit(r.ctx.tenantId, "write.default");
+  if (!rl.ok) return rl.response;
 
   // Multi-store sanity check: if the outbox row was rung up at a branch
   // the cashier later switched away from, refuse rather than book the

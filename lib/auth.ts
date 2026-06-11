@@ -12,6 +12,7 @@ import { logActivity } from "./repo/activity";
 import { cacheBustPrefix, cacheRemember, globalKey } from "./cache";
 import { rateLimit, rateLimitConsume } from "./ratelimit";
 import { findRecoveryCodeIndex, verifyTotp } from "./totp";
+import { logger } from "./logger";
 
 // Login limits — both must pass. The IP guard slows credential-stuffing from
 // a single host; the email guard slows targeted attacks. Numbers are tight
@@ -257,7 +258,10 @@ async function resolveTenantContext(userId: string): Promise<UserContext> {
       } catch (err) {
         // If the lookup fails, default to "access active" so an outage of the
         // subscription store doesn't lock everyone out.
-        console.warn("[auth] subscription resolve failed:", err);
+        logger.warn({
+          event: "auth.subscription_resolve_failed",
+          reason: err instanceof Error ? err.message : String(err),
+        });
       }
     }
 

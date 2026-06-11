@@ -7,6 +7,7 @@ import {
 import { resolveBranchFilter } from "@/lib/api/branch-context";
 import { addProduct, listProducts } from "@/lib/repo/catalog";
 import { logActivity } from "@/lib/repo/activity";
+import { checkTenantRateLimit } from "@/lib/api/tenant-rate-limit";
 
 export async function GET(req: NextRequest) {
   const r = await requireTenant();
@@ -43,6 +44,8 @@ const createSchema = z.object({
 export async function POST(req: NextRequest) {
   const r = await requireTenantWithBranch();
   if (!r.ok) return r.response;
+  const rl = await checkTenantRateLimit(r.ctx.tenantId, "write.default");
+  if (!rl.ok) return rl.response;
   const body = await req.json().catch(() => null);
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) {

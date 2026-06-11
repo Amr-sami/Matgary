@@ -1,4 +1,5 @@
 import { redis } from "@/lib/redis";
+import { logger } from "@/lib/logger";
 
 // Per-user notification event channel. The SSE stream subscribes to a user's
 // channel; every notification mutation (insert / mark-read / mark-all-read)
@@ -30,10 +31,10 @@ export async function publishUserNotificationEvent(
   try {
     await redis.publish(channelKey(userId), "1");
   } catch (err) {
-    console.warn(
-      "[notif/events] publish failed:",
-      err instanceof Error ? err.message : err,
-    );
+    logger.warn({
+      event: "notif.events.publish_failed",
+      reason: err instanceof Error ? err.message : String(err),
+    });
   }
 }
 
@@ -63,10 +64,10 @@ export async function subscribeUserNotificationEvents(
   subscriber.on("error", (err) => {
     // Don't tear down — ioredis will reconnect on its own. We only log once.
     if (!closed) {
-      console.warn(
-        "[notif/events] subscriber error:",
-        err instanceof Error ? err.message : err,
-      );
+      logger.warn({
+        event: "notif.events.subscriber_error",
+        reason: err instanceof Error ? err.message : String(err),
+      });
     }
   });
   try {
@@ -74,10 +75,10 @@ export async function subscribeUserNotificationEvents(
   } catch (err) {
     closed = true;
     void subscriber.quit().catch(() => {});
-    console.warn(
-      "[notif/events] subscribe failed:",
-      err instanceof Error ? err.message : err,
-    );
+    logger.warn({
+      event: "notif.events.subscribe_failed",
+      reason: err instanceof Error ? err.message : String(err),
+    });
     return null;
   }
   return {

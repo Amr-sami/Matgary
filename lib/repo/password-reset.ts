@@ -6,6 +6,7 @@ import { users } from "@/lib/db/schema";
 import { redis } from "@/lib/redis";
 import { globalKey } from "@/lib/cache";
 import { bustUserContextCache } from "@/lib/auth";
+import { logger } from "@/lib/logger";
 
 // Tokens live in Redis with a 30-min TTL — short enough to limit damage if a
 // link leaks, long enough to survive normal email delivery latency. We store
@@ -70,14 +71,17 @@ export async function issueResetToken(email: string): Promise<IssuedToken> {
         TOKEN_TTL_SEC,
       );
     } catch (err) {
-      console.warn("[pwreset] failed to store token:", err);
+      logger.warn({
+        event: "pwreset.token.store_failed",
+        reason: err instanceof Error ? err.message : String(err),
+      });
       // Without Redis we cannot validate later, so refuse to claim success.
       return { raw, emailExists: false, locale: userLocale };
     }
   } else {
     // Without Redis the flow simply doesn't work — return as if the email
     // didn't exist, log so the operator notices.
-    console.warn("[pwreset] cannot issue token: REDIS_URL is not configured");
+    logger.warn({ event: "pwreset.no_redis" });
     return { raw, emailExists: false, locale: userLocale };
   }
 
@@ -165,7 +169,10 @@ export async function consumeResetToken(
       })
       .where(eq(users.id, payload.userId));
   } catch (err) {
-    console.error("[pwreset] failed to update password:", err);
+    logger.error({
+      event: "pwreset.password_update_failed",
+      reason: err instanceof Error ? err.message : String(err),
+    });
     return { ok: false, reason: "internal" };
   }
 

@@ -10,6 +10,7 @@ import { addExpense, listExpenses } from "@/lib/repo/operations";
 import { logActivity } from "@/lib/repo/activity";
 import { withTenant } from "@/lib/db";
 import { branches } from "@/lib/db/schema";
+import { checkTenantRateLimit } from "@/lib/api/tenant-rate-limit";
 
 export async function GET(req: NextRequest) {
   const r = await requireTenant();
@@ -43,6 +44,8 @@ const schema = z.object({
 export async function POST(req: NextRequest) {
   const r = await requireTenantWithBranch();
   if (!r.ok) return r.response;
+  const rl = await checkTenantRateLimit(r.ctx.tenantId, "write.default");
+  if (!rl.ok) return rl.response;
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
   if (!parsed.success) {

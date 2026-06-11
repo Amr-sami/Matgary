@@ -10,6 +10,7 @@ import { db } from "@/lib/db";
 import { tenantMembers } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import type { PlanKey } from "@/lib/payments/plans";
+import { logger } from "@/lib/logger";
 
 // Paymob webhook handler.
 //
@@ -47,7 +48,10 @@ export async function POST(req: NextRequest) {
   if (!parsed) {
     // Webhook for an order we don't recognise — log and accept (200) so
     // Paymob doesn't keep retrying. Record at console-level for debugging.
-    console.warn("[paymob-webhook] unknown merchant_order_id", merchantOrderId);
+    logger.warn({
+      event: "paymob.webhook.unknown_order",
+      merchantOrderId: String(merchantOrderId),
+    });
     return NextResponse.json({ ok: true, ignored: true });
   }
 
@@ -81,7 +85,10 @@ export async function POST(req: NextRequest) {
       .where(eq(tenantMembers.tenantId, parsed.tenantId));
     await Promise.all(members.map((m) => bustUserContextCache(m.userId)));
   } catch (err) {
-    console.warn("[paymob-webhook] cache bust failed:", err);
+    logger.warn({
+      event: "paymob.webhook.cache_bust_failed",
+      reason: err instanceof Error ? err.message : String(err),
+    });
   }
 
   logActivity({
