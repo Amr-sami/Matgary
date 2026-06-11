@@ -60,3 +60,4 @@ next-env.d.ts
 
 # Playwright shared-owner storage state — provisioned per dev box
 tests/e2e/.auth/
+tests/perf/.cookies/
