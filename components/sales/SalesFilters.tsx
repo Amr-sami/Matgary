@@ -3,6 +3,7 @@
 import { cn } from "@/lib/utils";
 import { CATEGORY_LABELS, GENDER_LABELS, type Category, type Gender } from "@/lib/types";
 import { useDictionary } from "@/components/i18n/DictionaryProvider";
+import { FilterSelect, SortSelect } from "@/components/ui/FilterSelect";
 
 export type DateRangeKey = "today" | "yesterday" | "7d" | "30d" | "thisMonth" | "all" | "custom";
 
@@ -206,33 +207,23 @@ export function SalesFilters({
         ))}
 
         {brands.length > 0 && (
-          <select
-            value={selectedBrand || ""}
-            onChange={(e) => onBrandChange(e.target.value || null)}
-            dir="auto"
-            className="px-3 py-1.5 rounded-lg border border-border bg-white text-sm"
-          >
-            <option value="">{t.allBrands}</option>
-            {brands.map((b) => (
-              <option key={b} value={b}>
-                {b}
-              </option>
-            ))}
-          </select>
+          <FilterSelect
+            value={selectedBrand}
+            onChange={onBrandChange}
+            allLabel={t.allBrands}
+            options={brands}
+          />
         )}
 
-        <select
+        <SortSelect
           value={sort}
-          onChange={(e) => onSortChange(e.target.value as SalesSortKey)}
-          dir="auto"
-          className="px-3 py-1.5 rounded-lg border border-border bg-white text-sm"
-        >
-          {(Object.keys(sortLabels) as SalesSortKey[]).map((k) => (
-            <option key={k} value={k}>
-              {t.sortPrefix.replace("{label}", sortLabels[k])}
-            </option>
-          ))}
-        </select>
+          onChange={onSortChange}
+          options={(Object.keys(sortLabels) as SalesSortKey[]).map((k) => ({
+            value: k,
+            label: sortLabels[k],
+          }))}
+          prefix={t.sortPrefix.replace("{label}", "")}
+        />
 
         <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-white text-sm cursor-pointer">
           <input

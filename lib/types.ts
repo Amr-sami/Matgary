@@ -131,6 +131,12 @@ export interface Sale {
   paymentMethod?: PaymentMethod;
   isPaid?: boolean;
   paidAt?: Date;
+  /** Running total paid against this sale. For non-deferred sales equals
+   *  totalPrice. Defaults to 0 for legacy rows. Migration 0037. */
+  amountPaid?: number;
+  /** Timestamp of the most-recent partial payment (not a full settlement).
+   *  Null/undefined when paid in full or never paid. */
+  partialPaidAt?: Date;
 }
 
 export interface CartLine {

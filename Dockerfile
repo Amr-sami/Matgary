@@ -23,6 +23,14 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+# Next 16 evaluates module-level code during page-data collection. Modules like
+# lib/db/index.ts throw if their env vars are missing, which breaks the build
+# even though no real connection is made. Provide harmless placeholders here
+# (build-only; the runner stage gets real values from compose env_file).
+ENV DATABASE_URL=postgres://build:build@localhost:5432/build
+ENV APP_DATABASE_URL=postgres://build:build@localhost:5432/build
+ENV AUTH_SECRET=build-placeholder-secret
+ENV SECRET_KEY=build-placeholder-secret
 RUN npm run build
 
 FROM node:20-alpine AS runner

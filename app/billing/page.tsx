@@ -5,7 +5,21 @@ import { useSession } from "next-auth/react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/Button";
 import { CheckCircle, AlertCircle, Receipt, Clock } from "@/lib/icons";
-import { PLANS, type PlanKey } from "@/lib/payments/plans";
+import type { PlanKey } from "@/lib/payments/plans";
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
+
+interface PublicPlan {
+  key: PlanKey;
+  labelAr: string;
+  labelEn: string;
+  taglineAr: string;
+  taglineEn: string;
+  monthlyEgp: number;
+  purchasable: boolean;
+  featuresAr: string[];
+  featuresEn: string[];
+  sortOrder: number;
+}
 
 interface SubscriptionData {
   plan: PlanKey;
@@ -28,24 +42,16 @@ interface SubscriptionData {
   }>;
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  trialing: "تجربة مجانية",
-  active: "اشتراك مفعّل",
-  past_due: "تأخر السداد",
-  cancelled: "تم الإلغاء",
-  expired: "منتهي",
-};
-
-const ATTEMPT_STATUS: Record<string, { label: string; tone: string }> = {
-  pending: { label: "بانتظار التأكيد", tone: "bg-orange-100 text-orange-700" },
-  succeeded: { label: "تم الدفع", tone: "bg-success-light text-success" },
-  failed: { label: "فشل الدفع", tone: "bg-danger-light text-danger" },
-};
-
 export default function BillingPage() {
   const { data: session, status: authStatus } = useSession();
+  const dict = useDictionary();
+  const locale = useLocale();
+  const t = dict.app.billing;
+  const dateLocale = locale === "ar" ? "ar-EG" : "en-US";
+
   const isOwner = session?.user?.role === "owner";
   const [data, setData] = useState<SubscriptionData | null>(null);
+  const [plans, setPlans] = useState<PublicPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,10 +59,18 @@ export default function BillingPage() {
   const refresh = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/billing/me", { cache: "no-store" });
-      if (res.ok) {
-        const json = (await res.json()) as SubscriptionData;
+      const [meRes, plansRes] = await Promise.all([
+        fetch("/api/billing/me", { cache: "no-store" }),
+        // Public + cached; falls back to typed defaults if DB hiccups.
+        fetch("/api/plans", { cache: "no-store" }),
+      ]);
+      if (meRes.ok) {
+        const json = (await meRes.json()) as SubscriptionData;
         setData(json);
+      }
+      if (plansRes.ok) {
+        const json = (await plansRes.json()) as { data: PublicPlan[] };
+        setPlans(json.data);
       }
     } finally {
       setLoading(false);
@@ -78,7 +92,7 @@ export default function BillingPage() {
       });
       const json = await res.json();
       if (!res.ok) {
-        setError(json.error || "تعذر فتح صفحة الدفع");
+        setError(json.error || t.errors.cantOpenCheckout);
         return;
       }
       // Redirect into Paymob iframe on the same tab — Paymob bounces back
@@ -90,38 +104,52 @@ export default function BillingPage() {
   };
 
   const cancel = async () => {
-    if (!window.confirm("هل أنت متأكد من إلغاء الاشتراك؟ ستظل الخدمة مفعّلة حتى نهاية الفترة المدفوعة.")) return;
+    if (!window.confirm(t.cancelConfirm)) return;
     setBusy(true);
     try {
       const res = await fetch("/api/billing/cancel", { method: "POST" });
       if (res.ok) await refresh();
       else {
         const json = await res.json();
-        setError(json.error || "تعذر إلغاء الاشتراك");
+        setError(json.error || t.errors.cantCancel);
       }
     } finally {
       setBusy(false);
     }
   };
 
+  const statusLabel = (s: string) =>
+    (t.status as Record<string, string>)[s] ?? s;
+
+  // Plan content (label / tagline / feature bullets / price / purchasable)
+  // comes from /api/plans (Spec 04), which reads platform_plans live.
+  // Admin edits at /admin/plans reflect here within ~1 minute. When the
+  // tenant locale is Arabic we render labelAr/etc.; English picks the *_en
+  // siblings.
+  const planContent = (k: PlanKey): { label: string; tagline: string; features: string[] } | null => {
+    const p = plans.find((pp) => pp.key === k);
+    if (!p) return null;
+    return locale === "ar"
+      ? { label: p.labelAr, tagline: p.taglineAr, features: p.featuresAr }
+      : { label: p.labelEn, tagline: p.taglineEn, features: p.featuresEn };
+  };
+
   return (
-    <AppShell title="الاشتراك">
+    <AppShell title={t.title}>
       <div className="max-w-4xl mx-auto space-y-6">
         <header>
-          <h1 className="text-2xl font-bold text-text-primary">الاشتراك</h1>
-          <p className="text-sm text-text-secondary mt-1">
-            إدارة باقتك، الدفع، وسجل الفواتير.
-          </p>
+          <h1 className="text-2xl font-bold text-text-primary">{t.title}</h1>
+          <p className="text-sm text-text-secondary mt-1">{t.subtitle}</p>
         </header>
 
         {!isOwner && (
           <div className="bg-bg-card border border-border rounded-xl p-6 text-center text-text-secondary">
-            هذه الصفحة مخصَّصة لصاحب المتجر فقط.
+            {t.ownerOnly}
           </div>
         )}
 
         {isOwner && loading && (
-          <p className="text-sm text-text-secondary">جاري التحميل…</p>
+          <p className="text-sm text-text-secondary">{t.loading}</p>
         )}
 
         {isOwner && data && (
@@ -135,52 +163,60 @@ export default function BillingPage() {
                   <AlertCircle className="w-5 h-5 text-danger" />
                 )}
                 <span className="font-semibold text-text-primary">
-                  {STATUS_LABEL[data.status] ?? data.status}
+                  {statusLabel(data.status)}
                 </span>
                 <span className="text-text-secondary text-sm">
-                  • {PLANS[data.plan]?.label ?? data.plan}
+                  • {planContent(data.plan)?.label ?? data.plan}
                 </span>
               </div>
               {data.status === "trialing" && (
                 <p className="text-sm text-text-secondary">
-                  متبقي{" "}
-                  <span className="font-bold text-text-primary">
-                    {data.daysLeftInTrial ?? 0}
-                  </span>{" "}
-                  يوم في التجربة المجانية.
+                  {t.statusLine.trialDaysLeft.replace(
+                    "{days}",
+                    String(data.daysLeftInTrial ?? 0),
+                  )}
                 </p>
               )}
               {data.status === "active" && data.currentPeriodEndsAt && (
                 <p className="text-sm text-text-secondary">
-                  التجديد القادم في{" "}
-                  {new Date(data.currentPeriodEndsAt).toLocaleDateString("ar-EG")}.
+                  {t.statusLine.renewalOn.replace(
+                    "{date}",
+                    new Date(data.currentPeriodEndsAt).toLocaleDateString(
+                      dateLocale,
+                    ),
+                  )}
                 </p>
               )}
               {data.status === "past_due" && (
                 <p className="text-sm text-danger">
-                  الدفعة الأخيرة فشلت. أعِد المحاولة لتجنب إيقاف الخدمة.
+                  {t.statusLine.pastDueWarning}
                 </p>
               )}
               {data.status === "cancelled" && data.currentPeriodEndsAt && (
                 <p className="text-sm text-text-secondary">
-                  الخدمة مفعّلة حتى{" "}
-                  {new Date(data.currentPeriodEndsAt).toLocaleDateString("ar-EG")}.
+                  {t.statusLine.cancelledUntil.replace(
+                    "{date}",
+                    new Date(data.currentPeriodEndsAt).toLocaleDateString(
+                      dateLocale,
+                    ),
+                  )}
                 </p>
               )}
               {!data.paymobConfigured && (
                 <p className="text-xs text-text-secondary border-t border-border pt-3">
-                  بوابة الدفع غير مهيأة على هذا الخادم بعد. تواصل معنا للترقية يدوياً
-                  حتى نُكمل التهيئة.
+                  {t.statusLine.paymobNotConfigured}
                 </p>
               )}
             </div>
 
             {/* Plan picker */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {(Object.keys(PLANS) as PlanKey[])
-                .filter((k) => PLANS[k].purchasable || k === "multi_branch")
-                .map((k) => {
-                  const plan = PLANS[k];
+              {plans
+                .filter((p) => p.purchasable || p.key === "multi_branch")
+                .map((plan) => {
+                  const k = plan.key;
+                  const content = planContent(k);
+                  if (!content) return null;
                   const isCurrent = data.plan === k && data.status === "active";
                   return (
                     <div
@@ -189,10 +225,10 @@ export default function BillingPage() {
                     >
                       <div className="mb-3">
                         <h3 className="text-lg font-bold text-text-primary">
-                          {plan.label}
+                          {content.label}
                         </h3>
                         <p className="text-xs text-text-secondary mt-0.5">
-                          {plan.tagline}
+                          {content.tagline}
                         </p>
                       </div>
                       <div className="mb-4">
@@ -200,17 +236,17 @@ export default function BillingPage() {
                           <p className="text-3xl font-extrabold text-accent">
                             {plan.monthlyEgp}{" "}
                             <span className="text-sm font-normal text-text-secondary">
-                              ج / شهر
+                              {t.perMonth}
                             </span>
                           </p>
                         ) : (
                           <p className="text-sm text-text-secondary">
-                            {k === "multi_branch" ? "قريباً" : "—"}
+                            {k === "multi_branch" ? t.comingSoon : t.dash}
                           </p>
                         )}
                       </div>
                       <ul className="space-y-1.5 mb-4 flex-1">
-                        {plan.features.map((f) => (
+                        {content.features.map((f: string) => (
                           <li
                             key={f}
                             className="text-sm text-text-secondary flex items-start gap-2"
@@ -227,7 +263,9 @@ export default function BillingPage() {
                           loading={busy}
                           className="w-full"
                         >
-                          {isCurrent ? "باقتك الحالية" : "اشترك الآن"}
+                          {isCurrent
+                            ? t.actions.currentPlan
+                            : t.actions.subscribeNow}
                         </Button>
                       )}
                     </div>
@@ -250,7 +288,7 @@ export default function BillingPage() {
                   disabled={busy}
                   className="text-sm text-text-secondary hover:text-danger"
                 >
-                  إلغاء الاشتراك
+                  {t.actions.cancelSubscription}
                 </button>
               </div>
             )}
@@ -259,37 +297,49 @@ export default function BillingPage() {
             <div className="bg-bg-card border border-border rounded-2xl">
               <div className="px-5 py-3 border-b border-border flex items-center gap-2">
                 <Receipt className="w-4 h-4 text-text-secondary" />
-                <h3 className="text-sm font-semibold text-text-primary">سجل الدفع</h3>
+                <h3 className="text-sm font-semibold text-text-primary">
+                  {t.history.title}
+                </h3>
               </div>
               {data.history.length === 0 ? (
                 <p className="text-sm text-text-secondary text-center py-8">
-                  لا توجد محاولات دفع بعد.
+                  {t.history.empty}
                 </p>
               ) : (
                 <ul className="divide-y divide-border">
                   {data.history.map((h) => {
+                    const attemptLabel =
+                      (t.attemptStatus as Record<string, string>)[h.status] ??
+                      h.status;
                     const tone =
-                      ATTEMPT_STATUS[h.status] ??
-                      { label: h.status, tone: "bg-bg-main text-text-secondary" };
+                      h.status === "succeeded"
+                        ? "bg-success-light text-success"
+                        : h.status === "failed"
+                          ? "bg-danger-light text-danger"
+                          : h.status === "pending"
+                            ? "bg-orange-100 text-orange-700"
+                            : "bg-bg-main text-text-secondary";
                     return (
                       <li key={h.id} className="px-5 py-3 flex items-center gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span
-                              className={`text-xs px-2 py-0.5 rounded-full ${tone.tone}`}
+                              className={`text-xs px-2 py-0.5 rounded-full ${tone}`}
                             >
-                              {tone.label}
+                              {attemptLabel}
                             </span>
                             <span className="font-medium text-text-primary">
-                              {h.amountEgp} ج
+                              {h.amountEgp} {locale === "ar" ? "ج" : "EGP"}
                             </span>
                           </div>
                           <p className="text-xs text-text-secondary mt-0.5 flex items-center gap-1">
                             <Clock className="w-3 h-3" />
-                            {new Date(h.attemptedAt).toLocaleString("ar-EG")}
+                            {new Date(h.attemptedAt).toLocaleString(dateLocale)}
                           </p>
                           {h.failureReason && (
-                            <p className="text-xs text-danger mt-1">{h.failureReason}</p>
+                            <p className="text-xs text-danger mt-1">
+                              {h.failureReason}
+                            </p>
                           )}
                         </div>
                       </li>

@@ -130,7 +130,7 @@ export function SalesTableRow({
           {!sale.isReturned && (
             <button
               onClick={() => onPrint(sale)}
-              className="p-1.5 bg-accent-light text-accent rounded-lg hover:bg-accent hover:text-white border border-accent/20"
+              className="p-1.5 rounded-lg text-accent hover:opacity-70 transition-opacity"
               title={t.actions.print}
             >
               <Printer className="w-4 h-4" />
@@ -140,7 +140,7 @@ export function SalesTableRow({
           <button
             onClick={() => onEdit(sale)}
             disabled={sale.isReturned}
-            className="p-1.5 bg-gray-100 text-text-secondary rounded-lg hover:bg-gray-200 disabled:opacity-40"
+            className="p-1.5 rounded-lg text-text-secondary hover:opacity-70 disabled:opacity-30 transition-opacity"
             title={t.actions.edit}
           >
             <Pencil className="w-4 h-4" />
@@ -148,14 +148,14 @@ export function SalesTableRow({
           <button
             onClick={() => onReturn(sale)}
             disabled={sale.isReturned}
-            className="p-1.5 bg-danger-light text-danger rounded-lg hover:bg-danger hover:text-white disabled:opacity-40 border border-danger/20"
+            className="p-1.5 rounded-lg text-danger hover:opacity-70 disabled:opacity-30 transition-opacity"
             title={t.actions.return}
           >
             <RotateCcw className="w-4 h-4" />
           </button>
           <button
             onClick={() => onVoid(sale)}
-            className="p-1.5 bg-gray-100 text-text-secondary rounded-lg hover:bg-danger hover:text-white"
+            className="p-1.5 rounded-lg text-text-secondary hover:text-danger hover:opacity-90 transition-colors"
             title={t.actions.void}
           >
             <Trash2 className="w-4 h-4" />

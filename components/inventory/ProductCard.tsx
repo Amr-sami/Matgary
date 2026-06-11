@@ -153,28 +153,28 @@ export function ProductCard({
         <button
           onClick={() => onSell(product)}
           disabled={isOutOfStock}
-          className="flex-1 flex items-center justify-center gap-2 py-2 bg-success-light text-success rounded-lg disabled:opacity-50"
+          className="flex-1 flex items-center justify-center gap-2 py-2 text-success disabled:opacity-50 active:opacity-70 transition-opacity"
         >
           <ShoppingCart className="w-4 h-4" />
           <span className="text-sm">{t.sellAction}</span>
         </button>
         <button
           onClick={() => onEdit(product)}
-          className="flex-1 flex items-center justify-center gap-2 py-2 bg-accent-light text-accent rounded-lg"
+          className="flex-1 flex items-center justify-center gap-2 py-2 text-accent active:opacity-70 transition-opacity"
         >
           <Pencil className="w-4 h-4" />
           <span className="text-sm">{t.editAction}</span>
         </button>
         <button
           onClick={() => onHistory(product)}
-          className="p-2 bg-gray-100 text-text-secondary rounded-lg"
+          className="p-2 text-text-secondary active:opacity-70 transition-opacity"
           title={t.historyTitle}
         >
           <History className="w-4 h-4" />
         </button>
         <button
           onClick={() => onDelete(product)}
-          className="p-2 bg-danger-light text-danger rounded-lg"
+          className="p-2 text-danger active:opacity-70 transition-opacity"
           title={tActions.delete}
         >
           <Trash2 className="w-4 h-4" />

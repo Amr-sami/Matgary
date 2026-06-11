@@ -53,7 +53,56 @@ export interface ShopSettingsDto {
   receiptFooterText: string;
   receiptLanguage: ReceiptLanguage;
   receiptShowLoyalty: boolean;
+  /** Receipt designer (added 0029). Owner uploads a logo + reorders blocks
+   *  + picks a font from the trio already loaded by app/layout. */
+  receiptLogoUrl: string;
+  receiptBlockOrder: ReceiptBlockKey[];
+  receiptFontFamily: ReceiptFontFamily;
+  receiptCustomBlocks: Record<string, ReceiptCustomBlock>;
 }
+
+export type ReceiptFixedBlock =
+  | "logo"
+  | "shopInfo"
+  | "purchaseDate"
+  | "items"
+  | "totals"
+  | "loyalty"
+  | "footer";
+export type ReceiptBlockKey = ReceiptFixedBlock | `custom:${string}`;
+export const RECEIPT_FIXED_BLOCKS: readonly ReceiptFixedBlock[] = [
+  "logo",
+  "shopInfo",
+  "purchaseDate",
+  "items",
+  "totals",
+  "loyalty",
+  "footer",
+];
+export const DEFAULT_RECEIPT_BLOCK_ORDER: ReceiptBlockKey[] = [
+  "logo",
+  "shopInfo",
+  "purchaseDate",
+  "items",
+  "totals",
+  "loyalty",
+  "footer",
+];
+export type ReceiptBlockAlign = "right" | "center" | "left";
+export interface ReceiptCustomBlock {
+  text: string;
+  align: ReceiptBlockAlign;
+}
+const CUSTOM_BLOCK_TEXT_MAX = 500;
+const CUSTOM_BLOCK_ID_RE = /^[a-z0-9]{6,32}$/;
+
+export type ReceiptFontFamily = "cairo" | "tajawal" | "lemonada";
+export const RECEIPT_FONT_FAMILIES: readonly ReceiptFontFamily[] = [
+  "cairo",
+  "tajawal",
+  "lemonada",
+];
+const LOGO_DATA_URI_MAX = 256 * 1024; // ~256 KB after base64 — comfortable for thermal logos.
 
 export type ReceiptLogoSize = "hidden" | "small" | "medium" | "large";
 export const RECEIPT_LOGO_SIZES: readonly ReceiptLogoSize[] = [
@@ -82,6 +131,71 @@ function clampLanguage(v: unknown): ReceiptLanguage {
     ? (v as ReceiptLanguage)
     : "ar";
 }
+function clampFontFamily(v: unknown): ReceiptFontFamily {
+  return RECEIPT_FONT_FAMILIES.includes(v as ReceiptFontFamily)
+    ? (v as ReceiptFontFamily)
+    : "cairo";
+}
+function isFixedBlock(s: string): s is ReceiptFixedBlock {
+  return (RECEIPT_FIXED_BLOCKS as readonly string[]).includes(s);
+}
+function isCustomRef(s: string): s is `custom:${string}` {
+  return s.startsWith("custom:") && CUSTOM_BLOCK_ID_RE.test(s.slice(7));
+}
+/** Accept fixed block keys + "custom:<id>" references. Dedupe, drop unknown
+ *  fixed keys, drop custom refs whose id doesn't match the existing custom
+ *  block map. Hidden fixed blocks: any fixed block NOT in the stored array
+ *  is treated as hidden — we no longer force-append the defaults the way 0029
+ *  did, so the owner can actually remove blocks from the receipt. */
+function normalizeBlockOrder(
+  v: unknown,
+  knownCustomIds: ReadonlySet<string>,
+): ReceiptBlockKey[] {
+  if (!Array.isArray(v)) return [...DEFAULT_RECEIPT_BLOCK_ORDER];
+  const seen = new Set<string>();
+  const out: ReceiptBlockKey[] = [];
+  for (const raw of v) {
+    if (typeof raw !== "string" || seen.has(raw)) continue;
+    if (isFixedBlock(raw)) {
+      seen.add(raw);
+      out.push(raw);
+    } else if (isCustomRef(raw) && knownCustomIds.has(raw.slice(7))) {
+      seen.add(raw);
+      out.push(raw);
+    }
+  }
+  return out;
+}
+function clampAlign(v: unknown): ReceiptBlockAlign {
+  return v === "right" || v === "center" || v === "left" ? v : "center";
+}
+function normalizeCustomBlocks(
+  v: unknown,
+): Record<string, ReceiptCustomBlock> {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return {};
+  const out: Record<string, ReceiptCustomBlock> = {};
+  for (const [id, raw] of Object.entries(v as Record<string, unknown>)) {
+    if (!CUSTOM_BLOCK_ID_RE.test(id)) continue;
+    if (!raw || typeof raw !== "object") continue;
+    const r = raw as { text?: unknown; align?: unknown };
+    if (typeof r.text !== "string") continue;
+    out[id] = {
+      text: r.text.replace(/\r/g, "").slice(0, CUSTOM_BLOCK_TEXT_MAX),
+      align: clampAlign(r.align),
+    };
+  }
+  return out;
+}
+/** Strip everything except a small allowlist of image data URIs. Returning
+ *  empty string is the "no custom logo" signal — receipt falls back to the
+ *  static /logo.png so the visual default stays the same as before. */
+export function sanitizeLogoDataUri(v: unknown): string {
+  if (typeof v !== "string" || v.length === 0) return "";
+  if (v.length > LOGO_DATA_URI_MAX) return "";
+  if (!/^data:image\/(png|jpe?g|webp|svg\+xml);base64,[A-Za-z0-9+/=]+$/.test(v))
+    return "";
+  return v;
+}
 
 export const DEFAULT_DTO: ShopSettingsDto = {
   shopName: "",
@@ -106,6 +220,10 @@ export const DEFAULT_DTO: ShopSettingsDto = {
   receiptFooterText: "",
   receiptLanguage: "ar",
   receiptShowLoyalty: true,
+  receiptLogoUrl: "",
+  receiptBlockOrder: DEFAULT_RECEIPT_BLOCK_ORDER,
+  receiptFontFamily: "cairo",
+  receiptCustomBlocks: {},
 };
 
 /** Load settings for the UI — never exposes the raw Green API token. */
@@ -152,6 +270,13 @@ export async function getShopSettings(
         receiptFooterText: row.receiptFooterText ?? "",
         receiptLanguage: clampLanguage(row.receiptLanguage),
         receiptShowLoyalty: row.receiptShowLoyalty,
+        receiptLogoUrl: row.logoPath ?? "",
+        receiptCustomBlocks: normalizeCustomBlocks(row.receiptCustomBlocks),
+        receiptBlockOrder: normalizeBlockOrder(
+          row.receiptBlockOrder,
+          new Set(Object.keys(normalizeCustomBlocks(row.receiptCustomBlocks))),
+        ),
+        receiptFontFamily: clampFontFamily(row.receiptFontFamily),
       };
     }),
   );
@@ -312,6 +437,46 @@ export async function saveShopSettings(
       set.receiptLanguage = clampLanguage(patch.receiptLanguage);
     if (patch.receiptShowLoyalty !== undefined)
       set.receiptShowLoyalty = !!patch.receiptShowLoyalty;
+    if (patch.receiptLogoUrl !== undefined) {
+      // Empty string clears the column → receipt falls back to the bundled
+      // /logo.png. Anything else has to pass the data-URI sanitiser; bad
+      // values are dropped silently to avoid a 500 from a malformed paste.
+      const clean = sanitizeLogoDataUri(patch.receiptLogoUrl);
+      set.logoPath = clean.length > 0 ? clean : null;
+    }
+    // Custom blocks must be written FIRST so the block-order normaliser can
+    // see the new IDs in the same transaction. If both fields are present,
+    // we use the incoming custom-block map directly; otherwise we look up
+    // the stored set so the normaliser still validates "custom:<id>" refs.
+    let knownCustomIds: Set<string> | null = null;
+    if (patch.receiptCustomBlocks !== undefined) {
+      const normalised = normalizeCustomBlocks(patch.receiptCustomBlocks);
+      set.receiptCustomBlocks = normalised;
+      knownCustomIds = new Set(Object.keys(normalised));
+    }
+    if (patch.receiptBlockOrder !== undefined) {
+      if (!knownCustomIds) {
+        const [row] = await tx
+          .select({ blocks: shopSettings.receiptCustomBlocks })
+          .from(shopSettings)
+          .where(
+            and(
+              eq(shopSettings.tenantId, tenantId),
+              eq(shopSettings.branchId, branchId),
+            ),
+          )
+          .limit(1);
+        knownCustomIds = new Set(
+          Object.keys(normalizeCustomBlocks(row?.blocks ?? {})),
+        );
+      }
+      set.receiptBlockOrder = normalizeBlockOrder(
+        patch.receiptBlockOrder,
+        knownCustomIds,
+      );
+    }
+    if (patch.receiptFontFamily !== undefined)
+      set.receiptFontFamily = clampFontFamily(patch.receiptFontFamily);
 
     await tx
       .update(shopSettings)

@@ -100,6 +100,10 @@ export const tenants = pgTable(
      *  + middleware show a banner with the countdown; the cron sidecar
      *  enforces the cutoff. */
     deletionScheduledAt: timestamp("deletion_scheduled_at", { withTimezone: true }),
+    /** Platform admin Spec 03 — non-null = tenant is suspended, all user
+     *  requests get bounced to /service-paused. */
+    suspendedAt: timestamp("suspended_at", { withTimezone: true }),
+    suspendedReason: text("suspended_reason"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .default(sql`now()`),
@@ -264,6 +268,17 @@ export const shopSettings = pgTable(
       .$type<Record<string, { text: string; align: "right" | "center" | "left" }>>()
       .notNull()
       .default({}),
+    /** Cash drawer reconciliation (migration 0032). When enabled, every cash
+     *  sale/expense requires an open shift; close-shift wizard surfaces the
+     *  Z-report. Defaults to off so existing tenants aren't blocked at upgrade. */
+    cashReconciliationEnabled: boolean("cash_reconciliation_enabled")
+      .notNull()
+      .default(false),
+    /** Variance threshold (EGP) at which the close-shift wizard makes the
+     *  closing note mandatory. Default 50. */
+    cashVarianceNoteThreshold: text("cash_variance_note_threshold")
+      .notNull()
+      .default("50"),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .default(sql`now()`),
@@ -567,8 +582,21 @@ export const sales = pgTable(
     paymentMethod: text("payment_method"), // 'cash' | 'instapay' | 'card' | 'deferred'
     isPaid: boolean("is_paid").notNull().default(true),
     paidAt: timestamp("paid_at", { withTimezone: true }),
+    /** Running total paid against this sale. For non-deferred sales it
+     *  always equals total_price. For deferred sales it starts at the
+     *  amount the customer paid at the counter (often 0) and grows as
+     *  later settlements come in. Outstanding balance = total_price -
+     *  amount_paid. Migration 0037. */
+    amountPaid: text("amount_paid").notNull().default("0"),
+    /** Timestamp of the most-recent partial payment (i.e. a payment that
+     *  did NOT fully settle the row). Null when the sale is paid in full
+     *  or has never received a payment. Migration 0037. */
+    partialPaidAt: timestamp("partial_paid_at", { withTimezone: true }),
     /** The user (cashier or owner) who recorded this sale. Null on legacy rows. */
     recordedByUserId: uuid("recorded_by_user_id"),
+    /** Cash drawer shift this sale was recorded on. Null on non-cash sales,
+     *  legacy rows, or when reconciliation isn't enabled for the branch. */
+    cashShiftId: uuid("cash_shift_id"),
   },
   (t) => [
     index("sales_tenant_date_idx").on(t.tenantId, t.saleDate),
@@ -577,6 +605,35 @@ export const sales = pgTable(
     index("sales_tenant_product_idx").on(t.tenantId, t.productId),
     index("sales_tenant_recorded_by_idx").on(t.tenantId, t.recordedByUserId),
     index("sales_tenant_branch_date_idx").on(t.tenantId, t.branchId, t.saleDate),
+  ],
+);
+
+/** Migration 0038. Every individual payment event recorded against a sale
+ *  row. Multiple rows per sale = the payment timeline (initial down-payment
+ *  + later settlements). `method = 'initial'` flags rows back-filled from
+ *  pre-0038 data (one row per existing sale with amount_paid > 0). */
+export const salePayments = pgTable(
+  "sale_payments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id").notNull(),
+    saleId: uuid("sale_id").notNull(),
+    amount: text("amount").notNull(),
+    /** 'cash' | 'instapay' | 'card' | 'initial' (back-fill). */
+    method: text("method").notNull(),
+    recordedAt: timestamp("recorded_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    /** SET NULL on user delete so the timeline survives staff removal. */
+    recordedByUserId: uuid("recorded_by_user_id"),
+    /** When this payment was collected on an active cash shift. Links the
+     *  customer-settlement to the same shift's cash drawer for Z-report. */
+    cashShiftId: uuid("cash_shift_id"),
+    note: text("note"),
+  },
+  (t) => [
+    index("sale_payments_sale_idx").on(t.saleId, t.recordedAt),
+    index("sale_payments_tenant_date_idx").on(t.tenantId, t.recordedAt),
   ],
 );
 
@@ -597,6 +654,9 @@ export const returns = pgTable(
       .notNull()
       .default(sql`now()`),
     reason: text("reason"),
+    /** Cash drawer shift the cash refund was paid from. Null when the
+     *  original sale wasn't cash, or reconciliation isn't enabled. */
+    cashShiftId: uuid("cash_shift_id"),
   },
   (t) => [index("returns_tenant_date_idx").on(t.tenantId, t.returnDate)],
 );
@@ -630,6 +690,9 @@ export const expenses = pgTable(
       .notNull()
       .default(sql`now()`),
     note: text("note"),
+    /** Cash drawer shift this expense was paid from. Set only for
+     *  cash-paid expenses recorded while a shift is open. */
+    cashShiftId: uuid("cash_shift_id"),
   },
   (t) => [
     index("expenses_tenant_date_idx").on(t.tenantId, t.date),
@@ -811,6 +874,179 @@ export const purchaseOrderItemsRelations = relations(purchaseOrderItems, ({ one 
     references: [products.id],
   }),
 }));
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cash drawer reconciliation (scoped) — RLS applied in a separate migration step
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const cashShifts = pgTable(
+  "cash_shifts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branches.id, { onDelete: "restrict" }),
+    cashierUserId: uuid("cashier_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    /** 'open' | 'closed' | 'reviewed' */
+    status: text("status").notNull().default("open"),
+    openedAt: timestamp("opened_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    openedByUserId: uuid("opened_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    openingFloat: text("opening_float").notNull().default("0"),
+    openingNote: text("opening_note"),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    closedByUserId: uuid("closed_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    expectedCash: text("expected_cash"),
+    countedCash: text("counted_cash"),
+    /** Generated column: counted - expected. Read-only from app side. */
+    variance: text("variance"),
+    closingNote: text("closing_note"),
+    /** 'cashier' | 'auto_midnight' | 'forced' */
+    closeReason: text("close_reason"),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    reviewedByUserId: uuid("reviewed_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    reviewNote: text("review_note"),
+    /** Frozen Z-report snapshot — see lib/repo/cash-shifts.ts for the shape. */
+    totalsSnapshot: jsonb("totals_snapshot").$type<Record<string, unknown> | null>(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [
+    index("cash_shifts_tenant_branch_date_idx").on(t.tenantId, t.branchId, t.openedAt),
+    index("cash_shifts_tenant_cashier_idx").on(t.tenantId, t.cashierUserId, t.openedAt),
+    // Partial unique + review-queue indexes are enforced in the SQL migration.
+  ],
+);
+
+export const cashMovements = pgTable(
+  "cash_movements",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    shiftId: uuid("shift_id")
+      .notNull()
+      .references(() => cashShifts.id, { onDelete: "cascade" }),
+    /** 'cash_in' | 'cash_out' | 'paid_in' | 'paid_out' */
+    kind: text("kind").notNull(),
+    amount: text("amount").notNull(),
+    reason: text("reason").notNull(),
+    recordedByUserId: uuid("recorded_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    recordedAt: timestamp("recorded_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [
+    index("cash_movements_shift_idx").on(t.shiftId, t.recordedAt),
+    index("cash_movements_tenant_idx").on(t.tenantId, t.recordedAt),
+  ],
+);
+
+export const cashShiftsRelations = relations(cashShifts, ({ many, one }) => ({
+  movements: many(cashMovements),
+  cashier: one(users, {
+    fields: [cashShifts.cashierUserId],
+    references: [users.id],
+  }),
+}));
+
+export const cashMovementsRelations = relations(cashMovements, ({ one }) => ({
+  shift: one(cashShifts, {
+    fields: [cashMovements.shiftId],
+    references: [cashShifts.id],
+  }),
+}));
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Daily owner digest (scoped) — RLS applied in a separate migration step
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface DigestExtraRecipient {
+  name: string;
+  phone?: string | null;
+  email?: string | null;
+  locale?: "ar" | "en" | null;
+}
+
+export const digestSettings = pgTable("digest_settings", {
+  tenantId: uuid("tenant_id")
+    .primaryKey()
+    .references(() => tenants.id, { onDelete: "cascade" }),
+  enabled: boolean("enabled").notNull().default(false),
+  /** Hour (0-23) in tenant-local tz. 0 = midnight end-of-day digest. */
+  digestHour: integer("digest_hour").notNull().default(0),
+  /** Where the digest goes. Deliberately separate from receipt-sending
+   *  WhatsApp credentials and from tenant_members.phone — the owner may
+   *  want to use their personal WhatsApp without touching either. */
+  ownerPhone: text("owner_phone"),
+  sendOnEmpty: boolean("send_on_empty").notNull().default(false),
+  emailFallback: boolean("email_fallback").notNull().default(true),
+  extraRecipients: jsonb("extra_recipients")
+    .$type<DigestExtraRecipient[]>()
+    .notNull()
+    .default([]),
+  managersSubscribed: uuid("managers_subscribed")
+    .array()
+    .notNull()
+    .default(sql`'{}'::uuid[]`),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now()`),
+});
+
+export const digestRuns = pgTable(
+  "digest_runs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branches.id, { onDelete: "cascade" }),
+    businessDate: text("business_date").notNull(),
+    recipientUserId: uuid("recipient_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    recipientPhone: text("recipient_phone"),
+    recipientEmail: text("recipient_email"),
+    /** 'whatsapp' | 'email' | 'email_fallback' */
+    channel: text("channel").notNull(),
+    /** 'pending' | 'sent' | 'failed' | 'skipped_empty' | 'skipped_no_channel' */
+    status: text("status").notNull().default("pending"),
+    error: text("error"),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+    messageText: text("message_text"),
+    whatsappMessageId: text("whatsapp_message_id"),
+    enqueuedAt: timestamp("enqueued_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("digest_runs_tenant_date_idx").on(t.tenantId, t.businessDate),
+    // Idempotency unique indexes live in the SQL migration (partial indexes).
+  ],
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Attendance & payroll (scoped) — RLS applied in a separate migration step
@@ -1704,3 +1940,152 @@ export type NewWaConversation = typeof waConversations.$inferInsert;
 export type WaTemplateRow = typeof waTemplates.$inferSelect;
 export type NewWaTemplate = typeof waTemplates.$inferInsert;
 export type PayrollPeriodRow = typeof payrollPeriods.$inferSelect;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Platform admin (godmode) — see docs/specs/platform-admin-dashboard.md.
+//
+// These tables sit OUTSIDE the tenant RLS model. They have no tenant_id;
+// access is enforced at the application layer via the admin session cookie
+// + the matgary_admin DB role (BYPASSRLS). Tenant-facing code must never
+// import from lib/admin/* (ESLint rule guards this).
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const admins = pgTable("admins", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  // citext at the DB level; Drizzle treats it as text for the TS surface.
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  displayName: text("display_name"),
+  /** 'super_admin' | 'ops_admin' */
+  role: text("role").notNull().default("ops_admin"),
+  mustRotate: boolean("must_rotate").notNull().default(false),
+  totpSecret: text("totp_secret"),
+  totpEnabledAt: timestamp("totp_enabled_at", { withTimezone: true }),
+  lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+  lastLoginIp: text("last_login_ip"),
+  failedAttempts: integer("failed_attempts").notNull().default(0),
+  lockedUntil: timestamp("locked_until", { withTimezone: true }),
+  disabledAt: timestamp("disabled_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now()`),
+  createdByAdminId: uuid("created_by_admin_id"),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now()`),
+});
+
+export const adminSessions = pgTable(
+  "admin_sessions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    adminId: uuid("admin_id")
+      .notNull()
+      .references(() => admins.id, { onDelete: "cascade" }),
+    sessionToken: text("session_token").notNull().unique(),
+    ip: text("ip"),
+    userAgent: text("user_agent"),
+    /** Reserved for Spec 07 (impersonation). NULL = normal admin browsing. */
+    impersonatingTenantId: uuid("impersonating_tenant_id"),
+    impersonatingUserId: uuid("impersonating_user_id"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    index("admin_sessions_admin_idx").on(t.adminId),
+    index("admin_sessions_token_idx").on(t.sessionToken),
+  ],
+);
+
+export const adminPasswordHistory = pgTable(
+  "admin_password_history",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    adminId: uuid("admin_id")
+      .notNull()
+      .references(() => admins.id, { onDelete: "cascade" }),
+    passwordHash: text("password_hash").notNull(),
+    changedAt: timestamp("changed_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [index("admin_pw_history_admin_idx").on(t.adminId, t.changedAt)],
+);
+
+export const adminAuditLog = pgTable(
+  "admin_audit_log",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    // Nullable + SET NULL (migration 0035) so a hard-deleted admin's
+    // historical audit rows survive with admin_id=null. The UI renders
+    // "(deleted)" when the join to admins returns no row.
+    adminId: uuid("admin_id").references(() => admins.id, {
+      onDelete: "set null",
+    }),
+    action: text("action").notNull(),
+    targetKind: text("target_kind"),
+    targetId: uuid("target_id"),
+    ip: text("ip"),
+    userAgent: text("user_agent"),
+    beforeJsonb: jsonb("before_jsonb"),
+    afterJsonb: jsonb("after_jsonb"),
+    occurredAt: timestamp("occurred_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [
+    index("admin_audit_admin_time_idx").on(t.adminId, t.occurredAt),
+    index("admin_audit_target_idx").on(t.targetKind, t.targetId),
+  ],
+);
+
+// For Spec 04. Created in 0034 so the schema only changes once.
+export const platformPlans = pgTable("platform_plans", {
+  key: text("key").primaryKey(),
+  labelAr: text("label_ar").notNull(),
+  labelEn: text("label_en").notNull(),
+  taglineAr: text("tagline_ar").notNull(),
+  taglineEn: text("tagline_en").notNull(),
+  monthlyEgp: integer("monthly_egp").notNull().default(0),
+  purchasable: boolean("purchasable").notNull().default(false),
+  featuresAr: text("features_ar").array().notNull().default(sql`'{}'::text[]`),
+  featuresEn: text("features_en").array().notNull().default(sql`'{}'::text[]`),
+  sortOrder: integer("sort_order").notNull().default(0),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now()`),
+  updatedByAdminId: uuid("updated_by_admin_id"),
+});
+
+// For Spec 06. Created in 0034 so the schema only changes once.
+export const platformBroadcasts = pgTable("platform_broadcasts", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  titleAr: text("title_ar").notNull(),
+  titleEn: text("title_en").notNull(),
+  bodyAr: text("body_ar"),
+  bodyEn: text("body_en"),
+  /** 'info' | 'warning' | 'critical' */
+  severity: text("severity").notNull().default("info"),
+  /** 'all' | 'owners' | 'staff' */
+  audience: text("audience").notNull().default("all"),
+  startsAt: timestamp("starts_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now()`),
+  endsAt: timestamp("ends_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now()`),
+  createdByAdminId: uuid("created_by_admin_id"),
+});
+
+export type AdminRow = typeof admins.$inferSelect;
+export type NewAdmin = typeof admins.$inferInsert;
+export type AdminSessionRow = typeof adminSessions.$inferSelect;
+export type AdminAuditLogRow = typeof adminAuditLog.$inferSelect;
+export type PlatformPlanRow = typeof platformPlans.$inferSelect;
+export type PlatformBroadcastRow = typeof platformBroadcasts.$inferSelect;

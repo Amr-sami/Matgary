@@ -10,9 +10,13 @@ interface ModalProps {
   title: string;
   children: React.ReactNode;
   className?: string;
+  /** Hide the built-in title bar + close button so the caller can render
+   *  its own header inside `children` (e.g. a colored severity strip). The
+   *  caller is then responsible for surfacing a close affordance. */
+  hideHeader?: boolean;
 }
 
-export function Modal({ isOpen, onClose, title, children, className }: ModalProps) {
+export function Modal({ isOpen, onClose, title, children, className, hideHeader }: ModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -51,17 +55,26 @@ export function Modal({ isOpen, onClose, title, children, className }: ModalProp
         role="dialog"
         aria-modal="true"
       >
-        <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
-          <h2 className="text-lg font-bold">{title}</h2>
-          <button
-            onClick={onClose}
-            className="p-1 rounded-lg hover:bg-gray-100 transition-colors"
-            aria-label="إغلاق"
-          >
-            <X className="w-5 h-5" />
-          </button>
+        {!hideHeader && (
+          <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
+            <h2 className="text-lg font-bold">{title}</h2>
+            <button
+              onClick={onClose}
+              className="p-1 rounded-lg hover:bg-gray-100 transition-colors"
+              aria-label="إغلاق"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        )}
+        <div
+          className={cn(
+            "overflow-y-auto flex-1 min-h-0",
+            hideHeader ? "" : "p-4",
+          )}
+        >
+          {children}
         </div>
-        <div className="p-4 overflow-y-auto flex-1 min-h-0">{children}</div>
       </div>
     </div>
   );

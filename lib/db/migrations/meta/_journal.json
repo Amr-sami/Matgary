@@ -225,6 +225,55 @@
       "when": 1780500000000,
       "tag": "0031_user_locale",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1780600000000,
+      "tag": "0032_cash_shifts",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1780700000000,
+      "tag": "0033_daily_digest",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1780800000000,
+      "tag": "0034_platform_admin",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1780900000000,
+      "tag": "0035_admin_audit_fk_set_null",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1781000000000,
+      "tag": "0036_admin_audit_search",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1781100000000,
+      "tag": "0037_sales_partial_payments",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1781200000000,
+      "tag": "0038_sale_payments",
+      "breakpoints": true
     }
   ]
 }

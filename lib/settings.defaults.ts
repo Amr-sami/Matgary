@@ -1,10 +1,12 @@
-// Default WhatsApp message template — copied verbatim from the existing
-// lib/settings.ts so a fresh tenant has the same messaging UX as Corner Store.
-export const DEFAULT_MESSAGE_TEMPLATE = `مرحباً {{customer_name}} 👋
+// Default WhatsApp message template. Placeholder syntax must match the
+// substitute() function in lib/settings.ts — `{camelCase}`, single braces.
+// Previous version used `{{snake_case}}` which never matched, so the live
+// preview at /settings rendered the raw template unchanged.
+export const DEFAULT_MESSAGE_TEMPLATE = `مرحباً {customerName} 👋
 
-شكراً لتسوقك من {{shop_name}}.
-رقم الفاتورة: {{invoice_id}}
-الإجمالي: {{total}}
+شكراً لتسوقك من {shopName}.
+رقم الفاتورة: {invoiceId}
+الإجمالي: {totalPrice}
 
 لمراجعة الفاتورة الإلكترونية:
-{{receipt_link}}`;
+{receiptLink}`;

@@ -14,7 +14,7 @@ interface Props {
 }
 
 export function UserMenu({ collapsed }: Props) {
-  const { data: session } = useSession();
+  const { data: session, update: updateSession } = useSession();
   const dict = useDictionary();
   const activeLocale = useLocale();
   const t = dict.app.shell.userMenu;
@@ -62,6 +62,11 @@ export function UserMenu({ collapsed }: Props) {
         setSwitching(null);
         return;
       }
+      // Re-encode the JWT cookie with the fresh locale BEFORE reloading.
+      // Without this, the middleware reads the old `locale` claim from the
+      // stale JWT cookie on the reload and serves the page in the previous
+      // language — the user has to switch twice to actually flip.
+      await updateSession();
       // Full reload so the root layout + every RSC re-renders with the new
       // locale + dictionary + <html lang/dir>. Soft nav would leave the
       // shell in the old language until the next hard refresh.

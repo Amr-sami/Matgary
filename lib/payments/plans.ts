@@ -62,7 +62,7 @@ export const PLANS: Record<PlanKey, PlanDefinition> = {
 };
 
 /** TTL for the trial that ships with every fresh signup. */
-export const TRIAL_DAYS = 14;
+export const TRIAL_DAYS = 30;
 
 /** Days a tenant remains usable after a payment fails before we lock them out. */
 export const PAYMENT_GRACE_DAYS = 7;

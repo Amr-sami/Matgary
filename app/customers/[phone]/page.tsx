@@ -24,6 +24,7 @@ import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useShopSettings } from "@/hooks/useShopSettings";
 import { formatPrice, formatDate } from "@/lib/utils";
+import { InvoiceSettleModal } from "@/components/customers/InvoiceSettleModal";
 
 // Customer ledger detail. Lives at /customers/<urlencoded-phone>. Shows:
 //   - header: name, phone, outstanding (red if > 0), lifetime, last visit
@@ -39,6 +40,10 @@ interface LedgerInvoice {
   saleIds: string[];
   date: string;
   total: number;
+  /** Migration 0037: cash collected against this invoice (may be 0 ≤ x ≤ total). */
+  amountPaid: number;
+  /** total − amountPaid. Server pre-computes so the UI doesn't subtract. */
+  balance: number;
   isPaid: boolean;
   paidAt: string | null;
   paymentMethod: string | null;
@@ -96,6 +101,19 @@ interface WalletData {
   updatedAt: string;
 }
 
+/** Migration 0038. One payment-event row per settle action recorded
+ *  against this customer's sales in the active branch. Grouped by
+ *  invoiceId in the UI to render a per-invoice timeline. */
+interface PaymentEvent {
+  id: string;
+  saleId: string;
+  invoiceId: string | null;
+  amount: number;
+  method: string;
+  recordedAt: string;
+  recordedByName: string | null;
+}
+
 export default function CustomerDetailPage({
   params,
 }: {
@@ -115,9 +133,12 @@ export default function CustomerDetailPage({
   const [branchName, setBranchName] = useState<string>("");
   const [wallet, setWallet] = useState<WalletData | null>(null);
   const [walletEvents, setWalletEvents] = useState<WalletEvent[]>([]);
+  const [payments, setPayments] = useState<PaymentEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /** When non-null the InvoiceSettleModal is open against this invoice. */
+  const [settleInvoice, setSettleInvoice] = useState<LedgerInvoice | null>(null);
   const [toast, setToast] = useState<{
     type: "success" | "error";
     message: string;
@@ -137,9 +158,10 @@ export default function CustomerDetailPage({
       // and the page renders both. Wallet is best-effort (404 just means
       // no transactions yet).
       const encoded = encodeURIComponent(decodedPhone);
-      const [ledgerRes, walletRes] = await Promise.all([
+      const [ledgerRes, walletRes, paymentsRes] = await Promise.all([
         fetch(`/api/customers/by-phone/${encoded}`, { cache: "no-store" }),
         fetch(`/api/customers/by-phone/${encoded}/wallet`, { cache: "no-store" }),
+        fetch(`/api/customers/by-phone/${encoded}/payments`, { cache: "no-store" }),
       ]);
       if (ledgerRes.status === 404) {
         setErr("لا توجد فواتير لهذا العميل في الفرع الحالي.");
@@ -160,6 +182,12 @@ export default function CustomerDetailPage({
         setWallet(json.wallet);
         setWalletEvents(json.events);
       }
+      if (paymentsRes.ok) {
+        const json = (await paymentsRes.json()) as { data: PaymentEvent[] };
+        setPayments(json.data ?? []);
+      } else {
+        setPayments([]);
+      }
     } catch (e) {
       setErr(e instanceof Error ? e.message : "حدث خطأ");
       setLedger(null);
@@ -172,6 +200,26 @@ export default function CustomerDetailPage({
     refresh();
   }, [refresh]);
 
+  // Bucket the flat payments list by invoiceId so the per-invoice card
+  // can render its own timeline without the page doing the filter on
+  // every render. Falls back to saleId for legacy rows without a real
+  // invoice id. Sorted newest-first inside each bucket.
+  const paymentsByInvoice = useMemo(() => {
+    const map = new Map<string, PaymentEvent[]>();
+    for (const p of payments) {
+      const key = p.invoiceId ?? p.saleId;
+      const arr = map.get(key) ?? [];
+      arr.push(p);
+      map.set(key, arr);
+    }
+    return map;
+  }, [payments]);
+
+  // Unused now that the per-invoice modal handles partial collection,
+  // but kept as the implementation behind a quick "pay the rest in cash"
+  // shortcut if we want to add it back later. The bulk "تأكيد دفع الكل"
+  // button uses the dedicated bulk endpoint instead.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const markInvoicePaid = async (inv: LedgerInvoice) => {
     setBusy(true);
     try {
@@ -633,9 +681,16 @@ export default function CustomerDetailPage({
                       <span className="font-mono text-sm text-text-primary">
                         {inv.invoiceId}
                       </span>
+                      {/* Three-state chip — fully paid / partial / fully on
+                          account. The middle case is the new partial-pay
+                          flow (e.g. customer paid 1000 of 1300). */}
                       {inv.isPaid ? (
                         <span className="text-[10px] px-2 py-0.5 rounded-full bg-success-light text-success font-medium">
                           مدفوع
+                        </span>
+                      ) : inv.amountPaid > 0 ? (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-medium">
+                          جزئي
                         </span>
                       ) : (
                         <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium">
@@ -668,9 +723,23 @@ export default function CustomerDetailPage({
                     </ul>
                   </div>
                   <div className="text-end shrink-0">
+                    {/* Layout: total at the top (always shown), with a
+                        compact "Paid / Remaining" pair below when the
+                        invoice is partial-paid. Fully-paid and fully-
+                        unpaid invoices stay clean — no extra noise. */}
                     <p className="text-lg font-bold text-text-primary tabular-nums">
                       {formatPrice(inv.total)}
                     </p>
+                    {!inv.isPaid && inv.amountPaid > 0 && (
+                      <div className="mt-1 text-[11px] leading-tight space-y-0.5">
+                        <p className="text-success tabular-nums">
+                          مدفوع: {formatPrice(inv.amountPaid)}
+                        </p>
+                        <p className="font-semibold text-orange-700 tabular-nums">
+                          متبقي: {formatPrice(inv.balance)}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -678,12 +747,12 @@ export default function CustomerDetailPage({
                   <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-border">
                     <button
                       type="button"
-                      onClick={() => markInvoicePaid(inv)}
+                      onClick={() => setSettleInvoice(inv)}
                       disabled={busy}
                       className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-success text-white text-xs font-medium hover:bg-success/90 disabled:opacity-50"
                     >
                       <CheckCircle className="w-3.5 h-3.5" />
-                      تأكيد الدفع
+                      تسجيل دفعة
                     </button>
                     {ledger.customerPhone && (
                       <a
@@ -698,6 +767,65 @@ export default function CustomerDetailPage({
                     )}
                   </div>
                 )}
+
+                {/* Per-invoice payment timeline — Migration 0038. We show
+                    the date + amount + method for every recorded payment
+                    against this invoice. Empty for fully-unpaid آجل rows
+                    that haven't received anything yet. */}
+                {(() => {
+                  const events = paymentsByInvoice.get(inv.invoiceId) ?? [];
+                  if (events.length === 0) return null;
+                  return (
+                    <div className="mt-3 pt-3 border-t border-border">
+                      <p className="text-[10px] uppercase tracking-wider text-text-secondary mb-1.5">
+                        سجل الدفعات
+                      </p>
+                      <ul className="space-y-1">
+                        {events.map((p) => {
+                          const methodLabel =
+                            p.method === "cash"
+                              ? "كاش"
+                              : p.method === "instapay"
+                                ? "إنستا باي"
+                                : p.method === "card"
+                                  ? "كارت"
+                                  : "دفعة سابقة";
+                          const methodCls =
+                            p.method === "cash"
+                              ? "bg-success-light text-success"
+                              : p.method === "initial"
+                                ? "bg-bg-main text-text-secondary"
+                                : "bg-accent-light text-accent";
+                          return (
+                            <li
+                              key={p.id}
+                              className="flex items-center justify-between gap-2 text-xs"
+                            >
+                              <div className="min-w-0 flex items-center gap-2 flex-wrap">
+                                <span className="text-text-secondary">
+                                  {formatDate(new Date(p.recordedAt))}
+                                </span>
+                                <span
+                                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${methodCls}`}
+                                >
+                                  {methodLabel}
+                                </span>
+                                {p.recordedByName && (
+                                  <span className="text-[10px] text-text-secondary/80 truncate">
+                                    {p.recordedByName}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="font-bold text-success tabular-nums shrink-0">
+                                {formatPrice(p.amount)}
+                              </span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  );
+                })()}
               </li>
             ))}
           </ul>
@@ -711,6 +839,29 @@ export default function CustomerDetailPage({
           onClose={() => setToast(null)}
         />
       )}
+
+      <InvoiceSettleModal
+        invoice={
+          settleInvoice
+            ? {
+                invoiceId: settleInvoice.invoiceId,
+                total: settleInvoice.total,
+                amountPaid: settleInvoice.amountPaid,
+                balance: settleInvoice.balance,
+              }
+            : null
+        }
+        customerPhone={decodedPhone}
+        onClose={() => setSettleInvoice(null)}
+        onSettled={async (collected) => {
+          setSettleInvoice(null);
+          setToast({
+            type: "success",
+            message: `تم تسجيل ${formatPrice(collected)}`,
+          });
+          await refresh();
+        }}
+      />
     </AppShell>
   );
 }

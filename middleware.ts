@@ -3,6 +3,12 @@ import { NextResponse, type NextRequest } from "next/server";
 import { authConfig } from "@/lib/auth.config";
 import { LOCALE_COOKIE, defaultLocale, isLocale, locales } from "@/lib/i18n/config";
 import { detectLocale, pathLocale } from "@/lib/i18n/detect";
+import {
+  gateAdminRequest,
+  hasAdminCookie,
+  hardNotFound,
+  isAdminPublicPath,
+} from "@/lib/admin/middleware";
 
 const { auth } = NextAuth(authConfig);
 
@@ -109,6 +115,10 @@ const PUBLIC_PATHS = new Set<string>([
   // Lightweight token validation the reset page calls on mount so the
   // user finds out about an expired link without filling the form first.
   "/api/account/password/reset/validate",
+  // Spec 04 — public plan catalogue read for the landing page + /billing.
+  // No auth; cached at the edge for 60s; falls back to a typed catalogue
+  // on DB error so the pricing surface never blanks out.
+  "/api/plans",
   // Login form pre-checks whether a given email has 2FA enabled BEFORE the
   // password POST so the UI knows whether to ask for a TOTP code. No
   // password handled here; rate-limited per IP.
@@ -123,6 +133,10 @@ const PUBLIC_PATHS = new Set<string>([
   // upstream check without a session cookie. Both routes are no-tenant.
   "/healthz",
   "/readyz",
+  // Platform-admin Spec 03 — the suspended-tenant landing. Public so a
+  // signed-in user whose tenant just got paused can read the message
+  // (their session may be revoked before this redirect fires).
+  "/service-paused",
 ]);
 const PUBLIC_PREFIXES = [
   "/api/auth",
@@ -143,6 +157,19 @@ const PUBLIC_PREFIXES = [
 export default auth((req) => {
   const { nextUrl } = req;
   const pathname = nextUrl.pathname;
+
+  // Platform-admin gate. Runs FIRST so /admin/* never touches tenant auth.
+  // Hard-404 to invisible non-admins (spec §2.5); /admin/login is the only
+  // public surface; everything else needs the admin cookie.
+  if (pathname === "/admin" || pathname.startsWith("/admin/") || pathname.startsWith("/api/admin/")) {
+    const blocked = gateAdminRequest(req);
+    if (blocked) return blocked;
+    if (!isAdminPublicPath(pathname) && !hasAdminCookie(req)) {
+      return hardNotFound();
+    }
+    // Authenticated admin (or public admin path) — let the route run.
+    return NextResponse.next();
+  }
 
   // Generate a fresh nonce for every request and propagate it forward via
   // the modified request headers so server components can read it.
@@ -229,6 +256,26 @@ export default auth((req) => {
     // login the user is dropped back on /reports?from=yesterday, not /reports.
     loginUrl.searchParams.set("next", pathname + (nextUrl.search ?? ""));
     return applyCsp(req, nonce, NextResponse.redirect(loginUrl));
+  }
+
+  // Spec 03 — tenant suspension. When the JWT carries a non-null
+  // tenantSuspendedAt, every authenticated request gets bounced to
+  // /service-paused. Sign-out + the suspended page itself stay reachable
+  // so a stuck owner can sign out and contact support.
+  if (
+    session.user.tenantSuspendedAt &&
+    pathname !== "/service-paused" &&
+    !pathname.startsWith("/api/auth/")
+  ) {
+    if (pathname.startsWith("/api/")) {
+      return applyCsp(
+        req,
+        nonce,
+        NextResponse.json({ error: "TENANT_SUSPENDED" }, { status: 403 }),
+      );
+    }
+    const url = new URL("/service-paused", nextUrl);
+    return applyCsp(req, nonce, NextResponse.redirect(url));
   }
 
   // Force users with mustChangePassword=true through the change-password page

@@ -9,6 +9,7 @@ import {
   isPaymobConfigured,
 } from "@/lib/payments/paymob";
 import { PLANS, type PlanKey } from "@/lib/payments/plans";
+import { getPlan } from "@/lib/plans";
 import {
   ensureSubscription,
   recordPendingAttempt,
@@ -50,8 +51,15 @@ export async function POST(req: NextRequest) {
   }
 
   const planKey = parsed.data.plan as PlanKey;
-  const plan = PLANS[planKey];
-  if (!plan || !plan.purchasable) {
+  // Spec 04: pull plan price + purchasable from the DB (via getPlan) so an
+  // admin edit at /admin/plans takes effect on the very next signup. PLANS
+  // is the typed fallback when the DB read fails — same structural shape.
+  const dbPlan = await getPlan(planKey);
+  const planAmount =
+    dbPlan?.monthlyEgp ?? PLANS[planKey]?.monthlyEgp ?? 0;
+  const planPurchasable =
+    dbPlan?.purchasable ?? PLANS[planKey]?.purchasable ?? false;
+  if (!planPurchasable || planAmount <= 0) {
     return NextResponse.json({ error: "باقة غير صالحة" }, { status: 400 });
   }
 
@@ -78,7 +86,7 @@ export async function POST(req: NextRequest) {
 
   const result = await createCheckout({
     tenantId: r.ctx.tenantId,
-    amountEgp: plan.monthlyEgp,
+    amountEgp: planAmount,
     planKey,
     customer: {
       email: actor?.email ?? "no-reply@matgary.local",
@@ -100,7 +108,7 @@ export async function POST(req: NextRequest) {
   await recordPendingAttempt({
     tenantId: r.ctx.tenantId,
     paymobOrderId: result.paymobOrderId,
-    amountEgp: plan.monthlyEgp,
+    amountEgp: planAmount,
   });
 
   logActivity({
@@ -108,7 +116,7 @@ export async function POST(req: NextRequest) {
     actorUserId: r.ctx.userId,
     action: "billing.checkout_started",
     category: "settings",
-    metadata: { plan: planKey, amountEgp: plan.monthlyEgp },
+    metadata: { plan: planKey, amountEgp: planAmount },
   });
 
   return NextResponse.json({ iframeUrl: result.iframeUrl });

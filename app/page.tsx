@@ -6,6 +6,7 @@ import { LowStockAlert } from "@/components/dashboard/LowStockAlert";
 import { RecentSalesList } from "@/components/dashboard/RecentSalesList";
 import { Greeting } from "@/components/dashboard/Greeting";
 import { SelfCheckIn } from "@/components/team/SelfCheckIn";
+import { BroadcastStack } from "@/components/broadcasts/BroadcastStack";
 import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 export default function DashboardPage() {
@@ -13,6 +14,12 @@ export default function DashboardPage() {
   return (
     <AppShell title={dict.app.dashboard.title}>
       <div className="space-y-6">
+        {/* Platform-admin Spec 06: system-wide banner stack. Dashboard-only
+            so it doesn't follow the user into focus surfaces (sales, POS,
+            settings, etc). Self-hides when there's no broadcast for the
+            caller's audience or every active broadcast was dismissed on
+            this browser. */}
+        <BroadcastStack />
         <Greeting />
         <SelfCheckIn />
         <StatsGrid />

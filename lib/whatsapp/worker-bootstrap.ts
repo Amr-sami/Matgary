@@ -29,12 +29,8 @@ export async function bootWorker(): Promise<void> {
       .some((l) => (l as { name?: string }).name === SHUTDOWN_HANDLER_NAME);
     if (already) continue;
 
-    const handler = Object.assign(
-      async function waWorkerShutdown() {
-        await shutdown(sig);
-      },
-      { name: SHUTDOWN_HANDLER_NAME },
-    );
-    process.once(sig, handler);
+    process.once(sig, async function waWorkerShutdown() {
+      await shutdown(sig);
+    });
   }
 }

@@ -36,6 +36,32 @@ export const authConfig = {
         session.user.locale = (token.locale === "en" ? "en" : "ar") as
           | "ar"
           | "en";
+        // Spec 03 — tenant suspended fields. Older tokens fall through
+        // to null (treated as not suspended).
+        session.user.tenantSuspendedAt =
+          (token.tenantSuspendedAt as string | null) ?? null;
+        session.user.tenantSuspendedReason =
+          (token.tenantSuspendedReason as string | null) ?? null;
+        // Spec 07 — impersonation context. The hard cap is enforced here:
+        // any token whose claim says it's past the cap is treated as
+        // logged-out so AppShell + middleware bounce the request.
+        const impExpires = token.impersonationExpiresAt as number | undefined;
+        if (
+          token.impersonationAdminId &&
+          impExpires &&
+          Date.now() < impExpires
+        ) {
+          session.impersonation = {
+            adminId: token.impersonationAdminId as string,
+            adminEmail: token.impersonationAdminEmail as string,
+            sessionId: token.impersonationSessionId as string,
+            startedAt: token.impersonationStartedAt as number,
+            expiresAt: impExpires,
+          };
+        } else if (token.impersonationAdminId) {
+          // Past the cap → return null to fully invalidate the session.
+          return null as unknown as typeof session;
+        }
       }
       return session;
     },

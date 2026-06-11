@@ -160,7 +160,7 @@ export function SaleCard({
             <button
               onClick={() => onEdit(sale)}
               disabled={sale.isReturned}
-              className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-gray-100 text-text-secondary rounded-xl hover:bg-gray-200 disabled:opacity-40 text-sm"
+              className="flex-1 flex items-center justify-center gap-1 px-3 py-2 text-text-secondary active:opacity-70 disabled:opacity-30 transition-opacity text-sm"
             >
               <Pencil className="w-4 h-4" />
               {tTable.actions.edit}
@@ -169,10 +169,10 @@ export function SaleCard({
               onClick={() => onReturn(sale)}
               disabled={sale.isReturned}
               className={cn(
-                "flex-1 flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-sm",
+                "flex-1 flex items-center justify-center gap-1 px-3 py-2 text-sm active:opacity-70 transition-opacity",
                 sale.isReturned
-                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                  : "bg-danger-light text-danger hover:bg-danger hover:text-white border border-danger/10"
+                  ? "text-gray-400 cursor-not-allowed"
+                  : "text-danger"
               )}
             >
               <RotateCcw className="w-4 h-4" />

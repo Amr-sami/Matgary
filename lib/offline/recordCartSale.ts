@@ -43,6 +43,9 @@ export interface OfflineCartOptions {
    *  goes to `failed` and the cashier is notified. */
   redeemPoints?: number;
   applyCreditEgp?: number;
+  /** Partial payment on آجل: amount paid at the counter. Distributed across
+   *  the line items by the server. Ignored for non-deferred sales. */
+  amountPaidNow?: number;
 }
 
 export interface OfflineCartContext {

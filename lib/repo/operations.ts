@@ -9,6 +9,9 @@ import {
   returns as returnsTable,
   expenses as expensesTable,
   shopSettings,
+  cashShifts,
+  cashMovements,
+  salePayments,
 } from "@/lib/db/schema";
 import type {
   Sale,
@@ -25,6 +28,12 @@ import {
   earnPoints as walletEarnPoints,
   redeemPoints as walletRedeemPoints,
 } from "@/lib/repo/loyalty";
+import {
+  NoOpenShiftError,
+  resolveShiftStampForSale,
+} from "@/lib/repo/cash-shifts";
+
+export { NoOpenShiftError };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -70,6 +79,8 @@ function rowToSale(r: typeof sales.$inferSelect): Sale {
     paymentMethod: (r.paymentMethod as PaymentMethod | null) ?? undefined,
     isPaid: r.isPaid,
     paidAt: r.paidAt ?? undefined,
+    amountPaid: Number(r.amountPaid ?? 0),
+    partialPaidAt: r.partialPaidAt ?? undefined,
   };
 }
 
@@ -99,6 +110,47 @@ function rowToExpense(r: typeof expensesTable.$inferSelect): Expense {
     parentExpenseId: r.parentExpenseId ?? null,
     date: r.date,
     note: r.note ?? undefined,
+  };
+}
+
+/**
+ * Compute the partial-payment field set for a sale insert.
+ *
+ * Non-deferred (cash / instapay / card) sales are always fully paid in one
+ * shot — amount_paid equals total_price. Deferred sales start at whatever
+ * the customer handed over at the counter; if that fully covers the line
+ * we treat it as paid. The flags isPaid / paidAt / partialPaidAt are kept
+ * consistent so old code that filters on `is_paid` keeps working.
+ */
+function computePaidFields(
+  method: PaymentMethod | "cash",
+  totalPrice: number,
+  amountPaidNow?: number,
+): {
+  amountPaid: string;
+  isPaid: boolean;
+  paidAt: Date | null;
+  partialPaidAt: Date | null;
+} {
+  const now = new Date();
+  if (method !== "deferred") {
+    return {
+      amountPaid: String(totalPrice),
+      isPaid: true,
+      paidAt: now,
+      partialPaidAt: null,
+    };
+  }
+  const paid = Math.max(
+    0,
+    Math.min(Number(amountPaidNow ?? 0), totalPrice),
+  );
+  const isFullyPaid = paid >= totalPrice && totalPrice > 0;
+  return {
+    amountPaid: String(paid),
+    isPaid: isFullyPaid,
+    paidAt: isFullyPaid ? now : null,
+    partialPaidAt: paid > 0 && !isFullyPaid ? now : null,
   };
 }
 
@@ -221,6 +273,10 @@ export interface RecordSaleInput {
   customerName?: string;
   customerPhone?: string;
   paymentMethod?: PaymentMethod;
+  /** Optional amount the customer paid at the counter for a deferred sale.
+   *  Ignored for non-deferred methods (they're always fully paid). Defaults
+   *  to 0 when missing — i.e. full receipt deferred. */
+  amountPaidNow?: number;
   /** The cashier/owner who recorded this sale. Powers staff performance reports. */
   recordedByUserId?: string;
   /** Branch the sale was rung up at. Required by the multi-branch rollout —
@@ -288,8 +344,10 @@ export async function recordSale(
         customerName: input.customerName?.trim() || null,
         customerPhone: input.customerPhone?.trim() || null,
         paymentMethod,
-        isPaid: paymentMethod !== "deferred",
-        paidAt: paymentMethod !== "deferred" ? new Date() : null,
+        // Partial-payments semantics: non-deferred is always fully paid;
+        // deferred starts at whatever the customer handed over at the
+        // counter (often 0). is_paid mirrors amount_paid >= total.
+        ...computePaidFields(paymentMethod, totalPrice, input.amountPaidNow),
         recordedByUserId: input.recordedByUserId ?? null,
       })
       .returning({ id: sales.id });
@@ -341,12 +399,21 @@ export interface CartSaleOptions {
    *  whether the sale synced immediately or hours later. Server picks one
    *  itself when omitted. */
   invoiceId?: string;
+  /** Role of the recorder — used to decide if cash sales without an open
+   *  shift should auto-open an owner-desk shift (owners) or 409 (cashiers).
+   *  Optional; defaults to non-owner. */
+  recordedByRole?: "owner" | "staff" | null;
   /** Loyalty redemption from the customer's wallet. Both default to 0. The
    *  cart endpoint refuses if customerPhone is missing or balance is short.
    *  Each is applied to the cart total as a discount; the redemption value
    *  in EGP is `redeemPoints * loyaltyEgpPerPoint + applyCreditEgp`. */
   redeemPoints?: number;
   applyCreditEgp?: number;
+  /** For deferred sales: amount the customer paid at the counter. Allocated
+   *  proportionally across line items so the per-customer outstanding total
+   *  reflects exactly the unpaid remainder. Ignored for non-deferred sales
+   *  (those are always fully paid). Defaults to 0. */
+  amountPaidNow?: number;
 }
 
 export interface CartSaleLineSummary {
@@ -514,10 +581,34 @@ export async function recordCartSale(
       );
     }
 
+    // Cash-drawer reconciliation: resolve the shift this cart should be
+    // stamped onto (or null if reconciliation is off / non-cash). Throws
+    // NoOpenShiftError when a cashier tries to ring up cash without an
+    // open shift — the route turns that into 409 NO_OPEN_SHIFT and the
+    // client prompts to open one.
+    const cashShiftId = await resolveShiftStampForSale(tx, {
+      tenantId,
+      branchId: options.branchId,
+      recordedByUserId: options.recordedByUserId ?? null,
+      isOwner: options.recordedByRole === "owner",
+      paymentMethod,
+    });
+
     const saleIds: string[] = [];
     const lineSummaries: CartSaleLineSummary[] = [];
     let cartTotal = 0;
     let allocated = 0;
+
+    // Partial payments: distribute the cashier-entered "amount paid now"
+    // proportionally across the lines so per-customer outstanding math is
+    // a plain sum across rows. Non-deferred = always fully paid (every
+    // line's amount_paid = its totalPrice).
+    const cartFinalTotal = Math.max(0, cartGross - orderDiscountTotal);
+    const requestedPaidNow =
+      paymentMethod === "deferred"
+        ? Math.max(0, Math.min(Number(options.amountPaidNow ?? 0), cartFinalTotal))
+        : cartFinalTotal;
+    let paidRemaining = requestedPaidNow;
 
     for (let i = 0; i < pre.length; i++) {
       const p = pre[i];
@@ -531,6 +622,27 @@ export async function recordCartSale(
       allocated += allocation;
       const totalLineDiscount = p.lineDiscount + allocation;
       const totalPrice = p.lineSubtotal - totalLineDiscount;
+
+      // Per-line slice of the customer's down payment. Proportional to the
+      // line's share of the cart final total; the last line picks up the
+      // rounding remainder so the sum exactly equals requestedPaidNow. We
+      // ALWAYS clamp to `totalPrice` (including the last line) — the new
+      // CHECK constraint `amount_paid <= total_price` would otherwise
+      // reject the insert if rounding pushed the remainder a cent above
+      // the last line's total. The dropped cents (rare; bounded by
+      // pre.length × 0.01 EGP) are an accepted rounding artifact.
+      const isLastLine = i === pre.length - 1;
+      const linePaid = Math.min(
+        totalPrice,
+        isLastLine
+          ? paidRemaining
+          : cartFinalTotal > 0
+            ? Math.round(
+                ((requestedPaidNow * totalPrice) / cartFinalTotal) * 100,
+              ) / 100
+            : 0,
+      );
+      paidRemaining = Math.max(0, paidRemaining - linePaid);
 
       // Decrement the product's qty directly (multi-store: the product
       // already belongs to options.branchId, verified in the pre-loop).
@@ -574,9 +686,9 @@ export async function recordCartSale(
           customerName: options.customerName?.trim() || null,
           customerPhone: options.customerPhone?.trim() || null,
           paymentMethod,
-          isPaid: paymentMethod !== "deferred",
-          paidAt: paymentMethod !== "deferred" ? new Date() : null,
+          ...computePaidFields(paymentMethod, totalPrice, linePaid),
           recordedByUserId: options.recordedByUserId ?? null,
+          cashShiftId,
         })
         .returning({ id: sales.id });
 
@@ -795,10 +907,18 @@ export async function voidSale(tenantId: string, saleId: string): Promise<void> 
 
 export async function markSalePaid(tenantId: string, saleId: string): Promise<void> {
   await withTenant(tenantId, async (tx) => {
-    await tx
-      .update(sales)
-      .set({ isPaid: true, paidAt: new Date() })
-      .where(and(eq(sales.tenantId, tenantId), eq(sales.id, saleId)));
+    // Bring amount_paid up to total_price so the receivables aggregator
+    // agrees with the is_paid flag. Without this, "mark paid" leaves an
+    // amount_paid=0 row that the customer page still flags as owed.
+    await tx.execute(sql`
+      UPDATE sales
+         SET is_paid           = true,
+             paid_at           = now(),
+             amount_paid       = CAST(total_price AS numeric(14,2)),
+             partial_paid_at   = NULL
+       WHERE tenant_id = ${tenantId}
+         AND id        = ${saleId}
+    `);
   });
 }
 
@@ -807,11 +927,252 @@ export async function markInvoicePaid(
   invoiceId: string,
 ): Promise<void> {
   await withTenant(tenantId, async (tx) => {
-    await tx
-      .update(sales)
-      .set({ isPaid: true, paidAt: new Date() })
-      .where(and(eq(sales.tenantId, tenantId), eq(sales.invoiceId, invoiceId)));
+    await tx.execute(sql`
+      UPDATE sales
+         SET is_paid           = true,
+             paid_at           = now(),
+             amount_paid       = CAST(total_price AS numeric(14,2)),
+             partial_paid_at   = NULL
+       WHERE tenant_id  = ${tenantId}
+         AND invoice_id = ${invoiceId}
+    `);
   });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Customer settlements — record a later payment against a customer's
+// outstanding balance. Applies the amount oldest-first across unpaid sales
+// (or restricted to `invoiceIds` when the caller hand-picks invoices).
+// Returns a summary the caller can drop into a toast / activity log.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type SettlementMethod = "cash" | "instapay" | "card";
+
+export interface SettleCustomerPaymentInput {
+  /** Customer matching key — canonicalised E.164 phone (the same key the
+   *  customer aggregator uses). At least one unpaid sale must carry this
+   *  phone or the call returns NOTHING_TO_SETTLE. */
+  customerPhone: string;
+  /** Amount the customer just paid. Must be > 0. */
+  amount: number;
+  /** How they paid. Cash settlements stamp the active cash shift so the
+   *  Z-report sees the receipt the next time the cashier closes out. */
+  method: SettlementMethod;
+  /** Optional restriction: settle only these invoices. If omitted we apply
+   *  the amount across all unpaid invoices oldest-first. */
+  invoiceIds?: string[];
+  /** Cashier / owner recording the settlement — required for cash-shift
+   *  stamping and activity logging. */
+  recordedByUserId: string;
+  /** Branch context — used to locate the active cash shift for the cash
+   *  movement record. */
+  branchId: string;
+}
+
+export interface SettleCustomerPaymentResult {
+  /** Sum actually applied across the unpaid sales. Equals `input.amount`
+   *  unless the customer's outstanding balance was lower (we never
+   *  over-credit; the leftover is returned in `overpay`). */
+  appliedAmount: number;
+  /** Amount the caller offered that we couldn't apply because the
+   *  customer's balance ran out. UI should surface this back to the
+   *  cashier so they know whether to bank it as customer credit or
+   *  refund it. */
+  overpay: number;
+  /** Number of distinct invoices that are now fully settled by this
+   *  payment. Drives the "settled X invoices" toast copy. */
+  fullySettledInvoices: number;
+  /** The customer's remaining outstanding balance AFTER this payment. */
+  newBalance: number;
+}
+
+export class SettlementError extends Error {
+  constructor(
+    public code:
+      | "INVALID_AMOUNT"
+      | "INVALID_METHOD"
+      | "NOTHING_TO_SETTLE"
+      | "PHONE_REQUIRED",
+    public httpStatus: number,
+    message?: string,
+  ) {
+    super(message ?? code);
+    this.name = "SettlementError";
+  }
+}
+
+export async function settleCustomerPayment(
+  tenantId: string,
+  input: SettleCustomerPaymentInput,
+): Promise<SettleCustomerPaymentResult> {
+  if (!input.customerPhone.trim()) {
+    throw new SettlementError("PHONE_REQUIRED", 400, "Customer phone required");
+  }
+  const requested = Number(input.amount);
+  if (!Number.isFinite(requested) || requested <= 0) {
+    throw new SettlementError("INVALID_AMOUNT", 400, "Amount must be positive");
+  }
+  if (
+    input.method !== "cash" &&
+    input.method !== "instapay" &&
+    input.method !== "card"
+  ) {
+    throw new SettlementError("INVALID_METHOD", 400);
+  }
+
+  const result = await withTenant(tenantId, async (tx) => {
+    // Fetch unpaid sales for this customer oldest-first. We deliberately
+    // re-read amount_paid inside the same tx so two cashiers can't double-
+    // apply against the same row (FOR UPDATE would be safer; postgres.js
+    // doesn't expose it cleanly here so we accept the tiny race).
+    const unpaidRows = (await tx.execute(sql`
+      SELECT id,
+             invoice_id,
+             total_price,
+             amount_paid,
+             sale_date
+        FROM sales
+       WHERE tenant_id      = ${tenantId}
+         AND customer_phone = ${input.customerPhone}
+         AND is_returned    = false
+         AND is_paid        = false
+         ${
+           input.invoiceIds && input.invoiceIds.length > 0
+             ? sql`AND invoice_id IN (${sql.join(
+                 input.invoiceIds.map((id) => sql`${id}`),
+                 sql`, `,
+               )})`
+             : sql``
+         }
+       ORDER BY sale_date ASC, id ASC
+    `)) as unknown as Array<{
+      id: string;
+      invoice_id: string | null;
+      total_price: string;
+      amount_paid: string;
+      sale_date: Date;
+    }>;
+
+    if (unpaidRows.length === 0) {
+      throw new SettlementError(
+        "NOTHING_TO_SETTLE",
+        409,
+        "No unpaid sales for this customer",
+      );
+    }
+
+    let remaining = requested;
+    const fullySettledInvoices = new Set<string>();
+    const now = new Date();
+    // ISO-string form for SQL param binding. Drizzle's raw `sql` template
+    // serializes JS Date via Date.prototype.toString() (e.g. "Thu Jun 11
+    // 2026 06:10:03 GMT+0300"), which Postgres can't parse as a
+    // timestamptz. The ISO form goes through cleanly.
+    const nowIso = now.toISOString();
+
+    // Resolve the active cash shift ONCE up front so every sale_payments
+    // row we insert can carry it. Cash settlements also drop a single
+    // aggregate cash_movements row at the end of the loop (kept that way
+    // so the cash drawer shows one line per customer pay-down, not one
+    // per invoice — easier to read on the Z-report).
+    const [activeShift] = await tx
+      .select({ id: cashShifts.id })
+      .from(cashShifts)
+      .where(
+        and(
+          eq(cashShifts.tenantId, tenantId),
+          eq(cashShifts.branchId, input.branchId),
+          eq(cashShifts.cashierUserId, input.recordedByUserId),
+          eq(cashShifts.status, "open"),
+        ),
+      )
+      .limit(1);
+    const shiftIdForPayments =
+      input.method === "cash" && activeShift ? activeShift.id : null;
+
+    for (const row of unpaidRows) {
+      if (remaining <= 0) break;
+      const lineTotal = Number(row.total_price);
+      const lineAlreadyPaid = Number(row.amount_paid);
+      const lineOwed = Math.max(0, lineTotal - lineAlreadyPaid);
+      if (lineOwed <= 0) continue;
+      const apply = Math.min(remaining, lineOwed);
+      const newPaid = lineAlreadyPaid + apply;
+      const fullyPaid = newPaid >= lineTotal;
+      remaining -= apply;
+      if (fullyPaid && row.invoice_id) {
+        fullySettledInvoices.add(row.invoice_id);
+      }
+      await tx.execute(sql`
+        UPDATE sales
+           SET amount_paid     = ${String(newPaid)}::numeric(14,2),
+               is_paid         = ${fullyPaid},
+               paid_at         = CASE WHEN ${fullyPaid} THEN ${nowIso}::timestamptz ELSE paid_at END,
+               partial_paid_at = CASE WHEN ${fullyPaid} THEN NULL ELSE ${nowIso}::timestamptz END
+         WHERE tenant_id = ${tenantId}
+           AND id        = ${row.id}
+      `);
+      // Persist the individual event so the customer detail page can
+      // render a real timeline (vs. just the latest partial_paid_at).
+      await tx.insert(salePayments).values({
+        tenantId,
+        saleId: row.id,
+        amount: String(apply),
+        method: input.method,
+        recordedAt: now,
+        recordedByUserId: input.recordedByUserId,
+        cashShiftId: shiftIdForPayments,
+      });
+    }
+
+    const applied = requested - remaining;
+    const overpay = remaining;
+
+    // Cash settlements stamp the active cash shift so the Z-report
+    // captures the receipt. We DON'T auto-open a shift here (unlike the
+    // sale path) — if no shift is open, the settlement still records but
+    // the cashier loses the drawer reconciliation. Reason: customer
+    // settlements often happen outside of a normal serving rhythm
+    // (owner pops in for a few minutes), and forcing a shift-open here
+    // would be more friction than benefit. If you want to flip this,
+    // call resolveShiftStampForSale instead.
+    if (input.method === "cash" && applied > 0) {
+      const shift = activeShift;
+      if (shift) {
+        await tx.insert(cashMovements).values({
+          tenantId,
+          shiftId: shift.id,
+          kind: "paid_in",
+          amount: String(applied),
+          reason: `Customer settlement — ${input.customerPhone}`,
+          recordedByUserId: input.recordedByUserId,
+        });
+      }
+    }
+
+    // New balance for this customer = sum of remaining unpaid balance.
+    const [{ owed }] = (await tx.execute(sql`
+      SELECT COALESCE(
+               SUM(CAST(total_price AS numeric(14,2)) - amount_paid),
+               0
+             )::text AS owed
+        FROM sales
+       WHERE tenant_id      = ${tenantId}
+         AND customer_phone = ${input.customerPhone}
+         AND is_returned    = false
+         AND is_paid        = false
+    `)) as unknown as Array<{ owed: string }>;
+
+    return {
+      appliedAmount: applied,
+      overpay,
+      fullySettledInvoices: fullySettledInvoices.size,
+      newBalance: Number(owed),
+    };
+  });
+
+  await bustInsightsCache(tenantId);
+  return result;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1038,6 +1399,11 @@ export interface AddExpenseInput {
    *  subscription, accounting fees) — caller is responsible for the
    *  semantic. */
   branchId?: string | null;
+  /** Who recorded the expense. When the branch has cash reconciliation
+   *  enabled and the recorder has an open shift, the expense is stamped
+   *  with that shift_id so its amount flows into expected_cash. */
+  recordedByUserId?: string | null;
+  recordedByRole?: "owner" | "staff" | null;
 }
 
 export async function addExpense(
@@ -1058,6 +1424,28 @@ export async function addExpense(
       }
     }
 
+    // Stamp the open cash shift (if reconciliation is enabled for this
+    // branch and the caller has one). Recurring template parents are NOT
+    // stamped — only the spawned cash-impacting instances would be, and
+    // even those are out of scope for v1 (handled by the cron sidecar
+    // which has no shift context).
+    const cashShiftId =
+      input.branchId && input.recordedByUserId && !input.isRecurring
+        ? await resolveShiftStampForSale(tx, {
+            tenantId,
+            branchId: input.branchId,
+            recordedByUserId: input.recordedByUserId,
+            isOwner: input.recordedByRole === "owner",
+            paymentMethod: "cash",
+          }).catch((err) => {
+            // For expenses we don't 409 on no-open-shift — we silently skip
+            // the stamp. Cashiers rarely record expenses; owners do, and
+            // their auto-desk shift handles it. Re-raise other errors.
+            if (err instanceof NoOpenShiftError) return null;
+            throw err;
+          })
+        : null;
+
     const [created] = await tx
       .insert(expensesTable)
       .values({
@@ -1074,6 +1462,7 @@ export async function addExpense(
         nextOccurrenceDate,
         date: startDate,
         note: input.note ?? null,
+        cashShiftId,
       })
       .returning({ id: expensesTable.id });
 

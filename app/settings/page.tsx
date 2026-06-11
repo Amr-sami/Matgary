@@ -15,6 +15,8 @@ import {
   Send,
   ExternalLink,
   ChevronLeft,
+  History,
+  DollarSign,
 } from "@/lib/icons";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/Button";
@@ -453,9 +455,7 @@ function SettingsPageInner() {
             className="group block bg-white rounded-xl border border-border p-5 hover:border-accent transition-colors"
           >
             <div className="flex items-center gap-3">
-              <div className="shrink-0 w-10 h-10 rounded-lg bg-accent-light text-accent flex items-center justify-center">
-                <Store className="w-5 h-5" />
-              </div>
+              <Store className="w-5 h-5 text-text-secondary shrink-0 group-hover:text-accent transition-colors" />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="font-bold text-text-primary">{t.branches.title}</h3>
@@ -466,6 +466,70 @@ function SettingsPageInner() {
                 </div>
                 <p className="text-xs text-text-secondary mt-0.5">
                   {branchCount <= 1 ? t.branches.hintOne : t.branches.hintMany}
+                </p>
+              </div>
+              <ChevronLeft className="w-5 h-5 text-text-secondary shrink-0 group-hover:text-accent transition-colors" />
+            </div>
+          </Link>
+        )}
+
+        {/* Cash drawer reconciliation — owner-only. */}
+        {isOwner && (
+          <Link
+            href="/settings/cash-drawer"
+            className="group block bg-white rounded-xl border border-border p-5 hover:border-accent transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <DollarSign className="w-5 h-5 text-text-secondary shrink-0 group-hover:text-accent transition-colors" />
+              <div className="flex-1 min-w-0">
+                <h3 className="font-bold text-text-primary">
+                  {t.cashDrawerTile.title}
+                </h3>
+                <p className="text-xs text-text-secondary mt-0.5">
+                  {t.cashDrawerTile.subtitle}
+                </p>
+              </div>
+              <ChevronLeft className="w-5 h-5 text-text-secondary shrink-0 group-hover:text-accent transition-colors" />
+            </div>
+          </Link>
+        )}
+
+        {/* Daily owner digest — owner-only. */}
+        {isOwner && (
+          <Link
+            href="/settings/digest"
+            className="group block bg-white rounded-xl border border-border p-5 hover:border-accent transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <MessageCircle className="w-5 h-5 text-text-secondary shrink-0 group-hover:text-accent transition-colors" />
+              <div className="flex-1 min-w-0">
+                <h3 className="font-bold text-text-primary">
+                  {t.digestTile.title}
+                </h3>
+                <p className="text-xs text-text-secondary mt-0.5">
+                  {t.digestTile.subtitle}
+                </p>
+              </div>
+              <ChevronLeft className="w-5 h-5 text-text-secondary shrink-0 group-hover:text-accent transition-colors" />
+            </div>
+          </Link>
+        )}
+
+        {/* Activity log — moved here from the sidebar. Owner-only by default
+            (matches the `view_activity_log` permission catalog default). */}
+        {isOwner && (
+          <Link
+            href="/activity"
+            className="group block bg-white rounded-xl border border-border p-5 hover:border-accent transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <History className="w-5 h-5 text-text-secondary shrink-0 group-hover:text-accent transition-colors" />
+              <div className="flex-1 min-w-0">
+                <h3 className="font-bold text-text-primary">
+                  {t.activityTile.title}
+                </h3>
+                <p className="text-xs text-text-secondary mt-0.5">
+                  {t.activityTile.subtitle}
                 </p>
               </div>
               <ChevronLeft className="w-5 h-5 text-text-secondary shrink-0 group-hover:text-accent transition-colors" />

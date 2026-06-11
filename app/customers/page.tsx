@@ -1,7 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Download, Users, Star, Wallet, Bell, Megaphone } from "@/lib/icons";
+import {
+  Download,
+  Users,
+  Star,
+  Wallet,
+  Bell,
+  Megaphone,
+  AlertCircle,
+  Clock,
+} from "@/lib/icons";
+import { CustomerSettleModal } from "@/components/customers/CustomerSettleModal";
 import { AppShell } from "@/components/layout/AppShell";
 import { useCustomersData } from "@/hooks/useCustomersData";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
@@ -16,6 +26,7 @@ import {
 import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
 import { formatCurrency } from "@/lib/i18n/format";
 import { useShopSettings } from "@/hooks/useShopSettings";
+import { FilterSelect, SortSelect } from "@/components/ui/FilterSelect";
 
 const BUILD_STAMP = "2026-04-30-customer-invoices-v4";
 
@@ -96,6 +107,26 @@ export default function CustomersPage() {
     [customers]
   );
 
+  // Receivables panel data. Top debtors by balance, plus the oldest unpaid
+  // date across the whole tenant — that's the "خطر" signal owners care
+  // about most ("we have receivables sitting for 50+ days").
+  const debtors = useMemo(
+    () =>
+      customers
+        .filter((c) => c.outstandingBalance > 0)
+        .sort((a, b) => b.outstandingBalance - a.outstandingBalance),
+    [customers]
+  );
+  const oldestUnpaidDays = useMemo(() => {
+    let oldest: Date | undefined;
+    for (const c of debtors) {
+      if (c.oldestUnpaidDate && (!oldest || c.oldestUnpaidDate < oldest)) {
+        oldest = c.oldestUnpaidDate;
+      }
+    }
+    return oldest ? daysSince(oldest) : 0;
+  }, [debtors]);
+
   const totals = useMemo(() => {
     const total = customers.length;
     const repeats = customers.filter((c) => c.invoiceCount >= 3).length;
@@ -105,6 +136,14 @@ export default function CustomersPage() {
     const outstanding = customers.reduce((s, c) => s + c.outstandingBalance, 0);
     return { total, repeats, inactive, outstanding };
   }, [customers]);
+
+  /** Customer the cashier picked from a "تسجيل دفعة" button. The settle
+   *  modal lazily mounts when this is non-null. */
+  const [settleCustomerKey, setSettleCustomerKey] = useState<string | null>(null);
+  const settleCustomer = useMemo(
+    () => debtors.find((c) => c.key === settleCustomerKey) ?? null,
+    [debtors, settleCustomerKey]
+  );
 
   const handleExport = () => {
     if (filtered.length === 0) return;
@@ -268,6 +307,141 @@ export default function CustomersPage() {
           </div>
         )}
 
+        {/* Receivables panel — only renders when at least one customer has a
+            positive balance. Mirrors the structure of Top-5: KPI strip across
+            the top, ranked list below. The "تسجيل دفعة" action opens the
+            CustomerSettleModal which writes back via the settle endpoint. */}
+        {debtors.length > 0 && (
+          <div className="bg-white rounded-xl border border-orange-200 overflow-hidden">
+            <div className="px-4 py-3 bg-gradient-to-br from-orange-50 to-orange-50/40 border-b border-orange-100">
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5 text-orange-600" />
+                  <div>
+                    <p className="font-bold text-orange-900">{t.receivables.title}</p>
+                    <p className="text-[11px] text-orange-700 mt-0.5">
+                      {t.receivables.subtitle}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4 text-right">
+                  <div>
+                    <p className="text-[10px] text-orange-700 uppercase tracking-wider">
+                      {t.receivables.totalLabel}
+                    </p>
+                    <p className="text-lg font-extrabold text-orange-900">
+                      {formatCurrency(totals.outstanding, locale)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-orange-700 uppercase tracking-wider">
+                      {t.receivables.debtorCountLabel}
+                    </p>
+                    <p className="text-lg font-extrabold text-orange-900">
+                      {debtors.length}
+                    </p>
+                  </div>
+                  {oldestUnpaidDays > 0 && (
+                    <div className="flex items-center gap-1.5 text-orange-700">
+                      <Clock className="w-3.5 h-3.5" />
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider">
+                          {t.receivables.oldestLabel}
+                        </p>
+                        <p className="text-lg font-extrabold text-orange-900">
+                          {t.receivables.daysFormat.replace(
+                            "{n}",
+                            String(oldestUnpaidDays)
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            <ul className="divide-y divide-orange-50">
+              {debtors.slice(0, 10).map((c, idx) => {
+                const days = c.oldestUnpaidDate ? daysSince(c.oldestUnpaidDate) : 0;
+                // Aging colour: stays neutral up to 14d, amber 15-30, orange
+                // 31-60, red beyond. Matches the way owners think about
+                // dunning urgency.
+                const ageTone =
+                  days >= 60
+                    ? "text-danger bg-danger-light"
+                    : days >= 30
+                      ? "text-orange-700 bg-orange-100"
+                      : days >= 14
+                        ? "text-amber-700 bg-amber-100"
+                        : "text-text-secondary bg-bg-main";
+                return (
+                  <li
+                    key={c.key}
+                    className="px-4 py-3 flex items-center gap-3"
+                  >
+                    <span className="w-7 h-7 rounded-full bg-orange-100 text-orange-700 text-xs flex items-center justify-center font-bold shrink-0">
+                      {idx + 1}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p
+                        className="font-semibold text-text-primary truncate"
+                        dir="auto"
+                      >
+                        {c.name}
+                      </p>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        {c.phone && (
+                          <span
+                            className="text-[11px] text-text-secondary"
+                            dir="ltr"
+                          >
+                            {c.phone}
+                          </span>
+                        )}
+                        <span
+                          className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${ageTone}`}
+                        >
+                          {t.receivables.daysFormat.replace(
+                            "{n}",
+                            String(days)
+                          )}
+                        </span>
+                        <span className="text-[10px] text-text-secondary">
+                          {t.receivables.invoiceCountFormat.replace(
+                            "{n}",
+                            String(c.unpaidInvoiceCount || 1)
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-end shrink-0">
+                      <p className="font-extrabold text-orange-700 text-base">
+                        {formatCurrency(c.outstandingBalance, locale)}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setSettleCustomerKey(c.key)}
+                        className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-accent hover:underline"
+                      >
+                        <Wallet className="w-3 h-3" />
+                        {t.receivables.recordPayment}
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+            {debtors.length > 10 && (
+              <div className="px-4 py-2 text-center text-[11px] text-text-secondary border-t border-orange-50">
+                {t.receivables.andMore.replace(
+                  "{n}",
+                  String(debtors.length - 10)
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Search + sort + filter + actions */}
         <div className="bg-white rounded-xl border border-border p-3 space-y-3">
           <input
@@ -280,29 +454,27 @@ export default function CustomersPage() {
           />
           <div className="flex flex-wrap items-center gap-2 justify-between">
             <div className="flex flex-wrap items-center gap-2">
-              <select
+              {/* "all" is a real value here (not a clear), so we model this
+                  with SortSelect — a non-nullable select with friendly labels. */}
+              <SortSelect<Filter>
                 value={filter}
-                onChange={(e) => setFilter(e.target.value as Filter)}
-                dir="auto"
-                className="px-3 py-1.5 rounded-lg border border-border bg-white text-sm"
-              >
-                <option value="all">{t.filter.all}</option>
-                <option value="repeat">{t.filter.repeat}</option>
-                <option value="inactive">{t.filter.inactive}</option>
-                <option value="outstanding">{t.filter.outstanding}</option>
-              </select>
-              <select
+                onChange={setFilter}
+                options={[
+                  { value: "all", label: t.filter.all },
+                  { value: "repeat", label: t.filter.repeat },
+                  { value: "inactive", label: t.filter.inactive },
+                  { value: "outstanding", label: t.filter.outstanding },
+                ]}
+              />
+              <SortSelect<SortKey>
                 value={sort}
-                onChange={(e) => setSort(e.target.value as SortKey)}
-                dir="auto"
-                className="px-3 py-1.5 rounded-lg border border-border bg-white text-sm"
-              >
-                {SORT_KEYS.map((k) => (
-                  <option key={k} value={k}>
-                    {t.sort.prefix.replace("{label}", t.sort.options[k])}
-                  </option>
-                ))}
-              </select>
+                onChange={setSort}
+                options={SORT_KEYS.map((k) => ({
+                  value: k,
+                  label: t.sort.options[k],
+                }))}
+                prefix={t.sort.prefix.replace("{label}", "")}
+              />
             </div>
             <div className="flex items-center gap-2">
               {totals.inactive > 0 && (
@@ -350,6 +522,16 @@ export default function CustomersPage() {
             />
           ))}
         </div>
+
+        <CustomerSettleModal
+          customer={settleCustomer}
+          records={records}
+          onClose={() => setSettleCustomerKey(null)}
+          onSettled={async () => {
+            setSettleCustomerKey(null);
+            await refreshRecords(false);
+          }}
+        />
       </div>
     </AppShell>
   );

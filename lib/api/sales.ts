@@ -23,10 +23,12 @@ export interface CartSaleResult {
   saleIds: string[];
 }
 
-interface SaleApiRow extends Omit<Sale, "saleDate" | "returnedAt" | "paidAt"> {
+interface SaleApiRow
+  extends Omit<Sale, "saleDate" | "returnedAt" | "paidAt" | "partialPaidAt"> {
   saleDate: string;
   returnedAt?: string;
   paidAt?: string;
+  partialPaidAt?: string;
 }
 
 function reviveSale(s: SaleApiRow): Sale {
@@ -35,6 +37,7 @@ function reviveSale(s: SaleApiRow): Sale {
     saleDate: new Date(s.saleDate),
     returnedAt: s.returnedAt ? new Date(s.returnedAt) : undefined,
     paidAt: s.paidAt ? new Date(s.paidAt) : undefined,
+    partialPaidAt: s.partialPaidAt ? new Date(s.partialPaidAt) : undefined,
   };
 }
 

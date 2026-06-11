@@ -73,7 +73,24 @@ declare module "next-auth" {
        *  /settings → Language). Drives <html lang/dir> + the logged-in
        *  app dictionary. Always 'ar' | 'en' (CHECK-constrained at DB). */
       locale: "ar" | "en";
+      /** Platform-admin Spec 03: non-null = the tenant is suspended.
+       *  Proxy/middleware bounces any authenticated request to
+       *  /service-paused while this is set. */
+      tenantSuspendedAt: string | null;
+      /** Spec 03: the reason text the admin entered when suspending. Surfaced
+       *  on the /service-paused page so the owner knows what to fix. */
+      tenantSuspendedReason: string | null;
     } & DefaultSession["user"];
+    /** Platform-admin Spec 07. Truthy iff the current session was minted
+     *  via the impersonation flow — the owner is being viewed by an admin.
+     *  AppShell renders a persistent red banner whenever this is set. */
+    impersonation?: {
+      adminId: string;
+      adminEmail: string;
+      sessionId: string;
+      startedAt: number;
+      expiresAt: number;
+    };
   }
 }
 
@@ -92,6 +109,17 @@ declare module "@auth/core/jwt" {
     tv: number;
     /** Phase 2 — see session declaration above. */
     locale: "ar" | "en";
+    /** Platform-admin Spec 03 — null = active, ISO string = suspended at. */
+    tenantSuspendedAt: string | null;
+    tenantSuspendedReason: string | null;
+    /** Platform-admin Spec 07 — impersonation claims. Populated only when
+     *  the credentials provider authorized this JWT via an
+     *  impersonationToken (i.e. an admin is acting as the owner). */
+    impersonationAdminId?: string;
+    impersonationAdminEmail?: string;
+    impersonationSessionId?: string;
+    impersonationStartedAt?: number;
+    impersonationExpiresAt?: number;
   }
 }
 
@@ -137,6 +165,9 @@ interface UserContext {
   tokenVersion: number;
   /** Phase 2 — UI locale, persisted on the user row. */
   locale: "ar" | "en";
+  /** Platform-admin Spec 03 — non-null when the tenant is suspended. */
+  tenantSuspendedAt: Date | null;
+  tenantSuspendedReason: string | null;
 }
 
 async function resolveTenantContext(userId: string): Promise<UserContext> {
@@ -175,14 +206,22 @@ async function resolveTenantContext(userId: string): Promise<UserContext> {
 
     let onboardingComplete = false;
     let tenantSlug: string | null = null;
+    let tenantSuspendedAt: Date | null = null;
+    let tenantSuspendedReason: string | null = null;
 
     if (tenantId) {
       const [tenant] = await db
-        .select({ slug: tenants.slug })
+        .select({
+          slug: tenants.slug,
+          suspendedAt: tenants.suspendedAt,
+          suspendedReason: tenants.suspendedReason,
+        })
         .from(tenants)
         .where(eq(tenants.id, tenantId))
         .limit(1);
       tenantSlug = tenant?.slug ?? null;
+      tenantSuspendedAt = tenant?.suspendedAt ?? null;
+      tenantSuspendedReason = tenant?.suspendedReason ?? null;
 
       // shop_settings IS RLS-protected — set app.tenant_id first.
       // Multi-store: settings are now per (tenant, branch). Onboarding
@@ -233,6 +272,8 @@ async function resolveTenantContext(userId: string): Promise<UserContext> {
       subscriptionStatus,
       tokenVersion,
       locale,
+      tenantSuspendedAt,
+      tenantSuspendedReason,
     };
   });
 }
@@ -259,6 +300,44 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Password", type: "password" },
       },
       authorize: async (raw, req) => {
+        // Spec 07 — impersonation login. If the request carries a valid
+        // one-time impersonationToken (minted by /api/admin/tenants/[id]
+        // /impersonate), bypass password + rate-limit checks entirely and
+        // return the owner user augmented with an __impersonation marker
+        // the jwt callback below picks up.
+        const impToken =
+          typeof (raw as { impersonationToken?: unknown })?.impersonationToken ===
+          "string"
+            ? ((raw as { impersonationToken: string }).impersonationToken).trim()
+            : "";
+        if (impToken) {
+          const mod = await import("./admin/impersonation");
+          const ctx = await mod.consumeImpersonationToken(impToken);
+          if (!ctx) return null;
+          const [owner] = await db
+            .select()
+            .from(users)
+            .where(eq(users.id, ctx.ownerUserId))
+            .limit(1);
+          if (!owner) return null;
+          return {
+            id: owner.id,
+            email: owner.email,
+            name: owner.name,
+            image: owner.image,
+            // Carried through to the jwt() callback so it can embed the
+            // impersonation claims in the token. The session callback
+            // exposes these as session.impersonation.
+            __impersonation: {
+              adminId: ctx.adminId,
+              adminEmail: ctx.adminEmail,
+              sessionId: ctx.sessionId,
+              startedAt: ctx.startedAt,
+              expiresAt: ctx.expiresAt,
+            },
+          } as unknown as { id: string; email: string };
+        }
+
         const parsed = credentialsSchema.safeParse(raw);
         if (!parsed.success) return null;
 
@@ -366,6 +445,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.subscriptionStatus = ctx.subscriptionStatus;
         token.tv = ctx.tokenVersion;
         token.locale = ctx.locale;
+        token.tenantSuspendedAt = ctx.tenantSuspendedAt?.toISOString() ?? null;
+        token.tenantSuspendedReason = ctx.tenantSuspendedReason;
+        // Spec 07 — propagate the impersonation marker into the JWT.
+        const imp = (user as { __impersonation?: {
+          adminId: string;
+          adminEmail: string;
+          sessionId: string;
+          startedAt: number;
+          expiresAt: number;
+        } }).__impersonation;
+        if (imp) {
+          token.impersonationAdminId = imp.adminId;
+          token.impersonationAdminEmail = imp.adminEmail;
+          token.impersonationSessionId = imp.sessionId;
+          token.impersonationStartedAt = imp.startedAt;
+          token.impersonationExpiresAt = imp.expiresAt;
+        }
         if (ctx.tenantId) {
           logActivity({
             tenantId: ctx.tenantId,
@@ -393,6 +489,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           token.mustChangePassword = false;
           token.subscriptionAccessActive = true;
           token.subscriptionStatus = null;
+          token.tenantSuspendedAt = null;
+          token.tenantSuspendedReason = null;
           return token;
         }
         token.tenantId = ctx.tenantId;
@@ -405,6 +503,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.subscriptionStatus = ctx.subscriptionStatus;
         token.tv = ctx.tokenVersion;
         token.locale = ctx.locale;
+        token.tenantSuspendedAt = ctx.tenantSuspendedAt?.toISOString() ?? null;
+        token.tenantSuspendedReason = ctx.tenantSuspendedReason;
       }
       return token;
     },

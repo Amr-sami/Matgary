@@ -13,6 +13,7 @@ export interface PurchaseOrderSummary {
   receivedDate: Date | null;
   notes: string | null;
   total: number;
+  paidAmount: number;
   itemCount: number;
   createdAt: Date;
   updatedAt: Date;
@@ -27,6 +28,7 @@ interface ApiPurchaseOrder {
   receivedDate: string | null;
   notes: string | null;
   total: number;
+  paidAmount: number;
   itemCount: number;
   createdAt: string;
   updatedAt: string;

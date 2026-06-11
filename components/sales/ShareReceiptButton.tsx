@@ -56,8 +56,8 @@ export function ShareReceiptButton({ sale, variant = "icon" }: ShareReceiptButto
         onClick={() => setOpen((v) => !v)}
         className={
           variant === "icon"
-            ? "p-1.5 bg-gray-100 text-text-secondary rounded-lg hover:bg-accent hover:text-white"
-            : "flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-gray-100 text-text-secondary rounded-xl hover:bg-gray-200 text-sm"
+            ? "p-1.5 rounded-lg text-text-secondary hover:text-accent hover:opacity-90 transition-colors"
+            : "flex-1 flex items-center justify-center gap-1 px-3 py-2 text-text-secondary active:opacity-70 transition-opacity text-sm"
         }
         title={t.title}
       >

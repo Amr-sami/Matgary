@@ -14,7 +14,6 @@ import {
   type SalesSortKey,
 } from "@/components/sales/SalesFilters";
 import { SalesKpiCards } from "@/components/sales/SalesKpiCards";
-import { DeferredPanel } from "@/components/sales/DeferredPanel";
 import { DayCompareCard } from "@/components/sales/DayCompareCard";
 import { SalesChart } from "@/components/sales/SalesChart";
 import { TopProductsCard } from "@/components/sales/TopProductsCard";
@@ -107,8 +106,8 @@ function SalesPageInner() {
   const dict = useDictionary();
   const t = dict.app.sales;
 
-  const { sales, loading: salesLoading } = useSales();
-  const { returns: _returns } = useReturns();
+  const { sales, loading: salesLoading, refresh: refreshSales } = useSales();
+  const { returns: _returns, refresh: refreshReturns } = useReturns();
   const { products: _products } = useProducts();
 
   const [query, setQuery] = useState("");
@@ -334,6 +333,8 @@ function SalesPageInner() {
   };
   const handleReturnSuccess = () => {
     setToast({ type: "success", message: t.toast.returnSuccess });
+    void refreshSales();
+    void refreshReturns();
   };
 
   const handleVoidConfirm = useCallback(async () => {
@@ -346,12 +347,13 @@ function SalesPageInner() {
           ? t.toast.saleDeleted
           : t.toast.saleDeletedRestocked,
       });
+      void refreshSales();
     } catch (e: any) {
       setToast({ type: "error", message: e.message || t.toast.deleteFailed });
     } finally {
       setVoidSaleData(null);
     }
-  }, [voidSaleData, t.toast]);
+  }, [voidSaleData, t.toast, refreshSales]);
 
   const handleBulkExport = useCallback(() => {
     if (selectedSales.length === 0) return;
@@ -420,12 +422,16 @@ function SalesPageInner() {
         {/* KPIs over the date-ranged sales */}
         <SalesKpiCards sales={dateRangedSales} rangeLabel={rangeLabel} />
 
-        {/* Outstanding deferred (across all time) */}
-        <DeferredPanel sales={sales} />
-
         {/* Sale Form */}
         <SaleForm
-          onSuccess={() => setToast({ type: "success", message: t.toast.saleSuccess })}
+          onSuccess={() => {
+            setToast({ type: "success", message: t.toast.saleSuccess });
+            // Reload sales + returns so the table, KPIs, brand list, and
+            // receivables aggregates reflect the new invoice without
+            // forcing the cashier to refresh the page.
+            void refreshSales();
+            void refreshReturns();
+          }}
           onPrintLastSale={setReceiptData}
           onPrintLastInvoice={setInvoiceReceipt}
         />
@@ -554,7 +560,10 @@ function SalesPageInner() {
         isOpen={!!editSale}
         onClose={() => setEditSale(null)}
         sale={editSale}
-        onSuccess={() => setToast({ type: "success", message: t.toast.saleUpdated })}
+        onSuccess={() => {
+          setToast({ type: "success", message: t.toast.saleUpdated });
+          void refreshSales();
+        }}
       />
 
       <ConfirmDialog

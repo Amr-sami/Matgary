@@ -29,6 +29,7 @@ export interface PurchaseOrderSummary {
   receivedDate: Date | null;
   notes: string | null;
   total: number;
+  paidAmount: number;
   itemCount: number;
   createdAt: Date;
   updatedAt: Date;
@@ -77,6 +78,7 @@ export async function listPurchaseOrders(
       receivedDate: r.po.receivedDate,
       notes: r.po.notes,
       total: Number(r.po.total),
+      paidAmount: Number(r.po.paidAmount),
       itemCount: r.itemCount,
       createdAt: r.po.createdAt,
       updatedAt: r.po.updatedAt,
@@ -120,6 +122,7 @@ export async function getPurchaseOrder(
       receivedDate: row.po.receivedDate,
       notes: row.po.notes,
       total: Number(row.po.total),
+      paidAmount: Number(row.po.paidAmount),
       itemCount: items.length,
       createdAt: row.po.createdAt,
       updatedAt: row.po.updatedAt,

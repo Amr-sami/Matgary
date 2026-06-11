@@ -48,6 +48,11 @@ export interface ReceiptInvoiceData {
   cartSubtotal: number;
   orderDiscountAmount: number;
   totalPrice: number;
+  /** Partial payment snapshot: amount the customer handed over at the
+   *  counter. The receipt surfaces "PAID / ON ACCOUNT" lines when this is
+   *  set and less than `totalPrice`. Undefined ⇒ fully paid (no extra
+   *  lines printed). */
+  amountPaid?: number;
   note?: string;
   /** Loyalty redemption + earn snapshot at the moment of sale. Rendered on
    *  the receipt only when the branch's `receiptShowLoyalty` is on AND at
@@ -159,6 +164,10 @@ export function SaleForm({
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
+  /** For deferred sales only: amount the customer paid at the counter. Stored
+   *  as a string so the input can be edited fluently (empty, "0", "0.50",
+   *  etc.) — parsed to a number at submit. */
+  const [amountPaidNowInput, setAmountPaidNowInput] = useState("");
 
   // Loyalty redemption — appears only when the active branch's loyalty
   // programme is enabled AND the cashier has typed a customer phone.
@@ -502,6 +511,13 @@ export function SaleForm({
           // and refuses if balance is short or programme is disabled.
           redeemPoints: Math.max(0, Math.floor(Number(redeemPointsInput) || 0)),
           applyCreditEgp: Math.max(0, Number(applyCreditInput) || 0),
+          // Partial payment on آجل: how much the customer handed over now.
+          // Server clamps to [0, finalTotal]. Sending 0 (the default) keeps
+          // the simple "full receipt on account" flow working as before.
+          amountPaidNow:
+            paymentMethod === "deferred"
+              ? Math.max(0, Number(amountPaidNowInput) || 0)
+              : undefined,
         }
       );
 
@@ -572,6 +588,16 @@ export function SaleForm({
         // the customer handed over, post-loyalty. Pre-loyalty subtotal
         // still appears above as SUBTOTAL so the math reads correctly.
         totalPrice: paidTotal,
+        // Partial-payment IOU lines on the receipt. We pass undefined on
+        // non-deferred sales (or fully-paid deferred ones) so the receipt
+        // stays clean. The clamp matches the server's invariant.
+        amountPaid:
+          paymentMethod === "deferred"
+            ? Math.max(
+                0,
+                Math.min(Number(amountPaidNowInput) || 0, paidTotal),
+              )
+            : undefined,
         note: note || undefined,
         loyaltyPointsRedeemed: loyaltyPointsAppliedDisplay || undefined,
         loyaltyCreditApplied: loyaltyCreditAppliedDisplay || undefined,
@@ -874,6 +900,7 @@ export function SaleForm({
       setCustomerName("");
       setCustomerPhone("");
       setPaymentMethod("cash");
+      setAmountPaidNowInput("");
       onSuccess();
     } catch (error: any) {
       alert(error.message);
@@ -1253,9 +1280,56 @@ export function SaleForm({
                 ))}
               </div>
               {paymentMethod === "deferred" && (
-                <p className="mt-1 text-xs text-orange-600">
-                  {t.payment.deferredNote}
-                </p>
+                <div className="mt-2 rounded-lg border border-orange-200 bg-orange-50/60 p-3 space-y-2">
+                  <p className="text-xs text-orange-700 leading-relaxed">
+                    {t.payment.deferredNote}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-medium text-text-secondary shrink-0">
+                      {t.payment.partialPaidNow}
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={cartTotal}
+                      step="0.01"
+                      inputMode="decimal"
+                      value={amountPaidNowInput}
+                      onChange={(e) => setAmountPaidNowInput(e.target.value)}
+                      placeholder="0"
+                      dir="ltr"
+                      className="flex-1 min-w-0 px-3 py-2 rounded-lg border border-orange-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setAmountPaidNowInput(String(cartTotal))}
+                      className="shrink-0 text-[11px] font-semibold text-accent hover:underline"
+                    >
+                      {t.payment.partialPayAll}
+                    </button>
+                  </div>
+                  {(() => {
+                    const paidNow = Math.max(
+                      0,
+                      Math.min(Number(amountPaidNowInput) || 0, cartTotal),
+                    );
+                    const balance = Math.max(0, cartTotal - paidNow);
+                    return (
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-text-secondary">
+                          {t.payment.partialPaidLabel}: {fmt(paidNow)}
+                        </span>
+                        <span
+                          className={`font-semibold ${
+                            balance > 0 ? "text-orange-700" : "text-success"
+                          }`}
+                        >
+                          {t.payment.partialBalanceLabel}: {fmt(balance)}
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </div>
               )}
             </div>
 

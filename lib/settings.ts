@@ -8,6 +8,44 @@ export const DEFAULT_TEMPLATE = DEFAULT_MESSAGE_TEMPLATE;
 
 export type ReceiptLogoSize = "hidden" | "small" | "medium" | "large";
 export type ReceiptLanguage = "ar" | "en" | "bilingual";
+export type ReceiptFontFamily = "cairo" | "tajawal" | "lemonada";
+/** Fixed receipt blocks the renderer knows how to draw. Order is owner-
+ *  controlled; arbitrary "custom:<id>" entries may also appear in the order
+ *  and reference entries in receiptCustomBlocks. */
+export type ReceiptFixedBlock =
+  | "logo"
+  | "shopInfo"
+  | "purchaseDate"
+  | "items"
+  | "totals"
+  | "loyalty"
+  | "footer";
+/** What lives in receiptBlockOrder: either a fixed block key or a
+ *  custom-block reference like "custom:abc123". */
+export type ReceiptBlockKey = ReceiptFixedBlock | `custom:${string}`;
+export const RECEIPT_FIXED_BLOCKS: readonly ReceiptFixedBlock[] = [
+  "logo",
+  "shopInfo",
+  "purchaseDate",
+  "items",
+  "totals",
+  "loyalty",
+  "footer",
+];
+export const DEFAULT_RECEIPT_BLOCK_ORDER: ReceiptBlockKey[] = [
+  "logo",
+  "shopInfo",
+  "purchaseDate",
+  "items",
+  "totals",
+  "loyalty",
+  "footer",
+];
+export type ReceiptBlockAlign = "right" | "center" | "left";
+export interface ReceiptCustomBlock {
+  text: string;
+  align: ReceiptBlockAlign;
+}
 
 export interface ShopSettings {
   autoOpenWhatsApp: boolean;
@@ -41,6 +79,13 @@ export interface ShopSettings {
   receiptFooterText: string;
   receiptLanguage: ReceiptLanguage;
   receiptShowLoyalty: boolean;
+  /** Receipt designer — see migration 0029. Logo is stored as a data:image
+   *  URI; block order + font are owner-customisable from /settings. */
+  receiptLogoUrl: string;
+  receiptBlockOrder: ReceiptBlockKey[];
+  receiptFontFamily: ReceiptFontFamily;
+  /** Owner-defined text blocks the renderer splices in by ID — added in 0030. */
+  receiptCustomBlocks: Record<string, ReceiptCustomBlock>;
 }
 
 export const DEFAULT_SETTINGS: ShopSettings = {
@@ -66,6 +111,10 @@ export const DEFAULT_SETTINGS: ShopSettings = {
   receiptFooterText: "",
   receiptLanguage: "ar",
   receiptShowLoyalty: true,
+  receiptLogoUrl: "",
+  receiptBlockOrder: DEFAULT_RECEIPT_BLOCK_ORDER,
+  receiptFontFamily: "cairo",
+  receiptCustomBlocks: {},
 };
 
 export interface ReceiptVars {

@@ -88,6 +88,8 @@ export async function POST(req: NextRequest) {
     recurrencePeriod: parsed.data.recurrencePeriod ?? null,
     date: parsed.data.date ? new Date(parsed.data.date) : undefined,
     branchId: resolvedBranchId,
+    recordedByUserId: r.ctx.userId,
+    recordedByRole: r.ctx.role === "owner" ? "owner" : "staff",
   });
   logActivity({
     tenantId: r.ctx.tenantId,

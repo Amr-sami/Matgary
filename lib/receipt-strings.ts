@@ -24,6 +24,8 @@ export const RECEIPT_LABELS = {
   loyaltyEarned: { en: "POINTS EARNED", ar: "نقاط مكتسبة" },
   walletBalance: { en: "WALLET BALANCE", ar: "رصيد المحفظة" },
   total: { en: "TOTAL AMOUNT", ar: "الإجمالي" },
+  paid: { en: "PAID", ar: "مدفوع" },
+  balance: { en: "ON ACCOUNT", ar: "متبقي على الحساب" },
   thankYou: { en: "THANK YOU FOR SHOPPING!", ar: "شكراً لتسوقكم معنا" },
   brand: { en: "BRAND", ar: "الماركة" },
   scanToVisit: { en: "SCAN TO VISIT", ar: "امسح للزيارة" },

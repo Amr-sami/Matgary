@@ -18,9 +18,10 @@ import {
   Truck,
   Receipt,
   ListChecks,
-  History,
+  DollarSign,
   Menu,
   LogOut,
+  Globe,
   X,
 } from "@/lib/icons";
 import { cn } from "@/lib/utils";
@@ -28,7 +29,8 @@ import { logoutAction } from "@/app/[lang]/(auth)/actions";
 import { can, canAny, type Permission } from "@/lib/permissions";
 import { useUnreadTaskCount } from "@/hooks/useUnreadTaskCount";
 import { useLeaveUnread } from "@/hooks/useLeaveUnread";
-import { useDictionary } from "@/components/i18n/DictionaryProvider";
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
+import type { Locale } from "@/lib/i18n/config";
 
 interface NavItem {
   href: string;
@@ -52,17 +54,18 @@ const moreItems: NavItem[] = [
   { href: "/tasks", labelKey: "tasks", icon: ListChecks, requires: "view_dashboard" },
   { href: "/customers", labelKey: "customers", icon: Users, requires: "view_customers" },
   { href: "/expenses", labelKey: "expenses", icon: Wallet, requires: "view_expenses" },
+  { href: "/cash-shifts", labelKey: "cashShifts", icon: DollarSign, requires: "manage_cash_reconciliation" },
   { href: "/suppliers", labelKey: "suppliers", icon: Truck, requires: "view_suppliers" },
   { href: "/returns", labelKey: "returns", icon: RotateCcw, requires: "view_returns" },
   { href: "/team", labelKey: "team", icon: UsersGroup, requires: "manage_team" },
-  { href: "/activity", labelKey: "activity", icon: History, requires: "view_activity_log" },
+  // /activity moved into /settings to keep the More sheet compact.
   { href: "/settings", labelKey: "settings", icon: Settings, requires: "view_settings" },
 ];
 
 export function MobileBottomNav() {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
-  const { data: session } = useSession();
+  const { data: session, update: updateSession } = useSession();
   const dict = useDictionary();
   const shellT = dict.app.shell;
   const primaryLabels = shellT.primary as Record<string, string>;
@@ -84,6 +87,36 @@ export function MobileBottomNav() {
   const email = session?.user?.email ?? "";
   const { count: unreadTasks } = useUnreadTaskCount();
   const { counts: leaveUnread } = useLeaveUnread();
+
+  // Language switcher — same PATCH + reload flow as the desktop UserMenu,
+  // so behaviour stays identical across surfaces.
+  const activeLocale = useLocale();
+  const langT = shellT.language;
+  const [switchingTo, setSwitchingTo] = useState<Locale | null>(null);
+  const switchLocale = async (target: Locale) => {
+    if (target === activeLocale || switchingTo) return;
+    setSwitchingTo(target);
+    try {
+      const res = await fetch("/api/account/locale", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ locale: target }),
+      });
+      if (!res.ok) {
+        setSwitchingTo(null);
+        return;
+      }
+      // Force NextAuth to re-encode the JWT cookie with the fresh locale.
+      // Without this, window.location.reload() races the cache-bust and the
+      // middleware reads the OLD locale from the still-cached JWT cookie —
+      // the page renders in the previous language and the user has to
+      // switch a second time.
+      await updateSession();
+      window.location.reload();
+    } catch {
+      setSwitchingTo(null);
+    }
+  };
 
   const badgeFor = (href: string): number | null => {
     if (href === "/tasks" && unreadTasks > 0) return unreadTasks;
@@ -205,6 +238,49 @@ export function MobileBottomNav() {
               </Link>
             );
           })}
+        </div>
+
+        {/* Language switcher — inline AR/EN pills. One tap to switch,
+            mirrors the desktop UserMenu's behaviour. */}
+        <div className="mt-3 pt-3 border-t border-border flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <Globe className="w-4 h-4 text-text-secondary shrink-0" />
+            <span className="text-xs font-medium text-text-secondary">
+              {langT.label}
+            </span>
+          </div>
+          <div
+            role="group"
+            aria-label={langT.label}
+            className="inline-flex rounded-full border border-border bg-bg-main p-0.5 shrink-0"
+          >
+            {(["ar", "en"] as Locale[]).map((loc) => {
+              const isActive = loc === activeLocale;
+              const isSwitching = switchingTo === loc;
+              return (
+                <button
+                  key={loc}
+                  type="button"
+                  onClick={() => switchLocale(loc)}
+                  disabled={!!switchingTo || isActive}
+                  aria-pressed={isActive}
+                  className={cn(
+                    "min-w-[64px] px-3 py-1 text-xs font-semibold rounded-full transition-colors",
+                    isActive
+                      ? "bg-white text-accent shadow-sm"
+                      : "text-text-secondary hover:text-text-primary",
+                    switchingTo && !isSwitching && "opacity-50",
+                  )}
+                >
+                  {isSwitching
+                    ? langT.switching
+                    : loc === "ar"
+                      ? langT.arabic
+                      : langT.english}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {email && (

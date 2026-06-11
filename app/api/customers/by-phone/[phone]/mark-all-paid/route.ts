@@ -35,6 +35,7 @@ export async function POST(
     r.ctx.tenantId,
     r.ctx.branchId,
     normalised,
+    { recordedByUserId: r.ctx.userId },
   );
 
   if (result.markedCount > 0) {

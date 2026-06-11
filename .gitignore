@@ -54,3 +54,6 @@ next-env.d.ts
 
 # Claude Code local config (per-machine settings, scheduled-tasks lock, etc.)
 .claude/
+
+# local scratch (seed / verify logs)
+/tmp

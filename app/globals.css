@@ -100,6 +100,81 @@ textarea {
 }
 
 
+/* ─── Broadcast banner motion ─── */
+@keyframes broadcast-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes broadcast-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(192, 57, 43, 0.45);
+  }
+  60% {
+    box-shadow: 0 0 0 6px rgba(192, 57, 43, 0);
+  }
+}
+
+.broadcast-banner {
+  animation: broadcast-slide-in 200ms ease-out both;
+}
+
+.broadcast-critical-pulse {
+  animation: broadcast-pulse 2.4s ease-out infinite;
+}
+
+/* Animated brand-blue gradient border — sweeps a soft accent highlight
+   around the perimeter on a slow loop. Uses the @property + double-
+   background-clip trick so we render a real gradient on the border ring
+   itself (no JS, no extra DOM nodes). The faint warm `--border` segment
+   keeps the rest of the perimeter visually consistent with the app's
+   default card border. */
+@property --broadcast-border-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes broadcast-border-rotate {
+  to {
+    --broadcast-border-angle: 360deg;
+  }
+}
+
+.broadcast-glow {
+  position: relative;
+  background-color: #ffffff;
+  background-image:
+    linear-gradient(#ffffff, #ffffff),
+    conic-gradient(
+      from var(--broadcast-border-angle),
+      #e8e4dc 0deg,
+      #e8e4dc 250deg,
+      #6759ff 290deg,
+      #1203e3 320deg,
+      #6759ff 350deg,
+      #e8e4dc 360deg
+    );
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  border: 1.5px solid transparent;
+  animation: broadcast-border-rotate 5s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .broadcast-banner,
+  .broadcast-critical-pulse,
+  .broadcast-glow {
+    animation: none;
+  }
+}
+
 /* ─── Receipt Styles (hidden on screen) ─── */
 .print-receipt-container {
   display: none;

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireTenantWithBranch } from "@/lib/api/auth-helpers";
-import { recordCartSale } from "@/lib/repo/operations";
+import { NoOpenShiftError, recordCartSale } from "@/lib/repo/operations";
 import { logActivity } from "@/lib/repo/activity";
 import { normalizeEgyptPhone } from "@/lib/validators/egypt";
 import {
@@ -41,6 +41,9 @@ const schema = z.object({
       // the wallet balance is short.
       redeemPoints: z.number().int().min(0).max(1_000_000).optional(),
       applyCreditEgp: z.number().min(0).max(1_000_000).optional(),
+      // Partial payment: amount the customer paid at the counter on a
+      // deferred sale. Distributed proportionally across the lines.
+      amountPaidNow: z.number().min(0).max(10_000_000).optional(),
     })
     .optional(),
 });
@@ -94,6 +97,7 @@ export async function POST(req: NextRequest) {
         ? new Date(parsed.data.options.customDate)
         : undefined,
       recordedByUserId: r.ctx.userId,
+      recordedByRole: r.ctx.role === "owner" ? "owner" : "staff",
       branchId: r.ctx.branchId,
     });
     const totalQty = result.lines.reduce((s, l) => s + l.quantity, 0);
@@ -125,6 +129,15 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json(result, { status: 201 });
   } catch (err) {
+    // Cash drawer not open → instruct the client to open one. Doesn't get
+    // cached against the idempotency key — the cashier can open a shift
+    // and retry the same key.
+    if (err instanceof NoOpenShiftError) {
+      return NextResponse.json(
+        { error: "NO_OPEN_SHIFT", code: "NO_OPEN_SHIFT" },
+        { status: 409 },
+      );
+    }
     const errorBody = { error: err instanceof Error ? err.message : "خطأ" };
     // Cache 4xx-style failures too so a stuck outbox row doesn't keep
     // failing forever — the same key returns the same error every time.

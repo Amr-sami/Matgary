@@ -117,6 +117,23 @@ export async function pruneActivityAllTenants(
 export async function logActivity(input: LogActivityInput): Promise<void> {
   try {
     let actorName = input.actorName ?? null;
+    // Spec 07 — when the current request is an impersonation session,
+    // every activity row picks up an `impersonatedBy` marker in metadata.
+    // Best-effort: silently skip when there's no active request / session.
+    let metadata = input.metadata ?? null;
+    try {
+      const { auth } = await import("@/lib/auth");
+      const session = await auth();
+      if (session && session.impersonation) {
+        metadata = {
+          ...(metadata ?? {}),
+          impersonatedBy: session.impersonation.adminId,
+          impersonatedByEmail: session.impersonation.adminEmail,
+        };
+      }
+    } catch {
+      // No request context (e.g. cron-driven write) — leave metadata alone.
+    }
     await withTenant(input.tenantId, async (tx) => {
       if (!actorName && input.actorUserId) {
         const [member] = await tx
@@ -148,7 +165,7 @@ export async function logActivity(input: LogActivityInput): Promise<void> {
         entityType: input.entityType ?? null,
         entityId: input.entityId ?? null,
         entityLabel: input.entityLabel ?? null,
-        metadata: input.metadata ?? null,
+        metadata,
         ip: input.ip ?? null,
         branchId: input.branchId ?? null,
       });

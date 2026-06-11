@@ -169,28 +169,28 @@ export function ProductTableRow({
           <button
             onClick={() => onSell(product)}
             disabled={isOutOfStock}
-            className="p-2 hover:bg-success-light rounded-lg text-success disabled:opacity-50 disabled:cursor-not-allowed"
+            className="p-2 rounded-lg text-success hover:opacity-70 disabled:opacity-30 disabled:cursor-not-allowed transition-opacity"
             title={t.sell}
           >
             <ShoppingCart className="w-4 h-4" />
           </button>
           <button
             onClick={() => onEdit(product)}
-            className="p-2 hover:bg-accent-light rounded-lg text-accent"
+            className="p-2 rounded-lg text-accent hover:opacity-70 transition-opacity"
             title={t.edit}
           >
             <Pencil className="w-4 h-4" />
           </button>
           <button
             onClick={() => onHistory(product)}
-            className="p-2 hover:bg-gray-100 rounded-lg text-text-secondary"
+            className="p-2 rounded-lg text-text-secondary hover:opacity-70 transition-opacity"
             title={t.history}
           >
             <History className="w-4 h-4" />
           </button>
           <button
             onClick={() => onDelete(product)}
-            className="p-2 hover:bg-danger-light rounded-lg text-danger"
+            className="p-2 rounded-lg text-danger hover:opacity-70 transition-opacity"
             title={t.delete}
           >
             <Trash2 className="w-4 h-4" />

@@ -3,6 +3,7 @@
 import { cn } from "@/lib/utils";
 import type { Category, Gender, CategoryDescriptor } from "@/lib/types";
 import { useDictionary } from "@/components/i18n/DictionaryProvider";
+import { FilterSelect } from "@/components/ui/FilterSelect";
 
 export type StockStatus = "in" | "low" | "out";
 
@@ -156,34 +157,20 @@ export function InventoryFilters({
       {/* Brand + Supplier + Price filters */}
       <div className="flex flex-wrap gap-2">
         {brands.length > 0 && (
-          <select
-            value={selectedBrand || ""}
-            onChange={(e) => onBrandChange(e.target.value || null)}
-            className="px-3 py-2 rounded-lg border border-border bg-white text-sm"
-            dir="auto"
-          >
-            <option value="">{t.allBrands}</option>
-            {brands.map((brand) => (
-              <option key={brand} value={brand}>
-                {brand}
-              </option>
-            ))}
-          </select>
+          <FilterSelect
+            value={selectedBrand}
+            onChange={onBrandChange}
+            allLabel={t.allBrands}
+            options={brands}
+          />
         )}
         {suppliers.length > 0 && (
-          <select
-            value={selectedSupplier || ""}
-            onChange={(e) => onSupplierChange(e.target.value || null)}
-            className="px-3 py-2 rounded-lg border border-border bg-white text-sm"
-            dir="auto"
-          >
-            <option value="">{t.allSuppliers}</option>
-            {suppliers.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
+          <FilterSelect
+            value={selectedSupplier}
+            onChange={onSupplierChange}
+            allLabel={t.allSuppliers}
+            options={suppliers}
+          />
         )}
         <input
           type="number"

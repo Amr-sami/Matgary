@@ -31,6 +31,10 @@ export interface CustomerSaleRecord {
   customerPhone?: string;
   paymentMethod?: string;
   isPaid?: boolean;
+  /** Partial-payments tracking. Defaults to 0 on legacy rows; the
+   *  receivables aggregator falls back to the isPaid heuristic when this
+   *  is missing. */
+  amountPaid?: number;
 }
 
 export function useCustomersData() {
@@ -55,6 +59,7 @@ export function useCustomersData() {
           customerPhone: s.customerPhone,
           paymentMethod: s.paymentMethod,
           isPaid: s.isPaid,
+          amountPaid: s.amountPaid,
         })),
       );
     } catch (err) {

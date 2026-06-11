@@ -468,7 +468,11 @@
         },
         "payment": {
           "label": "Payment method",
-          "deferredNote": "This sale will be recorded as unpaid (on account)."
+          "deferredNote": "This sale will be recorded on the customer's account. You can collect part of it now and the rest later.",
+          "partialPaidNow": "Paid now",
+          "partialPayAll": "Pay full",
+          "partialPaidLabel": "Paid",
+          "partialBalanceLabel": "Remaining"
         },
         "note": {
           "label": "Note (optional)",
@@ -922,6 +926,586 @@
       "title": "Returns",
       "monthLabel": "Returns this month"
     },
+    "admin": {
+      "shell": {
+        "brand": "Matgary",
+        "title": "Platform admin",
+        "nav": {
+          "dashboard": "Dashboard",
+          "tenants": "Stores",
+          "sales": "Sales",
+          "plans": "Plans",
+          "broadcasts": "Broadcasts",
+          "admins": "Admins",
+          "audit": "Audit",
+          "account": "My account"
+        },
+        "roleSuper": "Super admin",
+        "roleOps": "Ops admin",
+        "signOut": "Sign out",
+        "signOutEverywhere": "Sign out everywhere",
+        "signOutEverywhereConfirm": "Sign out from every device? You'll have to log in again here too."
+      },
+      "login": {
+        "brand": "Matgary",
+        "title": "Platform admin",
+        "subtitle": "Restricted access — sign in to continue.",
+        "emailLabel": "Email",
+        "passwordLabel": "Password",
+        "submit": "Sign in",
+        "submitting": "Signing in…",
+        "invalidCredentials": "Incorrect email or password.",
+        "rateLimited": "Too many attempts. Try again in a few minutes.",
+        "networkError": "Could not reach the server. Try again."
+      },
+      "home": {
+        "eyebrow": "Platform admin",
+        "welcome": "Welcome, {name}.",
+        "placeholderIntro": "This is the foundation slice. The real overview cards, tenant list, and tools land in Specs 02–08.",
+        "upNext": {
+          "title": "Up next",
+          "spec02": "Spec 02 — Tenants overview + list + detail (read-only).",
+          "spec03": "Spec 03 — Tenant write actions (suspend, extend trial).",
+          "spec04": "Spec 04 — Plan editor that reflects on the landing page.",
+          "spec05": "Spec 05 — Manage other admins."
+        }
+      },
+      "overview": {
+        "title": "Platform overview",
+        "subtitle": "How the whole platform is doing right now.",
+        "kpis": {
+          "totalTenants": "Total stores",
+          "trialing": "On trial",
+          "activePaid": "Active paid",
+          "mrr": "MRR",
+          "todaySignups": "Today's signups",
+          "thisWeekDelta": "+{n} this week",
+          "expiringIn7d": "{n} expiring in 7d",
+          "vsLastWeek": "vs same day last week",
+          "wow": "▲ {n}% wow"
+        },
+        "lists": {
+          "trialsExpiring": "Trials expiring next 7 days",
+          "recentFailures": "Recent payment failures",
+          "recentAdminActivity": "Recent admin activity",
+          "viewAll": "View all",
+          "empty": "Nothing here yet."
+        },
+        "charts": {
+          "planDistribution": "Plan distribution",
+          "signups30d": "Signups (last 30 days)"
+        }
+      },
+      "sales": {
+        "platform": {
+          "title": "Platform sales",
+          "subtitle": "How every store is selling, right now.",
+          "kpis": {
+            "todayGmv": "Today",
+            "thisMonthGmv": "This month",
+            "thisYearGmv": "This year",
+            "wow": "vs same day last week",
+            "mom": "vs last month",
+            "yoy": "vs same period last year",
+            "saleCount": "{n} sale(s)"
+          },
+          "chart": {
+            "title": "Platform GMV — last 12 months"
+          },
+          "topStores": {
+            "title": "Top 5 stores · this month",
+            "empty": "No sales yet this month."
+          }
+        },
+        "list": {
+          "title": "Sales by store",
+          "subtitle": "Cross-store performance for the selected period. Click a row to drill in.",
+          "rangeLabel": "Range",
+          "ranges": {
+            "this_month": "This month",
+            "last_month": "Last month",
+            "this_year": "This year",
+            "last_30d": "Last 30 days",
+            "last_90d": "Last 90 days"
+          },
+          "planLabel": "Plan",
+          "planAny": "Any",
+          "statusLabel": "Status",
+          "statusAny": "Any",
+          "statusActive": "Active paid",
+          "statusTrialing": "Trialing",
+          "statusSuspended": "Suspended",
+          "columns": {
+            "store": "Store",
+            "owner": "Owner",
+            "plan": "Plan",
+            "gmv": "GMV",
+            "count": "Sales",
+            "avg": "Avg ticket",
+            "mom": "vs prev period",
+            "status": "Status"
+          },
+          "suspendedBadge": "Suspended",
+          "empty": "No sales in this period.",
+          "emptyHint": "Try widening the date range or clearing filters."
+        },
+        "tenantDetail": {
+          "title": "Sales performance",
+          "ytdLabel": "This year (YTD)",
+          "yoyLabel": "vs last year",
+          "thisMonthLabel": "This month",
+          "chartTitle": "GMV — last 12 months",
+          "topBranches": "Top branches · this month",
+          "topProducts": "Top products · this month",
+          "paymentMix": "Payment mix · this month",
+          "paymentMethods": {
+            "cash": "Cash",
+            "card": "Card",
+            "instapay": "InstaPay",
+            "deferred": "Deferred"
+          },
+          "noBranches": "No branch sales this month.",
+          "noProducts": "No products sold this month."
+        }
+      },
+      "audit": {
+        "title": "Audit",
+        "subtitle": "Searchable record of every admin write. Reads are not logged; writes are.",
+        "filters": {
+          "actor": "Actor",
+          "actorAny": "Any admin",
+          "actionPrefix": "Action",
+          "actionAll": "All",
+          "actionAuth": "Auth (auth.*)",
+          "actionTenant": "Tenant (tenant.*)",
+          "actionPlan": "Plan (plan.*)",
+          "actionAdmin": "Admin (admin.*)",
+          "actionBroadcast": "Broadcast (broadcast.*)",
+          "actionImpersonate": "Impersonation (impersonate.*)",
+          "targetKind": "Target",
+          "targetKindAny": "Any",
+          "since": "From",
+          "until": "To",
+          "q": "Search (3+ chars)",
+          "qPlaceholder": "Free-text on diff JSON…"
+        },
+        "columns": {
+          "time": "Time",
+          "actor": "Actor",
+          "action": "Action",
+          "target": "Target",
+          "ip": "IP",
+          "diff": "Diff summary"
+        },
+        "loadMore": "Load older",
+        "empty": "No audit entries match this filter.",
+        "emptyHint": "Try clearing the action filter or expanding the date range.",
+        "deletedActor": "(deleted)",
+        "createdMarker": "Created",
+        "deletedMarker": "Deleted",
+        "modal": {
+          "title": "Audit entry",
+          "actor": "Actor",
+          "action": "Action",
+          "target": "Target",
+          "occurredAt": "Occurred at",
+          "ip": "IP",
+          "userAgent": "User agent",
+          "before": "Before",
+          "after": "After",
+          "copy": "Copy JSON",
+          "copied": "Copied",
+          "close": "Close"
+        }
+      },
+      "broadcasts": {
+        "title": "Broadcasts",
+        "subtitle": "Post system-wide banners shown in every tenant's app. Pick severity and audience carefully — every signed-in user will see them.",
+        "createCta": "New broadcast",
+        "sections": {
+          "active": "Active now",
+          "scheduled": "Scheduled",
+          "past": "Past",
+          "emptyActive": "Nothing live right now.",
+          "emptyScheduled": "No scheduled broadcasts.",
+          "emptyPast": "No past broadcasts yet."
+        },
+        "severity": {
+          "info": "Info",
+          "warning": "Warning",
+          "critical": "Critical"
+        },
+        "audience": {
+          "all": "Everyone",
+          "owners": "Store owners",
+          "staff": "Store staff"
+        },
+        "fields": {
+          "titleAr": "Title (Arabic)",
+          "titleEn": "Title (English)",
+          "bodyAr": "Body (Arabic)",
+          "bodyEn": "Body (English)",
+          "severityLabel": "Severity",
+          "audienceLabel": "Audience"
+        },
+        "preview": {
+          "title": "Live preview",
+          "subtitle": "How the broadcast appears inside the tenant app",
+          "asBanner": "Banner — top of every page",
+          "asModal": "Modal — first time each user sees it",
+          "emptyTitle": "Type a title to see the preview",
+          "emptySub": "We'll show how the banner — and, for critical, the popup — appears in the tenant app.",
+          "frameUrl": "app.matgary.com",
+          "frameWorkspace": "Tenant workspace",
+          "localeAr": "العربية",
+          "localeEn": "English",
+          "criticalBadge": "Critical · pops up first"
+        },
+        "row": {
+          "endsIn": "Ends in {when}",
+          "noEnd": "No end set",
+          "startsIn": "Starts in {when}",
+          "endedAt": "Ended {when}",
+          "edit": "Edit",
+          "endNow": "End now"
+        },
+        "form": {
+          "createTitle": "New broadcast",
+          "editTitle": "Edit broadcast",
+          "submitCreate": "Create",
+          "submitSave": "Save",
+          "submitEndNow": "End now",
+          "cancel": "Cancel"
+        },
+        "toast": {
+          "created": "Broadcast posted.",
+          "saved": "Saved.",
+          "ended": "Broadcast ended.",
+          "errorGeneric": "Action failed."
+        },
+        "errors": {
+          "INVALID_WINDOW": "End time must be after start time.",
+          "INVALID_TITLE_AR": "Arabic title must be 120 chars or fewer.",
+          "INVALID_TITLE_EN": "English title must be 120 chars or fewer.",
+          "BODY_TOO_LONG": "Body must be 1000 chars or fewer.",
+          "INVALID_SEVERITY": "Invalid severity.",
+          "INVALID_AUDIENCE": "Invalid audience.",
+          "NO_TITLE": "Please add a title in Arabic or English.",
+          "INVALID": "Please double-check the form and try again.",
+          "NOT_FOUND": "Broadcast not found."
+        }
+      },
+      "adminMgmt": {
+        "title": "Admins",
+        "subtitle": "Add, promote, or disable platform admins. Super-admin only.",
+        "addCta": "Add admin",
+        "columns": {
+          "email": "Email",
+          "name": "Display name",
+          "role": "Role",
+          "status": "Status",
+          "lastLogin": "Last login",
+          "lastPasswordChange": "Last password change",
+          "createdBy": "Created by",
+          "actions": "Actions"
+        },
+        "roles": {
+          "super_admin": "Super admin",
+          "ops_admin": "Ops admin"
+        },
+        "statusActive": "Active",
+        "statusDisabled": "Disabled",
+        "mustRotateBadge": "Must rotate password",
+        "youBadge": "You",
+        "rowActions": {
+          "edit": "Edit",
+          "resetPassword": "Reset password",
+          "enable": "Enable",
+          "disable": "Disable",
+          "delete": "Delete"
+        },
+        "addModal": {
+          "title": "Add admin",
+          "intro": "Pick the role. We'll generate a temporary password to share with the new admin out-of-band — they'll be forced to set a real one on first login.",
+          "emailLabel": "Email",
+          "nameLabel": "Display name",
+          "roleLabel": "Role",
+          "submit": "Create admin",
+          "cancel": "Cancel"
+        },
+        "editModal": {
+          "title": "Edit admin",
+          "intro": "Update display name, role, or disable/enable. The change takes effect on the admin's next request.",
+          "nameLabel": "Display name",
+          "roleLabel": "Role",
+          "disabledLabel": "Disabled",
+          "submit": "Save",
+          "cancel": "Cancel"
+        },
+        "tempPasswordModal": {
+          "title": "Temporary password",
+          "intro": "Copy this password now and share it with {email} out-of-band. It will NOT be shown again. The admin will be forced to set a new one on first login.",
+          "copy": "Copy",
+          "copied": "Copied!",
+          "done": "Done"
+        },
+        "resetConfirm": {
+          "title": "Reset password?",
+          "intro": "This signs {email} out of every device and forces them to set a new password on next login.",
+          "submit": "Reset password",
+          "cancel": "Cancel"
+        },
+        "deleteConfirm": {
+          "title": "Delete admin?",
+          "intro": "Delete {email} permanently. Their audit log entries will keep referencing this admin id; the UI will show '(deleted)' next to the name.",
+          "submit": "Delete admin",
+          "cancel": "Cancel"
+        },
+        "toast": {
+          "added": "Admin created.",
+          "edited": "Saved.",
+          "passwordReset": "Password reset.",
+          "deleted": "Admin deleted.",
+          "errorGeneric": "Action failed."
+        },
+        "errors": {
+          "SELF_TARGET": "You can't perform this action on yourself.",
+          "LAST_SUPER_ADMIN": "Cannot remove the last enabled super-admin. Promote someone else first.",
+          "EMAIL_TAKEN": "An admin with that email already exists.",
+          "USE_ACCOUNT_PAGE": "Use the account page to rotate your own password.",
+          "NOT_FOUND": "Admin not found.",
+          "INVALID_EMAIL": "Email is invalid.",
+          "INVALID_NAME": "Display name must be 1–80 characters.",
+          "INVALID_ROLE": "Role must be super_admin or ops_admin."
+        }
+      },
+      "plans": {
+        "title": "Plans",
+        "subtitle": "Edit landing-page pricing, labels and feature lists. Changes go live within ~1 minute (no deploy).",
+        "lastEditedBy": "Last edited by {email} · {when}",
+        "lastEditedAnon": "Last edited {when}",
+        "fields": {
+          "labelAr": "Label (Arabic)",
+          "labelEn": "Label (English)",
+          "taglineAr": "Tagline (Arabic)",
+          "taglineEn": "Tagline (English)",
+          "monthlyEgp": "Monthly price (EGP)",
+          "purchasable": "Purchasable",
+          "purchasableHint": "If off, the plan still renders on the landing page but with a 'Coming soon' badge instead of a Subscribe button.",
+          "sortOrder": "Display order",
+          "featuresAr": "Features (Arabic)",
+          "featuresEn": "Features (English)",
+          "addFeature": "Add feature",
+          "featurePlaceholder": "Bullet point",
+          "removeFeature": "Remove"
+        },
+        "preview": {
+          "title": "Landing-page preview",
+          "switchLocale": "Preview language"
+        },
+        "actions": {
+          "save": "Save changes",
+          "saving": "Saving…",
+          "savedToast": "Saved. Landing page refreshes within ~1 minute.",
+          "discard": "Discard",
+          "diffTitle": "Confirm changes",
+          "diffIntro": "These edits will be visible on the landing page within ~1 minute.",
+          "diffCancel": "Cancel",
+          "diffConfirm": "Confirm"
+        },
+        "errors": {
+          "stale": "Another admin updated this plan since you opened the editor. Reload the page and try again.",
+          "localePairRequired": "Send both Arabic and English when editing labels, taglines, or feature lists.",
+          "invalidPrice": "Price must be a non-negative integer below 100,000.",
+          "generic": "Could not save the plan."
+        }
+      },
+      "tenants": {
+        "list": {
+          "title": "Stores",
+          "subtitle": "Every store on the platform. Use the search and filters to drill into one.",
+          "searchPlaceholder": "Search by store name, owner email, phone…",
+          "filters": {
+            "status": "Status",
+            "all": "All",
+            "trialing": "Trialing",
+            "active": "Active",
+            "past_due": "Past due",
+            "cancelled": "Cancelled",
+            "expired": "Expired",
+            "suspended": "Suspended",
+            "plan": "Plan",
+            "branchCount": "Branches",
+            "branchCount_1": "1",
+            "branchCount_23": "2–3",
+            "branchCount_4p": "4+",
+            "trialExpiring": "Trial expiring in"
+          },
+          "columns": {
+            "name": "Store",
+            "owner": "Owner",
+            "plan": "Plan",
+            "branches": "Branches",
+            "employees": "Employees",
+            "lastLogin": "Last sale",
+            "mrr": "MRR",
+            "status": "Status"
+          },
+          "empty": "No stores match this filter.",
+          "emptyHint": "Try clearing the filter or expanding the date range."
+        },
+        "detail": {
+          "back": "← All stores",
+          "loading": "Loading…",
+          "notFound": "Store not found.",
+          "createdAt": "Created {date}",
+          "lastSaleLabel": "Last sale",
+          "actions": {
+            "title": "Actions",
+            "suspend": "Suspend",
+            "unsuspend": "Unsuspend",
+            "extendTrial": "Extend trial",
+            "impersonate": "Impersonate owner",
+            "viewActivity": "View activity",
+            "spec07Tooltip": "Wired in Spec 07 (impersonation).",
+            "impersonateModal": {
+              "title": "Impersonate store owner",
+              "intro": "You're about to sign into this store as its owner. Every action is logged with your name AND theirs. This session is hard-capped at 30 minutes — you can exit any time.",
+              "confirmLabel": "Type the store name to confirm",
+              "cancel": "Cancel",
+              "submit": "Impersonate owner",
+              "errors": {
+                "TENANT_SUSPENDED": "Unsuspend the store before impersonating.",
+                "OWNER_DISABLED": "The owner account is disabled.",
+                "NO_OWNER": "This store has no owner to impersonate.",
+                "REDIS_UNAVAILABLE": "Cache layer is unavailable — try again.",
+                "generic": "Could not start impersonation."
+              }
+            },
+            "suspendModal": {
+              "title": "Suspend store",
+              "intro": "The store will be locked out immediately. Owners and staff get bounced to a 'service paused' page until you unsuspend. Type a reason — the owner sees it.",
+              "reasonLabel": "Reason (required, 5-500 chars)",
+              "reasonPlaceholder": "e.g. non-payment / abuse / data review",
+              "cancel": "Cancel",
+              "confirm": "Suspend store",
+              "errorGeneric": "Could not suspend the store.",
+              "successToast": "Store suspended."
+            },
+            "unsuspendModal": {
+              "title": "Unsuspend store",
+              "intro": "The store regains access immediately. Existing sessions stay logged out — owners and staff sign back in normally.",
+              "cancel": "Cancel",
+              "confirm": "Unsuspend",
+              "errorGeneric": "Could not unsuspend the store.",
+              "successToast": "Store unsuspended."
+            },
+            "extendModal": {
+              "title": "Extend trial",
+              "intro": "Bump the trial end date by a number of days (1-90). The new end date will be visible to the owner on their billing page within ~1 minute.",
+              "daysLabel": "Extra days",
+              "reasonLabel": "Reason (optional, for the audit log)",
+              "reasonPlaceholder": "e.g. requested 14 more days, paid pending",
+              "currentLabel": "Current trial ends",
+              "previewLabel": "New trial ends",
+              "cancel": "Cancel",
+              "confirm": "Extend trial",
+              "errorGeneric": "Could not extend the trial.",
+              "errorNotTrialing": "Trial can only be extended while the subscription is in 'trialing' state.",
+              "successToast": "Trial extended."
+            }
+          },
+          "billing": {
+            "title": "Plan & billing",
+            "perMonth": "EGP / month",
+            "renewalOn": "Next renewal {date}",
+            "trialEndsOn": "Trial ends {date}",
+            "lastPayment": "Last payment",
+            "lastPaymentNone": "No payment attempts yet.",
+            "failedAttempts": "Failed attempts (90 d): {n}"
+          },
+          "branches": {
+            "title": "Branches ({n})",
+            "name": "Name",
+            "active": "Active",
+            "inactive": "Inactive",
+            "employees": "Employees",
+            "lastSale": "Last sale",
+            "none": "—"
+          },
+          "healthFlags": {
+            "title": "Health flags",
+            "ok": "Looks good",
+            "cash_reconciliation_off": "Cash reconciliation off on every branch",
+            "cash_shifts_open_too_long": "{n} cash shifts open > 24 h",
+            "digest_not_configured": "Daily digest not configured",
+            "no_sales_7d": "No sales in {n} day(s)",
+            "dormant_employees_30d": "{n} employee(s) inactive > 30 d"
+          },
+          "activity": {
+            "title": "Recent owner activity",
+            "viewAll": "View all activity",
+            "empty": "No activity logged yet."
+          },
+          "suspendedBanner": {
+            "title": "Suspended",
+            "reason": "Reason: {reason}",
+            "noReason": "(no reason recorded)"
+          }
+        },
+        "activity": {
+          "title": "Store activity",
+          "subtitle": "Last 500 entries from this store's activity log.",
+          "back": "← Back to store"
+        }
+      },
+      "account": {
+        "title": "My account",
+        "subtitle": "Update your display name or change your email. Use the password card below to rotate your password.",
+        "emailLabel": "Email",
+        "displayNameLabel": "Display name",
+        "currentPasswordForEmail": "Current password (required to change email)",
+        "roleLabel": "Role",
+        "lastLoginLabel": "Last login",
+        "save": "Save changes",
+        "saving": "Saving…",
+        "saved": "Saved.",
+        "errors": {
+          "needPassword": "Enter your current password to change your email.",
+          "wrongPassword": "Current password is incorrect.",
+          "generic": "Could not save. Try again."
+        },
+        "passwordCard": {
+          "title": "Password",
+          "subtitle": "Rotate your password every 90 days. New passwords must be 12+ chars with a digit, uppercase, and lowercase letter, and must differ from the last 3.",
+          "cta": "Change password"
+        }
+      },
+      "password": {
+        "requiredEyebrow": "Required",
+        "title": "Change password",
+        "subtitle": "Pick a password that's at least 12 characters with an uppercase letter, a lowercase letter, and a digit.",
+        "requiredIntro": "Your account is using the bootstrap default. Set a real password to continue.",
+        "currentLabel": "Current password",
+        "newLabel": "New password",
+        "confirmLabel": "Confirm new password",
+        "save": "Save password",
+        "saving": "Saving…",
+        "cancel": "Cancel",
+        "rules": {
+          "minLen": "At least {n} characters",
+          "upperLower": "At least one uppercase and one lowercase letter",
+          "digit": "At least one digit",
+          "noReuse": "Cannot match your last 3 passwords"
+        },
+        "errors": {
+          "mismatch": "The two passwords don't match.",
+          "wrongCurrent": "Current password is incorrect.",
+          "reused": "You've used this password recently — pick a new one.",
+          "generic": "Could not change password. Try again."
+        }
+      }
+    },
     "activity": {
       "title": "Activity log",
       "heading": "Activity log",
@@ -974,6 +1558,46 @@
       "top5": {
         "title": "Top 5 customers by spend",
         "invoiceCount": "{n} invoices"
+      },
+      "receivables": {
+        "title": "On-account balances",
+        "subtitle": "Customers who still owe money. Tap a row to record a payment.",
+        "totalLabel": "Total owed",
+        "debtorCountLabel": "Customers",
+        "oldestLabel": "Oldest unpaid",
+        "daysFormat": "{n}d",
+        "invoiceCountFormat": "{n} unpaid invoices",
+        "recordPayment": "Record payment",
+        "andMore": "+ {n} more customers with balance"
+      },
+      "settle": {
+        "title": "Record customer payment",
+        "balanceLabel": "On account",
+        "amountLabel": "Amount received",
+        "payAllShort": "Pay all",
+        "overpayHint": "More than the customer owes — we won't credit the excess.",
+        "methodLabel": "Method",
+        "methods": {
+          "cash": "Cash",
+          "instapay": "InstaPay",
+          "card": "Card"
+        },
+        "invoicePicker": {
+          "oldestFirst": "Apply across {n} invoices, oldest first",
+          "picked": "{n} invoices picked",
+          "toggle": "Change",
+          "paid": "Paid: {amount}"
+        },
+        "cancel": "Cancel",
+        "submit": "Record payment",
+        "success": "Recorded {amount} — {count} invoice(s) settled. Remaining: {balance}.",
+        "errors": {
+          "INVALID_PHONE": "Customer phone is invalid.",
+          "INVALID_AMOUNT": "Amount must be greater than zero.",
+          "INVALID_METHOD": "Pick a valid payment method.",
+          "NOTHING_TO_SETTLE": "No unpaid invoices found for this customer.",
+          "GENERIC": "Couldn't record the payment. Try again."
+        }
       },
       "search": {
         "placeholder": "Search by name or mobile…"
@@ -1391,6 +2015,18 @@
         "countMany": "branches",
         "hintOne": "Add a new branch to track sales and inventory per location.",
         "hintMany": "Manage branches, disable or delete a branch, and update location data."
+      },
+      "cashDrawerTile": {
+        "title": "Cash drawer settings",
+        "subtitle": "Enable drawer counting and the Z-report per branch."
+      },
+      "digestTile": {
+        "title": "Daily WhatsApp digest",
+        "subtitle": "Receive a daily message with the day's highlights per branch."
+      },
+      "activityTile": {
+        "title": "Activity log",
+        "subtitle": "Who did what — every edit, sale, return, and staff action."
       },
       "loyalty": {
         "title": "Loyalty programme",
@@ -2097,6 +2733,296 @@
         "empty": "No expenses recorded yet"
       }
     },
+    "billing": {
+      "title": "Subscription",
+      "subtitle": "Manage your plan, payments, and invoice history.",
+      "ownerOnly": "This page is for the store owner only.",
+      "loading": "Loading…",
+      "perMonth": "EGP / month",
+      "comingSoon": "Coming soon",
+      "dash": "—",
+      "status": {
+        "trialing": "Free trial",
+        "active": "Active subscription",
+        "past_due": "Payment overdue",
+        "cancelled": "Cancelled",
+        "expired": "Expired"
+      },
+      "statusLine": {
+        "trialDaysLeft": "{days} day(s) left in the free trial.",
+        "renewalOn": "Next renewal on {date}.",
+        "pastDueWarning": "The last payment failed. Retry to avoid service interruption.",
+        "cancelledUntil": "Service stays active until {date}.",
+        "paymobNotConfigured": "The payment gateway isn't set up on this server yet. Contact us for a manual upgrade until setup completes."
+      },
+      "actions": {
+        "currentPlan": "Your current plan",
+        "subscribeNow": "Subscribe now",
+        "cancelSubscription": "Cancel subscription"
+      },
+      "cancelConfirm": "Cancel your subscription? Service will stay active until the end of the paid period.",
+      "errors": {
+        "cantOpenCheckout": "Could not open checkout",
+        "cantCancel": "Could not cancel subscription"
+      },
+      "history": {
+        "title": "Payment history",
+        "empty": "No payment attempts yet."
+      },
+      "attemptStatus": {
+        "pending": "Awaiting confirmation",
+        "succeeded": "Paid",
+        "failed": "Payment failed"
+      },
+      "plans": {
+        "trial": {
+          "label": "Free trial",
+          "tagline": "All features for 14 days",
+          "features": [
+            "All Professional plan features",
+            "No credit card required",
+            "Switches to the chosen plan when the trial ends"
+          ]
+        },
+        "professional": {
+          "label": "Professional",
+          "tagline": "Single store — everything your business needs",
+          "features": [
+            "POS, inventory, invoices, reports",
+            "Team and permissions management",
+            "GPS-based attendance tracking",
+            "Send invoices over WhatsApp",
+            "Automatic daily backups",
+            "WhatsApp support"
+          ]
+        },
+        "multi_branch": {
+          "label": "Multi-branch",
+          "tagline": "Coming soon — to manage more than one store",
+          "features": [
+            "All Professional plan features",
+            "Manage multiple branches from one account",
+            "Unified cross-branch reports",
+            "Transfer inventory between branches"
+          ]
+        }
+      }
+    },
+    "cashShifts": {
+      "list": {
+        "title": "Cash drawer shifts",
+        "subtitle": "Every shift closes by counting the variance between expected and counted cash. Variances stay in the review queue until you sign off.",
+        "filters": {
+          "all": "All",
+          "open": "Open",
+          "needsReview": "Needs review",
+          "closed": "Closed",
+          "reviewed": "Reviewed"
+        },
+        "emptyTitle": "No shifts match this filter",
+        "emptyHint": "Try clearing the filter or open a new shift",
+        "sections": {
+          "openNow": "Open right now",
+          "needsReview": "Needs review",
+          "other": "Other"
+        },
+        "row": {
+          "openNow": "open",
+          "countedShortLabel": "Counted",
+          "expectedShortLabel": "Expected"
+        }
+      },
+      "detail": {
+        "titlePrefix": "Z-report",
+        "notFound": "Shift not found",
+        "expectedCountedVariance": "Expected / Counted / Variance",
+        "status": {
+          "open": "Open",
+          "closed": "Closed",
+          "reviewed": "Reviewed",
+          "forced": "Force-closed",
+          "autoClosed": "Auto-closed"
+        },
+        "actions": {
+          "print": "Print",
+          "review": "Review",
+          "forceClose": "Force close"
+        },
+        "sections": {
+          "cashFlow": "Cash flow",
+          "byMethod": "Sales by payment method",
+          "topProducts": "Top products this shift",
+          "movements": "Shift movements",
+          "reviewed": "Reviewed"
+        },
+        "lines": {
+          "openingFloat": "Opening float",
+          "cashSales": "Cash sales",
+          "cashRefunds": "Cash refunds",
+          "paidIn": "Cash deposited",
+          "paidOut": "Cash withdrawn",
+          "cashIn": "Cash in (misc)",
+          "cashOut": "Cash out (misc)",
+          "cashExpenses": "Cash expenses",
+          "expectedCash": "Expected in drawer"
+        },
+        "method": {
+          "cash": "Cash",
+          "card": "Card",
+          "instapay": "InstaPay",
+          "deferred": "Deferred",
+          "invoiceCount": "{count} invoices"
+        },
+        "movement": {
+          "paid_in": "Deposit",
+          "paid_out": "Withdrawal",
+          "cash_in": "Cash in",
+          "cash_out": "Cash out"
+        },
+        "backToList": "← All shifts",
+        "review": {
+          "title": "Review shift",
+          "intro": "Confirm you've reviewed this shift. You can add a note before approving.",
+          "notePlaceholder": "Note (optional)",
+          "confirm": "Approve review",
+          "errorGeneric": "Could not save review"
+        },
+        "force": {
+          "title": "Force close",
+          "intro": "You'll close this shift without the cashier counting the drawer. A reason is required.",
+          "reasonPlaceholder": "Reason (required)",
+          "confirm": "Force close",
+          "reasonRequired": "Type the reason for the force close",
+          "errorGeneric": "Could not close shift"
+        },
+        "toast": {
+          "reviewed": "Marked as reviewed",
+          "closed": "Shift closed"
+        }
+      },
+      "chip": {
+        "openAria": "Open cash drawer",
+        "openCta": "Open drawer",
+        "openTitle": "Open a cash drawer shift",
+        "openedAt": "Open since {time}",
+        "openedToast": "Drawer opened",
+        "closedToast": "Drawer closed"
+      },
+      "panel": {
+        "title": "Drawer — {branch}",
+        "subtitle": "{cashier} · open since {time}",
+        "expectedCash": "Expected in drawer",
+        "countsLine": "{sales} invoices · {movements} movements · {expenses} expenses",
+        "addMovement": "Record a movement (deposit / withdrawal)",
+        "viewDetails": "See full details + shift movements",
+        "closeButton": "Close shift + Z-report"
+      },
+      "openModal": {
+        "title": "Open a cash drawer shift",
+        "intro": "Type the cash you have in the drawer right now before you start selling. Anything coming in or out after that is counted automatically.",
+        "floatLabel": "Opening float",
+        "noteLabel": "Note (optional)",
+        "notePlaceholder": "e.g. found 200 EGP from yesterday's shift",
+        "cancel": "Cancel",
+        "submit": "Open shift",
+        "invalidFloat": "Opening float is invalid",
+        "errorGeneric": "Could not open shift"
+      },
+      "closeModal": {
+        "title": "Close cash drawer shift",
+        "expectedLabel": "Expected in drawer",
+        "countedLabel": "Count the cash and enter it here",
+        "noteLabel": "Note (required for large variances)",
+        "notePlaceholder": "e.g. 30 EGP went missing in change",
+        "balanced": "Drawer balanced",
+        "short": "Short {amount}",
+        "over": "Over {amount}",
+        "cancel": "Cancel",
+        "submit": "Close + Z-report",
+        "countRequired": "Type the counted amount",
+        "errorGeneric": "Could not close shift"
+      },
+      "movement": {
+        "kindLabel": "Movement type",
+        "kinds": {
+          "paid_in": "Deposit — cash into the drawer",
+          "paid_out": "Withdrawal — cash out of the drawer",
+          "cash_in": "Cash in (misc)",
+          "cash_out": "Cash out (misc)"
+        },
+        "amountLabel": "Amount",
+        "reasonLabel": "Reason",
+        "reasonPlaceholder": "e.g. deposit to the bank",
+        "cancel": "Cancel",
+        "submit": "Record movement",
+        "invalidAmount": "Amount is invalid",
+        "reasonRequired": "A reason is required",
+        "errorGeneric": "Could not save movement"
+      }
+    },
+    "cashDrawerSettings": {
+      "title": "Cash drawer settings",
+      "intro": "When the drawer is enabled for a branch, the cashier must open a shift before recording cash sales, and at close they'll compare the counted total against the expected and log the variance.",
+      "enabled": "Drawer is on",
+      "disabled": "Drawer is off",
+      "enable": "Enable",
+      "disable": "Disable",
+      "thresholdLabel": "Variance amount that requires a note (₤)",
+      "savedToast": "Saved",
+      "errorToast": "Could not save"
+    },
+    "digestSettings": {
+      "title": "Daily WhatsApp digest",
+      "intro": "Every day at the time you pick, you'll receive a WhatsApp with the day's sales, the top-selling product, any alerts, and a flag if any shift needs review.",
+      "enable": {
+        "title": "Enable digest",
+        "onLine": "✅ On — you'll receive a message at {hour}:00 in your local time",
+        "offLine": "⚪ Off",
+        "enable": "Enable",
+        "disable": "Disable"
+      },
+      "phone": {
+        "title": "Primary WhatsApp number",
+        "intro": "The number that will receive the daily digest. This is NOT the same as the WhatsApp number you send customer receipts from — this is your personal number where the report will land.",
+        "label": "WhatsApp number",
+        "placeholder": "e.g. 01001112233 or 201001112233",
+        "save": "Save number"
+      },
+      "schedule": {
+        "title": "Schedule",
+        "intro": "The default is 12 midnight (end of day). You can set it to whatever time fits your closing routine.",
+        "hourLabel": "Hour (in your store's local time)"
+      },
+      "behavior": {
+        "title": "Behavior",
+        "sendOnEmpty": "Send the message even when there were no sales",
+        "emailFallback": "Send by email as a fallback if WhatsApp fails"
+      },
+      "extras": {
+        "title": "Extra recipients",
+        "intro": "Add other WhatsApp numbers or emails to receive the same message (e.g. your accountant).",
+        "empty": "Nobody added",
+        "nameLabel": "Name",
+        "phoneLabel": "WhatsApp",
+        "emailLabel": "Email",
+        "delete": "Delete",
+        "add": "Add recipient",
+        "saveAll": "Save recipients"
+      },
+      "preview": {
+        "title": "Preview",
+        "intro": "See what today's message would look like — useful before turning the digest on for the first time.",
+        "submit": "Preview",
+        "modalTitle": "Message preview"
+      },
+      "toggles": {
+        "on": "On",
+        "off": "Off"
+      },
+      "savedToast": "Saved",
+      "errorToast": "Could not save",
+      "previewErrorToast": "Could not generate preview"
+    },
     "inventory": {
       "title": "Inventory",
       "search": {
@@ -2414,6 +3340,25 @@
         }
       }
     },
+    "broadcastStack": {
+      "dismissAria": "Dismiss"
+    },
+    "broadcastModal": {
+      "severityLabel": "Important announcement",
+      "gotIt": "Got it"
+    },
+    "impersonationBanner": {
+      "message": "You are viewing this store as {owner} via platform support ({admin}).",
+      "minutesLeft": "Auto-exit in {n} min",
+      "exitCta": "Exit impersonation"
+    },
+    "servicePaused": {
+      "title": "Your service is paused",
+      "message": "Access to your store has been temporarily paused by Matgary support. Contact us to resolve the issue and reactivate your account.",
+      "reasonLabel": "Reason from support",
+      "contactHint": "Get in touch on WhatsApp to learn how to restore service.",
+      "signOut": "Sign out"
+    },
     "shell": {
       "primary": {
         "dashboard": "Dashboard",
@@ -2428,6 +3373,7 @@
         "tasks": "Tasks",
         "customers": "Customers",
         "expenses": "Expenses",
+        "cashShifts": "Cash drawer",
         "suppliers": "Suppliers",
         "returns": "Returns",
         "team": "Team",

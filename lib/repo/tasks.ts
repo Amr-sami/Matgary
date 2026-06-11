@@ -33,9 +33,11 @@ export class TaskConflictError extends Error {
 const ASSIGNEE_DISPLAY_NAME = sql<string | null>`coalesce(${tenantMembers.displayName}, ${users.name})`;
 
 /**
- * List tasks. If `forUserId` is provided (and the caller doesn't manage all),
- * results are restricted to tasks assigned to that user. Manager view returns
- * everything.
+ * List tasks. If `onlyForUserId` is provided, results are restricted to tasks
+ * assigned to that user — branch filter is intentionally ignored so an
+ * assignee sees every task that's actually for them (a manager can assign
+ * while browsing a different branch). Manager view (`onlyForUserId` undefined)
+ * keeps the branch scope so each branch's board stays self-contained.
  */
 export async function listTasks(
   tenantId: string,
@@ -45,8 +47,11 @@ export async function listTasks(
     // Self-join users for assignee + creator names. Drizzle aliasing is
     // verbose; we do two separate selects and then merge by id.
     const filters = [eq(tasks.tenantId, tenantId)];
-    if (opts.onlyForUserId) filters.push(eq(tasks.assignedToUserId, opts.onlyForUserId));
-    if (opts.branchId) filters.push(eq(tasks.branchId, opts.branchId));
+    if (opts.onlyForUserId) {
+      filters.push(eq(tasks.assignedToUserId, opts.onlyForUserId));
+    } else if (opts.branchId) {
+      filters.push(eq(tasks.branchId, opts.branchId));
+    }
     const rows = await tx
       .select({
         task: tasks,
@@ -244,7 +249,7 @@ export async function setTaskStatus(
 
     const set: Record<string, unknown> = { status, updatedAt: sql`now()` };
     if (status === "done") set.completedAt = sql`now()`;
-    else if (existing.status === "done" && status !== "done") set.completedAt = null;
+    else if (existing.status === "done") set.completedAt = null;
 
     // Whoever changes status acknowledges they've seen it.
     if (callerUserId === existing.assignedToUserId) {

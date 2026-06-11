@@ -44,6 +44,24 @@ const patchSchema = z.object({
   receiptFooterText: z.string().max(500).optional(),
   receiptLanguage: z.enum(["ar", "en", "bilingual"]).optional(),
   receiptShowLoyalty: z.boolean().optional(),
+  // Receipt designer (0029). The logo URL is a data:image URI; the repo
+  // sanitiser caps it at ~256 KB and rejects anything that isn't a known
+  // image type so the 500 KB ceiling here is just a defence-in-depth cap.
+  receiptLogoUrl: z.string().max(500_000).optional(),
+  // Receipt block order: fixed-block strings OR "custom:<id>" refs. The repo
+  // normalises against the known custom IDs and drops anything unrecognised,
+  // so the schema here just needs to allow the shape.
+  receiptBlockOrder: z.array(z.string().max(50)).max(64).optional(),
+  receiptFontFamily: z.enum(["cairo", "tajawal", "lemonada"]).optional(),
+  receiptCustomBlocks: z
+    .record(
+      z.string(),
+      z.object({
+        text: z.string().max(500),
+        align: z.enum(["right", "center", "left"]),
+      }),
+    )
+    .optional(),
 });
 
 export async function PATCH(req: NextRequest) {
@@ -54,7 +72,14 @@ export async function PATCH(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
   }
-  await saveShopSettings(r.ctx.tenantId, r.ctx.branchId, parsed.data);
+  // receiptBlockOrder is widened to string[] by the zod schema (so it can
+  // accept "custom:<id>" entries without enumerating them); the repo
+  // normaliser will drop anything unknown. Cast through unknown to apologise.
+  await saveShopSettings(
+    r.ctx.tenantId,
+    r.ctx.branchId,
+    parsed.data as unknown as Parameters<typeof saveShopSettings>[2],
+  );
   // Don't echo secrets (greenApiToken, whatsappCloudToken) into audit metadata.
   const safeChanged = Object.keys(parsed.data).filter(
     (k) => k !== "greenApiToken" && k !== "whatsappCloudToken",

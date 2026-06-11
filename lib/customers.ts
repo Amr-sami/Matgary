@@ -18,6 +18,10 @@ export interface CustomerAggregateInput {
   customerPhone?: string;
   paymentMethod?: string;
   isPaid?: boolean;
+  /** Migration 0037: amount actually collected against this sale. Optional
+   *  so legacy data still aggregates correctly — we fall back to the
+   *  isPaid/paymentMethod heuristic when this is missing. */
+  amountPaid?: number;
 }
 
 export interface CustomerAggregate {
@@ -27,7 +31,15 @@ export interface CustomerAggregate {
   invoiceCount: number;
   saleCount: number;
   lifetimeValue: number;
+  /** Total owed: sum of (totalPrice - amountPaid) across non-returned sales. */
   outstandingBalance: number;
+  /** Date of the oldest sale that still has a positive balance. Used to
+   *  surface aging — how long has this debt been sitting. Undefined when
+   *  there's no outstanding balance. */
+  oldestUnpaidDate?: Date;
+  /** Count of invoices that still have a positive balance. Distinct from
+   *  saleCount which counts every line. */
+  unpaidInvoiceCount: number;
   lastVisit: Date;
   firstVisit: Date;
   topCategory?: Category;
@@ -35,10 +47,25 @@ export interface CustomerAggregate {
   invoiceIds: Set<string>;
 }
 
+/** Compute the unpaid balance for a single sale, tolerating legacy data
+ *  that doesn't carry `amountPaid`. Returned sales never count. */
+function balanceFor(s: CustomerAggregateInput): number {
+  if (s.isReturned) return 0;
+  if (typeof s.amountPaid === "number") {
+    return Math.max(0, s.totalPrice - s.amountPaid);
+  }
+  // Legacy fallback: a deferred-unpaid row is fully owed; anything else
+  // (cash/instapay/card or isPaid=true) is fully settled.
+  return s.paymentMethod === "deferred" && !s.isPaid ? s.totalPrice : 0;
+}
+
 export function buildCustomerAggregatesGeneric(
   sales: CustomerAggregateInput[]
 ): CustomerAggregate[] {
   const map = new Map<string, CustomerAggregate>();
+  // Parallel map of unpaid-invoice ids per customer so we can count
+  // distinct unpaid invoices (not lines) after the accumulation pass.
+  const unpaidInvoicesByKey = new Map<string, Set<string>>();
   for (const s of sales) {
     if (s.isReturned) continue;
     const name = (s.customerName || "").trim();
@@ -56,6 +83,7 @@ export function buildCustomerAggregatesGeneric(
         saleCount: 0,
         lifetimeValue: 0,
         outstandingBalance: 0,
+        unpaidInvoiceCount: 0,
         lastVisit: s.saleDate,
         firstVisit: s.saleDate,
         topCategoryCount: 0,
@@ -68,8 +96,19 @@ export function buildCustomerAggregatesGeneric(
     cur.saleCount += 1;
     cur.lifetimeValue += s.totalPrice;
     if (s.invoiceId) cur.invoiceIds.add(s.invoiceId);
-    if (s.paymentMethod === "deferred" && !s.isPaid) {
-      cur.outstandingBalance += s.totalPrice;
+    const lineBalance = balanceFor(s);
+    if (lineBalance > 0) {
+      cur.outstandingBalance += lineBalance;
+      // Track the oldest sale date that still has a positive balance so
+      // the receivables panel can surface aging ("oldest unpaid: 23 days").
+      if (!cur.oldestUnpaidDate || s.saleDate < cur.oldestUnpaidDate) {
+        cur.oldestUnpaidDate = s.saleDate;
+      }
+      if (s.invoiceId) {
+        const set = unpaidInvoicesByKey.get(key) ?? new Set<string>();
+        set.add(s.invoiceId);
+        unpaidInvoicesByKey.set(key, set);
+      }
     }
     if (s.saleDate > cur.lastVisit) cur.lastVisit = s.saleDate;
     if (s.saleDate < cur.firstVisit) cur.firstVisit = s.saleDate;
@@ -92,6 +131,7 @@ export function buildCustomerAggregatesGeneric(
   for (const [key, agg] of map) {
     const inner = catCounts.get(key);
     agg.invoiceCount = agg.invoiceIds.size || agg.saleCount;
+    agg.unpaidInvoiceCount = unpaidInvoicesByKey.get(key)?.size ?? 0;
     if (!inner) continue;
     let bestCat: string | undefined;
     let bestCount = 0;
@@ -110,6 +150,7 @@ export function buildCustomerAggregatesGeneric(
 
 export function buildCustomerAggregates(sales: Sale[]): CustomerAggregate[] {
   const map = new Map<string, CustomerAggregate>();
+  const unpaidInvoicesByKey = new Map<string, Set<string>>();
   for (const s of sales) {
     if (s.isReturned) continue;
     const name = (s.customerName || "").trim();
@@ -127,6 +168,7 @@ export function buildCustomerAggregates(sales: Sale[]): CustomerAggregate[] {
         saleCount: 0,
         lifetimeValue: 0,
         outstandingBalance: 0,
+        unpaidInvoiceCount: 0,
         lastVisit: s.saleDate,
         firstVisit: s.saleDate,
         topCategoryCount: 0,
@@ -139,8 +181,17 @@ export function buildCustomerAggregates(sales: Sale[]): CustomerAggregate[] {
     cur.saleCount += 1;
     cur.lifetimeValue += s.totalPrice;
     if (s.invoiceId) cur.invoiceIds.add(s.invoiceId);
-    if (s.paymentMethod === "deferred" && !s.isPaid) {
-      cur.outstandingBalance += s.totalPrice;
+    const lineBalance = balanceFor(s);
+    if (lineBalance > 0) {
+      cur.outstandingBalance += lineBalance;
+      if (!cur.oldestUnpaidDate || s.saleDate < cur.oldestUnpaidDate) {
+        cur.oldestUnpaidDate = s.saleDate;
+      }
+      if (s.invoiceId) {
+        const set = unpaidInvoicesByKey.get(key) ?? new Set<string>();
+        set.add(s.invoiceId);
+        unpaidInvoicesByKey.set(key, set);
+      }
     }
     if (s.saleDate > cur.lastVisit) cur.lastVisit = s.saleDate;
     if (s.saleDate < cur.firstVisit) cur.firstVisit = s.saleDate;
@@ -174,6 +225,7 @@ export function buildCustomerAggregates(sales: Sale[]): CustomerAggregate[] {
     agg.topCategory = bestCat;
     agg.topCategoryCount = bestCount;
     agg.invoiceCount = agg.invoiceIds.size || agg.saleCount;
+    agg.unpaidInvoiceCount = unpaidInvoicesByKey.get(key)?.size ?? 0;
   }
 
   return Array.from(map.values());

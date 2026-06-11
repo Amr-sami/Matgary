@@ -15,8 +15,8 @@ import {
   Settings,
   Truck,
   Receipt,
+  DollarSign,
   ListChecks,
-  History,
   PanelRightClose,
   PanelRightOpen,
   MessageCircle,
@@ -53,13 +53,15 @@ const secondaryItems: NavItem[] = [
   { href: "/tasks", labelKey: "tasks", icon: ListChecks, requires: "view_dashboard" },
   { href: "/customers", labelKey: "customers", icon: Users, requires: "view_customers" },
   { href: "/expenses", labelKey: "expenses", icon: Wallet, requires: "view_expenses" },
+  { href: "/cash-shifts", labelKey: "cashShifts", icon: DollarSign, requires: "manage_cash_reconciliation" },
   { href: "/suppliers", labelKey: "suppliers", icon: Truck, requires: "view_suppliers" },
   { href: "/returns", labelKey: "returns", icon: RotateCcw, requires: "view_returns" },
   // /team also hosts the leaves tab (merged in). Anyone with team management
   // OR leave-request capability can open it; the page itself filters tabs.
   { href: "/team", labelKey: "team", icon: UsersGroup, requires: "manage_team" },
   { href: "/whatsapp", labelKey: "whatsapp", icon: MessageCircle, requires: "manage_whatsapp" },
-  { href: "/activity", labelKey: "activity", icon: History, requires: "view_activity_log" },
+  // Activity log lives inside /settings now — keeps the sidebar from
+  // overflowing past the footer (UserMenu) on shorter screens.
   { href: "/settings", labelKey: "settings", icon: Settings, requires: "view_settings" },
 ];
 
@@ -221,27 +223,32 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         )}
       </div>
 
-      {/* Primary Nav Links */}
-      <div className="mt-2 px-1 space-y-1">{visiblePrimary.map(renderItem)}</div>
+      {/* Scrollable middle section — primary + secondary nav. Wrapping both
+          in one flex-1 / overflow-y-auto block guarantees the footer (user
+          menu) stays pinned even when the list outgrows the viewport. */}
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden [scrollbar-width:thin]">
+        {/* Primary Nav Links */}
+        <div className="mt-2 px-1 space-y-1">{visiblePrimary.map(renderItem)}</div>
 
-      {/* "More" divider — hidden when no secondary items survive permission filter */}
-      {visibleSecondary.length > 0 && (
-        <div className={cn("mt-6 mb-2", collapsed ? "px-2" : "px-6")}>
-          {collapsed ? (
-            <div className="h-px bg-border" />
-          ) : (
-            <p className="text-xs text-text-secondary font-medium">{shellT.more}</p>
-          )}
-        </div>
-      )}
+        {/* "More" divider — hidden when no secondary items survive permission filter */}
+        {visibleSecondary.length > 0 && (
+          <div className={cn("mt-6 mb-2", collapsed ? "px-2" : "px-6")}>
+            {collapsed ? (
+              <div className="h-px bg-border" />
+            ) : (
+              <p className="text-xs text-text-secondary font-medium">{shellT.more}</p>
+            )}
+          </div>
+        )}
 
-      {/* Secondary Nav Links */}
-      <div className="flex-1 px-1 space-y-1">{visibleSecondary.map(renderItem)}</div>
+        {/* Secondary Nav Links */}
+        <div className="px-1 space-y-1 pb-2">{visibleSecondary.map(renderItem)}</div>
+      </div>
 
-      {/* Footer: user menu + version */}
+      {/* Footer: user menu + version (always pinned to bottom) */}
       <div
         className={cn(
-          "border-t border-border pt-2 mt-2 transition-all duration-200",
+          "border-t border-border pt-2 mt-2 transition-all duration-200 shrink-0",
           collapsed ? "px-1" : "px-2"
         )}
       >

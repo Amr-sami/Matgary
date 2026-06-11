@@ -21,9 +21,15 @@ interface Props {
   /** Visual variant. `compact` = icon + short label (default). `bare` = icon only. */
   variant?: "compact" | "bare";
   className?: string;
+  /** When true, the switcher writes the LOCALE_COOKIE and reloads in place
+   *  WITHOUT prefixing the URL with /{lang}. Use this on surfaces that don't
+   *  participate in the [lang] routing tree (the admin area, the logged-in
+   *  tenant app post-auth). Defaults to false to preserve the pre-login
+   *  marketing-page behaviour. */
+  cookieOnly?: boolean;
 }
 
-export function LangSwitcher({ variant = "compact", className }: Props) {
+export function LangSwitcher({ variant = "compact", className, cookieOnly = false }: Props) {
   const pathname = usePathname();
   const active = useLocale();
   const [open, setOpen] = useState(false);
@@ -44,6 +50,13 @@ export function LangSwitcher({ variant = "compact", className }: Props) {
       return;
     }
     document.cookie = `${LOCALE_COOKIE}=${target}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
+    if (cookieOnly) {
+      // Admin + logged-in surfaces: no /[lang] segment in the URL. Stay on
+      // the same path and let middleware → x-locale → root layout re-render
+      // in the new language.
+      window.location.assign(pathname);
+      return;
+    }
     const segs = pathname.split("/");
     let nextPath: string;
     if (segs[1] === active) {
