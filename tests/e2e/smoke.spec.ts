@@ -12,6 +12,9 @@ import { expect, test } from "@playwright/test";
 
 test.describe.configure({ mode: "serial" });
 
+// Signup → onboarding smoke must start anonymous.
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test("signup → onboarding → product → sale → insights", async ({
   page,
   baseURL,

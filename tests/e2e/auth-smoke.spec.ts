@@ -14,6 +14,9 @@ import { expect, test } from "@playwright/test";
 
 test.describe.configure({ mode: "serial" });
 
+// Auth-smoke probes start anonymous.
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test("open redirect: ?next=https://evil is collapsed to /", async ({
   page,
 }) => {

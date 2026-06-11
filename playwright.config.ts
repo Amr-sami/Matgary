@@ -11,12 +11,32 @@ export default defineConfig({
   workers: 1,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? "list" : "list",
+  // Provision ONE shared owner tenant before any spec runs and save the
+  // authenticated cookie jar to disk. Specs load that state via
+  // `storageState` (see the `use` block below) so they skip the slow
+  // signup-onboarding browser dance — the #1 source of dev-mode flake.
+  globalSetup: "./tests/e2e/helpers/global-setup.ts",
+  // The signup-onboarding-product-sale chain is long under dev compile
+  // (each page first-render takes a few seconds). 90s gives a safe ceiling
+  // for the workflow specs without masking real bugs.
+  timeout: 90_000,
+  expect: {
+    // Several pages stream + revalidate; bump the visibility default so we
+    // don't false-fail on a 6s React tree.
+    timeout: 15_000,
+  },
   use: {
     baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3100",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     locale: "ar-EG",
     timezoneId: "Africa/Cairo",
+    // Dev-mode first navigation can be 8–10s while Next compiles.
+    navigationTimeout: 30_000,
+    // Default storage state for every test. The auth-flow spec opts out
+    // via `test.use({ storageState: { cookies: [], origins: [] } })` so
+    // its login/logout assertions start anonymous.
+    storageState: "./tests/e2e/.auth/shared-owner.json",
   },
   // Setting PLAYWRIGHT_NO_WEBSERVER=1 + PLAYWRIGHT_BASE_URL=http://localhost:3001
   // points the test suite at an already-running dev server — handy for fast

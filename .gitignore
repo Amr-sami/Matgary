@@ -57,3 +57,6 @@ next-env.d.ts
 
 # local scratch (seed / verify logs)
 /tmp
+
+# Playwright shared-owner storage state — provisioned per dev box
+tests/e2e/.auth/
