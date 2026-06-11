@@ -10,7 +10,25 @@ import {
   products,
   shopSettings,
 } from "@/lib/db/schema";
-import { cacheBustPrefix, globalKey } from "@/lib/cache";
+import { cacheBustPrefix, cacheRemember, globalKey, tenantKey } from "@/lib/cache";
+
+// Branches are mutated by the owner on /settings/branches and a couple of
+// admin paths — far less often than they're read. The branch list is read
+// by every authenticated render (sidebar heading, /api/branches, every API
+// route that resolves the active branch). Caching pays back per page view.
+//
+// TTL 5 min mirrors catalog. Bust on every create/update/delete below;
+// the existing cache helpers cover the bust set without touching writers.
+const BRANCHES_PREFIX = "branches";
+const BRANCHES_TTL_SEC = 300;
+
+const branchListKey = (tenantId: string) =>
+  tenantKey(tenantId, BRANCHES_PREFIX, "list");
+
+/** Drop the cached branch list for a tenant. Called from every writer. */
+export async function bustBranchListCache(tenantId: string): Promise<void> {
+  await cacheBustPrefix(tenantKey(tenantId, BRANCHES_PREFIX));
+}
 
 /** Build a stable URL-safe slug from a branch name. Random suffix guarantees
  *  uniqueness within a tenant when two branches happen to share a name. */
@@ -70,18 +88,22 @@ function rowToDescriptor(
   };
 }
 
-/** List every branch in a tenant, ordered: primary first, then by createdAt asc. */
+/** List every branch in a tenant, ordered: primary first, then by createdAt asc.
+ *  Cached at 5 min TTL — the most-frequent read in the system (every
+ *  authenticated render hits it via the active-branch resolver). */
 export async function listBranches(
   tenantId: string,
 ): Promise<BranchDescriptor[]> {
-  return withTenant(tenantId, async (tx) => {
-    const rows = await tx
-      .select()
-      .from(branches)
-      .where(eq(branches.tenantId, tenantId))
-      .orderBy(desc(branches.isPrimary), asc(branches.createdAt));
-    return rows.map(rowToDescriptor);
-  });
+  return cacheRemember(branchListKey(tenantId), BRANCHES_TTL_SEC, () =>
+    withTenant(tenantId, async (tx) => {
+      const rows = await tx
+        .select()
+        .from(branches)
+        .where(eq(branches.tenantId, tenantId))
+        .orderBy(desc(branches.isPrimary), asc(branches.createdAt));
+      return rows.map(rowToDescriptor);
+    }),
+  );
 }
 
 export async function getBranch(
@@ -148,6 +170,7 @@ export async function createBranch(
   // re-evaluated; staff allow-lists don't change automatically when a new
   // branch lands (owner explicitly grants access via the team form).
   await bustAllAllowListCachesForTenant(tenantId);
+  await bustBranchListCache(tenantId);
   return result;
 }
 
@@ -202,6 +225,7 @@ export async function updateBranch(
       );
   });
   await bustAllAllowListCachesForTenant(tenantId);
+  await bustBranchListCache(tenantId);
 }
 
 /**
@@ -241,6 +265,7 @@ export async function deleteBranch(
       );
   });
   await bustAllAllowListCachesForTenant(tenantId);
+  await bustBranchListCache(tenantId);
 }
 
 async function collectReferenceCounts(
