@@ -36,6 +36,14 @@ const PAGES: PageProbe[] = [
 
 interface PageResult {
   route: string;
+  /** Time from goto() until the response is "committed" — first byte
+   *  arrives. Streaming SCs hit this fast; the old client-rendered pages
+   *  also hit it fast (they were never the bottleneck). */
+  firstByte_p50: number;
+  firstByte_p95: number;
+  /** Time until DOMContentLoaded — for streaming pages, this includes
+   *  every chunk Suspense flushes. For the old CC pages it's basically
+   *  the same as first-byte (skeleton DOM, no data). */
   ttfb_p50: number;
   ttfb_p95: number;
   total_p50: number;
@@ -80,6 +88,7 @@ async function main(): Promise<void> {
         /* warmup */
       }
     }
+    const firstBytes: number[] = [];
     const ttfbs: number[] = [];
     const totals: number[] = [];
     let bodyBytes = 0;
@@ -88,25 +97,34 @@ async function main(): Promise<void> {
     for (let i = 0; i < ITER; i++) {
       const t0 = performance.now();
       try {
-        const resp = await page.goto(`${BASE}${probe.route}`, {
-          waitUntil: "domcontentloaded",
+        // Two-stage measurement so streaming SCs are fair: `commit` fires
+        // on first byte (~response header), `domcontentloaded` fires when
+        // the full streamed HTML has arrived.
+        const commitResp = await page.goto(`${BASE}${probe.route}`, {
+          waitUntil: "commit",
           timeout: 30_000,
         });
+        const t_first = performance.now();
+        await page.waitForLoadState("domcontentloaded", { timeout: 30_000 });
         const t1 = performance.now();
-        const body = await resp?.body();
+        const body = await commitResp?.body();
         const t2 = performance.now();
-        status = resp?.status() ?? 0;
+        status = commitResp?.status() ?? 0;
         bodyBytes = body?.length ?? 0;
+        firstBytes.push(t_first - t0);
         ttfbs.push(t1 - t0);
         totals.push(t2 - t0);
       } catch {
         errors += 1;
       }
     }
+    const fbSorted = [...firstBytes].sort((a, b) => a - b);
     const tSorted = [...ttfbs].sort((a, b) => a - b);
     const totSorted = [...totals].sort((a, b) => a - b);
     const result: PageResult = {
       route: probe.route,
+      firstByte_p50: pct(fbSorted, 0.5),
+      firstByte_p95: pct(fbSorted, 0.95),
       ttfb_p50: pct(tSorted, 0.5),
       ttfb_p95: pct(tSorted, 0.95),
       total_p50: pct(totSorted, 0.5),
@@ -117,7 +135,7 @@ async function main(): Promise<void> {
     };
     rows.push(result);
     console.log(
-      `${probe.route.padEnd(14)} status=${status}  ttfb p50=${result.ttfb_p50.toFixed(0).padStart(5)}ms p95=${result.ttfb_p95.toFixed(0).padStart(5)}ms  total p50=${result.total_p50.toFixed(0).padStart(5)}ms p95=${result.total_p95.toFixed(0).padStart(5)}ms  html=${(bodyBytes / 1024).toFixed(1)}KB`,
+      `${probe.route.padEnd(14)} status=${status}  first p50=${result.firstByte_p50.toFixed(0).padStart(4)}ms p95=${result.firstByte_p95.toFixed(0).padStart(4)}ms  dom p50=${result.ttfb_p50.toFixed(0).padStart(4)}ms p95=${result.ttfb_p95.toFixed(0).padStart(4)}ms  total p50=${result.total_p50.toFixed(0).padStart(4)}ms p95=${result.total_p95.toFixed(0).padStart(4)}ms  html=${(bodyBytes / 1024).toFixed(1)}KB`,
     );
   }
 

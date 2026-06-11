@@ -1,10 +1,15 @@
+"use client";
 /**
  * Icon shim — re-exports Phosphor icons under the names the codebase
  * historically imported from `lucide-react`. Letting us swap the icon
  * family in one place without touching every callsite.
  *
- * Phosphor accepts `className`, `size`, `color`, and `weight`. Tailwind
- * size classes (e.g. `w-4 h-4`) work on the underlying <svg/>.
+ * `"use client"` is mandatory in Next 16: phosphor evaluates `createContext`
+ * at module load. Without the directive, importing this file from a Server
+ * Component fails during page-data collection ("createContext is not a
+ * function"). With the directive, Server Components can still render
+ * `<DollarSign />` etc — React 19 supports SC → CC rendering — and the
+ * icon module lands in the client bundle as it always has.
  */
 export {
   WarningCircle as AlertCircle,
