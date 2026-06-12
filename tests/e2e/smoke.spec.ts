@@ -30,15 +30,40 @@ test("signup → onboarding → product → sale → insights", async ({
   await page.goto("/signup");
   await page.locator('input[name="email"]').fill(email);
   await page.locator('input[name="password"]').fill(password);
-  await page.getByRole("button", { name: "التالي" }).click();
+  // The "التالي" button is `disabled` while the live email-availability
+  // check is in flight (emailStatus === "checking"). Under the production
+  // build that round-trip can run a few hundred ms — clicking before it
+  // settles is a no-op and the form stays on step 1, with the rest of the
+  // flow operating on a DOM that's still in step-1 state. Wait for the
+  // button to be enabled before clicking.
+  const stepOneNext = page.getByRole("button", { name: "التالي" });
+  await expect(stepOneNext).toBeEnabled({ timeout: 8_000 });
+  await stepOneNext.click();
 
   // ── 2. Signup, step 2 (store identity) ─────────────────────────────────
-  await page.locator('input[name="storeName"]').fill(shopName);
+  // Both signup steps are mounted simultaneously — step 1 stays in the
+  // DOM with `class="hidden"` once we advance. Wait for the storeName
+  // input to be visible so we know the step-2 panel has actually flipped
+  // before interacting with it (otherwise fills go into hidden inputs
+  // and downstream `toBeVisible` assertions fail on still-hidden text).
+  const storeName = page.locator('input[name="storeName"]');
+  await expect(storeName).toBeVisible({ timeout: 8_000 });
+  await storeName.fill(shopName);
   await page.locator('input[name="storeHandle"]').fill(handle);
-  // Wait for the debounced live availability check to resolve. The
-  // success message ("متاح ✓") renders in two paragraphs (helper text +
-  // status pill) — use .first() so the strict-mode locator doesn't trip.
-  await expect(page.getByText("متاح").first()).toBeVisible({ timeout: 8_000 });
+  // The storeHandle live-availability check is also debounced. Both
+  // `emailAvailable` and `handleAvailable` dict entries are the literal
+  // same string ("متاح ✓"), so `getByText("متاح")` matches two paragraphs
+  // — one inside the (now-hidden) step-1 panel, one in step-2. `.first()`
+  // picks the step-1 one (rendered first in DOM order) and reports it
+  // as hidden forever. Scope to the storeHandle field's own wrapper
+  // (storeHandle input → grandparent div) so we only ever see the
+  // handle paragraph, never the email one.
+  const handleFieldWrapper = page
+    .locator('input[name="storeHandle"]')
+    .locator("xpath=ancestor::div[label][1]");
+  await expect(
+    handleFieldWrapper.getByText("متاح ✓"),
+  ).toBeVisible({ timeout: 8_000 });
   await page.getByRole("button", { name: "إنشاء الحساب" }).click();
 
   // ── 3. Onboarding (3 steps; cornerstore preset is the default) ─────────
@@ -93,6 +118,9 @@ test("signup → onboarding → product → sale → insights", async ({
   ).toBeVisible({ timeout: 10_000 });
 
   // ── 9. /insights overview reflects the day's revenue (200 EGP) ─────────
+  // The figure "200" appears in several places on /insights (chart
+  // ticks, KPI tiles, etc.) — `.first()` keeps the strict-mode locator
+  // happy without asserting a brittle exact element.
   await page.goto("/insights");
-  await expect(page.getByText("200")).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText("200").first()).toBeVisible({ timeout: 10_000 });
 });
