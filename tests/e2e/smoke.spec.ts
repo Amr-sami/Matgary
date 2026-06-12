@@ -35,8 +35,10 @@ test("signup → onboarding → product → sale → insights", async ({
   // ── 2. Signup, step 2 (store identity) ─────────────────────────────────
   await page.locator('input[name="storeName"]').fill(shopName);
   await page.locator('input[name="storeHandle"]').fill(handle);
-  // Wait for the debounced live availability check to resolve.
-  await expect(page.getByText("متاح")).toBeVisible({ timeout: 8_000 });
+  // Wait for the debounced live availability check to resolve. The
+  // success message ("متاح ✓") renders in two paragraphs (helper text +
+  // status pill) — use .first() so the strict-mode locator doesn't trip.
+  await expect(page.getByText("متاح").first()).toBeVisible({ timeout: 8_000 });
   await page.getByRole("button", { name: "إنشاء الحساب" }).click();
 
   // ── 3. Onboarding (3 steps; cornerstore preset is the default) ─────────
