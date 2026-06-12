@@ -37,8 +37,8 @@ const lemonada = Lemonada({
 });
 
 export const metadata: Metadata = {
-  title: "CornerStore - نظام إدارة المخزن والمبيعات",
-  description: "نظام نقطة البيع وإدارة المخزن لمتجر الساعات والبرفانات والنظارات",
+  title: "Matjary - نظام إدارة المخزن والمبيعات",
+  description: "نظام نقطة البيع وإدارة المخزن لمتجرك الساعات والبرفانات والنظارات",
 };
 
 export default async function RootLayout({

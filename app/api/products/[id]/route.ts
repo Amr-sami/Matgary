@@ -16,6 +16,7 @@ const patchSchema = z.object({
   supplier: z.string().max(120).nullable().optional(),
   supplierId: z.string().uuid().nullable().optional(),
   location: z.string().max(120).nullable().optional(),
+  categoryId: z.string().uuid().optional(),
 });
 
 export async function PATCH(

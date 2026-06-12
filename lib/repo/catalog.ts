@@ -380,6 +380,9 @@ export interface UpdateProductInput {
   supplier?: string | null;
   supplierId?: string | null;
   location?: string | null;
+  /** Re-categorise the product. Caller is trusted to pass a category id
+   *  that belongs to the same tenant — RLS would reject otherwise. */
+  categoryId?: string;
 }
 
 export async function updateProduct(
@@ -402,6 +405,7 @@ export async function updateProduct(
     if (patch.supplier !== undefined) set.supplier = patch.supplier;
     if (patch.supplierId !== undefined) set.supplierId = patch.supplierId;
     if (patch.location !== undefined) set.location = patch.location;
+    if (patch.categoryId !== undefined) set.categoryId = patch.categoryId;
 
     const [before] = await tx
       .select({ name: products.name, quantity: products.quantity })

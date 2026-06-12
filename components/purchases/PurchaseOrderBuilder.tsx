@@ -4,8 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, Search } from "@/lib/icons";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
+import { FilterSelect } from "@/components/ui/FilterSelect";
 import { SupplierPicker } from "@/components/suppliers/SupplierPicker";
 import { useProducts } from "@/hooks/useProducts";
+import { useCategories } from "@/hooks/useCategories";
 import type { Product } from "@/lib/types";
 import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
 import { formatCurrency } from "@/lib/i18n/format";
@@ -17,6 +19,9 @@ interface Line {
   productName: string;
   quantity: number;
   unitCost: number;
+  /** External (productId=null) lines may pick the category they'll be
+   *  filed under once the PO is received. Empty string = "use default". */
+  categoryId?: string;
 }
 
 interface Props {
@@ -34,6 +39,7 @@ export function PurchaseOrderBuilder({ isOpen, onClose, onSaved, onError }: Prop
   const locale = useLocale();
   const t = dict.app.purchases.builder;
   const { products } = useProducts();
+  const { data: categories } = useCategories();
   const [supplierId, setSupplierId] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
@@ -130,6 +136,9 @@ export function PurchaseOrderBuilder({ isOpen, onClose, onSaved, onError }: Prop
             productName: l.productName,
             quantity: l.quantity,
             unitCost: l.unitCost,
+            // Only forward categoryId for external lines (productId=null);
+            // catalog lines already have a category on the product row.
+            categoryId: !l.productId && l.categoryId ? l.categoryId : undefined,
           })),
         }),
       });
@@ -220,6 +229,28 @@ export function PurchaseOrderBuilder({ isOpen, onClose, onSaved, onError }: Prop
                         onChange={(e) => updateLine(l.uid, { productName: e.target.value })}
                         className="w-full px-2 py-1 rounded border border-border focus:outline-none focus:ring-1 focus:ring-accent"
                       />
+                      {/* External (productId=null) lines show a category
+                          picker so the owner can file the new product
+                          correctly on receive. Catalog-picked lines hide
+                          this — their category is already on the product
+                          row. Empty string = "use default category". */}
+                      {!l.productId && (
+                        <div className="mt-1">
+                          <FilterSelect
+                            value={l.categoryId ?? null}
+                            onChange={(v) =>
+                              updateLine(l.uid, { categoryId: v ?? undefined })
+                            }
+                            options={categories.map((c) => ({
+                              value: c.id,
+                              label: c.label,
+                            }))}
+                            allLabel={t.table.categoryPlaceholder}
+                            fullWidth
+                            ariaLabel={t.table.categoryPlaceholder}
+                          />
+                        </div>
+                      )}
                     </td>
                     <td className="px-3 py-2">
                       <input

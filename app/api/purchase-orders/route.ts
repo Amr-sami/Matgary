@@ -34,6 +34,11 @@ const createSchema = z.object({
         productName: z.string().min(1).max(200),
         quantity: z.number().int().min(1),
         unitCost: z.number().min(0),
+        // Only meaningful for external (productId=null) lines — picks
+        // which category the materialised product will be filed under
+        // when the PO is received. Optional; falls back to the tenant's
+        // default category if absent.
+        categoryId: z.string().uuid().optional(),
       }),
     )
     .min(1),
@@ -56,6 +61,7 @@ export async function POST(req: NextRequest) {
         productName: i.productName,
         quantity: i.quantity,
         unitCost: i.unitCost,
+        categoryId: i.categoryId,
       })),
     });
     return NextResponse.json(result, { status: 201 });

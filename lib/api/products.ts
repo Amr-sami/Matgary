@@ -31,6 +31,28 @@ export async function deleteProduct(productId: string): Promise<void> {
   await jsonFetch(`/api/products/${productId}`, { method: "DELETE" });
 }
 
+export interface CreateProductInput {
+  name: string;
+  categoryId: string;
+  brand?: string;
+  quantity: number;
+  price: number;
+  costPrice?: number;
+  lowStockThreshold?: number;
+  sku?: string;
+}
+
+/** POST /api/products. Returns the new product id. */
+export async function createProduct(
+  input: CreateProductInput,
+): Promise<{ id: string }> {
+  const res = (await jsonFetch("/api/products", {
+    method: "POST",
+    body: JSON.stringify(input),
+  })) as { id: string };
+  return res;
+}
+
 export interface UpdateProductInput {
   name?: string;
   brand?: string | null;
@@ -43,6 +65,7 @@ export interface UpdateProductInput {
   supplier?: string | null;
   supplierId?: string | null;
   location?: string | null;
+  categoryId?: string;
 }
 
 export async function updateProduct(

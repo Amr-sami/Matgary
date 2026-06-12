@@ -7,6 +7,7 @@ import type { Product } from "@/lib/types";
 import { Badge } from "../ui/Badge";
 import { CATEGORY_LABELS } from "@/lib/types";
 import { useDictionary } from "@/components/i18n/DictionaryProvider";
+import { QuickAddProductModal } from "./QuickAddProductModal";
 
 interface ProductSearchSelectProps {
   value: Product | null;
@@ -16,8 +17,12 @@ interface ProductSearchSelectProps {
 export function ProductSearchSelect({ value, onChange }: ProductSearchSelectProps) {
   const dict = useDictionary();
   const t = dict.app.sales.form.productSearch;
-  const { products } = useProducts();
+  const { products, refresh: refreshProducts } = useProducts();
   const [search, setSearch] = useState("");
+  // Quick-add modal — lets the cashier add a brand-new product to the
+  // catalog without leaving the register. The new product joins inventory
+  // immediately and is auto-selected for the current sale.
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -90,8 +95,8 @@ export function ProductSearchSelect({ value, onChange }: ProductSearchSelectProp
         )}
       </div>
 
-      {isOpen && filteredProducts.length > 0 && (
-        <div className="absolute top-full start-0 end-0 mt-1 bg-white border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto z-50">
+      {isOpen && (filteredProducts.length > 0 || search.trim().length > 0) && (
+        <div className="absolute top-full start-0 end-0 mt-1 bg-white border border-border rounded-lg shadow-lg max-h-72 overflow-y-auto z-50">
           {filteredProducts.slice(0, 10).map((product) => (
             <button
               key={product.id}
@@ -120,8 +125,51 @@ export function ProductSearchSelect({ value, onChange }: ProductSearchSelectProp
               </div>
             </button>
           ))}
+
+          {/* Quick-add CTA. Renders when the user has typed something
+              (so we have a name to pre-fill); the label flips to a
+              "no match" hint when the typed name doesn't match any
+              existing product. */}
+          {search.trim().length > 0 && (
+            <button
+              onClick={() => {
+                setIsOpen(false);
+                setQuickAddOpen(true);
+              }}
+              className={`w-full px-4 py-3 text-start hover:bg-accent-light/40 border-t border-border ${
+                filteredProducts.length === 0 ? "text-accent" : "text-text-primary"
+              }`}
+            >
+              <p className="font-medium text-sm" dir="auto">
+                {filteredProducts.length === 0
+                  ? t.addNewWithName.replace("{name}", search.trim())
+                  : t.addNew}
+              </p>
+              {filteredProducts.length === 0 && (
+                <p className="text-xs text-text-secondary mt-0.5">{t.noMatch}</p>
+              )}
+            </button>
+          )}
         </div>
       )}
+
+      <QuickAddProductModal
+        isOpen={quickAddOpen}
+        onClose={() => setQuickAddOpen(false)}
+        initialName={search}
+        onCreated={async (productId) => {
+          // Re-fetch the catalog so the new product appears in every
+          // useProducts consumer (inventory page, stats grid, etc.), AND
+          // auto-select it for the current cart line. refresh() returns
+          // the fresh array so we don't race React's state commit.
+          const freshList = await refreshProducts();
+          const fresh = freshList.find((p) => p.id === productId);
+          if (fresh) {
+            onChange(fresh);
+            setSearch(fresh.name);
+          }
+        }}
+      />
     </div>
   );
 }

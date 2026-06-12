@@ -281,6 +281,20 @@
       "when": 1781300000000,
       "tag": "0039_pg_stat_statements",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1781400000000,
+      "tag": "0040_po_items_category",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1781500000000,
+      "tag": "0041_heal_paid_amount_drift",
+      "breakpoints": true
     }
   ]
 }

@@ -792,6 +792,10 @@ export const purchaseOrderItems = pgTable(
     quantity: integer("quantity").notNull(),
     unitCost: text("unit_cost").notNull(),
     lineTotal: text("line_total").notNull(),
+    /** Owner-picked category for external (productId IS NULL) lines.
+     *  receivePurchaseOrder uses this to file the materialised product
+     *  instead of falling back to the tenant's first category. */
+    categoryId: uuid("category_id").references(() => categories.id, { onDelete: "set null" }),
   },
   (t) => [
     index("po_items_tenant_po_idx").on(t.tenantId, t.purchaseOrderId),

@@ -424,7 +424,22 @@
         "productSearch": {
           "label": "اختيار المنتج",
           "placeholder": "ابحث عن منتج…",
-          "inStock": "متوفر: {n}"
+          "inStock": "متوفر: {n}",
+          "addNew": "+ أضف صنف جديد للمخزن",
+          "addNewWithName": "+ أضف \"{name}\" كصنف جديد",
+          "noMatch": "لا يوجد منتج بهذا الاسم — أضفه للمخزن"
+        },
+        "quickAddProduct": {
+          "title": "إضافة صنف جديد للمخزن",
+          "name": "اسم المنتج",
+          "namePlaceholder": "مثال: ساعة كاسيو F-91W",
+          "category": "الصنف",
+          "price": "سعر البيع (جنيه)",
+          "quantity": "الكمية الموجودة بالمخزن",
+          "costPrice": "سعر الشراء (اختياري)",
+          "costPricePlaceholder": "اختياري",
+          "save": "حفظ وإضافة للسلة",
+          "errorGeneric": "تعذر إضافة المنتج. حاول مرة أخرى."
         },
         "recentLabel": "منتجات حديثة:",
         "available": "المتاح: {n} قطعة",
@@ -2674,7 +2689,8 @@
           "unitCost": "سعر الوحدة",
           "total": "الإجمالي",
           "totalRow": "الإجمالي",
-          "deleteTitle": "حذف"
+          "deleteTitle": "حذف",
+          "categoryPlaceholder": "اختر القسم للصنف الجديد"
         },
         "notesLabel": "ملاحظات",
         "cancel": "إلغاء",
@@ -3166,6 +3182,7 @@
         "fields": {
           "name": "اسم المنتج",
           "brand": "الماركة",
+          "category": "القسم",
           "quantity": "الكمية",
           "price": "سعر البيع (جنيه)",
           "costPrice": "سعر الشراء (جنيه)",

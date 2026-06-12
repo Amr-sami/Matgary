@@ -13,7 +13,14 @@ interface EditSaleModalProps {
   isOpen: boolean;
   onClose: () => void;
   sale: Sale | null;
-  onSuccess: () => void;
+  /**
+   * Called AFTER the PATCH commits. The parent normally refreshes the
+   * sales list here. The modal awaits the returned promise (if any)
+   * before closing, so the loading spinner stays visible until the
+   * refresh has landed — the row shows the new values the instant the
+   * modal disappears, not 50–200 ms later.
+   */
+  onSuccess: () => void | Promise<void>;
 }
 
 export function EditSaleModal({ isOpen, onClose, sale, onSuccess }: EditSaleModalProps) {
@@ -53,7 +60,16 @@ export function EditSaleModal({ isOpen, onClose, sale, onSuccess }: EditSaleModa
   const handleSave = async () => {
     setLoading(true);
     try {
-      const parsed = date ? new Date(`${date}T12:00:00`) : undefined;
+      // Only send saleDate if the user actually changed the date input —
+      // sending it unconditionally normalises the time-of-day to 12:00
+      // local, which shifts the row in any "newest-first" sort. Users
+      // perceived this as the row "disappearing" after a simple price
+      // edit because it moved down the list by a few hours.
+      const originalDate = new Date(sale.saleDate).toISOString().slice(0, 10);
+      const dateChanged = date !== "" && date !== originalDate;
+      const parsed = dateChanged
+        ? new Date(`${date}T12:00:00`)
+        : undefined;
       await updateSale(sale.id, {
         quantitySold: quantity,
         pricePerUnit,
@@ -62,7 +78,11 @@ export function EditSaleModal({ isOpen, onClose, sale, onSuccess }: EditSaleModa
         note,
         saleDate: parsed,
       });
-      onSuccess();
+      // Await the parent's refresh BEFORE closing so the underlying row
+      // already shows the new values when the modal disappears. Without
+      // the await the modal closed first, leaving the row briefly stale
+      // — users perceived "nothing happened" and reloaded the page.
+      await onSuccess();
       onClose();
     } catch (e: any) {
       alert(e.message || t.error);
@@ -78,20 +98,44 @@ export function EditSaleModal({ isOpen, onClose, sale, onSuccess }: EditSaleModa
       title={t.title.replace("{productName}", sale.productName)}
     >
       <div className="space-y-4">
-        <Input
-          label={t.quantity}
-          type="number"
-          min={1}
-          value={quantity}
-          onChange={(e) => setQuantity(Number(e.target.value))}
-        />
-        <Input
-          label={t.unitPrice}
-          type="number"
-          min={0}
-          value={pricePerUnit}
-          onChange={(e) => setPricePerUnit(Number(e.target.value))}
-        />
+        {/* Side-by-side so quantity and unit price are visually distinct
+            — stacked inputs in a narrow modal were easy to confuse when
+            both are numeric. Each carries its ORIGINAL value as a hint
+            so the cashier can see what they're changing from. */}
+        <div className="grid grid-cols-2 gap-3">
+          <Input
+            label={t.quantity}
+            type="number"
+            inputMode="numeric"
+            min={1}
+            step={1}
+            value={quantity}
+            onChange={(e) => setQuantity(Number(e.target.value))}
+            placeholder={String(sale.quantitySold)}
+          />
+          <Input
+            label={t.unitPrice}
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step="0.01"
+            value={pricePerUnit}
+            onChange={(e) => setPricePerUnit(Number(e.target.value))}
+            placeholder={String(sale.pricePerUnit)}
+          />
+        </div>
+        {/* "Before" hint — explicit so the user can verify what's being
+            changed against the original. Hidden when nothing's been
+            touched yet. */}
+        {(quantity !== sale.quantitySold || pricePerUnit !== sale.pricePerUnit) && (
+          <p className="text-xs text-text-secondary -mt-2">
+            {locale === "ar" ? "القيمة الأصلية" : "Original"}:&nbsp;
+            <span dir="ltr">
+              {sale.quantitySold} × {formatCurrency(sale.pricePerUnit, locale)}{" "}
+              = {formatCurrency(sale.quantitySold * sale.pricePerUnit, locale)}
+            </span>
+          </p>
+        )}
         <div className="space-y-2 p-3 bg-gray-50 rounded-lg">
           <div className="flex rounded-lg overflow-hidden border border-border">
             <button

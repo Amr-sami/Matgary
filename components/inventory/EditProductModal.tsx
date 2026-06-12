@@ -5,7 +5,9 @@ import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { SupplierPicker } from "../suppliers/SupplierPicker";
+import { SortSelect } from "../ui/FilterSelect";
 import { updateProduct } from "@/lib/api/products";
+import { useCategories } from "@/hooks/useCategories";
 import type { Product } from "@/lib/types";
 import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
@@ -24,6 +26,7 @@ export function EditProductModal({
 }: EditProductModalProps) {
   const dict = useDictionary();
   const t = dict.app.inventory.editForm;
+  const { data: categories } = useCategories();
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState("");
   const [brand, setBrand] = useState("");
@@ -36,6 +39,10 @@ export function EditProductModal({
   const [supplier, setSupplier] = useState("");
   const [supplierId, setSupplierId] = useState<string | null>(null);
   const [location, setLocation] = useState("");
+  // categoryId is intentionally separate from `product` because we want
+  // to let the owner re-categorise; the parent passes the current value
+  // via `product.category` (the FK).
+  const [categoryId, setCategoryId] = useState<string>("");
 
   useEffect(() => {
     if (product && isOpen) {
@@ -50,6 +57,7 @@ export function EditProductModal({
       setSupplier(product.supplier || "");
       setSupplierId(product.supplierId ?? null);
       setLocation(product.location || "");
+      setCategoryId(product.category);
     }
   }, [product, isOpen]);
 
@@ -80,6 +88,11 @@ export function EditProductModal({
         supplierId,
         location: location.trim(),
         tags: tagList,
+        // Only send categoryId when it differs from the current value —
+        // skips an unnecessary catalog cache bust on every save.
+        ...(categoryId && categoryId !== product.category
+          ? { categoryId }
+          : {}),
       });
       onSuccess();
       onClose();
@@ -109,6 +122,22 @@ export function EditProductModal({
           value={brand}
           onChange={(e) => setBrand(e.target.value)}
         />
+
+        {/* Category picker — added in the inventory-edit UX pass so the
+            owner can re-categorise a product without going back to the
+            full /add-product wizard. */}
+        <div>
+          <label className="block text-sm font-medium text-text-secondary mb-1.5">
+            {t.fields.category}
+          </label>
+          <SortSelect
+            value={categoryId}
+            onChange={setCategoryId}
+            options={categories.map((c) => ({ value: c.id, label: c.label }))}
+            fullWidth
+            ariaLabel={t.fields.category}
+          />
+        </div>
 
         <Input
           label={t.fields.quantity}

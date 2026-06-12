@@ -1011,6 +1011,36 @@ export async function updateSale(
       }
     }
 
+    // amount_paid honours the CHECK constraint (amount_paid <= total_price):
+    //   - Fully paid sale → keep "fully paid" status, adjust amount_paid
+    //     down to the new total (the customer effectively got a discount).
+    //   - Partially paid + new total >= old amount_paid → leave amount_paid
+    //     as-is (customer still owes the remainder).
+    //   - Partially paid + new total <  old amount_paid → clamp to new
+    //     total (customer overpaid; treated as paid in full).
+    // Without this rebalance, lowering total_price below amount_paid would
+    // violate sales_amount_paid_lte_total and the whole UPDATE fails.
+    const oldPaid = Number(sale.amountPaid ?? 0);
+    const oldTotal = Number(sale.totalPrice);
+    let newAmountPaid = oldPaid;
+    let newIsPaid = sale.isPaid;
+    let newPaidAt = sale.paidAt;
+    let newPartialPaidAt = sale.partialPaidAt;
+    if (oldPaid >= oldTotal) {
+      // Was fully paid — keep it fully paid at the new total.
+      newAmountPaid = totalPrice;
+      newIsPaid = true;
+      newPaidAt = sale.paidAt ?? new Date();
+      newPartialPaidAt = null;
+    } else if (oldPaid > totalPrice) {
+      // New total dropped below old amount_paid → treat as fully paid at
+      // the new lower total (effectively a discount applied retroactively).
+      newAmountPaid = totalPrice;
+      newIsPaid = true;
+      newPaidAt = new Date();
+      newPartialPaidAt = null;
+    }
+
     const set: Record<string, unknown> = {
       quantitySold: newQty,
       pricePerUnit: String(newPrice),
@@ -1019,6 +1049,10 @@ export async function updateSale(
       discountValue: newDiscVal != null ? String(newDiscVal) : null,
       discountAmount: discountAmount > 0 ? String(discountAmount) : null,
       totalPrice: String(totalPrice),
+      amountPaid: String(newAmountPaid),
+      isPaid: newIsPaid,
+      paidAt: newPaidAt,
+      partialPaidAt: newPartialPaidAt,
     };
     if (patch.note !== undefined) set.note = patch.note || null;
     if (patch.saleDate) set.saleDate = patch.saleDate;

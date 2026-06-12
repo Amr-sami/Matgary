@@ -21,15 +21,24 @@ export function useProducts() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
+  /**
+   * Re-fetch the product list. Returns the new list directly so callers
+   * who need to act on the fresh data (e.g. selecting a just-created
+   * product) don't have to wait for React to commit the state update
+   * before reading from `products`.
+   */
+  const refresh = useCallback(async (): Promise<Product[]> => {
     try {
       const res = await fetch("/api/products", { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json: { data: ProductRowApi[] } = await res.json();
-      setProducts(json.data.map(reviveProduct));
+      const revived = json.data.map(reviveProduct);
+      setProducts(revived);
       setError(null);
+      return revived;
     } catch (err) {
       setError(err instanceof Error ? err.message : "حدث خطأ");
+      return [];
     } finally {
       setLoading(false);
     }

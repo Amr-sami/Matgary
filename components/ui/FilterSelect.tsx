@@ -1,7 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Check, ChevronDown } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 
@@ -25,6 +26,10 @@ interface FilterSelectProps {
   prefix?: string;
   /** Optional icon rendered before the label in the trigger. */
   leadingIcon?: ReactNode;
+  /** When true, the trigger fills its container instead of sitting as an
+   *  inline-block chip. Used when the dropdown replaces a native `<select>`
+   *  inside a form column rather than a filter row. */
+  fullWidth?: boolean;
   className?: string;
   ariaLabel?: string;
 }
@@ -50,16 +55,38 @@ export function FilterSelect({
   nullable = true,
   prefix,
   leadingIcon,
+  fullWidth = false,
   className,
   ariaLabel,
 }: FilterSelectProps) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLUListElement>(null);
+  // Portal mount target — only set in the browser so SSR stays inert. Refs
+  // resolved on mount via useLayoutEffect to avoid the first-paint flash that
+  // would happen if the menu rendered at (0,0) before measuring.
+  const [portalNode, setPortalNode] = useState<HTMLElement | null>(null);
+  const [menuRect, setMenuRect] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    maxHeight: number;
+    placement: "below" | "above";
+  } | null>(null);
+
+  useLayoutEffect(() => {
+    if (typeof document !== "undefined") setPortalNode(document.body);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
+    // Click-outside / Escape close. Includes the portalled menu so clicks
+    // inside an <li> don't trip the outside-click handler.
     const onClick = (e: MouseEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (wrapRef.current?.contains(target)) return;
+      if (menuRef.current?.contains(target)) return;
+      setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
@@ -69,6 +96,49 @@ export function FilterSelect({
     return () => {
       document.removeEventListener("mousedown", onClick);
       document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  // Position the portalled menu relative to the trigger. Recompute on open,
+  // on scroll, and on resize so the menu tracks its anchor.
+  useLayoutEffect(() => {
+    if (!open) {
+      setMenuRect(null);
+      return;
+    }
+    const measure = () => {
+      const trigger = wrapRef.current?.querySelector("button");
+      if (!trigger) return;
+      const r = trigger.getBoundingClientRect();
+      const viewportH = window.innerHeight;
+      const margin = 8;
+      const desiredMax = 288; // matches Tailwind max-h-72
+      const spaceBelow = viewportH - r.bottom - margin;
+      const spaceAbove = r.top - margin;
+      const placement: "below" | "above" =
+        spaceBelow >= Math.min(desiredMax, 160) || spaceBelow >= spaceAbove
+          ? "below"
+          : "above";
+      const maxHeight = Math.max(
+        120,
+        Math.min(desiredMax, placement === "below" ? spaceBelow : spaceAbove),
+      );
+      const top =
+        placement === "below" ? r.bottom + 6 : Math.max(margin, r.top - 6);
+      setMenuRect({
+        top,
+        left: r.left,
+        width: r.width,
+        maxHeight,
+        placement,
+      });
+    };
+    measure();
+    window.addEventListener("scroll", measure, true);
+    window.addEventListener("resize", measure);
+    return () => {
+      window.removeEventListener("scroll", measure, true);
+      window.removeEventListener("resize", measure);
     };
   }, [open]);
 
@@ -95,7 +165,14 @@ export function FilterSelect({
   };
 
   return (
-    <div ref={wrapRef} className={cn("relative inline-block", className)}>
+    <div
+      ref={wrapRef}
+      className={cn(
+        "relative",
+        fullWidth ? "block w-full" : "inline-block",
+        className,
+      )}
+    >
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -103,7 +180,10 @@ export function FilterSelect({
         aria-expanded={open}
         aria-label={ariaLabel ?? allLabel ?? activeLabel}
         className={cn(
-          "inline-flex items-center justify-between gap-2 min-w-[140px] px-3 py-2 rounded-lg border border-border bg-white text-sm transition-colors hover:border-text-secondary/40",
+          "items-center justify-between gap-2 rounded-lg border border-border bg-white transition-colors hover:border-text-secondary/40",
+          fullWidth
+            ? "flex w-full px-4 py-2.5 text-text-primary focus:outline-none focus:border-accent"
+            : "inline-flex min-w-[140px] px-3 py-2 text-sm",
           // Neutral colour only — selection state shows via the active row's
           // accent + check in the menu, not via the trigger's border. Matches
           // the rest of the filter chips on /customers, /sales etc.
@@ -127,10 +207,29 @@ export function FilterSelect({
         />
       </button>
 
-      {open && (
+      {open && portalNode && menuRect && createPortal(
         <ul
+          ref={menuRef}
           role="listbox"
-          className="absolute start-0 top-full mt-1.5 z-30 min-w-full w-max max-w-[280px] max-h-72 overflow-y-auto rounded-xl border border-border bg-white shadow-lg py-1"
+          style={{
+            position: "fixed",
+            top:
+              menuRect.placement === "above"
+                ? undefined
+                : menuRect.top,
+            bottom:
+              menuRect.placement === "above"
+                ? window.innerHeight - menuRect.top
+                : undefined,
+            left: menuRect.left,
+            width: fullWidth ? menuRect.width : undefined,
+            minWidth: fullWidth ? undefined : menuRect.width,
+            maxHeight: menuRect.maxHeight,
+          }}
+          className={cn(
+            "z-[60] overflow-y-auto rounded-xl border border-border bg-white shadow-lg py-1",
+            !fullWidth && "max-w-[320px] w-max",
+          )}
         >
           {nullable && allLabel && (
             <>
@@ -179,7 +278,8 @@ export function FilterSelect({
               </li>
             );
           })}
-        </ul>
+        </ul>,
+        portalNode,
       )}
     </div>
   );
@@ -191,6 +291,7 @@ interface SortSelectProps<T extends string> {
   options: { value: T; label: string }[];
   prefix?: string;
   leadingIcon?: ReactNode;
+  fullWidth?: boolean;
   className?: string;
   ariaLabel?: string;
 }
@@ -204,6 +305,7 @@ export function SortSelect<T extends string>({
   options,
   prefix,
   leadingIcon,
+  fullWidth,
   className,
   ariaLabel,
 }: SortSelectProps<T>) {
@@ -217,6 +319,7 @@ export function SortSelect<T extends string>({
       nullable={false}
       prefix={prefix}
       leadingIcon={leadingIcon}
+      fullWidth={fullWidth}
       className={className}
       ariaLabel={ariaLabel}
     />

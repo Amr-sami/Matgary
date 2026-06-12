@@ -639,7 +639,14 @@ function InventoryPageInner() {
         isOpen={!!editProduct}
         onClose={() => setEditProduct(null)}
         product={editProduct}
-        onSuccess={() => setToast({ type: "success", message: t.toast.productUpdated })}
+        onSuccess={async () => {
+          // Refetch so the list reflects the saved fields (price, qty,
+          // name, etc.) without a manual page reload. The other handlers
+          // (delete, adjustQty, import) do this too; the edit path was
+          // the outlier that just showed a toast.
+          await refreshProducts();
+          setToast({ type: "success", message: t.toast.productUpdated });
+        }}
       />
 
       {/* History Modal */}

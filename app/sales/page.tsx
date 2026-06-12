@@ -331,23 +331,26 @@ function SalesPageInner() {
       saleDate: sale.saleDate,
     });
   };
-  const handleReturnSuccess = () => {
+  const handleReturnSuccess = async () => {
+    // Await refreshes BEFORE toast so the table + KPIs reflect the
+    // return at the moment the success message appears.
+    await Promise.all([refreshSales(), refreshReturns()]);
     setToast({ type: "success", message: t.toast.returnSuccess });
-    void refreshSales();
-    void refreshReturns();
   };
 
   const handleVoidConfirm = useCallback(async () => {
     if (!voidSaleData) return;
     try {
       await voidSale(voidSaleData.id);
+      // Await refresh BEFORE toast so the row disappears (or shows
+      // returned-to-stock state) before the success banner appears.
+      await refreshSales();
       setToast({
         type: "success",
         message: voidSaleData.isReturned
           ? t.toast.saleDeleted
           : t.toast.saleDeletedRestocked,
       });
-      void refreshSales();
     } catch (e: any) {
       setToast({ type: "error", message: e.message || t.toast.deleteFailed });
     } finally {
@@ -424,13 +427,12 @@ function SalesPageInner() {
 
         {/* Sale Form */}
         <SaleForm
-          onSuccess={() => {
+          onSuccess={async () => {
+            // Await the refresh BEFORE the toast so the table + KPIs
+            // already show the new sale at the moment the success
+            // message appears. Mirrors EditSaleModal's flow.
+            await Promise.all([refreshSales(), refreshReturns()]);
             setToast({ type: "success", message: t.toast.saleSuccess });
-            // Reload sales + returns so the table, KPIs, brand list, and
-            // receivables aggregates reflect the new invoice without
-            // forcing the cashier to refresh the page.
-            void refreshSales();
-            void refreshReturns();
           }}
           onPrintLastSale={setReceiptData}
           onPrintLastInvoice={setInvoiceReceipt}
@@ -560,9 +562,13 @@ function SalesPageInner() {
         isOpen={!!editSale}
         onClose={() => setEditSale(null)}
         sale={editSale}
-        onSuccess={() => {
+        onSuccess={async () => {
+          // Await the refresh BEFORE the toast so the row reflects the
+          // new values at the moment the success message appears.
+          // Modal's handleSave awaits this promise, so its loading
+          // spinner stays up until the data is in.
+          await refreshSales();
           setToast({ type: "success", message: t.toast.saleUpdated });
-          void refreshSales();
         }}
       />
 

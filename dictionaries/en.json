@@ -424,7 +424,22 @@
         "productSearch": {
           "label": "Choose product",
           "placeholder": "Search products…",
-          "inStock": "In stock: {n}"
+          "inStock": "In stock: {n}",
+          "addNew": "+ Add new product to inventory",
+          "addNewWithName": "+ Add \"{name}\" as a new product",
+          "noMatch": "No product matches — add it to inventory"
+        },
+        "quickAddProduct": {
+          "title": "Add new product to inventory",
+          "name": "Product name",
+          "namePlaceholder": "e.g. Casio F-91W watch",
+          "category": "Category",
+          "price": "Selling price (EGP)",
+          "quantity": "Quantity in stock",
+          "costPrice": "Cost price (optional)",
+          "costPricePlaceholder": "Optional",
+          "save": "Save and add to cart",
+          "errorGeneric": "Could not add product. Please try again."
         },
         "recentLabel": "Recent products:",
         "available": "Available: {n} pcs",
@@ -2674,7 +2689,8 @@
           "unitCost": "Unit cost",
           "total": "Total",
           "totalRow": "Total",
-          "deleteTitle": "Delete"
+          "deleteTitle": "Delete",
+          "categoryPlaceholder": "Choose a category for the new product"
         },
         "notesLabel": "Notes",
         "cancel": "Cancel",
@@ -3166,6 +3182,7 @@
         "fields": {
           "name": "Product name",
           "brand": "Brand",
+          "category": "Category",
           "quantity": "Quantity",
           "price": "Selling price (EGP)",
           "costPrice": "Cost price (EGP)",
