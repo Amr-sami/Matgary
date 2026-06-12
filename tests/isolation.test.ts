@@ -48,6 +48,13 @@ async function freshTenant(name: string, email: string) {
       .insert(tenants)
       .values({ name, slug })
       .returning({ id: tenants.id });
+    // Set the RLS GUC up front so every downstream INSERT (branches,
+    // shop_settings, the cornerstore seed) passes the WITH CHECK clause.
+    // Done immediately after we know the tenant id — the FORCE ROW LEVEL
+    // SECURITY policy on `branches` rejects writes when app.tenant_id is
+    // unset, so the original order (branches → set_config → settings)
+    // failed on the very first insert.
+    await tx.execute(sql`select set_config('app.tenant_id', ${t.id}, true)`);
     // Every tenant needs a primary branch — production signup creates one,
     // tests have to do it explicitly because they bypass signupAction.
     const [b] = await tx
@@ -64,7 +71,6 @@ async function freshTenant(name: string, email: string) {
       userId: u.id,
       role: "owner",
     });
-    await tx.execute(sql`select set_config('app.tenant_id', ${t.id}, true)`);
     await tx.insert(shopSettings).values({
       tenantId: t.id,
       branchId: b.id,
