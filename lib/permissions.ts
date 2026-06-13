@@ -33,9 +33,6 @@ export type Permission =
   | "manage_leave" // approve / reject everyone's
   // Audit / activity log
   | "view_activity_log" // see "who did what" feed (owner-only by default)
-  // Cash drawer reconciliation
-  | "open_close_shift" // cashier: open own shift + record movements + close
-  | "manage_cash_reconciliation" // owner/manager: review variances, force-close, cross-cashier list
   // Daily owner digest
   | "manage_digest_settings"; // owner: toggle, recipients, schedule
 
@@ -65,8 +62,6 @@ export const ALL_PERMISSIONS: Permission[] = [
   "request_leave",
   "manage_leave",
   "view_activity_log",
-  "open_close_shift",
-  "manage_cash_reconciliation",
   "manage_digest_settings",
 ];
 
@@ -96,8 +91,6 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   request_leave: "تقديم طلبات إجازة",
   manage_leave: "الموافقة على طلبات الإجازة",
   view_activity_log: "عرض سجل النشاط",
-  open_close_shift: "فتح وإقفال شيفت الخزينة",
-  manage_cash_reconciliation: "مراجعة الخزينة وتقارير الـ Z",
   manage_digest_settings: "إعدادات الملخص اليومي",
 };
 
@@ -151,12 +144,8 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     permissions: ["attendance_self_manual"],
   },
   {
-    title: "الخزينة والملخص اليومي",
-    permissions: [
-      "open_close_shift",
-      "manage_cash_reconciliation",
-      "manage_digest_settings",
-    ],
+    title: "الملخص اليومي",
+    permissions: ["manage_digest_settings"],
   },
 ];
 
@@ -170,8 +159,6 @@ export const DEFAULT_STAFF_PERMISSIONS: Permission[] = [
   "view_customers",
   "record_sales",
   "request_leave",
-  // A default cashier needs to be able to open + close their own shift.
-  "open_close_shift",
 ];
 
 export interface PermissionPrincipal {

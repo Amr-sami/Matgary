@@ -41,10 +41,6 @@ const T = {
     deferred: (count: string, amount: string) =>
       `⚠ آجل متأخر: ${count} فواتير ${amount} مستحقة منذ +7 أيام`,
     attendance: (count: string) => `⚠ حضور: ${count} شيفت محتاج مراجعة`,
-    cashShort: (cashier: string, amount: string) =>
-      `⚠ خزينة: عجز ${amount} في شيفت ${cashier}`,
-    cashOpen: (cashier: string) => `⚠ شيفت خزينة لم يُقفل: ${cashier}`,
-    cashAllOk: "✅ كل الشيفتات مقفولة بدون فروقات",
     tasksOk: "✅ مهام: لا توجد مهام جديدة بدون تأكيد",
     tasksPending: (count: string) =>
       `⚠ ${count} مهام موكلة بدون قراءة من الموظف`,
@@ -65,10 +61,6 @@ const T = {
     deferred: (count: string, amount: string) =>
       `⚠ Overdue deferred: ${count} invoices, ${amount} past 7 days`,
     attendance: (count: string) => `⚠ Attendance: ${count} shift needs review`,
-    cashShort: (cashier: string, amount: string) =>
-      `⚠ Cash: ${amount} short in ${cashier}'s shift`,
-    cashOpen: (cashier: string) => `⚠ Cash shift still open: ${cashier}`,
-    cashAllOk: "✅ All shifts closed with no variance",
     tasksOk: "✅ Tasks: no unacknowledged tasks",
     tasksPending: (count: string) => `⚠ ${count} tasks assigned but not yet seen`,
     openDashboard: "Open dashboard",
@@ -128,20 +120,6 @@ export function renderDigestMessage(
   }
   if (payload.attendanceReviewCount > 0) {
     warnings.push(t.attendance(n(payload.attendanceReviewCount, opts.locale)));
-  }
-
-  for (const s of payload.cash.shortShifts) {
-    warnings.push(t.cashShort(s.cashier, money(s.shortBy, opts.locale)));
-  }
-  for (const s of payload.cash.openShifts) {
-    warnings.push(t.cashOpen(s.cashier));
-  }
-  if (
-    payload.cash.shortShifts.length === 0 &&
-    payload.cash.openShifts.length === 0 &&
-    payload.cash.closedShifts > 0
-  ) {
-    warnings.push(t.cashAllOk);
   }
 
   if (payload.unreadTaskCount > 0) {

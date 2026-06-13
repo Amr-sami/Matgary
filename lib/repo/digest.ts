@@ -9,13 +9,10 @@ import { withTenant } from "@/lib/db";
 import {
   attendanceEvents,
   branches,
-  cashShifts,
   products,
   sales,
   tasks,
-  tenantMembers,
   tenants,
-  users,
 } from "@/lib/db/schema";
 
 export interface DigestPayload {
@@ -40,11 +37,6 @@ export interface DigestPayload {
   };
   deferredOverdue: { count: number; totalOutstanding: string };
   attendanceReviewCount: number;
-  cash: {
-    closedShifts: number;
-    shortShifts: { cashier: string; shortBy: string }[];
-    openShifts: { cashier: string; openedAt: string }[];
-  };
   unreadTaskCount: number;
 }
 
@@ -213,67 +205,6 @@ export async function computeDigest(
         ),
       );
 
-    // ── Cash reconciliation ─────────────────────────────────────────────
-    const closedToday = await tx
-      .select({
-        cashierUserId: cashShifts.cashierUserId,
-        variance: cashShifts.variance,
-      })
-      .from(cashShifts)
-      .where(
-        and(
-          eq(cashShifts.tenantId, tenantId),
-          eq(cashShifts.branchId, branchId),
-          or(eq(cashShifts.status, "closed"), eq(cashShifts.status, "reviewed"))!,
-          gte(cashShifts.closedAt, dayStart),
-          lte(cashShifts.closedAt, dayEnd),
-        ),
-      );
-    const openNow = await tx
-      .select({
-        cashierUserId: cashShifts.cashierUserId,
-        openedAt: cashShifts.openedAt,
-      })
-      .from(cashShifts)
-      .where(
-        and(
-          eq(cashShifts.tenantId, tenantId),
-          eq(cashShifts.branchId, branchId),
-          eq(cashShifts.status, "open"),
-        ),
-      );
-
-    const cashierIds = Array.from(
-      new Set(
-        [...closedToday.map((r) => r.cashierUserId), ...openNow.map((r) => r.cashierUserId)].filter(Boolean),
-      ),
-    );
-    const nameRows =
-      cashierIds.length === 0
-        ? []
-        : await tx
-            .select({
-              userId: users.id,
-              name: sql<string | null>`coalesce(${tenantMembers.displayName}, ${users.name})`,
-            })
-            .from(users)
-            .leftJoin(
-              tenantMembers,
-              and(eq(tenantMembers.userId, users.id), eq(tenantMembers.tenantId, tenantId)),
-            )
-            .where(sql`${users.id} = any(${sql.raw(`array[${cashierIds.map((id) => `'${id}'`).join(",")}]::uuid[]`)})`);
-    const nameById = new Map(nameRows.map((r) => [r.userId, r.name ?? "—"]));
-    const shortShifts = closedToday
-      .filter((r) => r.variance != null && Number(r.variance) < -1)
-      .map((r) => ({
-        cashier: nameById.get(r.cashierUserId) ?? "—",
-        shortBy: Math.abs(Number(r.variance)).toFixed(2),
-      }));
-    const openShiftSummaries = openNow.map((r) => ({
-      cashier: nameById.get(r.cashierUserId) ?? "—",
-      openedAt: r.openedAt.toISOString(),
-    }));
-
     // ── Unread tasks (assigned, unseen, open/in-progress) ───────────────
     const [taskAgg] = await tx
       .select({ count: sql<number>`coalesce(count(*), 0)::int` })
@@ -309,11 +240,6 @@ export async function computeDigest(
         totalOutstanding: deferredAgg.outstanding,
       },
       attendanceReviewCount: attendanceAgg.count,
-      cash: {
-        closedShifts: closedToday.length,
-        shortShifts,
-        openShifts: openShiftSummaries,
-      },
       unreadTaskCount: taskAgg.count,
     };
   });
@@ -326,8 +252,6 @@ export function isDigestEmpty(p: DigestPayload): boolean {
     p.lowStock.totalCount === 0 &&
     p.deferredOverdue.count === 0 &&
     p.attendanceReviewCount === 0 &&
-    p.cash.shortShifts.length === 0 &&
-    p.cash.openShifts.length === 0 &&
     p.unreadTaskCount === 0
   );
 }

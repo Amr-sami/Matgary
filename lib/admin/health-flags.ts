@@ -1,15 +1,11 @@
 // Per-tenant Health Flags rollup. Surfaces signals from the cross-cutting
-// features (cash reconciliation, daily digest, cash shifts, sales activity)
-// so admin support sees the same picture the owner would.
+// features (daily digest, sales activity) so admin support sees the same
+// picture the owner would.
 
-import { and, eq, gt, isNull, lt, or, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import {
-  branches,
-  cashShifts,
   digestSettings,
   sales,
-  shopSettings,
-  users,
 } from "@/lib/db/schema";
 import { getAdminDb } from "./db";
 
@@ -17,8 +13,6 @@ export type HealthFlagSeverity = "ok" | "warn";
 
 export interface HealthFlag {
   key:
-    | "cash_reconciliation_off"
-    | "cash_shifts_open_too_long"
     | "digest_not_configured"
     | "no_sales_7d"
     | "dormant_employees_30d";
@@ -30,41 +24,10 @@ export interface HealthFlag {
 export async function computeHealthFlags(tenantId: string): Promise<HealthFlag[]> {
   const db = getAdminDb();
   const now = new Date();
-  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-  const [
-    branchTotal,
-    reconciliationOnBranches,
-    staleShifts,
-    digestRow,
-    lastSale,
-    dormantEmployees,
-  ] = await Promise.all([
-    db
-      .select({ count: sql<number>`coalesce(count(*), 0)::int` })
-      .from(branches)
-      .where(eq(branches.tenantId, tenantId)),
-    db
-      .select({ count: sql<number>`coalesce(count(*), 0)::int` })
-      .from(shopSettings)
-      .where(
-        and(
-          eq(shopSettings.tenantId, tenantId),
-          eq(shopSettings.cashReconciliationEnabled, true),
-        ),
-      ),
-    db
-      .select({ count: sql<number>`coalesce(count(*), 0)::int` })
-      .from(cashShifts)
-      .where(
-        and(
-          eq(cashShifts.tenantId, tenantId),
-          eq(cashShifts.status, "open"),
-          lt(cashShifts.openedAt, twentyFourHoursAgo),
-        ),
-      ),
+  const [digestRow, lastSale, dormantEmployees] = await Promise.all([
     db
       .select()
       .from(digestSettings)
@@ -94,9 +57,6 @@ export async function computeHealthFlags(tenantId: string): Promise<HealthFlag[]
     `),
   ]);
 
-  const branches_ = branchTotal[0]?.count ?? 0;
-  const reconciledOn = reconciliationOnBranches[0]?.count ?? 0;
-  const staleCount = staleShifts[0]?.count ?? 0;
   const digest = digestRow[0];
   const lastSaleAt = lastSale[0]?.lastSaleAt ?? null;
   // Drizzle's sql.execute returns either an array or { rows: [...] } depending
@@ -110,16 +70,6 @@ export async function computeHealthFlags(tenantId: string): Promise<HealthFlag[]
   void now;
 
   const flags: HealthFlag[] = [];
-  flags.push({
-    key: "cash_reconciliation_off",
-    severity: branches_ > 0 && reconciledOn === 0 ? "warn" : "ok",
-    value: branches_ - reconciledOn,
-  });
-  flags.push({
-    key: "cash_shifts_open_too_long",
-    severity: staleCount > 0 ? "warn" : "ok",
-    value: staleCount,
-  });
   flags.push({
     key: "digest_not_configured",
     severity:

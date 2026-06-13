@@ -1,6 +1,6 @@
 import { and, eq, sql } from "drizzle-orm";
 import { withTenant } from "@/lib/db";
-import { sales, salePayments, cashShifts, cashMovements } from "@/lib/db/schema";
+import { sales, salePayments } from "@/lib/db/schema";
 
 // Customer ledger — read + mutate side. Customers are derived from
 // sales.customer_phone (no separate customers table), so the "ledger"
@@ -235,26 +235,6 @@ export async function markCustomerAllPaid(
          AND is_paid        = false
     `);
 
-    // Resolve the active cash shift so cash settlements line up with the
-    // drawer for Z-report. No shift = settlement still records, just no
-    // drawer reconciliation. Same trade-off as settleCustomerPayment.
-    let shiftId: string | null = null;
-    if (method === "cash") {
-      const [shift] = await tx
-        .select({ id: cashShifts.id })
-        .from(cashShifts)
-        .where(
-          and(
-            eq(cashShifts.tenantId, tenantId),
-            eq(cashShifts.branchId, branchId),
-            eq(cashShifts.cashierUserId, actor.recordedByUserId),
-            eq(cashShifts.status, "open"),
-          ),
-        )
-        .limit(1);
-      shiftId = shift?.id ?? null;
-    }
-
     // One payment event per row touched, recording the actual delta
     // collected (not the gross totalPrice).
     let markedTotal = 0;
@@ -273,24 +253,10 @@ export async function markCustomerAllPaid(
         method,
         recordedAt: now,
         recordedByUserId: actor.recordedByUserId,
-        cashShiftId: shiftId,
       });
     }
     if (eventRows.length > 0) {
       await tx.insert(salePayments).values(eventRows);
-    }
-
-    // Cash settlements: one aggregated cash_movements row so the cash
-    // drawer shows ONE "customer pay-down" line, not one per invoice.
-    if (method === "cash" && shiftId && markedTotal > 0) {
-      await tx.insert(cashMovements).values({
-        tenantId,
-        shiftId,
-        kind: "paid_in",
-        amount: String(markedTotal),
-        reason: `Customer settlement (bulk) — ${customerPhone}`,
-        recordedByUserId: actor.recordedByUserId,
-      });
     }
 
     return { markedCount: rows.length, markedTotal };

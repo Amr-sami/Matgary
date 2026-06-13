@@ -615,10 +615,6 @@ export function SaleForm({
       // channel and doesn't risk number bans).
       const trimmedPhone = customerPhone.trim();
       if (trimmedPhone && result.saleIds.length > 0) {
-        // Receipts are sent as PDF attachments in v1 — no public web URL.
-        // The {{receiptLink}} substitution is kept for template compatibility
-        // but always resolves to "" so the line drops out of the message.
-        const receiptLink = "";
         const message = substitute(settings.messageTemplate, {
           customerName: customerName.trim() || fallbackName,
           customerPhone: trimmedPhone,
@@ -626,7 +622,6 @@ export function SaleForm({
           invoiceCode: result.invoiceId.slice(-8).toUpperCase(),
           totalPrice: fmt(total),
           productNames: lines.map((l) => l.product.name).join("، "),
-          receiptLink,
           date: saleDate.toLocaleDateString(
             locale === "en" ? "en-EG" : "ar-EG",
             { numberingSystem: "latn" } as Intl.DateTimeFormatOptions,
@@ -709,7 +704,6 @@ export function SaleForm({
               invoiceCode: result.invoiceId.slice(-8).toUpperCase(),
               totalPrice: fmt(total),
               productNames: lines.map((l) => l.product.name).join("، "),
-              receiptLink: "",
               date: saleDate.toLocaleDateString(
                 locale === "en" ? "en-EG" : "ar-EG",
                 { numberingSystem: "latn" } as Intl.DateTimeFormatOptions,
@@ -717,14 +711,6 @@ export function SaleForm({
               shopName: settings.shopName,
               shopPhone: settings.shopPhone,
             })
-              .split("\n")
-              .filter((line) => {
-                const t = line.trim();
-                if (/^رابط الفاتورة:\s*$/.test(t)) return false;
-                if (/^receipt link:\s*$/i.test(t)) return false;
-                return true;
-              })
-              .join("\n")
               .replace(/\n{3,}/g, "\n\n")
               .trim();
 
@@ -797,32 +783,22 @@ export function SaleForm({
               "[whatsapp] Green API enabled but credentials missing — skipping send (no tab opened)"
             );
           } else if (settings.sendAsPdf) {
-            // PDF mode: build a clean caption WITHOUT the receipt link
-            // (the customer is getting the PDF itself, no link needed).
-            const captionRaw = substitute(settings.messageTemplate, {
+            // PDF mode: caption goes alongside the PDF attachment. Templates
+            // never reference a receipt link — the PDF itself is the receipt.
+            const pdfCaption = substitute(settings.messageTemplate, {
               customerName: customerName.trim() || fallbackName,
               customerPhone: trimmedPhone,
               invoiceId: result.invoiceId,
               invoiceCode: result.invoiceId.slice(-8).toUpperCase(),
               totalPrice: fmt(total),
               productNames: lines.map((l) => l.product.name).join("، "),
-              receiptLink: "",
               date: saleDate.toLocaleDateString(
                 locale === "en" ? "en-EG" : "ar-EG",
                 { numberingSystem: "latn" } as Intl.DateTimeFormatOptions,
               ),
               shopName: settings.shopName,
               shopPhone: settings.shopPhone,
-            });
-            const pdfCaption = captionRaw
-              .split("\n")
-              .filter((line) => {
-                const t = line.trim();
-                if (/^رابط الفاتورة:\s*$/.test(t)) return false;
-                if (/^receipt link:\s*$/i.test(t)) return false;
-                return true;
-              })
-              .join("\n")
+            })
               .replace(/\n{3,}/g, "\n\n")
               .trim();
             // Send as PDF attachment via Green API sendFileByUpload

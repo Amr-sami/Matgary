@@ -15,7 +15,7 @@ export default function ExpensesPage() {
   const dict = useDictionary();
   const locale = useLocale();
   const t = dict.app.expenses;
-  const { expenses, loading } = useExpenses();
+  const { expenses, loading, refresh } = useExpenses();
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
@@ -51,7 +51,12 @@ export default function ExpensesPage() {
           {/* New Expense Form */}
           <div className="lg:col-span-1">
             <div className="sticky top-6">
-              <ExpenseForm onSuccess={() => setToast({ type: "success", message: t.toast.added })} />
+              <ExpenseForm
+                onSuccess={() => {
+                  setToast({ type: "success", message: t.toast.added });
+                  void refresh();
+                }}
+              />
             </div>
           </div>
 

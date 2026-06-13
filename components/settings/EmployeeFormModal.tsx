@@ -261,7 +261,10 @@ export function EmployeeFormModal({ isOpen, member, slug, onClose, onSaved, onTo
         {/* Section 1: Basic info */}
         <section>
           <h3 className={sectionTitle}>{t.basicSection}</h3>
-          <div className="grid md:grid-cols-2 gap-3">
+          {/* Stack name + username vertically — the username's @slug suffix
+              clipped input text when the two were side-by-side on narrow
+              modal widths. */}
+          <div className="space-y-3">
             <Input
               label={t.nameLabel}
               placeholder={t.namePlaceholder}
@@ -274,7 +277,10 @@ export function EmployeeFormModal({ isOpen, member, slug, onClose, onSaved, onTo
                 <label className="block text-sm font-medium text-text-secondary mb-1.5">
                   {t.usernameLabel}
                 </label>
-                <div className="flex items-center gap-1 bg-white border border-border rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-accent">
+                {/* dir="ltr" on the wrapper so flex order matches DOM order
+                    even inside the RTL Arabic shell — input on the left, the
+                    @slug suffix on the right. */}
+                <div dir="ltr" className="flex items-center gap-1 bg-white border border-border rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-accent">
                   <input
                     type="text"
                     dir="ltr"
@@ -287,7 +293,7 @@ export function EmployeeFormModal({ isOpen, member, slug, onClose, onSaved, onTo
                     }
                     className="flex-1 px-3 py-2.5 bg-transparent focus:outline-none text-text-primary"
                   />
-                  <span dir="ltr" className="px-3 py-2.5 text-text-secondary bg-bg-main text-sm">
+                  <span className="px-3 py-2.5 text-text-secondary bg-bg-main text-sm">
                     @{slug}
                   </span>
                 </div>

@@ -21,7 +21,6 @@ test("authz: every tenant /api/* route returns 401 to anonymous", async ({
     "/api/customers/by-phone/%2B201001234567",
     "/api/insights/overview",
     "/api/team",
-    "/api/cash-shifts",
     "/api/returns",
     "/api/branches",
   ];

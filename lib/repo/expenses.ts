@@ -7,10 +7,6 @@ import { withTenant } from "@/lib/db";
 import { expenses as expensesTable } from "@/lib/db/schema";
 import type { Expense, ExpenseCategory } from "@/lib/types";
 import { bustInsightsCache } from "@/lib/repo/insights";
-import {
-  NoOpenShiftError,
-  resolveShiftStampForSale,
-} from "@/lib/repo/cash-shifts";
 
 function rowToExpense(r: typeof expensesTable.$inferSelect): Expense {
   return {
@@ -173,20 +169,6 @@ export async function addExpense(
       }
     }
 
-    const cashShiftId =
-      input.branchId && input.recordedByUserId && !input.isRecurring
-        ? await resolveShiftStampForSale(tx, {
-            tenantId,
-            branchId: input.branchId,
-            recordedByUserId: input.recordedByUserId,
-            isOwner: input.recordedByRole === "owner",
-            paymentMethod: "cash",
-          }).catch((err) => {
-            if (err instanceof NoOpenShiftError) return null;
-            throw err;
-          })
-        : null;
-
     const [created] = await tx
       .insert(expensesTable)
       .values({
@@ -203,7 +185,6 @@ export async function addExpense(
         nextOccurrenceDate,
         date: startDate,
         note: input.note ?? null,
-        cashShiftId,
       })
       .returning({ id: expensesTable.id });
 

@@ -8,8 +8,6 @@ import {
   sales,
   returns as returnsTable,
   shopSettings,
-  cashShifts,
-  cashMovements,
   salePayments,
 } from "@/lib/db/schema";
 import type {
@@ -27,12 +25,6 @@ import {
   earnPoints as walletEarnPoints,
   redeemPoints as walletRedeemPoints,
 } from "@/lib/repo/loyalty";
-import {
-  NoOpenShiftError,
-  resolveShiftStampForSale,
-} from "@/lib/repo/cash-shifts";
-
-export { NoOpenShiftError };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -737,19 +729,6 @@ async function recordCartSaleImpl(
       );
     }
 
-    // Cash-drawer reconciliation: resolve the shift this cart should be
-    // stamped onto (or null if reconciliation is off / non-cash). Throws
-    // NoOpenShiftError when a cashier tries to ring up cash without an
-    // open shift — the route turns that into 409 NO_OPEN_SHIFT and the
-    // client prompts to open one.
-    const cashShiftId = await resolveShiftStampForSale(tx, {
-      tenantId,
-      branchId: options.branchId,
-      recordedByUserId: options.recordedByUserId ?? null,
-      isOwner: options.recordedByRole === "owner",
-      paymentMethod,
-    });
-
     const saleIds: string[] = [];
     const lineSummaries: CartSaleLineSummary[] = [];
     let cartTotal = 0;
@@ -844,7 +823,6 @@ async function recordCartSaleImpl(
           paymentMethod,
           ...computePaidFields(paymentMethod, totalPrice, linePaid),
           recordedByUserId: options.recordedByUserId ?? null,
-          cashShiftId,
         })
         .returning({ id: sales.id });
 
@@ -1260,26 +1238,6 @@ export async function settleCustomerPayment(
     // timestamptz. The ISO form goes through cleanly.
     const nowIso = now.toISOString();
 
-    // Resolve the active cash shift ONCE up front so every sale_payments
-    // row we insert can carry it. Cash settlements also drop a single
-    // aggregate cash_movements row at the end of the loop (kept that way
-    // so the cash drawer shows one line per customer pay-down, not one
-    // per invoice — easier to read on the Z-report).
-    const [activeShift] = await tx
-      .select({ id: cashShifts.id })
-      .from(cashShifts)
-      .where(
-        and(
-          eq(cashShifts.tenantId, tenantId),
-          eq(cashShifts.branchId, input.branchId),
-          eq(cashShifts.cashierUserId, input.recordedByUserId),
-          eq(cashShifts.status, "open"),
-        ),
-      )
-      .limit(1);
-    const shiftIdForPayments =
-      input.method === "cash" && activeShift ? activeShift.id : null;
-
     for (const row of unpaidRows) {
       if (remaining <= 0) break;
       const lineTotal = Number(row.total_price);
@@ -1311,34 +1269,11 @@ export async function settleCustomerPayment(
         method: input.method,
         recordedAt: now,
         recordedByUserId: input.recordedByUserId,
-        cashShiftId: shiftIdForPayments,
       });
     }
 
     const applied = requested - remaining;
     const overpay = remaining;
-
-    // Cash settlements stamp the active cash shift so the Z-report
-    // captures the receipt. We DON'T auto-open a shift here (unlike the
-    // sale path) — if no shift is open, the settlement still records but
-    // the cashier loses the drawer reconciliation. Reason: customer
-    // settlements often happen outside of a normal serving rhythm
-    // (owner pops in for a few minutes), and forcing a shift-open here
-    // would be more friction than benefit. If you want to flip this,
-    // call resolveShiftStampForSale instead.
-    if (input.method === "cash" && applied > 0) {
-      const shift = activeShift;
-      if (shift) {
-        await tx.insert(cashMovements).values({
-          tenantId,
-          shiftId: shift.id,
-          kind: "paid_in",
-          amount: String(applied),
-          reason: `Customer settlement — ${input.customerPhone}`,
-          recordedByUserId: input.recordedByUserId,
-        });
-      }
-    }
 
     // New balance for this customer = sum of remaining unpaid balance.
     const [{ owed }] = (await tx.execute(sql`

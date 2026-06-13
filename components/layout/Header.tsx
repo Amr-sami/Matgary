@@ -3,7 +3,6 @@
 import { Menu } from "@/lib/icons";
 import { formatDate } from "@/lib/utils";
 import { BranchPicker } from "@/components/branches/BranchPicker";
-import { CashDrawerChip } from "@/components/cash-shifts/CashDrawerChip";
 import { OfflineIndicator } from "@/components/offline/OfflineIndicator";
 import { SwRegister } from "@/components/offline/SwRegister";
 
@@ -27,8 +26,6 @@ export function Header({ title }: HeaderProps) {
           <h1 className="text-xl font-semibold">{title}</h1>
         </div>
         <div className="flex items-center gap-3">
-          {/* CashDrawerChip self-hides for users without open_close_shift. */}
-          <CashDrawerChip />
           {/* OfflineIndicator self-hides when everything is healthy. */}
           <OfflineIndicator />
           {/* BranchPicker self-hides when the tenant has only one branch, so

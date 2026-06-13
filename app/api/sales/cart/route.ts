@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireTenantWithBranch } from "@/lib/api/auth-helpers";
-import { NoOpenShiftError, recordCartSale } from "@/lib/repo/operations";
+import { recordCartSale } from "@/lib/repo/operations";
 import { logActivity } from "@/lib/repo/activity";
 import { normalizeEgyptPhone } from "@/lib/validators/egypt";
 import { isDomainError, domainErrorBody } from "@/lib/errors";
@@ -139,15 +139,6 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json(result, { status: 201 });
   } catch (err) {
-    // Cash drawer not open → instruct the client to open one. Doesn't get
-    // cached against the idempotency key — the cashier can open a shift
-    // and retry the same key.
-    if (err instanceof NoOpenShiftError) {
-      return NextResponse.json(
-        { error: "NO_OPEN_SHIFT", code: "NO_OPEN_SHIFT" },
-        { status: 409 },
-      );
-    }
     if (isDomainError(err)) {
       const body = domainErrorBody(err);
       // Cache 4xx failures too so a stuck outbox row doesn't keep failing

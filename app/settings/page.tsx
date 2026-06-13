@@ -17,7 +17,6 @@ import {
   ExternalLink,
   ChevronLeft,
   History,
-  DollarSign,
 } from "@/lib/icons";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/Button";
@@ -121,7 +120,6 @@ const PLACEHOLDER_KEYS = [
   "invoiceCode",
   "totalPrice",
   "productNames",
-  "receiptLink",
   "date",
   "shopName",
   "shopPhone",
@@ -443,7 +441,6 @@ function SettingsPageInner() {
     invoiceCode: "L6XQ7ZL8",
     totalPrice: formatCurrency(2500, locale),
     productNames: t.messageTemplate.sampleProducts,
-    receiptLink: "",
     date: formatDateTime(new Date(), locale),
     shopName: draft.shopName,
     shopPhone: draft.shopPhone,
@@ -480,27 +477,6 @@ function SettingsPageInner() {
                 </div>
                 <p className="text-xs text-text-secondary mt-0.5">
                   {branchCount <= 1 ? t.branches.hintOne : t.branches.hintMany}
-                </p>
-              </div>
-              <ChevronLeft className="w-5 h-5 text-text-secondary shrink-0 group-hover:text-accent transition-colors" />
-            </div>
-          </Link>
-        )}
-
-        {/* Cash drawer reconciliation — owner-only. */}
-        {isOwner && (
-          <Link
-            href="/settings/cash-drawer"
-            className="group block bg-white rounded-xl border border-border p-5 hover:border-accent transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <DollarSign className="w-5 h-5 text-text-secondary shrink-0 group-hover:text-accent transition-colors" />
-              <div className="flex-1 min-w-0">
-                <h3 className="font-bold text-text-primary">
-                  {t.cashDrawerTile.title}
-                </h3>
-                <p className="text-xs text-text-secondary mt-0.5">
-                  {t.cashDrawerTile.subtitle}
                 </p>
               </div>
               <ChevronLeft className="w-5 h-5 text-text-secondary shrink-0 group-hover:text-accent transition-colors" />

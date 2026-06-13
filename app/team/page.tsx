@@ -38,7 +38,11 @@ function TeamPageInner() {
   const isManager = can(principal, "manage_team");
   const canSeeLeaves =
     can(principal, "manage_leave") || can(principal, "request_leave");
-  const { refresh: refreshLeaveUnread } = useLeaveUnread();
+  const { counts: leaveUnread, refresh: refreshLeaveUnread } = useLeaveUnread();
+  // Mirror the sidebar's badge math (submitted + decided) so the in-page
+  // "الإجازات" tab carries the same unread indicator. Capped at 99 to keep
+  // the chip narrow.
+  const leaveBadge = leaveUnread.submitted + leaveUnread.decided;
 
   // Tab list adapts to perms. Staff with only request_leave see only "leaves";
   // managers see the full set. Default tab is the first allowed.
@@ -47,10 +51,16 @@ function TeamPageInner() {
     if (isManager) items.push({ key: "team", label: t.tabs.team });
     if (isManager) items.push({ key: "attendance", label: t.tabs.attendance });
     if (isManager) items.push({ key: "payroll", label: t.tabs.payroll });
-    if (canSeeLeaves) items.push({ key: "leaves", label: t.tabs.leaves });
+    if (canSeeLeaves) {
+      items.push({
+        key: "leaves",
+        label: t.tabs.leaves,
+        badge: leaveBadge > 0 ? (leaveBadge > 99 ? "99+" : leaveBadge) : undefined,
+      });
+    }
     if (isManager) items.push({ key: "settings", label: t.tabs.settings });
     return items;
-  }, [isManager, canSeeLeaves, t.tabs]);
+  }, [isManager, canSeeLeaves, t.tabs, leaveBadge]);
 
   const defaultTab: TabKey = useMemo(
     () => tabs[0]?.key ?? "team",

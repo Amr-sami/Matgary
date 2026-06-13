@@ -31,7 +31,6 @@ const PAGES: PageProbe[] = [
   { route: "/team" },
   { route: "/tasks" },
   { route: "/expenses" },
-  { route: "/cash-shifts" },
 ];
 
 interface PageResult {

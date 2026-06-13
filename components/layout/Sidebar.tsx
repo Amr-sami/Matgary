@@ -16,7 +16,6 @@ import {
   Settings,
   Truck,
   Receipt,
-  DollarSign,
   ListChecks,
   PanelRightClose,
   PanelRightOpen,
@@ -54,7 +53,6 @@ const secondaryItems: NavItem[] = [
   { href: "/tasks", labelKey: "tasks", icon: ListChecks, requires: "view_dashboard" },
   { href: "/customers", labelKey: "customers", icon: Users, requires: "view_customers" },
   { href: "/expenses", labelKey: "expenses", icon: Wallet, requires: "view_expenses" },
-  { href: "/cash-shifts", labelKey: "cashShifts", icon: DollarSign, requires: "manage_cash_reconciliation" },
   { href: "/suppliers", labelKey: "suppliers", icon: Truck, requires: "view_suppliers" },
   { href: "/returns", labelKey: "returns", icon: RotateCcw, requires: "view_returns" },
   // /team also hosts the leaves tab (merged in). Anyone with team management

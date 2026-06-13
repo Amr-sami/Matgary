@@ -53,6 +53,11 @@ export default async function RootLayout({
   const raw = hdrs.get("x-locale");
   const locale = raw && isLocale(raw) ? raw : defaultLocale;
   const dir = dirOf(locale);
+  // Middleware sets x-nonce per request. We pass it to <Script> explicitly:
+  // in dev we ship CSP as Report-Only, and Next.js's auto-nonce injection
+  // only parses the enforce header, so without this the splash-hide script
+  // hydrates with nonce="" on the server and nonce={undefined} on the client.
+  const nonce = hdrs.get("x-nonce") ?? undefined;
   // Phase 2 — load the dictionary at the root so the entire app (logged-in
   // pages + the pre-login [lang] tree) sees it via React context.
   // Pre-login pages still nest their own DictionaryProvider with the
@@ -99,6 +104,7 @@ export default async function RootLayout({
         <Script
           id="app-splash-hide"
           strategy="beforeInteractive"
+          nonce={nonce}
         >{`(function(){var start=Date.now();function hide(){var elapsed=Date.now()-start;var wait=Math.max(0,520-elapsed);setTimeout(function(){var el=document.getElementById('app-splash');if(el)el.classList.add('app-splash--hidden');},wait);}if(document.readyState==='complete')hide();else window.addEventListener('load',hide,{once:true});})();`}</Script>
         <SessionProvider>
           <IconProvider>

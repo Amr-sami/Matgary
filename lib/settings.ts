@@ -124,7 +124,6 @@ export interface ReceiptVars {
   invoiceCode: string;
   totalPrice: string;
   productNames: string;
-  receiptLink: string;
   date: string;
   shopName: string;
   shopPhone: string;

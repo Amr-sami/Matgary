@@ -1451,8 +1451,6 @@
           "healthFlags": {
             "title": "Health flags",
             "ok": "Looks good",
-            "cash_reconciliation_off": "Cash reconciliation off on every branch",
-            "cash_shifts_open_too_long": "{n} cash shifts open > 24 h",
             "digest_not_configured": "Daily digest not configured",
             "no_sales_7d": "No sales in {n} day(s)",
             "dormant_employees_30d": "{n} employee(s) inactive > 30 d"
@@ -2031,10 +2029,6 @@
         "hintOne": "Add a new branch to track sales and inventory per location.",
         "hintMany": "Manage branches, disable or delete a branch, and update location data."
       },
-      "cashDrawerTile": {
-        "title": "Cash drawer settings",
-        "subtitle": "Enable drawer counting and the Z-report per branch."
-      },
       "digestTile": {
         "title": "Daily WhatsApp digest",
         "subtitle": "Receive a daily message with the day's highlights per branch."
@@ -2208,7 +2202,6 @@
           "invoiceCode": "Last 8 chars of the invoice ID",
           "totalPrice": "Invoice total",
           "productNames": "Product names (comma-separated)",
-          "receiptLink": "Receipt link",
           "date": "Sale date",
           "shopName": "Shop name",
           "shopPhone": "Shop phone"
@@ -2824,169 +2817,6 @@
         }
       }
     },
-    "cashShifts": {
-      "list": {
-        "title": "Cash drawer shifts",
-        "subtitle": "Every shift closes by counting the variance between expected and counted cash. Variances stay in the review queue until you sign off.",
-        "filters": {
-          "all": "All",
-          "open": "Open",
-          "needsReview": "Needs review",
-          "closed": "Closed",
-          "reviewed": "Reviewed"
-        },
-        "emptyTitle": "No shifts match this filter",
-        "emptyHint": "Try clearing the filter or open a new shift",
-        "sections": {
-          "openNow": "Open right now",
-          "needsReview": "Needs review",
-          "other": "Other"
-        },
-        "row": {
-          "openNow": "open",
-          "countedShortLabel": "Counted",
-          "expectedShortLabel": "Expected"
-        }
-      },
-      "detail": {
-        "titlePrefix": "Z-report",
-        "notFound": "Shift not found",
-        "expectedCountedVariance": "Expected / Counted / Variance",
-        "status": {
-          "open": "Open",
-          "closed": "Closed",
-          "reviewed": "Reviewed",
-          "forced": "Force-closed",
-          "autoClosed": "Auto-closed"
-        },
-        "actions": {
-          "print": "Print",
-          "review": "Review",
-          "forceClose": "Force close"
-        },
-        "sections": {
-          "cashFlow": "Cash flow",
-          "byMethod": "Sales by payment method",
-          "topProducts": "Top products this shift",
-          "movements": "Shift movements",
-          "reviewed": "Reviewed"
-        },
-        "lines": {
-          "openingFloat": "Opening float",
-          "cashSales": "Cash sales",
-          "cashRefunds": "Cash refunds",
-          "paidIn": "Cash deposited",
-          "paidOut": "Cash withdrawn",
-          "cashIn": "Cash in (misc)",
-          "cashOut": "Cash out (misc)",
-          "cashExpenses": "Cash expenses",
-          "expectedCash": "Expected in drawer"
-        },
-        "method": {
-          "cash": "Cash",
-          "card": "Card",
-          "instapay": "InstaPay",
-          "deferred": "Deferred",
-          "invoiceCount": "{count} invoices"
-        },
-        "movement": {
-          "paid_in": "Deposit",
-          "paid_out": "Withdrawal",
-          "cash_in": "Cash in",
-          "cash_out": "Cash out"
-        },
-        "backToList": "← All shifts",
-        "review": {
-          "title": "Review shift",
-          "intro": "Confirm you've reviewed this shift. You can add a note before approving.",
-          "notePlaceholder": "Note (optional)",
-          "confirm": "Approve review",
-          "errorGeneric": "Could not save review"
-        },
-        "force": {
-          "title": "Force close",
-          "intro": "You'll close this shift without the cashier counting the drawer. A reason is required.",
-          "reasonPlaceholder": "Reason (required)",
-          "confirm": "Force close",
-          "reasonRequired": "Type the reason for the force close",
-          "errorGeneric": "Could not close shift"
-        },
-        "toast": {
-          "reviewed": "Marked as reviewed",
-          "closed": "Shift closed"
-        }
-      },
-      "chip": {
-        "openAria": "Open cash drawer",
-        "openCta": "Open drawer",
-        "openTitle": "Open a cash drawer shift",
-        "openedAt": "Open since {time}",
-        "openedToast": "Drawer opened",
-        "closedToast": "Drawer closed"
-      },
-      "panel": {
-        "title": "Drawer — {branch}",
-        "subtitle": "{cashier} · open since {time}",
-        "expectedCash": "Expected in drawer",
-        "countsLine": "{sales} invoices · {movements} movements · {expenses} expenses",
-        "addMovement": "Record a movement (deposit / withdrawal)",
-        "viewDetails": "See full details + shift movements",
-        "closeButton": "Close shift + Z-report"
-      },
-      "openModal": {
-        "title": "Open a cash drawer shift",
-        "intro": "Type the cash you have in the drawer right now before you start selling. Anything coming in or out after that is counted automatically.",
-        "floatLabel": "Opening float",
-        "noteLabel": "Note (optional)",
-        "notePlaceholder": "e.g. found 200 EGP from yesterday's shift",
-        "cancel": "Cancel",
-        "submit": "Open shift",
-        "invalidFloat": "Opening float is invalid",
-        "errorGeneric": "Could not open shift"
-      },
-      "closeModal": {
-        "title": "Close cash drawer shift",
-        "expectedLabel": "Expected in drawer",
-        "countedLabel": "Count the cash and enter it here",
-        "noteLabel": "Note (required for large variances)",
-        "notePlaceholder": "e.g. 30 EGP went missing in change",
-        "balanced": "Drawer balanced",
-        "short": "Short {amount}",
-        "over": "Over {amount}",
-        "cancel": "Cancel",
-        "submit": "Close + Z-report",
-        "countRequired": "Type the counted amount",
-        "errorGeneric": "Could not close shift"
-      },
-      "movement": {
-        "kindLabel": "Movement type",
-        "kinds": {
-          "paid_in": "Deposit — cash into the drawer",
-          "paid_out": "Withdrawal — cash out of the drawer",
-          "cash_in": "Cash in (misc)",
-          "cash_out": "Cash out (misc)"
-        },
-        "amountLabel": "Amount",
-        "reasonLabel": "Reason",
-        "reasonPlaceholder": "e.g. deposit to the bank",
-        "cancel": "Cancel",
-        "submit": "Record movement",
-        "invalidAmount": "Amount is invalid",
-        "reasonRequired": "A reason is required",
-        "errorGeneric": "Could not save movement"
-      }
-    },
-    "cashDrawerSettings": {
-      "title": "Cash drawer settings",
-      "intro": "When the drawer is enabled for a branch, the cashier must open a shift before recording cash sales, and at close they'll compare the counted total against the expected and log the variance.",
-      "enabled": "Drawer is on",
-      "disabled": "Drawer is off",
-      "enable": "Enable",
-      "disable": "Disable",
-      "thresholdLabel": "Variance amount that requires a note (₤)",
-      "savedToast": "Saved",
-      "errorToast": "Could not save"
-    },
     "digestSettings": {
       "title": "Daily WhatsApp digest",
       "intro": "Every day at the time you pick, you'll receive a WhatsApp with the day's sales, the top-selling product, any alerts, and a flag if any shift needs review.",
@@ -3287,9 +3117,18 @@
         "indicator": {
           "ariaLabel": "Product add wizard steps",
           "steps": {
-            "category": { "label": "Category", "helper": "Pick a category" },
-            "attributes": { "label": "Attributes", "helper": "Set details" },
-            "details": { "label": "Details", "helper": "Price and quantity" }
+            "category": {
+              "label": "Category",
+              "helper": "Pick a category"
+            },
+            "attributes": {
+              "label": "Attributes",
+              "helper": "Set details"
+            },
+            "details": {
+              "label": "Details",
+              "helper": "Price and quantity"
+            }
           }
         },
         "step1": {
@@ -3390,7 +3229,6 @@
         "tasks": "Tasks",
         "customers": "Customers",
         "expenses": "Expenses",
-        "cashShifts": "Cash drawer",
         "suppliers": "Suppliers",
         "returns": "Returns",
         "team": "Team",
@@ -3477,9 +3315,21 @@
       "title": "Permissions sized to each role",
       "body": "The cashier doesn't see reports. The warehouse manager can't reach settings. You set the boundaries — the system enforces them.",
       "members": {
-        "manager": { "name": "Ahmed", "initial": "A", "role": "Manager" },
-        "cashier": { "name": "Sarah", "initial": "S", "role": "Cashier" },
-        "warehouse": { "name": "Khaled", "initial": "K", "role": "Warehouse" }
+        "manager": {
+          "name": "Ahmed",
+          "initial": "A",
+          "role": "Manager"
+        },
+        "cashier": {
+          "name": "Sarah",
+          "initial": "S",
+          "role": "Cashier"
+        },
+        "warehouse": {
+          "name": "Khaled",
+          "initial": "K",
+          "role": "Warehouse"
+        }
       }
     },
     "unlimited": {
@@ -3499,9 +3349,21 @@
       "title": "Know your customers — bring them back",
       "body": "Track each customer's last visit, spot who's been away, then reach out with a bulk WhatsApp message in one tap.",
       "rows": [
-        { "name": "Ahmed Ali", "spend": "EGP 2,300", "last": "3 days ago" },
-        { "name": "Sarah Mohamed", "spend": "EGP 1,850", "last": "1 week ago" },
-        { "name": "Khaled Ibrahim", "spend": "EGP 4,200", "last": "2 months ago" }
+        {
+          "name": "Ahmed Ali",
+          "spend": "EGP 2,300",
+          "last": "3 days ago"
+        },
+        {
+          "name": "Sarah Mohamed",
+          "spend": "EGP 1,850",
+          "last": "1 week ago"
+        },
+        {
+          "name": "Khaled Ibrahim",
+          "spend": "EGP 4,200",
+          "last": "2 months ago"
+        }
       ]
     }
   },
@@ -3545,9 +3407,21 @@
     "title": "From a fresh account to your first sale",
     "subhead": "Three easy steps — and you're ready to run your shop from any device.",
     "steps": [
-      { "n": "1", "title": "Create your account", "body": "Quick signup — shop name, your email, a password. Under a minute." },
-      { "n": "2", "title": "Add your products", "body": "Import your product list from CSV or add them by hand with categories and prices." },
-      { "n": "3", "title": "Start selling", "body": "Open the POS and ring up your first sale. Inventory and reports update automatically." }
+      {
+        "n": "1",
+        "title": "Create your account",
+        "body": "Quick signup — shop name, your email, a password. Under a minute."
+      },
+      {
+        "n": "2",
+        "title": "Add your products",
+        "body": "Import your product list from CSV or add them by hand with categories and prices."
+      },
+      {
+        "n": "3",
+        "title": "Start selling",
+        "body": "Open the POS and ring up your first sale. Inventory and reports update automatically."
+      }
     ]
   },
   "pricing": {
@@ -3557,9 +3431,26 @@
     "recommended": "Recommended",
     "currency": "EGP",
     "plans": {
-      "monthly": { "name": "Monthly", "price": "300", "period": "/mo", "cta": "Choose monthly" },
-      "yearly":  { "name": "Yearly", "price": "2,500", "period": "/yr", "effective": "EGP 208 /mo effective", "cta": "Choose yearly" },
-      "threeYear": { "name": "3 years", "price": "6,000", "period": " total", "effective": "EGP 167 /mo effective", "cta": "Choose 3 years" }
+      "monthly": {
+        "name": "Monthly",
+        "price": "300",
+        "period": "/mo",
+        "cta": "Choose monthly"
+      },
+      "yearly": {
+        "name": "Yearly",
+        "price": "2,500",
+        "period": "/yr",
+        "effective": "EGP 208 /mo effective",
+        "cta": "Choose yearly"
+      },
+      "threeYear": {
+        "name": "3 years",
+        "price": "6,000",
+        "period": " total",
+        "effective": "EGP 167 /mo effective",
+        "cta": "Choose 3 years"
+      }
     },
     "includedEyebrow": "What's included",
     "includedTitle": "Every feature in every plan",
@@ -3579,12 +3470,30 @@
     "title": "Answers to the most-asked questions",
     "moreQuestion": "Got another question?",
     "items": [
-      { "q": "Do I need a credit card to start?", "a": "No. You can create your account and try every feature free, with no payment card." },
-      { "q": "Does it work on mobile?", "a": "Yes — every screen is designed to work on phone and tablet as smoothly as desktop, including the POS." },
-      { "q": "Can I add staff with specific permissions?", "a": "Absolutely. Create staff accounts and decide what they can see (inventory, reports, settings…) and what they can do, all in a click." },
-      { "q": "Is my data safe?", "a": "Yes. Every shop runs fully isolated from other shops at the database level (Row-Level Security), and all sensitive data is encrypted." },
-      { "q": "What happens if the internet drops?", "a": "The POS keeps working and records sales locally, then syncs automatically when the connection returns — you won't lose a sale." },
-      { "q": "Can I import my existing products?", "a": "Yes. We support CSV import, and our support team helps you migrate from any other system." }
+      {
+        "q": "Do I need a credit card to start?",
+        "a": "No. You can create your account and try every feature free, with no payment card."
+      },
+      {
+        "q": "Does it work on mobile?",
+        "a": "Yes — every screen is designed to work on phone and tablet as smoothly as desktop, including the POS."
+      },
+      {
+        "q": "Can I add staff with specific permissions?",
+        "a": "Absolutely. Create staff accounts and decide what they can see (inventory, reports, settings…) and what they can do, all in a click."
+      },
+      {
+        "q": "Is my data safe?",
+        "a": "Yes. Every shop runs fully isolated from other shops at the database level (Row-Level Security), and all sensitive data is encrypted."
+      },
+      {
+        "q": "What happens if the internet drops?",
+        "a": "The POS keeps working and records sales locally, then syncs automatically when the connection returns — you won't lose a sale."
+      },
+      {
+        "q": "Can I import my existing products?",
+        "a": "Yes. We support CSV import, and our support team helps you migrate from any other system."
+      }
     ]
   },
   "cta": {
@@ -3592,7 +3501,11 @@
     "headlineB": "store",
     "headlineC": "today.",
     "subhead": "Full setup in under a minute. Free, no strings.",
-    "badges": ["No credit card", "Setup in a minute", "Cancel any time"],
+    "badges": [
+      "No credit card",
+      "Setup in a minute",
+      "Cancel any time"
+    ],
     "freeSticker": "Free to start"
   },
   "footer": {
@@ -3761,7 +3674,11 @@
         "primaryBranchMissing": "Primary branch is missing — please contact support.",
         "internal": "Couldn't finish setup. Please try again."
       },
-      "stepLabels": ["Shop info", "Pick a start", "Review"],
+      "stepLabels": [
+        "Shop info",
+        "Pick a start",
+        "Review"
+      ],
       "stepCounter": "Step {n} of {total}",
       "step1": {
         "title": "Tell us about your store",
@@ -3788,14 +3705,38 @@
         "subheadBlank": "Start by adding your first category from settings.",
         "tips": {
           "cornerstore": [
-            { "before": "✓ Add your products from ", "link": "Add product", "after": "" },
-            { "before": "✓ Ring up your first sale from ", "link": "Sales", "after": "" },
-            { "before": "✓ Customize settings and WhatsApp from ", "link": "Settings", "after": "" }
+            {
+              "before": "✓ Add your products from ",
+              "link": "Add product",
+              "after": ""
+            },
+            {
+              "before": "✓ Ring up your first sale from ",
+              "link": "Sales",
+              "after": ""
+            },
+            {
+              "before": "✓ Customize settings and WhatsApp from ",
+              "link": "Settings",
+              "after": ""
+            }
           ],
           "blank": [
-            { "before": "✓ Define categories and attributes from ", "link": "Settings", "after": "" },
-            { "before": "✓ Add your products from ", "link": "Add product", "after": "" },
-            { "before": "✓ Ring up your first sale from ", "link": "Sales", "after": "" }
+            {
+              "before": "✓ Define categories and attributes from ",
+              "link": "Settings",
+              "after": ""
+            },
+            {
+              "before": "✓ Add your products from ",
+              "link": "Add product",
+              "after": ""
+            },
+            {
+              "before": "✓ Ring up your first sale from ",
+              "link": "Sales",
+              "after": ""
+            }
           ]
         },
         "back": "Back",
@@ -3815,9 +3756,18 @@
       "p1": "Matgary is a complete shop-management system — point of sale, inventory, reports, team and permissions — all in one place. We serve small and medium retailers across Egypt and the Arab region, and we treat every shop as a personal project, not a number.",
       "p2": "Our philosophy is simple: shops don't need more than they need. They need one working tool that understands what's happening in the store and helps the owner decide right. For every feature we build, we ask first: will the merchant use this every day? If the answer is no, we don't build it.",
       "values": [
-        { "title": "Simplicity first", "body": "A system any merchant can open and use from minute one — no long training, no tangled screens." },
-        { "title": "Your data is yours", "body": "Your shop is fully isolated from every other shop at the database level. What's yours stays with you." },
-        { "title": "Designed in Arabic", "body": "Every screen, every button, every report — written natively in Arabic by people who understand the market." }
+        {
+          "title": "Simplicity first",
+          "body": "A system any merchant can open and use from minute one — no long training, no tangled screens."
+        },
+        {
+          "title": "Your data is yours",
+          "body": "Your shop is fully isolated from every other shop at the database level. What's yours stays with you."
+        },
+        {
+          "title": "Designed in Arabic",
+          "body": "Every screen, every button, every report — written natively in Arabic by people who understand the market."
+        }
       ],
       "tryCta": "Try Matgary"
     },
@@ -3841,10 +3791,26 @@
       "title": "Our team is ready to listen",
       "lead": "Got a question, a suggestion, or need help setting up your shop? Pick the channel that works for you and we'll get back.",
       "channels": {
-        "email":    { "title": "Email",          "detail": "hello@matjari.app",   "note": "Reply within 24 hours on business days." },
-        "whatsapp": { "title": "WhatsApp",       "detail": "+20 100 000 0000",     "note": "For quick questions and support requests." },
-        "phone":    { "title": "Phone",          "detail": "+20 2 0000 0000",      "note": "During official business hours." },
-        "hours":    { "title": "Business hours", "detail": "Sun – Thu",            "note": "9 AM to 6 PM (Cairo time)." }
+        "email": {
+          "title": "Email",
+          "detail": "hello@matjari.app",
+          "note": "Reply within 24 hours on business days."
+        },
+        "whatsapp": {
+          "title": "WhatsApp",
+          "detail": "+20 100 000 0000",
+          "note": "For quick questions and support requests."
+        },
+        "phone": {
+          "title": "Phone",
+          "detail": "+20 2 0000 0000",
+          "note": "During official business hours."
+        },
+        "hours": {
+          "title": "Business hours",
+          "detail": "Sun – Thu",
+          "note": "9 AM to 6 PM (Cairo time)."
+        }
       },
       "faqHint": "For common questions, you can visit",
       "faqLink": "the FAQ page"
@@ -3858,10 +3824,22 @@
       "title": "Find a quick answer",
       "lead": "Pick the topic that matches your question — or check the FAQ, or reach out directly.",
       "topics": {
-        "pos":       { "title": "Getting started & POS",   "body": "Account setup, your first sale, printing, and receipts." },
-        "inventory": { "title": "Inventory & products",    "body": "Adding products, barcodes, categories, and low-stock alerts." },
-        "team":      { "title": "Team & permissions",      "body": "Create staff accounts and define what they can see and do." },
-        "reports":   { "title": "Reports & finance",       "body": "Reading daily reports, expenses, and returns." }
+        "pos": {
+          "title": "Getting started & POS",
+          "body": "Account setup, your first sale, printing, and receipts."
+        },
+        "inventory": {
+          "title": "Inventory & products",
+          "body": "Adding products, barcodes, categories, and low-stock alerts."
+        },
+        "team": {
+          "title": "Team & permissions",
+          "body": "Create staff accounts and define what they can see and do."
+        },
+        "reports": {
+          "title": "Reports & finance",
+          "body": "Reading daily reports, expenses, and returns."
+        }
       },
       "noAnswerTitle": "Didn't find your answer?",
       "noAnswerBody": "Our support team replies within 24 hours on business days.",
@@ -3898,18 +3876,54 @@
       "title": "Your data belongs to you",
       "lead": "Last updated: 7 May 2026 — compliant with Law No. 151 of 2020 on Personal Data Protection.",
       "sections": [
-        { "title": "1. Who controls your data", "body": "Matgary (the \"Platform\") is the data controller within the meaning of the Egyptian Personal Data Protection Law (Law No. 151 of 2020). For any matter relating to your data, use the contact page below." },
-        { "title": "2. Data we collect", "body": "We collect: (a) account data you provide — name, email, phone, shop name, national ID when attendance is enabled, employee photos when uploaded. (b) operational data your shop creates — products, sales, expenses, leave requests, attendance log. (c) limited technical data — IP address, browser type, sign-in time, for security and troubleshooting." },
-        { "title": "3. Legal basis and purposes", "body": "We process your data under: performance of the contract with you (running the platform), legal obligations (such as tax invoice records), and legitimate interest in securing the service and preventing abuse. We do not use your data for advertising and do not sell it to any third party." },
-        { "title": "4. Your rights under Law 151/2020", "body": "At any time you may: access your data, correct it, delete it, restrict its processing, or withdraw consent. You also have the right to data portability in a machine-readable format, and the right to lodge a complaint with the Personal Data Protection Centre. We commit to responding within 30 days of your request." },
-        { "title": "5. Cross-shop data isolation", "body": "Every shop runs in database-level isolation (Row-Level Security) — staff of any other shop, and our internal systems, cannot access your data without explicit authorization. We test this isolation automatically on every release." },
-        { "title": "6. Encryption and technical protection", "body": "All connections use TLS. Passwords are stored hashed (bcrypt). Sensitive credentials (e.g. WhatsApp Green API tokens) are stored encrypted in the database. Daily backups run automatically and are protected to the same standard." },
-        { "title": "7. Retention period", "body": "We retain your data for the duration of your use of the service. When your account is deleted, we delete the data within 30 days, except where retention is required by law (tax invoice records are kept for 5 years per the Unified Tax Procedures Law)." },
-        { "title": "8. Transfers outside Egypt", "body": "We run our servers in jurisdictions that meet comparable protection standards. Where an external provider is needed, we ensure contractual or legal safeguards protect your data to the same level required by Egyptian law." },
-        { "title": "9. Cookies", "body": "We use only the cookies strictly necessary for sign-in and CSRF protection. We do not use any tracking cookies for advertising, and we do not share your data with ad networks." },
-        { "title": "10. Children's data", "body": "The service is intended for adult shop owners and staff. We do not knowingly collect data from anyone under 14. If we discover that an account belongs to a minor, we delete it as soon as verified." },
-        { "title": "11. Incident notification", "body": "If a breach affects your personal data, we commit to notifying the Personal Data Protection Centre and you within 72 hours of discovery, where practicable, including the nature of the breach and the steps taken." },
-        { "title": "12. Updates to this policy", "body": "We may update this policy from time to time. For any material change, we'll notify you via your registered email or in-app notice a reasonable time before it takes effect." }
+        {
+          "title": "1. Who controls your data",
+          "body": "Matgary (the \"Platform\") is the data controller within the meaning of the Egyptian Personal Data Protection Law (Law No. 151 of 2020). For any matter relating to your data, use the contact page below."
+        },
+        {
+          "title": "2. Data we collect",
+          "body": "We collect: (a) account data you provide — name, email, phone, shop name, national ID when attendance is enabled, employee photos when uploaded. (b) operational data your shop creates — products, sales, expenses, leave requests, attendance log. (c) limited technical data — IP address, browser type, sign-in time, for security and troubleshooting."
+        },
+        {
+          "title": "3. Legal basis and purposes",
+          "body": "We process your data under: performance of the contract with you (running the platform), legal obligations (such as tax invoice records), and legitimate interest in securing the service and preventing abuse. We do not use your data for advertising and do not sell it to any third party."
+        },
+        {
+          "title": "4. Your rights under Law 151/2020",
+          "body": "At any time you may: access your data, correct it, delete it, restrict its processing, or withdraw consent. You also have the right to data portability in a machine-readable format, and the right to lodge a complaint with the Personal Data Protection Centre. We commit to responding within 30 days of your request."
+        },
+        {
+          "title": "5. Cross-shop data isolation",
+          "body": "Every shop runs in database-level isolation (Row-Level Security) — staff of any other shop, and our internal systems, cannot access your data without explicit authorization. We test this isolation automatically on every release."
+        },
+        {
+          "title": "6. Encryption and technical protection",
+          "body": "All connections use TLS. Passwords are stored hashed (bcrypt). Sensitive credentials (e.g. WhatsApp Green API tokens) are stored encrypted in the database. Daily backups run automatically and are protected to the same standard."
+        },
+        {
+          "title": "7. Retention period",
+          "body": "We retain your data for the duration of your use of the service. When your account is deleted, we delete the data within 30 days, except where retention is required by law (tax invoice records are kept for 5 years per the Unified Tax Procedures Law)."
+        },
+        {
+          "title": "8. Transfers outside Egypt",
+          "body": "We run our servers in jurisdictions that meet comparable protection standards. Where an external provider is needed, we ensure contractual or legal safeguards protect your data to the same level required by Egyptian law."
+        },
+        {
+          "title": "9. Cookies",
+          "body": "We use only the cookies strictly necessary for sign-in and CSRF protection. We do not use any tracking cookies for advertising, and we do not share your data with ad networks."
+        },
+        {
+          "title": "10. Children's data",
+          "body": "The service is intended for adult shop owners and staff. We do not knowingly collect data from anyone under 14. If we discover that an account belongs to a minor, we delete it as soon as verified."
+        },
+        {
+          "title": "11. Incident notification",
+          "body": "If a breach affects your personal data, we commit to notifying the Personal Data Protection Centre and you within 72 hours of discovery, where practicable, including the nature of the breach and the steps taken."
+        },
+        {
+          "title": "12. Updates to this policy",
+          "body": "We may update this policy from time to time. For any material change, we'll notify you via your registered email or in-app notice a reasonable time before it takes effect."
+        }
       ]
     },
     "terms": {
@@ -3921,18 +3935,54 @@
       "title": "Matgary terms of use",
       "lead": "Last updated: 7 May 2026.",
       "sections": [
-        { "title": "1. Acceptance of terms", "body": "By using the Matgary platform (the \"Service\") you confirm you are of legal age (18+) and have full capacity to contract, and you agree to be bound by these terms and the privacy policy. If you do not agree to any clause, please do not use the Service." },
-        { "title": "2. Service description", "body": "Matgary is a software-as-a-service (SaaS) platform for managing retail stores: point of sale, inventory, invoices, staff, reports, and related features. The Service is provided online without local software installation. We aim to keep it available with reasonable uptime (with no 99.9% contractual SLA on the base plans)." },
-        { "title": "3. Account and responsibility", "body": "You are responsible for the confidentiality of your sign-in details and for all activity on your account. If you suspect unauthorized access, you must notify us immediately and change your password. The data you provide (name, email, phone, shop name, national ID where required) must be accurate and up to date." },
-        { "title": "4. Acceptable use", "body": "You may use Matgary only to manage lawful commercial activity. It is prohibited to: (a) carry out any activity contrary to Egyptian law or public morals, (b) attempt to breach the Platform or access another shop's data, (c) misuse the APIs or overload the infrastructure with excessive requests, (d) use the Service to send unsolicited promotional messages (spam) over WhatsApp or otherwise." },
-        { "title": "5. Payment and subscriptions", "body": "During the trial period the Service may be free or available at reduced prices announced on the pricing page. After that, subscription fees are billed in advance through an approved payment gateway. You may cancel at any time, and the Service remains active until the end of the paid period. If a payment fails, you get a 7-day grace period before account suspension." },
-        { "title": "6. E-invoices and taxes", "body": "If you are a merchant registered with the Egyptian Tax Authority, you alone are responsible for issuing your electronic tax invoices via the ETA system. Matgary's invoicing features in the current version are for internal operational purposes and may not substitute for the official e-invoicing system. Check the features page for updates." },
-        { "title": "7. Data ownership", "body": "You retain full ownership of your shop's data. We process it strictly as a service provider and do not share it with any third party. On termination, you may export your data within 30 days before final deletion." },
-        { "title": "8. Downtime and maintenance", "body": "We perform periodic maintenance, scheduled at low-traffic times where possible with prior notice when feasible. Short unscheduled outages may occur due to unexpected faults; we work to restore the Service as quickly as possible." },
-        { "title": "9. Limits of liability", "body": "The Service is provided \"as is\" without express or implied warranties beyond what the law requires. In any case, our cumulative liability for any damage related to the Service is limited to what you actually paid in the 12 months preceding the damage. We are not liable for indirect or consequential losses such as lost profits or reputation." },
-        { "title": "10. Account suspension and termination", "body": "We may suspend or terminate your account if these terms are breached or the Platform is misused, with prior notice of the reason whenever possible. You may terminate your subscription at any time from your account settings." },
-        { "title": "11. Changes to the terms", "body": "We may update these terms from time to time. For any material change, we'll notify you via your registered email or in-app notice at least 14 days before it takes effect. Continued use after the change constitutes acceptance." },
-        { "title": "12. Governing law and jurisdiction", "body": "These terms are governed by the laws of the Arab Republic of Egypt, and any dispute arising from them falls under the exclusive jurisdiction of the courts of Cairo." }
+        {
+          "title": "1. Acceptance of terms",
+          "body": "By using the Matgary platform (the \"Service\") you confirm you are of legal age (18+) and have full capacity to contract, and you agree to be bound by these terms and the privacy policy. If you do not agree to any clause, please do not use the Service."
+        },
+        {
+          "title": "2. Service description",
+          "body": "Matgary is a software-as-a-service (SaaS) platform for managing retail stores: point of sale, inventory, invoices, staff, reports, and related features. The Service is provided online without local software installation. We aim to keep it available with reasonable uptime (with no 99.9% contractual SLA on the base plans)."
+        },
+        {
+          "title": "3. Account and responsibility",
+          "body": "You are responsible for the confidentiality of your sign-in details and for all activity on your account. If you suspect unauthorized access, you must notify us immediately and change your password. The data you provide (name, email, phone, shop name, national ID where required) must be accurate and up to date."
+        },
+        {
+          "title": "4. Acceptable use",
+          "body": "You may use Matgary only to manage lawful commercial activity. It is prohibited to: (a) carry out any activity contrary to Egyptian law or public morals, (b) attempt to breach the Platform or access another shop's data, (c) misuse the APIs or overload the infrastructure with excessive requests, (d) use the Service to send unsolicited promotional messages (spam) over WhatsApp or otherwise."
+        },
+        {
+          "title": "5. Payment and subscriptions",
+          "body": "During the trial period the Service may be free or available at reduced prices announced on the pricing page. After that, subscription fees are billed in advance through an approved payment gateway. You may cancel at any time, and the Service remains active until the end of the paid period. If a payment fails, you get a 7-day grace period before account suspension."
+        },
+        {
+          "title": "6. E-invoices and taxes",
+          "body": "If you are a merchant registered with the Egyptian Tax Authority, you alone are responsible for issuing your electronic tax invoices via the ETA system. Matgary's invoicing features in the current version are for internal operational purposes and may not substitute for the official e-invoicing system. Check the features page for updates."
+        },
+        {
+          "title": "7. Data ownership",
+          "body": "You retain full ownership of your shop's data. We process it strictly as a service provider and do not share it with any third party. On termination, you may export your data within 30 days before final deletion."
+        },
+        {
+          "title": "8. Downtime and maintenance",
+          "body": "We perform periodic maintenance, scheduled at low-traffic times where possible with prior notice when feasible. Short unscheduled outages may occur due to unexpected faults; we work to restore the Service as quickly as possible."
+        },
+        {
+          "title": "9. Limits of liability",
+          "body": "The Service is provided \"as is\" without express or implied warranties beyond what the law requires. In any case, our cumulative liability for any damage related to the Service is limited to what you actually paid in the 12 months preceding the damage. We are not liable for indirect or consequential losses such as lost profits or reputation."
+        },
+        {
+          "title": "10. Account suspension and termination",
+          "body": "We may suspend or terminate your account if these terms are breached or the Platform is misused, with prior notice of the reason whenever possible. You may terminate your subscription at any time from your account settings."
+        },
+        {
+          "title": "11. Changes to the terms",
+          "body": "We may update these terms from time to time. For any material change, we'll notify you via your registered email or in-app notice at least 14 days before it takes effect. Continued use after the change constitutes acceptance."
+        },
+        {
+          "title": "12. Governing law and jurisdiction",
+          "body": "These terms are governed by the laws of the Arab Republic of Egypt, and any dispute arising from them falls under the exclusive jurisdiction of the courts of Cairo."
+        }
       ]
     }
   }

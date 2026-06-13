@@ -46,12 +46,6 @@ const PROBES: Probe[] = [
     method: "GET",
     url: "/api/customers/by-phone/%2B201001234567",
   },
-  { label: "GET /api/cash-shifts", method: "GET", url: "/api/cash-shifts" },
-  {
-    label: "GET /api/cash-shifts/current",
-    method: "GET",
-    url: "/api/cash-shifts/current",
-  },
   {
     label: "GET /api/insights/overview",
     method: "GET",
