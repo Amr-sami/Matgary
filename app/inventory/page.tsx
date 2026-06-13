@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback, Suspense } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Download, LayoutGrid, Rows3, Upload, Skull } from "@/lib/icons";
+import { Download, LayoutGrid, Plus, Rows3, Upload, Skull } from "@/lib/icons";
 import { AppShell } from "@/components/layout/AppShell";
 import { useProducts } from "@/hooks/useProducts";
 import { useSales } from "@/hooks/useSales";
@@ -465,14 +466,26 @@ function InventoryPageInner() {
         {/* Search — no explicit `dir`: inherits from <html dir> so the
             placeholder follows the document language (RTL for Arabic,
             LTR for English). `dir="auto"` here would mis-render Arabic
-            placeholders LTR until the user typed a strong-RTL character. */}
-        <input
-          type="text"
-          placeholder={t.search.placeholder}
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="w-full px-4 py-3 rounded-xl border border-border bg-white focus:outline-none focus:ring-2 focus:ring-accent"
-        />
+            placeholders LTR until the user typed a strong-RTL character.
+            The "Add product" CTA sits inline after the search so adding
+            a SKU from inventory is one tap away — primary entry point
+            alongside the sidebar nav. */}
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input
+            type="text"
+            placeholder={t.search.placeholder}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="flex-1 px-4 py-3 rounded-xl border border-border bg-white focus:outline-none focus:ring-2 focus:ring-accent"
+          />
+          <Link
+            href="/add-product"
+            className="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-accent text-white font-semibold hover:opacity-90 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            <span>{t.tools.addProduct}</span>
+          </Link>
+        </div>
 
         {/* Filters */}
         <InventoryFilters
