@@ -29,7 +29,8 @@ export function useSuppliers() {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/suppliers", { cache: "no-store" });
+      // Cacheable per server Cache-Control (private, max-age=60, swr=300).
+      const res = await fetch("/api/suppliers");
       if (res.status === 403) {
         // User can't see suppliers — surface empty list, not an error.
         setData([]);

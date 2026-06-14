@@ -22,6 +22,9 @@ export async function GET(req: NextRequest) {
   }
 
   const data = await listProducts(r.ctx.tenantId, filter.branchId);
+  // Intentionally NOT cached: product.quantity decrements on every sale
+  // so any browser-side cache would show stale stock numbers across the
+  // app within seconds of a sale being recorded.
   return NextResponse.json({ data, branchId: filter.branchId });
 }
 

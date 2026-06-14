@@ -138,7 +138,8 @@ export function substitute(template: string, vars: ReceiptVars): string {
 }
 
 export async function fetchShopSettings(): Promise<ShopSettings> {
-  const res = await fetch("/api/settings", { cache: "no-store" });
+  // Cacheable per server Cache-Control (private, max-age=60, swr=300).
+  const res = await fetch("/api/settings");
   if (!res.ok) return DEFAULT_SETTINGS;
   const json: { data: ShopSettings } = await res.json();
   return { ...DEFAULT_SETTINGS, ...json.data };

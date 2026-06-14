@@ -10,7 +10,8 @@ export function useCategories() {
 
   const refresh = useCallback(async () => {
     try {
-      const res = await fetch("/api/categories", { cache: "no-store" });
+      // Cacheable per server Cache-Control (private, max-age=60, swr=300).
+      const res = await fetch("/api/categories");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json: { data: CategoryDescriptor[] } = await res.json();
       setData(json.data);

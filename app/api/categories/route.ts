@@ -5,6 +5,7 @@ import {
   requireTenantWithBranch,
 } from "@/lib/api/auth-helpers";
 import { resolveBranchFilter } from "@/lib/api/branch-context";
+import { CATALOG_CACHE, cacheHeaders } from "@/lib/api/cache-headers";
 import { listCategories } from "@/lib/repo/catalog";
 import { addCategory } from "@/lib/repo/catalog-admin";
 
@@ -19,7 +20,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: filter.error }, { status: filter.status });
   }
   const data = await listCategories(r.ctx.tenantId, filter.branchId);
-  return NextResponse.json({ data, branchId: filter.branchId });
+  return NextResponse.json(
+    { data, branchId: filter.branchId },
+    { headers: cacheHeaders(CATALOG_CACHE) },
+  );
 }
 
 const createSchema = z.object({

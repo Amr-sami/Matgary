@@ -5,6 +5,7 @@ import {
   resolveActiveBranch,
   resolveBranchFilter,
 } from "@/lib/api/branch-context";
+import { CATALOG_CACHE, cacheHeaders } from "@/lib/api/cache-headers";
 import { addSupplier, listSuppliers } from "@/lib/repo/suppliers";
 import { logActivity } from "@/lib/repo/activity";
 
@@ -19,7 +20,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: filter.error }, { status: filter.status });
   }
   const data = await listSuppliers(r.ctx.tenantId, filter.branchId);
-  return NextResponse.json({ data, branchId: filter.branchId });
+  return NextResponse.json(
+    { data, branchId: filter.branchId },
+    { headers: cacheHeaders(CATALOG_CACHE) },
+  );
 }
 
 const createSchema = z.object({

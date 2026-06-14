@@ -29,6 +29,8 @@ export function useProducts() {
    */
   const refresh = useCallback(async (): Promise<Product[]> => {
     try {
+      // Always fresh: product.quantity changes on every sale and a
+      // stale browser cache would mislead the cashier on remaining stock.
       const res = await fetch("/api/products", { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json: { data: ProductRowApi[] } = await res.json();

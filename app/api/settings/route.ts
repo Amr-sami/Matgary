@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireTenantWithBranch } from "@/lib/api/auth-helpers";
+import { SETTINGS_CACHE, cacheHeaders } from "@/lib/api/cache-headers";
 import { getShopSettings, saveShopSettings } from "@/lib/repo/settings";
 import { logActivity } from "@/lib/repo/activity";
 
@@ -12,7 +13,10 @@ export async function GET() {
   const r = await requireTenantWithBranch();
   if (!r.ok) return r.response;
   const data = await getShopSettings(r.ctx.tenantId, r.ctx.branchId);
-  return NextResponse.json({ data, branchId: r.ctx.branchId });
+  return NextResponse.json(
+    { data, branchId: r.ctx.branchId },
+    { headers: cacheHeaders(SETTINGS_CACHE) },
+  );
 }
 
 const patchSchema = z.object({

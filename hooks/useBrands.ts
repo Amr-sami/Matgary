@@ -14,7 +14,8 @@ export function useBrands(categoryId?: string | null) {
       const url = categoryId
         ? `/api/brands?categoryId=${encodeURIComponent(categoryId)}`
         : "/api/brands";
-      const res = await fetch(url, { cache: "no-store" });
+      // Cacheable per server Cache-Control (private, max-age=60, swr=300).
+      const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json: { data: BrandDescriptor[] } = await res.json();
       setData(json.data);
