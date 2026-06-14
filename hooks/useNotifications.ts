@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useDeferred } from "./useDeferred";
 
 export type NotificationKind =
   | "low_stock"
@@ -87,8 +88,15 @@ export function useNotifications() {
     }
   }, []);
 
+  // Defer the SSE handshake out of the critical first-paint window via
+  // useDeferred (idle / first interaction / 2 s fallback). The bell only
+  // matters AFTER the user is looking — opening a long-lived TCP
+  // connection during hydration adds mobile CPU + radio cost to the
+  // moment that already has the most.
+  const armed = useDeferred(2000);
+
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (!armed || typeof window === "undefined") return;
     setLoading(true);
 
     let pollHandle: ReturnType<typeof setInterval> | null = null;
@@ -140,7 +148,7 @@ export function useNotifications() {
       source?.close();
       if (pollHandle) clearInterval(pollHandle);
     };
-  }, [refresh]);
+  }, [armed, refresh]);
 
   const markRead = useCallback(async (id: string) => {
     // Optimistic — server-side publish will reconcile via SSE moments later.
