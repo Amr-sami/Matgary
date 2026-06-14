@@ -8,12 +8,12 @@ import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { useBranches } from "@/hooks/useBranches";
 import { recordCartSaleOfflineAware } from "@/lib/offline/recordCartSale";
-import { applyScanToCart } from "@/lib/sales/scan-cart";
 import {
   calcLineDiscount,
   clampLoyaltyRedemption,
   computeCartTotals,
 } from "@/lib/sales/cart-math";
+import { useCart } from "@/hooks/useCart";
 import { useSales } from "@/hooks/useSales";
 import { useProducts } from "@/hooks/useProducts";
 import { useCustomersData } from "@/hooks/useCustomersData";
@@ -136,15 +136,31 @@ export function SaleForm({
     };
   }, [tenantId, branchId]);
 
-  // Current line being composed
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(preselectedProduct || null);
-  const [quantity, setQuantity] = useState(1);
-  const [pricePerUnit, setPricePerUnit] = useState(0);
-  const [lineDiscountType, setLineDiscountType] = useState<DiscountType>("percentage");
-  const [lineDiscountValue, setLineDiscountValue] = useState(0);
-
-  // Cart of accumulated lines (multi-product invoice)
-  const [cart, setCart] = useState<CartLineState[]>([]);
+  // Cart + line builder state. Extracted to hooks/useCart so the cart
+  // logic is independently testable and the SaleForm orchestrator can
+  // shed responsibility. The hook returns the full surface so existing
+  // call sites work unchanged.
+  const cartHook = useCart({ products, preselectedProduct });
+  const {
+    selectedProduct,
+    setSelectedProduct,
+    quantity,
+    setQuantity,
+    pricePerUnit,
+    setPricePerUnit,
+    lineDiscountType,
+    setLineDiscountType,
+    lineDiscountValue,
+    setLineDiscountValue,
+    cart,
+    setCart,
+    remainingStockForCurrent,
+    canAddCurrentLine,
+    handleAddToCart,
+    handleScanProduct,
+    handleRemoveLine,
+    buildPreviewLines,
+  } = cartHook;
 
   // Order-level fields (apply to whole invoice)
   const [note, setNote] = useState("");
@@ -219,27 +235,6 @@ export function SaleForm({
 
   // Last invoice for receipt
   const [lastInvoice, setLastInvoice] = useState<ReceiptInvoiceData | null>(null);
-
-  useEffect(() => {
-    if (selectedProduct) {
-      setPricePerUnit(selectedProduct.price);
-    }
-  }, [selectedProduct]);
-
-  // Pre-select a product via ?preselect=<id> (used by inventory's quick-sell)
-  useEffect(() => {
-    const id = searchParams.get("preselect");
-    if (!id) return;
-    const p = products.find((x) => x.id === id);
-    if (p) {
-      setSelectedProduct(p);
-    }
-    // Strip the query from the URL so refresh doesn't re-trigger
-    const url = new URL(window.location.href);
-    url.searchParams.delete("preselect");
-    window.history.replaceState({}, "", url.toString());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [products]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -319,21 +314,9 @@ export function SaleForm({
     return out;
   })();
 
-  // Include the in-progress line (selected product + qty/price) in the live preview
-  // so users see totals before clicking "Add to cart".
-  const previewLines: CartLineState[] = (() => {
-    if (!selectedProduct || quantity < 1 || pricePerUnit <= 0) return cart;
-    return [
-      ...cart,
-      {
-        product: selectedProduct,
-        quantity,
-        pricePerUnit,
-        lineDiscountType,
-        lineDiscountValue,
-      },
-    ];
-  })();
+  // Include the in-progress line (selected product + qty/price) in the
+  // live preview so users see totals before clicking "Add to cart".
+  const previewLines = buildPreviewLines();
 
   // Cart + order-discount math (pure helper — see lib/sales/cart-math.ts)
   const cartTotals = computeCartTotals(previewLines, {
@@ -362,62 +345,6 @@ export function SaleForm({
   const loyaltyCreditAppliedDisplay = loyaltyClamp.creditApplied;
 
   const cartTotal = Math.max(0, cartAfterOrderDiscount - loyaltyDiscountAmount);
-
-  // Inventory check: account for the cart already holding some quantity of this product
-  const stockReservedFor = (productId: string) =>
-    cart
-      .filter((l) => l.product.id === productId)
-      .reduce((s, l) => s + l.quantity, 0);
-
-  const remainingStockForCurrent = selectedProduct
-    ? selectedProduct.quantity - stockReservedFor(selectedProduct.id)
-    : 0;
-
-  const canAddCurrentLine =
-    !!selectedProduct &&
-    quantity >= 1 &&
-    pricePerUnit >= 1 &&
-    quantity <= remainingStockForCurrent;
-
-  const handleAddToCart = () => {
-    if (!canAddCurrentLine || !selectedProduct) return;
-    setCart((prev) => [
-      ...prev,
-      {
-        product: selectedProduct,
-        quantity,
-        pricePerUnit,
-        lineDiscountType,
-        lineDiscountValue,
-      },
-    ]);
-    setSelectedProduct(null);
-    setQuantity(1);
-    setPricePerUnit(0);
-    setLineDiscountValue(0);
-  };
-
-  // Scan-to-cart: barcode flow. If the scanned product is already in the
-  // cart, increment its quantity (capped by remaining stock). Otherwise
-  // append a new line at the product's catalog price with qty=1. This
-  // diverges from manual selection on purpose — the spec allows the
-  // cashier to add the same product twice as separate lines via the
-  // manual flow (e.g. different per-line discounts), but a rapid-fire
-  // scan should never produce duplicate lines. Logic lives in
-  // lib/sales/scan-cart so it's covered by vitest.
-  const handleScanProduct = (product: Product) => {
-    setCart((prev) => applyScanToCart(prev, product));
-    // Scan flow always returns to a clean composer — no in-progress line
-    // dangling around the cart.
-    setSelectedProduct(null);
-    setQuantity(1);
-    setPricePerUnit(0);
-    setLineDiscountValue(0);
-  };
-
-  const handleRemoveLine = (idx: number) => {
-    setCart((prev) => prev.filter((_, i) => i !== idx));
-  };
 
   const handleSubmit = async () => {
     // Auto-add the current in-progress line to the cart if any
