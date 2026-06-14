@@ -272,7 +272,7 @@
         "invoicesInRange": "فواتير {range}",
         "netSales": "صافي المبيعات",
         "netProfit": "صافي الربح",
-        "profitNeedsReview": "يحتاج مراجعة",
+        "profitLossHint": "{n} عنصر مبيعة بأقل من سعر التكلفة (خسارة {amount})",
         "avgBasket": "متوسط الفاتورة",
         "avgDiscount": "متوسط الخصم"
       },
@@ -431,6 +431,8 @@
           "scanAriaLabel": "مسح الباركود",
           "scannedNotFound": "الباركود {code} غير موجود",
           "scannedNotFoundCreate": "أضف منتج بهذا الباركود",
+          "scannedOutOfStock": "غير متوفر في المخزون — الكمية الحالية ٠.",
+          "scannedOutOfStockAction": "زيادة الكمية من المخزن",
           "scannedMultiple": "{n} منتجات بنفس الباركود — اختر واحداً",
           "scannedAdded": "تمت إضافة {name} للسلة",
           "scannedIncremented": "تم زيادة كمية {name}"

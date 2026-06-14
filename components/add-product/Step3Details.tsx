@@ -6,6 +6,7 @@ import { Select } from "../ui/Select";
 import { SupplierPicker } from "../suppliers/SupplierPicker";
 import { BarcodeScannerModal } from "../scanner/BarcodeScannerModal";
 import { primeBeep } from "@/lib/scanner/beep";
+import { markScan } from "@/lib/scanner/perf";
 import { Barcode, Eye, ListChecks, MapPin, Package, Tag } from "@/lib/icons";
 import type { BrandDescriptor } from "@/lib/types";
 import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
@@ -232,6 +233,7 @@ export function Step3Details({
               <button
                 type="button"
                 onClick={() => {
+                  markScan("click");
                   primeBeep();
                   setScannerOpen(true);
                 }}

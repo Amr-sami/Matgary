@@ -272,7 +272,7 @@
         "invoicesInRange": "Invoices ({range})",
         "netSales": "Net sales",
         "netProfit": "Net profit",
-        "profitNeedsReview": "Needs review",
+        "profitLossHint": "{n} lines sold below cost ({amount} loss)",
         "avgBasket": "Average basket",
         "avgDiscount": "Avg discount"
       },
@@ -431,6 +431,8 @@
           "scanAriaLabel": "Scan barcode",
           "scannedNotFound": "Barcode {code} not found",
           "scannedNotFoundCreate": "Create product with this barcode",
+          "scannedOutOfStock": "Out of stock — currently 0 in inventory.",
+          "scannedOutOfStockAction": "Top up stock in inventory",
           "scannedMultiple": "{n} products share this barcode — pick one",
           "scannedAdded": "{name} added to cart",
           "scannedIncremented": "{name} quantity increased"

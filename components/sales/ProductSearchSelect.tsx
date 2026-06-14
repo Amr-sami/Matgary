@@ -11,6 +11,7 @@ import { QuickAddProductModal } from "./QuickAddProductModal";
 import { BarcodeScannerModal } from "../scanner/BarcodeScannerModal";
 import { resolveScannedSku } from "@/lib/sales/scan-cart";
 import { primeBeep } from "@/lib/scanner/beep";
+import { markScan } from "@/lib/scanner/perf";
 
 interface ProductSearchSelectProps {
   value: Product | null;
@@ -40,6 +41,13 @@ export function ProductSearchSelect({ value, onChange, onScan }: ProductSearchSe
   // Inline banner that appears above the dropdown when a scan returns
   // zero matches. Cleared on close, dismiss, or next scan.
   const [scanNotFoundCode, setScanNotFoundCode] = useState<string | null>(null);
+  // Same idea for "product exists but is sold out" — distinct UX from
+  // "not found" so the cashier knows to top up stock rather than
+  // re-create a duplicate product.
+  const [scanOutOfStock, setScanOutOfStock] = useState<{
+    name: string;
+    sku: string;
+  } | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   // Scan-aware filter — now matches name, brand AND sku. Sku is
@@ -93,6 +101,7 @@ export function ProductSearchSelect({ value, onChange, onScan }: ProductSearchSe
   const resolveScannedCode = (code: string) => {
     setScannerOpen(false);
     setScanNotFoundCode(null);
+    setScanOutOfStock(null);
 
     const resolution = resolveScannedSku(products, code);
     if (resolution.kind === "found") {
@@ -105,6 +114,18 @@ export function ProductSearchSelect({ value, onChange, onScan }: ProductSearchSe
       } else {
         handleSelect(product);
       }
+      return;
+    }
+
+    if (resolution.kind === "out-of-stock") {
+      // Product exists but stock is 0 — show the cashier the product
+      // name + a one-tap link to top up stock from /inventory.
+      setSearch(resolution.product.name);
+      setScanOutOfStock({
+        name: resolution.product.name,
+        sku: resolution.product.sku ?? code,
+      });
+      setIsOpen(true);
       return;
     }
 
@@ -141,6 +162,7 @@ export function ProductSearchSelect({ value, onChange, onScan }: ProductSearchSe
             setSearch(e.target.value);
             setIsOpen(true);
             setScanNotFoundCode(null);
+            setScanOutOfStock(null);
           }}
           onFocus={() => setIsOpen(true)}
           placeholder={t.placeholder}
@@ -161,6 +183,7 @@ export function ProductSearchSelect({ value, onChange, onScan }: ProductSearchSe
         <button
           type="button"
           onClick={() => {
+            markScan("click");
             primeBeep();
             setScannerOpen(true);
           }}
@@ -171,9 +194,25 @@ export function ProductSearchSelect({ value, onChange, onScan }: ProductSearchSe
         </button>
       </div>
 
-      {isOpen && (filteredProducts.length > 0 || search.trim().length > 0 || scanNotFoundCode) && (
+      {isOpen && (filteredProducts.length > 0 || search.trim().length > 0 || scanNotFoundCode || scanOutOfStock) && (
         <div className="absolute top-full start-0 end-0 mt-1 bg-white border border-border rounded-lg shadow-lg max-h-72 overflow-y-auto z-50">
-          {scanNotFoundCode && (
+          {scanOutOfStock && (
+            <div className="px-4 py-3 bg-warning-light/40 border-b border-border">
+              <p className="text-sm font-semibold text-text-primary" dir="auto">
+                {scanOutOfStock.name}
+              </p>
+              <p className="text-xs text-text-secondary mt-0.5">
+                {t.scannedOutOfStock}
+              </p>
+              <a
+                href={`/inventory?q=${encodeURIComponent(scanOutOfStock.sku)}`}
+                className="mt-1.5 inline-block text-sm font-semibold text-accent hover:underline"
+              >
+                {t.scannedOutOfStockAction}
+              </a>
+            </div>
+          )}
+          {scanNotFoundCode && !scanOutOfStock && (
             <div className="px-4 py-3 bg-warning-light/30 border-b border-border">
               <p className="text-sm text-text-primary">
                 {t.scannedNotFound.replace("{code}", scanNotFoundCode)}

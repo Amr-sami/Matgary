@@ -16,7 +16,7 @@
 // (barcode, internal SKU, future QR payload, etc.). Keeps the abstraction
 // reusable.
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
@@ -24,10 +24,20 @@ import { Input } from "../ui/Input";
 import { Barcode, CameraSlash } from "@/lib/icons";
 import { useDictionary } from "@/components/i18n/DictionaryProvider";
 import { playBeep } from "@/lib/scanner/beep";
+import {
+  getScanReport,
+  isScanPerfEnabled,
+  markScan,
+  subscribeScanPerf,
+} from "@/lib/scanner/perf";
 import type { IDetectedBarcode, IScannerError, ScannerErrorKind } from "@yudiel/react-qr-scanner";
 
 const Scanner = dynamic(
-  () => import("@yudiel/react-qr-scanner").then((m) => m.Scanner),
+  () =>
+    import("@yudiel/react-qr-scanner").then((m) => {
+      markScan("decoder");
+      return m.Scanner;
+    }),
   { ssr: false, loading: () => <ScannerSkeleton /> },
 );
 
@@ -106,14 +116,52 @@ function ScannerBody({
   // even though the decoder may emit consecutive frames before React tears
   // down the modal.
   const firedRef = useRef(false);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [errorKey, setErrorKey] = useState<DisplayErrorKey | null>(null);
   const [manual, setManual] = useState("");
+
+  // Mark "modal" the instant ScannerBody mounts (which is synchronous
+  // with the click that opened the modal, modulo one React commit).
+  useEffect(() => {
+    markScan("modal");
+  }, []);
+
+  // Mark "firstFrame" when the decoder library's <video> element starts
+  // playing. The library inserts the <video> inside our container; we
+  // watch it via MutationObserver because Scanner is a black-box dynamic
+  // import we can't ref directly.
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const root = containerRef.current;
+    let video: HTMLVideoElement | null = null;
+    const onPlaying = () => {
+      markScan("firstFrame");
+      video?.removeEventListener("playing", onPlaying);
+    };
+    const observer = new MutationObserver(() => {
+      const v = root.querySelector("video");
+      if (v && v !== video) {
+        video = v;
+        if (!v.paused && v.readyState >= 2) {
+          onPlaying();
+        } else {
+          v.addEventListener("playing", onPlaying);
+        }
+      }
+    });
+    observer.observe(root, { childList: true, subtree: true });
+    return () => {
+      observer.disconnect();
+      video?.removeEventListener("playing", onPlaying);
+    };
+  }, []);
 
   const handleScan = (detected: IDetectedBarcode[]) => {
     if (firedRef.current) return;
     const value = detected[0]?.rawValue?.trim();
     if (!value) return;
     firedRef.current = true;
+    markScan("firstScan");
     // Beep — primed by the Scan button's onClick inside the user-gesture
     // window. See lib/scanner/beep.ts for why this matters on iOS.
     playBeep();
@@ -153,7 +201,7 @@ function ScannerBody({
           <p className="text-sm text-danger">{t[errorKey]}</p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl bg-black">
+        <div ref={containerRef} className="overflow-hidden rounded-xl bg-black">
           <Scanner
             onScan={handleScan}
             onError={handleError}
@@ -167,6 +215,9 @@ function ScannerBody({
           />
         </div>
       )}
+
+      <ScanPerfOverlay />
+
 
       <div className="space-y-2">
         <label className="block text-sm font-medium text-text-secondary">
@@ -201,6 +252,43 @@ function ScannerBody({
           {t.cancel}
         </Button>
       </div>
+    </div>
+  );
+}
+
+// On-screen perf readout — visible only when the URL has `?perf=1`.
+// Lives inside the scanner modal so the cashier doesn't see it during
+// normal use. Numbers are deltas (ms) from the click that opened the
+// modal: click → modal → decoder → firstFrame → firstScan.
+function ScanPerfOverlay() {
+  const [report, setReport] = useState(() => getScanReport());
+  const enabled = isScanPerfEnabled();
+  useEffect(() => {
+    if (!enabled) return;
+    return subscribeScanPerf(() => setReport(getScanReport()));
+  }, [enabled]);
+  if (!enabled) return null;
+  const rows: Array<[string, number | undefined]> = [
+    ["click", report.deltas.click],
+    ["modal", report.deltas.modal],
+    ["decoder", report.deltas.decoder],
+    ["firstFrame", report.deltas.firstFrame],
+    ["firstScan", report.deltas.firstScan],
+  ];
+  return (
+    <div
+      dir="ltr"
+      className="rounded-lg bg-black/80 text-white text-xs font-mono p-3 space-y-0.5"
+    >
+      <p className="text-[10px] uppercase tracking-wider text-white/60 mb-1">
+        scan perf (ms from click)
+      </p>
+      {rows.map(([k, v]) => (
+        <div key={k} className="flex justify-between gap-4">
+          <span className="text-white/80">{k}</span>
+          <span className="tabular-nums">{v == null ? "—" : `+${v}`}</span>
+        </div>
+      ))}
     </div>
   );
 }

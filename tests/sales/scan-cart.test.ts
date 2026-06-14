@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyScanToCart, resolveScannedSku } from "@/lib/sales/scan-cart";
+import { applyScanToCart, normalizeSku, resolveScannedSku } from "@/lib/sales/scan-cart";
 import type { Product } from "@/lib/types";
 import type { CartLine } from "@/lib/sales/scan-cart";
 
@@ -37,7 +37,7 @@ describe("resolveScannedSku", () => {
     expect(r.kind).toBe("found");
   });
 
-  it("ignores out-of-stock products", () => {
+  it("prefers the in-stock variant when multiple products share a SKU", () => {
     const products = [
       makeProduct({ id: "a", sku: "X", quantity: 0 }),
       makeProduct({ id: "b", sku: "X", quantity: 5 }),
@@ -45,6 +45,22 @@ describe("resolveScannedSku", () => {
     const r = resolveScannedSku(products, "X");
     expect(r.kind).toBe("found");
     if (r.kind === "found") expect(r.product.id).toBe("b");
+  });
+
+  it("returns 'out-of-stock' for a single match with quantity 0", () => {
+    const products = [makeProduct({ id: "a", sku: "Y", quantity: 0 })];
+    const r = resolveScannedSku(products, "Y");
+    expect(r.kind).toBe("out-of-stock");
+    if (r.kind === "out-of-stock") expect(r.product.id).toBe("a");
+  });
+
+  it("returns 'out-of-stock' when every match has quantity 0", () => {
+    const products = [
+      makeProduct({ id: "a", sku: "Z", quantity: 0 }),
+      makeProduct({ id: "b", sku: "Z", quantity: 0 }),
+    ];
+    const r = resolveScannedSku(products, "Z");
+    expect(r.kind).toBe("out-of-stock");
   });
 
   it("returns not-found when no SKU matches", () => {
@@ -74,6 +90,34 @@ describe("resolveScannedSku", () => {
     const products = [makeProduct({ id: "a", sku: undefined })];
     const r = resolveScannedSku(products, "anything");
     expect(r.kind).toBe("not-found");
+  });
+
+  it("treats UPC-A and EAN-13 with leading zero as the same code", () => {
+    // UPC-A is 12 digits; the EAN-13 form prefixes a "0".
+    const products = [makeProduct({ id: "a", sku: "0012345678905" })];
+    const r = resolveScannedSku(products, "012345678905");
+    expect(r.kind).toBe("found");
+  });
+
+  it("ignores zero-width / control chars from the decoder", () => {
+    // Sku stored with a stray BOM (﻿) + zero-width space (​).
+    const products = [makeProduct({ id: "a", sku: "﻿ABC​123" })];
+    const r = resolveScannedSku(products, "abc123");
+    expect(r.kind).toBe("found");
+  });
+});
+
+describe("normalizeSku", () => {
+  it("lowercases and strips whitespace", () => {
+    expect(normalizeSku("  AbC-001  ")).toBe("abc-001");
+  });
+
+  it("collapses a UPC-A-as-EAN-13 leading zero", () => {
+    expect(normalizeSku("0012345678905")).toBe("012345678905");
+  });
+
+  it("strips zero-width chars and BOM", () => {
+    expect(normalizeSku("﻿1234​567")).toBe("1234567");
   });
 });
 

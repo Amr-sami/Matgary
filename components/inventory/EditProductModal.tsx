@@ -8,6 +8,7 @@ import { SupplierPicker } from "../suppliers/SupplierPicker";
 import { SortSelect } from "../ui/FilterSelect";
 import { BarcodeScannerModal } from "../scanner/BarcodeScannerModal";
 import { primeBeep } from "@/lib/scanner/beep";
+import { markScan } from "@/lib/scanner/perf";
 import { Barcode } from "@/lib/icons";
 import { updateProduct } from "@/lib/api/products";
 import { useCategories } from "@/hooks/useCategories";
@@ -186,6 +187,7 @@ export function EditProductModal({
           <button
             type="button"
             onClick={() => {
+              markScan("click");
               primeBeep();
               setScannerOpen(true);
             }}

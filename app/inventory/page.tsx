@@ -7,6 +7,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { BarcodeScannerModal } from "@/components/scanner/BarcodeScannerModal";
 import { QuickAddProductModal } from "@/components/sales/QuickAddProductModal";
 import { primeBeep } from "@/lib/scanner/beep";
+import { markScan } from "@/lib/scanner/perf";
 import { useProducts } from "@/hooks/useProducts";
 import { useSales } from "@/hooks/useSales";
 import { useSearch } from "@/hooks/useSearch";
@@ -70,6 +71,17 @@ function InventoryPageInner() {
     "supplier",
     "location",
   ]);
+
+  // Deep-link from /sales scan-out-of-stock: `/inventory?q=<sku>`. We
+  // apply the query once on mount so the cashier lands on the offending
+  // product, then the user is free to clear / edit the search input.
+  // Subsequent ?q= changes (rare) are ignored to avoid fighting the
+  // typed value.
+  useEffect(() => {
+    const q = searchParams.get("q");
+    if (q && !query) setQuery(q);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(
     (searchParams.get("cat") as Category | null) || null
@@ -490,6 +502,7 @@ function InventoryPageInner() {
             <button
               type="button"
               onClick={() => {
+                markScan("click");
                 primeBeep();
                 setScannerOpen(true);
               }}
