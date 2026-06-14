@@ -3,6 +3,7 @@ import { headers, cookies } from "next/headers";
 import { Cairo, Tajawal, Lemonada } from "next/font/google";
 import Script from "next/script";
 import { SessionProvider } from "next-auth/react";
+import { QueryProvider } from "@/components/providers/QueryProvider";
 import { IconProvider } from "@/components/IconProvider";
 import { defaultLocale, dirOf, isLocale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/get-dictionary";
@@ -107,13 +108,15 @@ export default async function RootLayout({
           nonce={nonce}
         >{`(function(){var start=Date.now();function hide(){var elapsed=Date.now()-start;var wait=Math.max(0,520-elapsed);setTimeout(function(){var el=document.getElementById('app-splash');if(el)el.classList.add('app-splash--hidden');},wait);}if(document.readyState==='complete')hide();else window.addEventListener('load',hide,{once:true});})();`}</Script>
         <SessionProvider>
-          <IconProvider>
-            <DictionaryProvider locale={locale} dict={dict}>
-              <ActiveBranchNameProvider initialName={activeBranchName}>
-                {children}
-              </ActiveBranchNameProvider>
-            </DictionaryProvider>
-          </IconProvider>
+          <QueryProvider>
+            <IconProvider>
+              <DictionaryProvider locale={locale} dict={dict}>
+                <ActiveBranchNameProvider initialName={activeBranchName}>
+                  {children}
+                </ActiveBranchNameProvider>
+              </DictionaryProvider>
+            </IconProvider>
+          </QueryProvider>
         </SessionProvider>
       </body>
     </html>

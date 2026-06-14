@@ -1,21 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { listSales } from "@/lib/api/sales";
+import { useMemo } from "react";
+import { useSales } from "./useSales";
 
 /**
- * Independent data hook used by the customers page.
+ * Customer-page projection of the sales list. After Wave 2, this hook
+ * just wraps `useSales` so two co-mounted consumers share one network
+ * request via TanStack Query's in-flight dedup.
  *
- * Reads sales via the standard /api/sales endpoint and projects them down
- * to the subset the customers page cares about.
- *
- * Refresh triggers:
- *   - Mount (initial load — shows skeleton).
- *   - Tab focus / visibility change — covers "user opened the customer
- *     detail page in a new tab, marked an invoice paid, came back to this
- *     tab" where the list would otherwise show stale outstanding totals.
- *   - The exposed `refresh()` function — for explicit re-fetches after a
- *     mutation in the same page (e.g. when we add inline actions).
+ * Previously this hook fetched /api/sales independently and reimplemented
+ * its own visibilitychange/focus refetch loop. That's now centralised in
+ * the QueryProvider (`refetchOnReconnect: true`) plus the regular
+ * `staleTime: 0` on the sales query — invalidating on focus is a
+ * one-line useEffect on the call site if a page truly needs it.
  */
 
 export interface CustomerSaleRecord {
@@ -31,66 +28,33 @@ export interface CustomerSaleRecord {
   customerPhone?: string;
   paymentMethod?: string;
   isPaid?: boolean;
-  /** Partial-payments tracking. Defaults to 0 on legacy rows; the
-   *  receivables aggregator falls back to the isPaid heuristic when this
-   *  is missing. */
   amountPaid?: number;
 }
 
 export function useCustomersData() {
-  const [records, setRecords] = useState<CustomerSaleRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Customer page needs full history for receivables math — opt into
+  // the unbounded read instead of the default 60-day window.
+  const { sales, loading, refresh } = useSales({ all: true });
 
-  const refresh = useCallback(async (initial = false) => {
-    if (initial) setLoading(true);
-    try {
-      const sales = await listSales();
-      setRecords(
-        sales.map((s) => ({
-          id: s.id,
-          invoiceId: s.invoiceId,
-          productId: s.productId,
-          productName: s.productName,
-          category: s.category,
-          totalPrice: s.totalPrice,
-          saleDate: s.saleDate,
-          isReturned: s.isReturned,
-          customerName: s.customerName,
-          customerPhone: s.customerPhone,
-          paymentMethod: s.paymentMethod,
-          isPaid: s.isPaid,
-          amountPaid: s.amountPaid,
-        })),
-      );
-    } catch (err) {
-      console.error("[useCustomersData] failed to load sales", err);
-    } finally {
-      if (initial) setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void refresh(true);
-
-    // Silent re-fetch on focus / visibility — don't flip `loading` so the
-    // list doesn't blink back to a skeleton every time the user tabs away
-    // and comes back. Same handler ref for both events so we can detach
-    // them cleanly.
-    const onWake = () => {
-      if (
-        typeof document === "undefined" ||
-        document.visibilityState === "visible"
-      ) {
-        void refresh(false);
-      }
-    };
-    document.addEventListener("visibilitychange", onWake);
-    window.addEventListener("focus", onWake);
-    return () => {
-      document.removeEventListener("visibilitychange", onWake);
-      window.removeEventListener("focus", onWake);
-    };
-  }, [refresh]);
+  const records = useMemo<CustomerSaleRecord[]>(
+    () =>
+      sales.map((s) => ({
+        id: s.id,
+        invoiceId: s.invoiceId,
+        productId: s.productId,
+        productName: s.productName,
+        category: s.category,
+        totalPrice: s.totalPrice,
+        saleDate: s.saleDate,
+        isReturned: s.isReturned,
+        customerName: s.customerName,
+        customerPhone: s.customerPhone,
+        paymentMethod: s.paymentMethod,
+        isPaid: s.isPaid,
+        amountPaid: s.amountPaid,
+      })),
+    [sales],
+  );
 
   return { records, loading, refresh };
 }

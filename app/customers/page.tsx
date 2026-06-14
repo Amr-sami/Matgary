@@ -523,7 +523,7 @@ export default function CustomersPage() {
               key={c.key}
               customer={c}
               records={records}
-              onChange={() => refreshRecords(false)}
+              onChange={() => refreshRecords()}
             />
           ))}
         </div>
