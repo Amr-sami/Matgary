@@ -9,14 +9,21 @@
 // Only the minimum fields are exposed. Anything else (brand, low-stock
 // threshold, SKU, supplier, attributes) is set to sensible defaults; the
 // cashier can refine it later from /inventory if they care to.
+//
+// Duplicate-name guard: when the cashier types a name that matches an
+// existing product (case-insensitive, trimmed), we surface a warning
+// with a "Use existing" action. This prevents accidental duplicates
+// like 4× "معجون اسنان". Cashier can still force "Save as new" — the
+// guard is soft, not a hard constraint.
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { SortSelect } from "../ui/FilterSelect";
 import { createProduct } from "@/lib/api/products";
 import { useCategories } from "@/hooks/useCategories";
+import { useProducts } from "@/hooks/useProducts";
 import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 export interface QuickAddProductModalProps {
@@ -29,6 +36,11 @@ export interface QuickAddProductModalProps {
   /** Called with the freshly-created product id so the caller can refresh
    *  its product list AND select the new item. */
   onCreated: (productId: string) => void | Promise<void>;
+  /** Called when the cashier hits the "Use existing" duplicate-name
+   *  shortcut. The caller decides what "use" means: select for the cart
+   *  (POS) or filter the inventory list (browse). Falls back to
+   *  onCreated if omitted. */
+  onSelectExisting?: (productId: string) => void | Promise<void>;
 }
 
 export function QuickAddProductModal({
@@ -37,10 +49,12 @@ export function QuickAddProductModal({
   initialName = "",
   initialSku = "",
   onCreated,
+  onSelectExisting,
 }: QuickAddProductModalProps) {
   const dict = useDictionary();
   const t = dict.app.sales.form.quickAddProduct;
   const { data: categories } = useCategories();
+  const { products } = useProducts();
 
   const [name, setName] = useState(initialName);
   const [categoryId, setCategoryId] = useState<string>("");
@@ -52,6 +66,9 @@ export function QuickAddProductModal({
   const [sku, setSku] = useState(initialSku);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // When the cashier triggers "Save as new anyway" we lift the
+  // duplicate-name guard for the next save attempt.
+  const [overrideDuplicate, setOverrideDuplicate] = useState(false);
 
   // Reset whenever the modal re-opens with a new search seed.
   useEffect(() => {
@@ -62,6 +79,7 @@ export function QuickAddProductModal({
       setCostPrice("");
       setQuantity(1);
       setError(null);
+      setOverrideDuplicate(false);
     }
   }, [isOpen, initialName, initialSku]);
 
@@ -72,12 +90,21 @@ export function QuickAddProductModal({
     }
   }, [categories, categoryId]);
 
+  // Find a product with the same name (case-insensitive, trimmed).
+  // null until the cashier has typed something meaningful.
+  const duplicate = useMemo(() => {
+    const target = name.trim().toLowerCase();
+    if (target.length < 2) return null;
+    return products.find((p) => p.name.trim().toLowerCase() === target) ?? null;
+  }, [name, products]);
+
   const canSave =
     !loading &&
     name.trim().length > 0 &&
     categoryId.length > 0 &&
     price >= 0 &&
-    quantity >= 0;
+    quantity >= 0 &&
+    (!duplicate || overrideDuplicate);
 
   const handleSave = async () => {
     setError(null);
@@ -103,17 +130,62 @@ export function QuickAddProductModal({
     }
   };
 
+  const handleUseExisting = async () => {
+    if (!duplicate) return;
+    setLoading(true);
+    try {
+      const cb = onSelectExisting ?? onCreated;
+      await cb(duplicate.id);
+      onClose();
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={t.title}>
       <div className="space-y-4">
         <Input
           label={t.name}
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) => {
+            setName(e.target.value);
+            // Re-arm the guard whenever the cashier edits the name.
+            setOverrideDuplicate(false);
+          }}
           placeholder={t.namePlaceholder}
           dir="auto"
           autoFocus
         />
+
+        {duplicate && (
+          <div className="rounded-lg border border-warning bg-warning-light/40 p-3 space-y-2">
+            <p className="text-sm font-semibold text-text-primary" dir="auto">
+              {t.duplicateWarning.replace("{name}", duplicate.name)}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                onClick={handleUseExisting}
+                disabled={loading}
+                className="text-sm"
+              >
+                {t.useExisting}
+              </Button>
+              {!overrideDuplicate && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setOverrideDuplicate(true)}
+                  disabled={loading}
+                  className="text-sm"
+                >
+                  {t.saveAsNewAnyway}
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
 
         <div>
           <label className="block text-sm font-medium text-text-secondary mb-1.5">

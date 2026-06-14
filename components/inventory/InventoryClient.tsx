@@ -120,6 +120,13 @@ export function InventoryClient() {
   const [scannerOpen, setScannerOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddInitialSku, setQuickAddInitialSku] = useState("");
+  // Tracks whether the current search `query` was set by a barcode
+  // scan vs typed input. When "scan", clicking the top "Add product"
+  // button pre-fills the SKU with the scanned code so the cashier
+  // doesn't have to know to use the empty-state contextual CTA.
+  // Bug fix: previously, a scan + click-top-button produced a product
+  // with no barcode, and the cashier had to edit + re-scan.
+  const [lastQuerySource, setLastQuerySource] = useState<"scan" | "type">("type");
   const [bulkConfirm, setBulkConfirm] = useState<null | { count: number }>(null);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -470,7 +477,10 @@ export function InventoryClient() {
               type="text"
               placeholder={t.search.placeholder}
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setLastQuerySource("type");
+              }}
               className="w-full pe-14 px-4 py-3 rounded-xl border border-border bg-white focus:outline-none focus:ring-2 focus:ring-accent"
             />
             <button
@@ -489,7 +499,15 @@ export function InventoryClient() {
           <button
             type="button"
             onClick={() => {
-              setQuickAddInitialSku("");
+              // If the search was set by a scan, carry the barcode
+              // through to the new product. Typed searches don't —
+              // those are name searches, the cashier wants a fresh
+              // form.
+              const carrySku =
+                lastQuerySource === "scan" && query.trim().length > 0
+                  ? query.trim()
+                  : "";
+              setQuickAddInitialSku(carrySku);
               setQuickAddOpen(true);
             }}
             className="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-accent text-white font-semibold hover:opacity-90 transition-colors"
@@ -713,6 +731,7 @@ export function InventoryClient() {
         onClose={() => setScannerOpen(false)}
         onDetected={(code) => {
           setQuery(code);
+          setLastQuerySource("scan");
           setScannerOpen(false);
         }}
       />
@@ -728,6 +747,17 @@ export function InventoryClient() {
           await refreshProducts();
           setQuery("");
           setToast({ type: "success", message: t.toast.productAdded });
+        }}
+        onSelectExisting={(existingId) => {
+          // Cashier acknowledged the duplicate-name warning by picking
+          // the existing product. Filter the inventory list to it so
+          // they can review / edit / adjust stock instead of creating
+          // a duplicate.
+          const existing = products.find((p) => p.id === existingId);
+          if (existing) {
+            setQuery(existing.name);
+            setLastQuerySource("type");
+          }
         }}
       />
 

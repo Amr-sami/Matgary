@@ -447,7 +447,10 @@
           "costPrice": "Cost price (optional)",
           "costPricePlaceholder": "Optional",
           "save": "Save and add to cart",
-          "errorGeneric": "Could not add product. Please try again."
+          "errorGeneric": "Could not add product. Please try again.",
+          "duplicateWarning": "A product named \"{name}\" already exists.",
+          "useExisting": "Use existing",
+          "saveAsNewAnyway": "Save as new anyway"
         },
         "recentLabel": "Recent products:",
         "available": "Available: {n} pcs",

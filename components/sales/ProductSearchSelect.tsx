@@ -316,6 +316,22 @@ export function ProductSearchSelect({ value, onChange, onScan }: ProductSearchSe
           }
           setQuickAddInitialSku("");
         }}
+        onSelectExisting={(existingId) => {
+          // Cashier acknowledged a duplicate-name warning and picked
+          // the existing product. Route it the same way a successful
+          // create-then-select would have gone.
+          const existing = products.find((p) => p.id === existingId);
+          if (existing) {
+            if (onScan) {
+              onScan(existing);
+              setSearch("");
+            } else {
+              onChange(existing);
+              setSearch(existing.name);
+            }
+          }
+          setQuickAddInitialSku("");
+        }}
       />
 
       <BarcodeScannerModal

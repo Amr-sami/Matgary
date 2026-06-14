@@ -447,7 +447,10 @@
           "costPrice": "سعر الشراء (اختياري)",
           "costPricePlaceholder": "اختياري",
           "save": "حفظ وإضافة للسلة",
-          "errorGeneric": "تعذر إضافة المنتج. حاول مرة أخرى."
+          "errorGeneric": "تعذر إضافة المنتج. حاول مرة أخرى.",
+          "duplicateWarning": "يوجد منتج بنفس الاسم \"{name}\".",
+          "useExisting": "استخدم الموجود",
+          "saveAsNewAnyway": "احفظ كمنتج جديد على أي حال"
         },
         "recentLabel": "منتجات حديثة:",
         "available": "المتاح: {n} قطعة",
