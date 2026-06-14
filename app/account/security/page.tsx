@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import QRCode from "qrcode";
+// `qrcode` is loaded on-demand inside startEnroll() — the user only ever
+// needs it when they tap "Enable 2FA". Keeping it out of the page bundle
+// trims ~12 KB gzipped from every visit to /account/security.
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -136,6 +138,7 @@ export default function SecurityPage() {
       const p = (await res.json()) as EnrollmentPreview;
       setPreview(p);
       try {
+        const { default: QRCode } = await import("qrcode");
         const dataUri = await QRCode.toDataURL(p.otpauthUri, {
           width: 256,
           margin: 1,
