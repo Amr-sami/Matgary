@@ -5,6 +5,7 @@ import {
   requireTenantWithBranch,
 } from "@/lib/api/auth-helpers";
 import { resolveBranchFilter } from "@/lib/api/branch-context";
+import { resolveSinceWindow } from "@/lib/api/list-window";
 import { listSales, listSalesPage, recordSale } from "@/lib/repo/operations";
 import { logActivity } from "@/lib/repo/activity";
 import { isDomainError, domainErrorBody } from "@/lib/errors";
@@ -38,7 +39,11 @@ export async function GET(req: NextRequest) {
       branchId: filter.branchId,
     });
   }
-  const data = await listSales(r.ctx.tenantId, filter.branchId);
+  // Default: last 60 days. Covers every dashboard widget + the
+  // inventory dead-stock window (60 days). Callers that need true full
+  // history (reports, audits) opt in via `?all=1`.
+  const since = resolveSinceWindow(req, { defaultDays: 60 });
+  const data = await listSales(r.ctx.tenantId, filter.branchId, since);
   return NextResponse.json({ data, branchId: filter.branchId });
 }
 

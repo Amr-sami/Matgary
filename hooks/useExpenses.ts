@@ -4,14 +4,20 @@ import { useCallback, useEffect, useState } from "react";
 import { listExpenses } from "@/lib/api/expenses";
 import type { Expense } from "@/lib/types";
 
-export function useExpenses() {
+export interface UseExpensesOptions {
+  all?: boolean;
+  days?: number;
+}
+
+export function useExpenses(opts: UseExpensesOptions = {}) {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { all, days } = opts;
 
   const refresh = useCallback(async () => {
     try {
-      const data = await listExpenses();
+      const data = await listExpenses({ all, days });
       setExpenses(data);
       setError(null);
     } catch (err) {
@@ -19,7 +25,7 @@ export function useExpenses() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [all, days]);
 
   useEffect(() => {
     refresh();

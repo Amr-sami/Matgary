@@ -23,8 +23,10 @@ function ReportsContent() {
   const locale = useLocale();
   const t = dict.app.reports;
   const searchParams = useSearchParams();
-  const { sales, loading: salesLoading } = useSales();
-  const { returns, loading: returnsLoading } = useReturns();
+  // Reports aggregate over arbitrary user-selected date ranges, so we
+  // opt out of the server's default 60-day window via `all: true`.
+  const { sales, loading: salesLoading } = useSales({ all: true });
+  const { returns, loading: returnsLoading } = useReturns({ all: true });
 
   const [dateRange, setDateRange] = useState({
     start: "",

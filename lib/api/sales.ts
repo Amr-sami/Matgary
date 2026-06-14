@@ -54,8 +54,18 @@ async function jsonFetch<T = unknown>(url: string, init?: RequestInit): Promise<
   return res.status === 204 ? (null as T) : res.json();
 }
 
-export async function listSales(): Promise<Sale[]> {
-  const json = await jsonFetch<{ data: SaleApiRow[] }>("/api/sales");
+export async function listSales(opts?: {
+  /** When true, bypass the server-side 60-day default (full history).
+   *  Use sparingly — pages backed by this should expect heavier payloads. */
+  all?: boolean;
+  /** Custom cutoff in days. Server clamps to [1, 730]. */
+  days?: number;
+}): Promise<Sale[]> {
+  const qs = new URLSearchParams();
+  if (opts?.all) qs.set("all", "1");
+  else if (opts?.days) qs.set("days", String(opts.days));
+  const url = qs.toString() ? `/api/sales?${qs}` : "/api/sales";
+  const json = await jsonFetch<{ data: SaleApiRow[] }>(url);
   return json.data.map(reviveSale);
 }
 

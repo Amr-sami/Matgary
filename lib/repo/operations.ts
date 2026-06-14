@@ -1,4 +1,4 @@
-import { and, eq, desc, sql, inArray } from "drizzle-orm";
+import { and, eq, desc, gte, sql, inArray } from "drizzle-orm";
 import { withTenant } from "@/lib/db";
 import {
   products,
@@ -249,10 +249,15 @@ export async function listSales(
   tenantId: string,
   /** When set, restrict to that branch. Null = no filter (every branch). */
   branchId?: string | null,
+  /** Optional cutoff. When set, only sales with `saleDate >= since` are
+   *  returned. The composite index `sales_tenant_branch_date_idx` keeps
+   *  the filter cheap. Callers that need full history pass `undefined`. */
+  since?: Date,
 ): Promise<Sale[]> {
   return withTenant(tenantId, async (tx) => {
     const filters = [eq(sales.tenantId, tenantId)];
     if (branchId) filters.push(eq(sales.branchId, branchId));
+    if (since) filters.push(gte(sales.saleDate, since));
     const rows = await tx
       .select()
       .from(sales)
@@ -1309,27 +1314,32 @@ export async function listReturns(
   /** When set, restrict to returns whose parent sale was rung up at that
    *  branch. Null = every branch. */
   branchId?: string | null,
+  /** Optional cutoff. When set, only returns with `returnDate >= since`
+   *  are returned. */
+  since?: Date,
 ): Promise<Return[]> {
   return withTenant(tenantId, async (tx) => {
     if (branchId) {
       // Join sales so we can filter on the parent sale's branch.
+      const f = [
+        eq(returnsTable.tenantId, tenantId),
+        eq(sales.branchId, branchId),
+      ];
+      if (since) f.push(gte(returnsTable.returnDate, since));
       const rows = await tx
         .select({ r: returnsTable })
         .from(returnsTable)
         .innerJoin(sales, eq(sales.id, returnsTable.saleId))
-        .where(
-          and(
-            eq(returnsTable.tenantId, tenantId),
-            eq(sales.branchId, branchId),
-          ),
-        )
+        .where(and(...f))
         .orderBy(desc(returnsTable.returnDate));
       return rows.map((row) => rowToReturn(row.r));
     }
+    const f = [eq(returnsTable.tenantId, tenantId)];
+    if (since) f.push(gte(returnsTable.returnDate, since));
     const rows = await tx
       .select()
       .from(returnsTable)
-      .where(eq(returnsTable.tenantId, tenantId))
+      .where(and(...f))
       .orderBy(desc(returnsTable.returnDate));
     return rows.map(rowToReturn);
   });

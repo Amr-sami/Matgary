@@ -6,6 +6,7 @@ import {
   requireTenantWithBranch,
 } from "@/lib/api/auth-helpers";
 import { resolveBranchFilter } from "@/lib/api/branch-context";
+import { resolveSinceWindow } from "@/lib/api/list-window";
 import { addExpense, listExpenses } from "@/lib/repo/operations";
 import { logActivity } from "@/lib/repo/activity";
 import { withTenant } from "@/lib/db";
@@ -22,7 +23,10 @@ export async function GET(req: NextRequest) {
   if (!filter.ok) {
     return NextResponse.json({ error: filter.error }, { status: filter.status });
   }
-  const data = await listExpenses(r.ctx.tenantId, filter.branchId);
+  // Default: last 90 days. Expense reporting typically goes 1-3 months
+  // back; longer history is admin/export work (`?all=1`).
+  const since = resolveSinceWindow(req, { defaultDays: 90 });
+  const data = await listExpenses(r.ctx.tenantId, filter.branchId, since);
   return NextResponse.json({ data, branchId: filter.branchId });
 }
 

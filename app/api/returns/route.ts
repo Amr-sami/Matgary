@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireTenant } from "@/lib/api/auth-helpers";
 import { resolveBranchFilter } from "@/lib/api/branch-context";
+import { resolveSinceWindow } from "@/lib/api/list-window";
 import { listReturns, recordReturn } from "@/lib/repo/operations";
 
 export async function GET(req: NextRequest) {
@@ -14,7 +15,9 @@ export async function GET(req: NextRequest) {
   if (!filter.ok) {
     return NextResponse.json({ error: filter.error }, { status: filter.status });
   }
-  const data = await listReturns(r.ctx.tenantId, filter.branchId);
+  // Default: last 60 days. ?all=1 for full history.
+  const since = resolveSinceWindow(req, { defaultDays: 60 });
+  const data = await listReturns(r.ctx.tenantId, filter.branchId, since);
   return NextResponse.json({ data, branchId: filter.branchId });
 }
 

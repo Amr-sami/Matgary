@@ -2,7 +2,7 @@
 // god-module refactor. Existing imports of these from "@/lib/repo/operations"
 // still resolve via re-export.
 
-import { and, eq, desc, sql } from "drizzle-orm";
+import { and, eq, desc, gte, sql } from "drizzle-orm";
 import { withTenant } from "@/lib/db";
 import { expenses as expensesTable } from "@/lib/db/schema";
 import type { Expense, ExpenseCategory } from "@/lib/types";
@@ -117,6 +117,8 @@ export async function listExpenses(
   /** When set, restrict to that branch (excludes tenant-wide null-branch
    *  expenses). Null = every branch + tenant-wide. */
   branchId?: string | null,
+  /** Optional cutoff. When set, only expenses with `date >= since`. */
+  since?: Date,
 ): Promise<Expense[]> {
   // Lazy: catch up any due recurring instances before listing.
   await materializeDueRecurringExpenses(tenantId);
@@ -124,6 +126,7 @@ export async function listExpenses(
   return withTenant(tenantId, async (tx) => {
     const filters = [eq(expensesTable.tenantId, tenantId)];
     if (branchId) filters.push(eq(expensesTable.branchId, branchId));
+    if (since) filters.push(gte(expensesTable.date, since));
     const rows = await tx
       .select()
       .from(expensesTable)

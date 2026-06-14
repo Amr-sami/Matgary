@@ -21,8 +21,15 @@ async function jsonFetch<T = unknown>(url: string, init?: RequestInit): Promise<
   return res.status === 204 ? (null as T) : res.json();
 }
 
-export async function listExpenses(): Promise<Expense[]> {
-  const json = await jsonFetch<{ data: ExpenseApiRow[] }>("/api/expenses");
+export async function listExpenses(opts?: {
+  all?: boolean;
+  days?: number;
+}): Promise<Expense[]> {
+  const qs = new URLSearchParams();
+  if (opts?.all) qs.set("all", "1");
+  else if (opts?.days) qs.set("days", String(opts.days));
+  const url = qs.toString() ? `/api/expenses?${qs}` : "/api/expenses";
+  const json = await jsonFetch<{ data: ExpenseApiRow[] }>(url);
   return json.data.map(reviveExpense);
 }
 
