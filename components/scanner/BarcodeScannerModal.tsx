@@ -211,6 +211,14 @@ function ScannerBody({
             // the library's playback path doesn't survive iOS's
             // gesture-window check.
             sound={false}
+            // Library default is 500 ms — used to read torch/zoom
+            // capabilities we don't surface. Drop to 0 so the decoder
+            // can start scanning the moment the camera plays.
+            settleDelayMs={0}
+            // Library default is 100 ms between detection attempts.
+            // 33 ms ≈ one frame at 30 fps — gives the camera every
+            // frame to decode instead of skipping ~70% of them.
+            retryDelay={33}
             styles={{ container: { width: "100%" } }}
           />
         </div>
