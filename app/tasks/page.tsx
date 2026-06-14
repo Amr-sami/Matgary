@@ -1,19 +1,22 @@
-"use client";
+// /tasks — Server Component.
+//
+// Page shell + heading render on the server with the dictionary
+// resolved at the SC layer (no `useDictionary` call). The interactive
+// surface (toast state + badge invalidation + TasksTab) lives in the
+// small `TasksPageBody` client island.
 
-import { useState } from "react";
+import { headers } from "next/headers";
 import { AppShell } from "@/components/layout/AppShell";
-import { TasksTab } from "@/components/tasks/TasksTab";
-import { Toast } from "@/components/ui/Toast";
-import { useUnreadTaskCount } from "@/hooks/useUnreadTaskCount";
-import { useDictionary } from "@/components/i18n/DictionaryProvider";
+import { TasksPageBody } from "@/components/tasks/TasksPageBody";
+import { getDictionary } from "@/lib/i18n/get-dictionary";
+import { defaultLocale, isLocale } from "@/lib/i18n/config";
 
-type ToastState = { type: "success" | "error"; message: string } | null;
-
-export default function TasksPage() {
-  const dict = useDictionary();
+export default async function TasksPage() {
+  const hdrs = await headers();
+  const raw = hdrs.get("x-locale");
+  const locale = raw && isLocale(raw) ? raw : defaultLocale;
+  const dict = await getDictionary(locale);
   const t = dict.app.tasks.page;
-  const [toast, setToast] = useState<ToastState>(null);
-  const { refresh: refreshUnread } = useUnreadTaskCount();
 
   return (
     <AppShell title={t.title}>
@@ -22,21 +25,11 @@ export default function TasksPage() {
           <h1 className="text-2xl font-bold text-text-primary leading-tight">
             {t.heading}
           </h1>
-          <p className="text-sm text-text-secondary mt-0.5">
-            {t.subhead}
-          </p>
+          <p className="text-sm text-text-secondary mt-0.5">{t.subhead}</p>
         </header>
 
-        <TasksTab onToast={setToast} onUnreadChange={refreshUnread} />
+        <TasksPageBody />
       </div>
-
-      {toast && (
-        <Toast
-          type={toast.type}
-          message={toast.message}
-          onClose={() => setToast(null)}
-        />
-      )}
     </AppShell>
   );
 }
