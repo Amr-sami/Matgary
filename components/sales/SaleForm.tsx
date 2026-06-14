@@ -9,6 +9,11 @@ import { Input } from "../ui/Input";
 import { useBranches } from "@/hooks/useBranches";
 import { recordCartSaleOfflineAware } from "@/lib/offline/recordCartSale";
 import { applyScanToCart } from "@/lib/sales/scan-cart";
+import {
+  calcLineDiscount,
+  clampLoyaltyRedemption,
+  computeCartTotals,
+} from "@/lib/sales/cart-math";
 import { useSales } from "@/hooks/useSales";
 import { useProducts } from "@/hooks/useProducts";
 import { useCustomersData } from "@/hooks/useCustomersData";
@@ -78,18 +83,6 @@ interface SaleFormProps {
   onPrintLastSale?: (data: ReceiptSaleData) => void;
   onPrintLastInvoice?: (data: ReceiptInvoiceData) => void;
   preselectedProduct?: Product | null;
-}
-
-function calcLineDiscount(
-  qty: number,
-  price: number,
-  type: DiscountType,
-  value: number
-): number {
-  const subtotal = qty * price;
-  if (value <= 0) return 0;
-  const raw = type === "percentage" ? Math.round((subtotal * value) / 100) : value;
-  return Math.min(raw, subtotal);
 }
 
 export function SaleForm({
@@ -342,76 +335,31 @@ export function SaleForm({
     ];
   })();
 
-  const cartSubtotalGross = previewLines.reduce(
-    (s, l) => s + l.quantity * l.pricePerUnit,
-    0
-  );
-  const cartLineDiscountTotal = previewLines.reduce(
-    (s, l) =>
-      s +
-      calcLineDiscount(
-        l.quantity,
-        l.pricePerUnit,
-        l.lineDiscountType,
-        l.lineDiscountValue
-      ),
-    0
-  );
-  const cartAfterLines = cartSubtotalGross - cartLineDiscountTotal;
-  const orderDiscountAmount =
-    orderDiscountValue > 0 && cartAfterLines > 0
-      ? Math.min(
-          orderDiscountType === "percentage"
-            ? Math.round((cartAfterLines * orderDiscountValue) / 100)
-            : orderDiscountValue,
-          cartAfterLines
-        )
-      : 0;
-  const cartAfterOrderDiscount = cartAfterLines - orderDiscountAmount;
+  // Cart + order-discount math (pure helper — see lib/sales/cart-math.ts)
+  const cartTotals = computeCartTotals(previewLines, {
+    type: orderDiscountType,
+    value: orderDiscountValue,
+  });
+  const cartSubtotalGross = cartTotals.subtotalGross;
+  const cartLineDiscountTotal = cartTotals.lineDiscountTotal;
+  const cartAfterLines = cartTotals.afterLines;
+  const orderDiscountAmount = cartTotals.orderDiscount;
+  const cartAfterOrderDiscount = cartTotals.afterOrderDiscount;
 
-  // ── Loyalty redemption preview ─────────────────────────────────────
-  // Live-recompute the discount as the cashier types in the redeem fields.
-  // Mirrors the server-side cap-and-trim logic in `recordCartSale`: if the
-  // requested redemption exceeds what's left after the order discount, we
-  // shrink it (preserve credit, trim points) so the displayed total
-  // matches what the server will actually book. The cashier sees the
-  // EXACT final number before submitting.
-  const requestedRedeemPoints = Math.max(
-    0,
-    Math.floor(Number(redeemPointsInput) || 0),
-  );
-  const requestedApplyCredit = Math.max(0, Number(applyCreditInput) || 0);
-  const cappedRedeemPoints = Math.min(requestedRedeemPoints, walletPoints);
-  const cappedApplyCredit = Math.min(requestedApplyCredit, walletCredit);
-
-  let loyaltyDiscountAmount = 0;
-  let loyaltyPointsAppliedDisplay = 0;
-  let loyaltyCreditAppliedDisplay = 0;
-  if (cappedRedeemPoints > 0 || cappedApplyCredit > 0) {
-    const rate = settings.loyaltyEgpPerPoint || 0;
-    const pointsValue = Math.round(cappedRedeemPoints * rate * 100) / 100;
-    let total = pointsValue + cappedApplyCredit;
-    if (total > cartAfterOrderDiscount) {
-      // Trim to the available headroom: keep credit, cut points first.
-      total = cartAfterOrderDiscount;
-      if (cappedApplyCredit >= cartAfterOrderDiscount) {
-        loyaltyCreditAppliedDisplay = cartAfterOrderDiscount;
-        loyaltyPointsAppliedDisplay = 0;
-      } else {
-        loyaltyCreditAppliedDisplay = cappedApplyCredit;
-        const fromPoints = cartAfterOrderDiscount - cappedApplyCredit;
-        loyaltyPointsAppliedDisplay =
-          rate > 0 ? Math.floor(fromPoints / rate) : 0;
-      }
-      loyaltyDiscountAmount =
-        Math.round(loyaltyPointsAppliedDisplay * rate * 100) / 100 +
-        loyaltyCreditAppliedDisplay;
-    } else {
-      loyaltyDiscountAmount = total;
-      loyaltyPointsAppliedDisplay = cappedRedeemPoints;
-      loyaltyCreditAppliedDisplay = cappedApplyCredit;
-    }
-  }
+  // Loyalty redemption preview — live-recompute as cashier types, cap +
+  // trim to mirror server-side rules (preserve credit, cut points first).
+  // The cashier sees the EXACT final number before submitting.
+  const loyaltyClamp = clampLoyaltyRedemption({
+    requestedRedeemPoints: Number(redeemPointsInput) || 0,
+    requestedApplyCredit: Number(applyCreditInput) || 0,
+    walletPoints,
+    walletCredit,
+    egpPerPoint: settings.loyaltyEgpPerPoint || 0,
+    cartAfterOrderDiscount,
+  });
+  const loyaltyDiscountAmount = loyaltyClamp.loyaltyDiscount;
+  const loyaltyPointsAppliedDisplay = loyaltyClamp.pointsApplied;
+  const loyaltyCreditAppliedDisplay = loyaltyClamp.creditApplied;
 
   const cartTotal = Math.max(0, cartAfterOrderDiscount - loyaltyDiscountAmount);
 
@@ -1156,16 +1104,11 @@ export function SaleForm({
                 <span>{t.totals.total}</span>
                 <span className="text-2xl text-accent">{fmt(cartTotal)}</span>
               </div>
-              {loyaltyDiscountAmount > 0 &&
-                (requestedRedeemPoints > cappedRedeemPoints ||
-                  requestedApplyCredit > cappedApplyCredit ||
-                  requestedRedeemPoints * (settings.loyaltyEgpPerPoint || 0) +
-                    requestedApplyCredit >
-                    cartAfterOrderDiscount) && (
-                  <p className="text-[11px] text-orange-700 leading-relaxed pt-1">
-                    {t.totals.loyaltyTrimmedNote}
-                  </p>
-                )}
+              {loyaltyDiscountAmount > 0 && loyaltyClamp.wasTrimmed && (
+                <p className="text-[11px] text-orange-700 leading-relaxed pt-1">
+                  {t.totals.loyaltyTrimmedNote}
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
