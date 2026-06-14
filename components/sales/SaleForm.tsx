@@ -14,6 +14,8 @@ import {
   computeCartTotals,
 } from "@/lib/sales/cart-math";
 import { useCart } from "@/hooks/useCart";
+import { useOrderAdjustments } from "@/hooks/useOrderAdjustments";
+import { useCustomerPayment } from "@/hooks/useCustomerPayment";
 import { useSales } from "@/hooks/useSales";
 import { useProducts } from "@/hooks/useProducts";
 import { useCustomersData } from "@/hooks/useCustomersData";
@@ -162,74 +164,38 @@ export function SaleForm({
     buildPreviewLines,
   } = cartHook;
 
-  // Order-level fields (apply to whole invoice)
-  const [note, setNote] = useState("");
-  const [orderDiscountType, setOrderDiscountType] = useState<DiscountType>("percentage");
-  const [orderDiscountValue, setOrderDiscountValue] = useState(0);
-  const [useCustomDate, setUseCustomDate] = useState(false);
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const [customDate, setCustomDate] = useState(todayStr);
+  // Order-level fields (note, order discount, optional custom date).
+  const {
+    note,
+    setNote,
+    orderDiscountType,
+    setOrderDiscountType,
+    orderDiscountValue,
+    setOrderDiscountValue,
+    useCustomDate,
+    setUseCustomDate,
+    customDate,
+    setCustomDate,
+    todayStr,
+  } = useOrderAdjustments();
 
-  // Customer + payment
-  const [customerName, setCustomerName] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
-  /** For deferred sales only: amount the customer paid at the counter. Stored
-   *  as a string so the input can be edited fluently (empty, "0", "0.50",
-   *  etc.) — parsed to a number at submit. */
-  const [amountPaidNowInput, setAmountPaidNowInput] = useState("");
-
-  // Loyalty redemption — appears only when the active branch's loyalty
-  // programme is enabled AND the cashier has typed a customer phone.
-  const [walletPoints, setWalletPoints] = useState(0);
-  const [walletCredit, setWalletCredit] = useState(0);
-  const [redeemPointsInput, setRedeemPointsInput] = useState("");
-  const [applyCreditInput, setApplyCreditInput] = useState("");
-  useEffect(() => {
-    if (!settings.loyaltyEnabled || !customerPhone.trim()) {
-      setWalletPoints(0);
-      setWalletCredit(0);
-      return;
-    }
-    const phone = customerPhone.trim();
-    let cancelled = false;
-    // 400ms debounce so a fast typist doesn't spam the wallet endpoint.
-    const t = setTimeout(async () => {
-      try {
-        const res = await fetch(
-          `/api/customers/by-phone/${encodeURIComponent(phone)}/wallet`,
-          { cache: "no-store" },
-        );
-        if (cancelled) return;
-        if (!res.ok) {
-          setWalletPoints(0);
-          setWalletCredit(0);
-          return;
-        }
-        const json = (await res.json()) as {
-          wallet: { points: number; credit: number };
-        };
-        setWalletPoints(json.wallet.points);
-        setWalletCredit(json.wallet.credit);
-      } catch {
-        if (!cancelled) {
-          setWalletPoints(0);
-          setWalletCredit(0);
-        }
-      }
-    }, 400);
-    return () => {
-      cancelled = true;
-      clearTimeout(t);
-    };
-  }, [customerPhone, settings.loyaltyEnabled]);
-
-  // Reset redemption inputs when the customer changes (otherwise a
-  // previous customer's "redeem 50 pts" would silently apply to next sale).
-  useEffect(() => {
-    setRedeemPointsInput("");
-    setApplyCreditInput("");
-  }, [customerPhone]);
+  // Customer + payment + loyalty (incl. debounced wallet fetch).
+  const {
+    customerName,
+    setCustomerName,
+    customerPhone,
+    setCustomerPhone,
+    paymentMethod,
+    setPaymentMethod,
+    amountPaidNowInput,
+    setAmountPaidNowInput,
+    walletPoints,
+    walletCredit,
+    redeemPointsInput,
+    setRedeemPointsInput,
+    applyCreditInput,
+    setApplyCreditInput,
+  } = useCustomerPayment({ loyaltyEnabled: !!settings.loyaltyEnabled });
 
   const [loading, setLoading] = useState(false);
 
