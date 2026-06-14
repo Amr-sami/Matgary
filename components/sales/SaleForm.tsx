@@ -8,6 +8,7 @@ import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { useBranches } from "@/hooks/useBranches";
 import { recordCartSaleOfflineAware } from "@/lib/offline/recordCartSale";
+import { applyScanToCart } from "@/lib/sales/scan-cart";
 import { useSales } from "@/hooks/useSales";
 import { useProducts } from "@/hooks/useProducts";
 import { useCustomersData } from "@/hooks/useCustomersData";
@@ -442,6 +443,24 @@ export function SaleForm({
         lineDiscountValue,
       },
     ]);
+    setSelectedProduct(null);
+    setQuantity(1);
+    setPricePerUnit(0);
+    setLineDiscountValue(0);
+  };
+
+  // Scan-to-cart: barcode flow. If the scanned product is already in the
+  // cart, increment its quantity (capped by remaining stock). Otherwise
+  // append a new line at the product's catalog price with qty=1. This
+  // diverges from manual selection on purpose — the spec allows the
+  // cashier to add the same product twice as separate lines via the
+  // manual flow (e.g. different per-line discounts), but a rapid-fire
+  // scan should never produce duplicate lines. Logic lives in
+  // lib/sales/scan-cart so it's covered by vitest.
+  const handleScanProduct = (product: Product) => {
+    setCart((prev) => applyScanToCart(prev, product));
+    // Scan flow always returns to a clean composer — no in-progress line
+    // dangling around the cart.
     setSelectedProduct(null);
     setQuantity(1);
     setPricePerUnit(0);
@@ -903,7 +922,11 @@ export function SaleForm({
       </div>
 
       <div className="space-y-4">
-        <ProductSearchSelect value={selectedProduct} onChange={setSelectedProduct} />
+        <ProductSearchSelect
+          value={selectedProduct}
+          onChange={setSelectedProduct}
+          onScan={handleScanProduct}
+        />
 
         {!selectedProduct && cart.length === 0 && recentProducts.length > 0 && (
           <div>

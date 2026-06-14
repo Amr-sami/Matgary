@@ -24,6 +24,8 @@ export interface QuickAddProductModalProps {
   onClose: () => void;
   /** Pre-fill the name from whatever the cashier typed in search. */
   initialName?: string;
+  /** Pre-fill the SKU/barcode (used by the scan-not-found flow). */
+  initialSku?: string;
   /** Called with the freshly-created product id so the caller can refresh
    *  its product list AND select the new item. */
   onCreated: (productId: string) => void | Promise<void>;
@@ -33,6 +35,7 @@ export function QuickAddProductModal({
   isOpen,
   onClose,
   initialName = "",
+  initialSku = "",
   onCreated,
 }: QuickAddProductModalProps) {
   const dict = useDictionary();
@@ -44,6 +47,9 @@ export function QuickAddProductModal({
   const [price, setPrice] = useState<number>(0);
   const [costPrice, setCostPrice] = useState<number | "">("");
   const [quantity, setQuantity] = useState<number>(1);
+  // SKU is only surfaced when pre-seeded from a scan — keeps the cashier
+  // shortcut single-purpose. Blank → undefined on save.
+  const [sku, setSku] = useState(initialSku);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,12 +57,13 @@ export function QuickAddProductModal({
   useEffect(() => {
     if (isOpen) {
       setName(initialName);
+      setSku(initialSku);
       setPrice(0);
       setCostPrice("");
       setQuantity(1);
       setError(null);
     }
-  }, [isOpen, initialName]);
+  }, [isOpen, initialName, initialSku]);
 
   // Default-select the first category once they load.
   useEffect(() => {
@@ -82,6 +89,7 @@ export function QuickAddProductModal({
         price: Number(price),
         quantity: Number(quantity),
         costPrice: costPrice === "" ? undefined : Number(costPrice),
+        sku: sku.trim() || undefined,
       });
       // Await the caller's refresh + select so the parent dropdown
       // re-fetches BEFORE the modal closes — no flash of stale data,

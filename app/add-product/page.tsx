@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { AppShell } from "@/components/layout/AppShell";
 import { StepIndicator } from "@/components/add-product/StepIndicator";
 import { Step1Category } from "@/components/add-product/Step1Category";
@@ -32,6 +33,11 @@ const EMPTY_FORM = {
 export default function AddProductPage() {
   const dict = useDictionary();
   const t = dict.app.inventory.addProduct;
+  const searchParams = useSearchParams();
+  // ?sku=<code> deep-link from POS scan-not-found → create-product. We
+  // read it once at mount; subsequent ?sku changes (rare) intentionally
+  // don't reset the in-progress form.
+  const initialSku = searchParams.get("sku")?.trim() ?? "";
   const [step, setStep] = useState(1);
   const [categoryId, setCategoryId] = useState<string | null>(null);
   // attribute_id -> attribute_value_id
@@ -40,7 +46,7 @@ export default function AddProductPage() {
   const [toast, setToast] = useState<
     { type: "success" | "error"; message: string } | null
   >(null);
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [form, setForm] = useState({ ...EMPTY_FORM, sku: initialSku });
 
   const {
     data: categories,

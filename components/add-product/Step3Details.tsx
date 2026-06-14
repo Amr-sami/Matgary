@@ -1,9 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { Input } from "../ui/Input";
 import { Select } from "../ui/Select";
 import { SupplierPicker } from "../suppliers/SupplierPicker";
-import { Eye, ListChecks, MapPin, Package, Tag } from "@/lib/icons";
+import { BarcodeScannerModal } from "../scanner/BarcodeScannerModal";
+import { primeBeep } from "@/lib/scanner/beep";
+import { Barcode, Eye, ListChecks, MapPin, Package, Tag } from "@/lib/icons";
 import type { BrandDescriptor } from "@/lib/types";
 import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
 import { formatCurrency } from "@/lib/i18n/format";
@@ -100,6 +103,7 @@ export function Step3Details({
   const dict = useDictionary();
   const locale = useLocale();
   const t = dict.app.inventory.addProduct.step3;
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   const brandOptions = [
     ...brands.map((b) => b.name).filter((n) => n.toLowerCase() !== "other"),
@@ -121,6 +125,7 @@ export function Step3Details({
   // <form> inline (Modal renders without a portal), and nested forms are
   // invalid HTML. Submission is the sticky footer button on the page.
   return (
+    <>
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Form column (left, 2/3 on desktop) */}
       <div className="lg:col-span-2 space-y-6">
@@ -216,12 +221,26 @@ export function Step3Details({
             subtitle={t.sections.extras.subtitle}
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input
-              label={t.fields.sku}
-              value={form.sku}
-              onChange={(e) => onChange("sku", e.target.value)}
-              placeholder={t.fields.skuPlaceholder}
-            />
+            <div className="relative">
+              <Input
+                label={t.fields.sku}
+                value={form.sku}
+                onChange={(e) => onChange("sku", e.target.value)}
+                placeholder={t.fields.skuPlaceholder}
+                className="pe-12"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  primeBeep();
+                  setScannerOpen(true);
+                }}
+                aria-label={t.fields.skuScanAriaLabel}
+                className="absolute end-2 top-[28px] inline-flex items-center justify-center w-9 h-9 rounded-lg text-accent hover:bg-accent-light/60 transition-colors"
+              >
+                <Barcode className="w-5 h-5" />
+              </button>
+            </div>
             <Input
               label={t.fields.location}
               value={form.location}
@@ -329,5 +348,14 @@ export function Step3Details({
         </div>
       </aside>
     </div>
+    <BarcodeScannerModal
+      isOpen={scannerOpen}
+      onClose={() => setScannerOpen(false)}
+      onDetected={(code) => {
+        onChange("sku", code);
+        setScannerOpen(false);
+      }}
+    />
+    </>
   );
 }

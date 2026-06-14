@@ -422,12 +422,18 @@
         "title": "New sale",
         "itemsInCart": "{n} items in cart",
         "productSearch": {
-          "label": "Choose product",
-          "placeholder": "Search products…",
+          "label": "Search or scan product",
+          "placeholder": "Name, SKU or barcode…",
           "inStock": "In stock: {n}",
           "addNew": "+ Add new product to inventory",
           "addNewWithName": "+ Add \"{name}\" as a new product",
-          "noMatch": "No product matches — add it to inventory"
+          "noMatch": "No product matches — add it to inventory",
+          "scanAriaLabel": "Scan barcode",
+          "scannedNotFound": "Barcode {code} not found",
+          "scannedNotFoundCreate": "Create product with this barcode",
+          "scannedMultiple": "{n} products share this barcode — pick one",
+          "scannedAdded": "{name} added to cart",
+          "scannedIncremented": "{name} quantity increased"
         },
         "quickAddProduct": {
           "title": "Add new product to inventory",
@@ -793,6 +799,21 @@
       "confirm": {
         "confirm": "Confirm",
         "cancel": "Cancel"
+      },
+      "scanner": {
+        "title": "Scan barcode",
+        "subtitle": "Point your camera at the barcode",
+        "scanButton": "Scan",
+        "loading": "Starting camera…",
+        "permissionDenied": "Camera permission denied. Please allow camera access in your browser settings.",
+        "notSupported": "Camera scanning is not supported on this device. Use manual entry below.",
+        "httpsRequired": "Camera requires a secure (HTTPS) connection. Use manual entry below or open the deployed site.",
+        "genericError": "Could not open camera. Try manual entry below.",
+        "manualLabel": "Or type the code manually",
+        "manualPlaceholder": "Barcode / SKU",
+        "manualSubmit": "Use this code",
+        "cancel": "Cancel",
+        "detected": "Detected: {code}"
       }
     },
     "whatsappInbox": {
@@ -2918,7 +2939,8 @@
         "comfortable": "Comfortable",
         "import": "Import",
         "exportCsv": "Export CSV",
-        "addProduct": "Add product"
+        "addProduct": "Add product",
+        "scanAriaLabel": "Scan barcode"
       },
       "count": "{n} products in inventory",
       "table": {
@@ -2958,9 +2980,11 @@
       "empty": {
         "search": "No results for \"{q}\"",
         "filters": "No results match the current filters",
-        "fresh": "No products yet. Start by adding one."
+        "fresh": "No products yet. Start by adding one.",
+        "createWithCode": "Add product with code \"{code}\""
       },
       "toast": {
+        "productAdded": "Product added",
         "productDeleted": "Product deleted",
         "deleteFailed": "Something went wrong",
         "productUpdated": "Product updated",
@@ -3019,6 +3043,7 @@
           "costPrice": "Cost price (EGP)",
           "lowStockThreshold": "Low-stock alert threshold",
           "sku": "SKU / Barcode",
+          "skuScanAriaLabel": "Scan barcode",
           "supplier": "Supplier",
           "legacySupplier": "Supplier (legacy text)",
           "location": "Storage location",
@@ -3179,6 +3204,7 @@
             "lowStockThreshold": "Low-stock alert threshold",
             "sku": "SKU / Barcode",
             "skuPlaceholder": "SKU or barcode",
+            "skuScanAriaLabel": "Scan barcode",
             "location": "Storage location",
             "locationPlaceholder": "Shelf 3, Display B",
             "tags": "Tags (comma-separated)",

@@ -6,6 +6,9 @@ import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { SupplierPicker } from "../suppliers/SupplierPicker";
 import { SortSelect } from "../ui/FilterSelect";
+import { BarcodeScannerModal } from "../scanner/BarcodeScannerModal";
+import { primeBeep } from "@/lib/scanner/beep";
+import { Barcode } from "@/lib/icons";
 import { updateProduct } from "@/lib/api/products";
 import { useCategories } from "@/hooks/useCategories";
 import type { Product } from "@/lib/types";
@@ -43,6 +46,7 @@ export function EditProductModal({
   // to let the owner re-categorise; the parent passes the current value
   // via `product.category` (the FK).
   const [categoryId, setCategoryId] = useState<string>("");
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   useEffect(() => {
     if (product && isOpen) {
@@ -171,12 +175,26 @@ export function EditProductModal({
           min={1}
         />
 
-        <Input
-          label={t.fields.sku}
-          type="text"
-          value={sku}
-          onChange={(e) => setSku(e.target.value)}
-        />
+        <div className="relative">
+          <Input
+            label={t.fields.sku}
+            type="text"
+            value={sku}
+            onChange={(e) => setSku(e.target.value)}
+            className="pe-12"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              primeBeep();
+              setScannerOpen(true);
+            }}
+            aria-label={t.fields.skuScanAriaLabel}
+            className="absolute end-2 top-[28px] inline-flex items-center justify-center w-9 h-9 rounded-lg text-accent hover:bg-accent-light/60 transition-colors"
+          >
+            <Barcode className="w-5 h-5" />
+          </button>
+        </div>
 
         <SupplierPicker
           value={supplierId}
@@ -216,6 +234,15 @@ export function EditProductModal({
           </Button>
         </div>
       </div>
+
+      <BarcodeScannerModal
+        isOpen={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onDetected={(code) => {
+          setSku(code);
+          setScannerOpen(false);
+        }}
+      />
     </Modal>
   );
 }

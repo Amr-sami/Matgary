@@ -422,12 +422,18 @@
         "title": "تسجيل بيع جديد",
         "itemsInCart": "{n} منتج في الفاتورة",
         "productSearch": {
-          "label": "اختيار المنتج",
-          "placeholder": "ابحث عن منتج…",
+          "label": "ابحث أو امسح المنتج",
+          "placeholder": "الاسم أو SKU أو الباركود…",
           "inStock": "متوفر: {n}",
           "addNew": "+ أضف صنف جديد للمخزن",
           "addNewWithName": "+ أضف \"{name}\" كصنف جديد",
-          "noMatch": "لا يوجد منتج بهذا الاسم — أضفه للمخزن"
+          "noMatch": "لا يوجد منتج بهذا الاسم — أضفه للمخزن",
+          "scanAriaLabel": "مسح الباركود",
+          "scannedNotFound": "الباركود {code} غير موجود",
+          "scannedNotFoundCreate": "أضف منتج بهذا الباركود",
+          "scannedMultiple": "{n} منتجات بنفس الباركود — اختر واحداً",
+          "scannedAdded": "تمت إضافة {name} للسلة",
+          "scannedIncremented": "تم زيادة كمية {name}"
         },
         "quickAddProduct": {
           "title": "إضافة صنف جديد للمخزن",
@@ -793,6 +799,21 @@
       "confirm": {
         "confirm": "تأكيد",
         "cancel": "إلغاء"
+      },
+      "scanner": {
+        "title": "مسح الباركود",
+        "subtitle": "وجّه كاميرا الجهاز نحو الباركود",
+        "scanButton": "مسح",
+        "loading": "جارٍ فتح الكاميرا…",
+        "permissionDenied": "تم رفض إذن الكاميرا. فعّل إذن الكاميرا من إعدادات المتصفح.",
+        "notSupported": "هذا الجهاز لا يدعم مسح الكاميرا. استخدم الإدخال اليدوي بالأسفل.",
+        "httpsRequired": "تشغيل الكاميرا يتطلب اتصالاً آمناً (HTTPS). استخدم الإدخال اليدوي أو افتح الموقع المنشور.",
+        "genericError": "تعذر فتح الكاميرا. جرّب الإدخال اليدوي بالأسفل.",
+        "manualLabel": "أو اكتب الكود يدوياً",
+        "manualPlaceholder": "الباركود / SKU",
+        "manualSubmit": "استخدم هذا الكود",
+        "cancel": "إلغاء",
+        "detected": "تم اكتشاف: {code}"
       }
     },
     "whatsappInbox": {
@@ -2918,7 +2939,8 @@
         "comfortable": "موسّع",
         "import": "استيراد",
         "exportCsv": "تصدير CSV",
-        "addProduct": "إضافة منتج"
+        "addProduct": "إضافة منتج",
+        "scanAriaLabel": "مسح الباركود"
       },
       "count": "{n} منتج في المخزن",
       "table": {
@@ -2958,9 +2980,11 @@
       "empty": {
         "search": "لا توجد نتائج للبحث عن \"{q}\"",
         "filters": "لا توجد نتائج تطابق الفلاتر الحالية",
-        "fresh": "لم تتم إضافة أي أصناف بعد. ابدأ بإضافة صنف جديد."
+        "fresh": "لم تتم إضافة أي أصناف بعد. ابدأ بإضافة صنف جديد.",
+        "createWithCode": "أضف منتج بالكود \"{code}\""
       },
       "toast": {
+        "productAdded": "تمت إضافة المنتج",
         "productDeleted": "تم حذف المنتج بنجاح",
         "deleteFailed": "حدث خطأ",
         "productUpdated": "تم تحديث المنتج بنجاح",
@@ -3019,6 +3043,7 @@
           "costPrice": "سعر الشراء (جنيه)",
           "lowStockThreshold": "حد التنبيه عند انخفاض الكمية",
           "sku": "كود المنتج / الباركود",
+          "skuScanAriaLabel": "مسح الباركود",
           "supplier": "المورد",
           "legacySupplier": "المورد (نص قديم)",
           "location": "مكان التخزين",
@@ -3179,6 +3204,7 @@
             "lowStockThreshold": "حد التنبيه عند انخفاض الكمية",
             "sku": "كود المنتج / باركود",
             "skuPlaceholder": "SKU أو باركود",
+            "skuScanAriaLabel": "مسح الباركود",
             "location": "مكان التخزين",
             "locationPlaceholder": "رف 3، فاترينة B",
             "tags": "تاجات (افصل بفاصلة)",

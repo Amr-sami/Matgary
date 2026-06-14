@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback, Suspense } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Download, LayoutGrid, Plus, Rows3, Upload, Skull } from "@/lib/icons";
+import { Barcode, Download, LayoutGrid, Plus, Rows3, Upload, Skull } from "@/lib/icons";
 import { AppShell } from "@/components/layout/AppShell";
+import { BarcodeScannerModal } from "@/components/scanner/BarcodeScannerModal";
+import { QuickAddProductModal } from "@/components/sales/QuickAddProductModal";
+import { primeBeep } from "@/lib/scanner/beep";
 import { useProducts } from "@/hooks/useProducts";
 import { useSales } from "@/hooks/useSales";
 import { useSearch } from "@/hooks/useSearch";
@@ -105,6 +107,12 @@ function InventoryPageInner() {
   const [deleteProductData, setDeleteProductData] = useState<Product | null>(null);
   const [_sellProduct, setSellProduct] = useState<Product | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  // Quick-add modal — matches the POS UX. Opens from the top "Add product"
+  // button (no SKU pre-fill) or from the empty-state CTA when a search /
+  // scanned barcode found nothing (SKU pre-filled).
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [quickAddInitialSku, setQuickAddInitialSku] = useState("");
   const [bulkConfirm, setBulkConfirm] = useState<null | { count: number }>(null);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -471,20 +479,37 @@ function InventoryPageInner() {
             a SKU from inventory is one tap away — primary entry point
             alongside the sidebar nav. */}
         <div className="flex flex-col sm:flex-row gap-2">
-          <input
-            type="text"
-            placeholder={t.search.placeholder}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="flex-1 px-4 py-3 rounded-xl border border-border bg-white focus:outline-none focus:ring-2 focus:ring-accent"
-          />
-          <Link
-            href="/add-product"
+          <div className="relative flex-1">
+            <input
+              type="text"
+              placeholder={t.search.placeholder}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="w-full pe-14 px-4 py-3 rounded-xl border border-border bg-white focus:outline-none focus:ring-2 focus:ring-accent"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                primeBeep();
+                setScannerOpen(true);
+              }}
+              aria-label={t.tools.scanAriaLabel}
+              className="absolute end-2 top-1/2 -translate-y-1/2 inline-flex items-center justify-center w-10 h-10 rounded-lg text-accent hover:bg-accent-light/60 transition-colors"
+            >
+              <Barcode className="w-5 h-5" />
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setQuickAddInitialSku("");
+              setQuickAddOpen(true);
+            }}
             className="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-accent text-white font-semibold hover:opacity-90 transition-colors"
           >
             <Plus className="w-4 h-4" />
             <span>{t.tools.addProduct}</span>
-          </Link>
+          </button>
         </div>
 
         {/* Filters */}
@@ -584,16 +609,37 @@ function InventoryPageInner() {
 
         {/* Empty State */}
         {filteredProducts.length === 0 && (
-          <EmptyState
-            type="products"
-            message={
-              query
-                ? t.empty.search.replace("{q}", query)
-                : hasAnyFilter
-                  ? t.empty.filters
-                  : t.empty.fresh
-            }
-          />
+          <div className="space-y-3">
+            <EmptyState
+              type="products"
+              message={
+                query
+                  ? t.empty.search.replace("{q}", query)
+                  : hasAnyFilter
+                    ? t.empty.filters
+                    : t.empty.fresh
+              }
+            />
+            {/* When the cashier scans (or types) something that doesn't
+                match any product, one-tap path to create it with the
+                code pre-filled as SKU. Stays in-page via QuickAdd —
+                same UX as the POS scan-not-found flow. */}
+            {query.trim().length > 0 && (
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuickAddInitialSku(query.trim());
+                    setQuickAddOpen(true);
+                  }}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-accent text-white text-sm font-semibold hover:opacity-90 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  {t.empty.createWithCode.replace("{code}", query.trim())}
+                </button>
+              </div>
+            )}
+          </div>
         )}
 
         {/* Desktop Table */}
@@ -700,6 +746,35 @@ function InventoryPageInner() {
         message={t.confirmBulkDelete.message.replace("{n}", String(bulkConfirm?.count || 0))}
         confirmText={t.confirmBulkDelete.confirm}
         variant="danger"
+      />
+
+      {/* Barcode scanner — fills the search box. The existing useSearch
+          hook already matches on `sku`, so a known product surfaces in
+          the list and an unknown one drops into the empty-state CTA. */}
+      <BarcodeScannerModal
+        isOpen={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onDetected={(code) => {
+          setQuery(code);
+          setScannerOpen(false);
+        }}
+      />
+
+      {/* Inline product creation — keeps the user on /inventory instead
+          of bouncing to the full 3-step wizard. Mirrors the POS quick-add
+          behaviour, including SKU pre-fill from a scan-not-found. */}
+      <QuickAddProductModal
+        isOpen={quickAddOpen}
+        onClose={() => {
+          setQuickAddOpen(false);
+          setQuickAddInitialSku("");
+        }}
+        initialSku={quickAddInitialSku}
+        onCreated={async () => {
+          await refreshProducts();
+          setQuery("");
+          setToast({ type: "success", message: t.toast.productAdded });
+        }}
       />
 
       {/* Toast */}
