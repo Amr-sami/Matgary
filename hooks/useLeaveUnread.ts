@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useDeferred } from "./useDeferred";
 
 const POLL_INTERVAL_MS = 60_000;
+const QUERY_KEY = ["leave-unread-summary"] as const;
 
 export interface LeaveUnread {
   /** New leave requests submitted by staff that the manager hasn't seen. */
@@ -14,37 +15,30 @@ export interface LeaveUnread {
 
 const EMPTY: LeaveUnread = { submitted: 0, decided: 0 };
 
+async function fetchLeaveUnread(): Promise<LeaveUnread> {
+  const res = await fetch("/api/leave-requests/unread-summary", { cache: "no-store" });
+  if (!res.ok) return EMPTY;
+  return (await res.json()) as LeaveUnread;
+}
+
 export function useLeaveUnread() {
-  const [counts, setCounts] = useState<LeaveUnread>(EMPTY);
-  // Defer the first poll out of the critical mount window. Three
-  // components consume this hook (Sidebar, /team page, LeaveTab); each
-  // mount otherwise fires the poll inside the same hydration burst.
+  // Deferred for the same reason as useUnreadTaskCount; TanStack Query
+  // then dedupes the poll across all 3 consumers (Sidebar, /team page,
+  // LeaveTab).
   const armed = useDeferred(2000);
 
-  const refresh = useCallback(async () => {
-    try {
-      const res = await fetch("/api/leave-requests/unread-summary", {
-        cache: "no-store",
-      });
-      if (!res.ok) return;
-      const json: LeaveUnread = await res.json();
-      setCounts(json);
-    } catch {
-      // best-effort
-    }
-  }, []);
+  const query = useQuery<LeaveUnread>({
+    queryKey: QUERY_KEY,
+    queryFn: fetchLeaveUnread,
+    enabled: armed,
+    refetchInterval: POLL_INTERVAL_MS,
+    refetchIntervalInBackground: false,
+    // Tab focus refetch is the one extra source of freshness the old
+    // hook had — opt in here (default global is `false`).
+    refetchOnWindowFocus: true,
+    staleTime: POLL_INTERVAL_MS / 2,
+    gcTime: 5 * 60_000,
+  });
 
-  useEffect(() => {
-    if (!armed) return;
-    refresh();
-    const t = setInterval(refresh, POLL_INTERVAL_MS);
-    const onFocus = () => refresh();
-    window.addEventListener("focus", onFocus);
-    return () => {
-      clearInterval(t);
-      window.removeEventListener("focus", onFocus);
-    };
-  }, [armed, refresh]);
-
-  return { counts, refresh };
+  return { counts: query.data ?? EMPTY, refresh: query.refetch };
 }
