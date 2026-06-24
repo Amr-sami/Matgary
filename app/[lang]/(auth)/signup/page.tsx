@@ -59,6 +59,7 @@ export default function SignupPage() {
   const [step, setStep] = useState<1 | 2>(1);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
   const [storeHandle, setStoreHandle] = useState("");
   const [handleEdited, setHandleEdited] = useState(false);
   const [handleStatus, setHandleStatus] = useState<
@@ -87,6 +88,11 @@ export default function SignupPage() {
     if (!password || password.length < 8) {
       setError(t.errors.shortPassword);
       setErrorField("password");
+      return;
+    }
+    if (password !== passwordConfirm) {
+      setError(t.errors.passwordMismatch);
+      setErrorField("passwordConfirm");
       return;
     }
     setStep(2);
@@ -251,6 +257,18 @@ export default function SignupPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             error={errorField === "password" ? error ?? undefined : undefined}
+          />
+          <PasswordInput
+            name="passwordConfirm"
+            label={t.passwordConfirmLabel}
+            placeholder={t.passwordConfirmPlaceholder}
+            required
+            autoComplete="new-password"
+            value={passwordConfirm}
+            onChange={(e) => setPasswordConfirm(e.target.value)}
+            error={
+              errorField === "passwordConfirm" ? error ?? undefined : undefined
+            }
           />
 
           {error && !errorField && (

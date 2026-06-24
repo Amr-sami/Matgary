@@ -5,7 +5,12 @@
 // painted fallback "for free" instead of a blank page.
 
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
+import { SkeletonShell } from "@/components/ui/SkeletonShell";
 
 export default function RootLoading() {
-  return <PageSkeleton cards rows={6} />;
+  return (
+    <SkeletonShell>
+      <PageSkeleton cards rows={6} />
+    </SkeletonShell>
+  );
 }

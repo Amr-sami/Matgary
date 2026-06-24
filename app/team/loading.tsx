@@ -1,5 +1,10 @@
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
+import { SkeletonShell } from "@/components/ui/SkeletonShell";
 
 export default function TeamLoading() {
-  return <PageSkeleton cards rows={8} />;
+  return (
+    <SkeletonShell>
+      <PageSkeleton cards rows={8} />
+    </SkeletonShell>
+  );
 }

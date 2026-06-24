@@ -23,13 +23,16 @@ export function PageSkeleton({
   variant = "list",
 }: PageSkeletonProps) {
   return (
-    <div className="space-y-6 p-4 md:p-6">
-      <div className="flex items-center justify-between gap-4">
-        <div className="space-y-2 flex-1">
-          <Skeleton className="h-7 w-40" />
+    // Outer padding intentionally omitted: callers wrap us in either
+    // `AppShell` (in-page Suspense fallbacks) or `SkeletonShell` (route
+    // loading.tsx), both of which provide `p-4 md:p-6` themselves.
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-3 sm:gap-4">
+        <div className="space-y-2 flex-1 min-w-0">
+          <Skeleton className="h-7 w-32 sm:w-40 max-w-full" />
           <Skeleton className="h-4 w-64 max-w-full" />
         </div>
-        <Skeleton className="h-10 w-28 rounded-lg shrink-0" />
+        <Skeleton className="h-10 w-20 sm:w-28 rounded-lg shrink-0" />
       </div>
 
       {cards && (

@@ -1,5 +1,10 @@
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
+import { SkeletonShell } from "@/components/ui/SkeletonShell";
 
 export default function SalesLoading() {
-  return <PageSkeleton cards chart rows={10} />;
+  return (
+    <SkeletonShell>
+      <PageSkeleton cards chart rows={10} />
+    </SkeletonShell>
+  );
 }

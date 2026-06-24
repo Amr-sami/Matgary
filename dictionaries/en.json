@@ -3624,10 +3624,12 @@
       "emailPlaceholder": "you@example.com",
       "passwordLabel": "Password",
       "passwordPlaceholder": "At least 8 characters",
+      "passwordConfirmLabel": "Confirm password",
+      "passwordConfirmPlaceholder": "Re-enter your password to confirm",
       "next": "Next",
       "previous": "Previous",
       "submit": "Create account",
-      "storeNameLabel": "Store name (shown to customers)",
+      "storeNameLabel": "Store name",
       "storeNamePlaceholder": "Happy Store",
       "handleLabel": "Store sign-in handle",
       "handlePlaceholder": "elhenawystore",
@@ -3645,6 +3647,7 @@
       "errors": {
         "badEmail": "Enter a valid email address",
         "shortPassword": "Password must be at least 8 characters",
+        "passwordMismatch": "Passwords don't match",
         "storeNameRequired": "Store name is required",
         "handleInvalid": "Lowercase letters, digits, and hyphens only; must start and end with a letter or digit",
         "rateLimited": "Too many attempts. Please try again in a bit.",
@@ -3707,31 +3710,20 @@
         "internal": "Couldn't finish setup. Please try again."
       },
       "stepLabels": [
-        "Shop info",
         "Pick a start",
         "Review"
       ],
       "stepCounter": "Step {n} of {total}",
       "step1": {
-        "title": "Tell us about your store",
-        "subhead": "A few quick details to get started",
-        "shopNameLabel": "Store name",
-        "shopNamePlaceholder": "Happy Store",
-        "shopPhoneLabel": "Phone (optional)",
-        "shopPhonePlaceholder": "01xxxxxxxxx",
-        "next": "Next"
-      },
-      "step2": {
         "title": "Pick a starting point",
         "subhead": "You can change everything later from settings",
         "cornerstoreTitle": "Full Corner Store experience",
         "cornerstoreBody": "Start with ready-made categories: watches, perfumes, eyewear — with types and brands.",
         "blankTitle": "Start from scratch",
         "blankBody": "Define your categories and attributes yourself from settings.",
-        "back": "Back",
         "next": "Next"
       },
-      "step3": {
+      "step2": {
         "title": "Ready to launch",
         "subheadCornerstore": "You'll find the categories ready in your dashboard.",
         "subheadBlank": "Start by adding your first category from settings.",
@@ -3772,7 +3764,83 @@
           ]
         },
         "back": "Back",
-        "start": "Start"
+        "next": "Take a tour"
+      },
+      "tour": {
+        "title": "A quick tour of Matgary",
+        "subhead": "Every corner of the app in 13 screens — skip anytime",
+        "slides": [
+          {
+            "tag": "Dashboard",
+            "title": "Your whole shop on one page",
+            "body": "Today's and the month's sales, item count, low-stock alerts, and recent activity — a quick board that sums up your shop the moment you open it."
+          },
+          {
+            "tag": "Inventory",
+            "title": "Add products in seconds",
+            "body": "Every product carries price, cost, quantity, margin, and a low-stock alert. CSV import / export, and built-in camera barcode scanning."
+          },
+          {
+            "tag": "Add product",
+            "title": "A complete new-product form",
+            "body": "Name, category, brand, sale price + cost, quantity, reorder level, description and attachments — all in one clean form, with barcode scan support."
+          },
+          {
+            "tag": "Sales",
+            "title": "Sell and send the receipt on WhatsApp",
+            "body": "Add to cart by name, SKU or barcode, apply a discount, take cash / InstaPay / card / deferred — the receipt reaches the customer in one tap, even offline."
+          },
+          {
+            "tag": "Customers",
+            "title": "Get to know your customers",
+            "body": "Capture name and phone, see your top spenders and who owes you on credit — every contact is one tap away from a WhatsApp message."
+          },
+          {
+            "tag": "Reports",
+            "title": "See your shop's pulse daily",
+            "body": "Top-selling products, net profit, peak hours, per-sale details with discount and customer. Flexible date filter from today back to months."
+          },
+          {
+            "tag": "Purchases",
+            "title": "Organized purchase orders",
+            "body": "Create a PO, add lines with costs, track its status from draft to received. Everything auto-links to supplier balance and your inventory."
+          },
+          {
+            "tag": "Suppliers",
+            "title": "A complete supplier ledger",
+            "body": "Name, phone, address, outstanding balance, and every PO tied to each supplier. Every transaction with them is logged and auditable."
+          },
+          {
+            "tag": "Tasks",
+            "title": "Organize your team's work",
+            "body": "Create a task, set priority and due date, assign to a staff member, and track from open → in-progress → done. With a Kanban board view."
+          },
+          {
+            "tag": "Expenses",
+            "title": "Track every expense",
+            "body": "Rent, electricity, internet, salaries, transport — log every expense by category. Recurring expenses auto-generate every month."
+          },
+          {
+            "tag": "Team",
+            "title": "Add staff and set their permissions",
+            "body": "Issue accounts for cashiers, managers, stockroom staff — each with the exact permissions they need (sell only, manage inventory, see reports…). Each staffer is locked to one branch."
+          },
+          {
+            "tag": "Activity log",
+            "title": "Know who did what and when",
+            "body": "Every system action — adding a product, ringing a sale, editing a price, receiving a PO, signing in — is captured with the actor and timestamp. Filter by category, user, and date."
+          },
+          {
+            "tag": "Settings",
+            "title": "Customize everything",
+            "body": "Multi-branch, WhatsApp message templates, taxes and currencies, daily summary, attendance settings, payroll — every dial under your control."
+          }
+        ],
+        "back": "Back",
+        "prev": "Previous",
+        "next": "Next",
+        "skip": "Skip",
+        "finish": "Get started"
       }
     }
   },

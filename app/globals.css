@@ -642,3 +642,68 @@ textarea {
   letter-spacing: 2px;
   margin-top: 2px;
 }
+
+/* ─── Onboarding tour (step 4) ─── */
+@keyframes tour-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Parallax depth: image moves a longer distance (28px) over a longer
+ * duration (720ms) than the title/body (14px / 480ms). The bigger delta
+ * is what sells the depth illusion — like the image is "behind" the
+ * text plane. Subtle scale + blur on enter give it the in-focus feel. */
+@keyframes tour-parallax-in {
+  from {
+    opacity: 0;
+    transform: translateY(28px) scale(1.03);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes tour-float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.tour-slide__visual {
+  animation: tour-parallax-in 720ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.tour-slide__visual-inner {
+  animation: tour-float 3.4s ease-in-out infinite;
+}
+
+/* Text enters faster + a shorter distance so it appears to sit "in front"
+ * of the image. Slight stagger between title and body for rhythm. */
+.tour-slide__title {
+  animation: tour-fade-up 480ms cubic-bezier(0.22, 1, 0.36, 1) 160ms both;
+}
+
+.tour-slide__body {
+  animation: tour-fade-up 480ms cubic-bezier(0.22, 1, 0.36, 1) 260ms both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tour-slide__visual,
+  .tour-slide__visual-inner,
+  .tour-slide__title,
+  .tour-slide__body {
+    animation: none;
+  }
+}
