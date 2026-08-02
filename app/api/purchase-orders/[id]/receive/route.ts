@@ -25,6 +25,7 @@ export async function POST(
   try {
     await receivePurchaseOrder(r.ctx.tenantId, id, {
       updateCost: parsed.data.updateCost ?? false,
+      actorUserId: r.ctx.userId,
     });
   } catch (err) {
     if (err instanceof PurchaseOrderConflictError) {

@@ -1,13 +1,13 @@
 // Notification dispatcher. Domain code calls `fanoutEvent` right after a
 // business event commits (a sale, a purchase received, etc.). This module
 // figures out who should hear about it (role filter → preferences),
-// writes in-app rows, sends instant emails, and buffers digestable events
-// for the daily cron.
+// renders localized in-app + email copy per recipient, writes in-app rows,
+// sends instant emails, and buffers digestable events for the daily cron.
 //
 // Dispatch is fire-and-forget from the caller's point of view: we catch and
 // log our own errors so a failed email never rolls back a sale. Domain
-// authors just pass a payload; the mapping to titles, bodies, and email
-// subjects lives entirely in this file.
+// authors just pass structured payload fields; localisation lives here so
+// every recipient sees copy in their own preferred locale.
 
 import { and, eq, inArray } from "drizzle-orm";
 import { withTenant } from "@/lib/db";
@@ -20,7 +20,7 @@ import {
 } from "@/lib/db/schema";
 import { logger } from "@/lib/logger";
 import { sendMail } from "@/lib/mailer";
-import { createNotification } from "@/lib/repo/notifications";
+import { createNotification, type NotificationKind } from "@/lib/repo/notifications";
 import {
   DEFAULT_EVENT_PREFERENCE,
   EVENT_RECIPIENT_ROLES,
@@ -30,13 +30,10 @@ import {
 } from "./event-types";
 
 // ─── Payload shapes ──────────────────────────────────────────────────────────
-// One shape per event type. `title` / `body` are the strings the recipient
-// sees; the caller renders them because it has the domain context (customer
-// name, product name, etc.) that this module doesn't know about.
+// Callers pass only structured facts; copy (title/body/subject) is rendered
+// per-recipient from these fields, in the recipient's locale.
 
 interface BaseEventPayload {
-  title: string;
-  body?: string | null;
   /** In-app deep link (e.g. `/sales`, `/purchases/abc`). */
   link?: string | null;
   /** Optional actor to exclude from fanout — e.g. the user who submitted a
@@ -45,15 +42,17 @@ interface BaseEventPayload {
 }
 
 interface SaleCreatedPayload extends BaseEventPayload {
-  saleNumber: number | string;
-  totalEgp: string | number;
+  invoiceId: string;
+  totalEgp: number;
+  lineCount: number;
   branchName?: string | null;
 }
 
 interface PurchaseReceivedPayload extends BaseEventPayload {
-  poNumber?: string | null;
+  poShortId: string;
   supplierName?: string | null;
-  totalEgp?: string | number | null;
+  totalEgp: number;
+  itemCount: number;
   branchName?: string | null;
 }
 
@@ -66,8 +65,9 @@ interface LowStockPayload extends BaseEventPayload {
 
 interface DeferredSettledPayload extends BaseEventPayload {
   customerName: string;
-  amountEgp: string | number;
-  saleNumber: number | string;
+  amountEgp: number;
+  invoicesSettled: number;
+  newBalanceEgp: number;
 }
 
 interface LeaveRequestedPayload extends BaseEventPayload {
@@ -81,6 +81,17 @@ export type EventPayloadMap = {
   "inventory.low_stock": LowStockPayload;
   "payment.deferred_settled": DeferredSettledPayload;
   "leave.requested": LeaveRequestedPayload;
+};
+
+// Notification `kind` column values. We reuse the existing loose enum
+// rather than adding a column per event type — the `kind` is what the
+// notification bell UI groups on today.
+const EVENT_TO_KIND: Record<NotificationEventType, NotificationKind> = {
+  "sale.created": "info",
+  "purchase.received": "info",
+  "inventory.low_stock": "low_stock",
+  "payment.deferred_settled": "info",
+  "leave.requested": "leave_submitted",
 };
 
 // ─── Public API ──────────────────────────────────────────────────────────────
@@ -178,6 +189,7 @@ async function doFanout<E extends NotificationEventType>(
     text: string;
   }
   const emailJobs: EmailJob[] = [];
+  const kind = EVENT_TO_KIND[eventType];
 
   await withTenant(tenantId, async (tx) => {
     for (const r of eligible) {
@@ -186,13 +198,15 @@ async function doFanout<E extends NotificationEventType>(
         eventType,
         storedByUser.get(r.userId) ?? null,
       );
+      const locale = (r.locale === "en" ? "en" : "ar") as "ar" | "en";
 
       if (pref.inApp) {
+        const { title, body } = renderInApp(eventType, payload, locale);
         await createNotification(tx, tenantId, branchId, {
           userId: r.userId,
-          kind: eventType,
-          title: payload.title,
-          body: payload.body ?? null,
+          kind,
+          title,
+          body,
           link: payload.link ?? null,
         });
       }
@@ -210,7 +224,7 @@ async function doFanout<E extends NotificationEventType>(
             eventType,
             payload,
             tenantName,
-            r.locale as "ar" | "en",
+            locale,
           );
           emailJobs.push({ to: r.email, subject, text });
         }
@@ -252,12 +266,98 @@ function resolveMemberPref(
   };
 }
 
-// ─── Email rendering ─────────────────────────────────────────────────────────
-// The in-app title/body come from the caller (localized in the domain layer).
-// For email we don't have the caller's dictionary handy, so we render a very
-// short plaintext template here in the recipient's locale. Consciously terse
-// — the goal is "you got a ping, click the app for details," not a full
-// message.
+// ─── Copy rendering ──────────────────────────────────────────────────────────
+// One switch each for in-app and email. In-app strings are tight — they
+// render inside the notification bell dropdown; email is only slightly more
+// verbose. Both are per-recipient by locale so a mixed ar/en team sees
+// their own language.
+
+function fmtEgp(n: number): string {
+  const rounded = Math.round(n);
+  return rounded.toLocaleString("en-US");
+}
+
+interface RenderedInApp {
+  title: string;
+  body: string | null;
+}
+
+/** Render the notification bell copy for a single recipient. */
+export function renderInApp<E extends NotificationEventType>(
+  eventType: E,
+  payload: EventPayloadMap[E],
+  locale: "ar" | "en",
+): RenderedInApp {
+  const ar = locale === "ar";
+  switch (eventType) {
+    case "sale.created": {
+      const p = payload as SaleCreatedPayload;
+      return ar
+        ? {
+            title: `بيع جديد — ${fmtEgp(p.totalEgp)} ج.م`,
+            body: p.branchName
+              ? `${p.branchName} · فاتورة ${p.invoiceId}`
+              : `فاتورة ${p.invoiceId}`,
+          }
+        : {
+            title: `New sale — EGP ${fmtEgp(p.totalEgp)}`,
+            body: p.branchName
+              ? `${p.branchName} · Invoice ${p.invoiceId}`
+              : `Invoice ${p.invoiceId}`,
+          };
+    }
+    case "purchase.received": {
+      const p = payload as PurchaseReceivedPayload;
+      return ar
+        ? {
+            title: `استلام شحنة — ${fmtEgp(p.totalEgp)} ج.م`,
+            body: `${p.supplierName ?? "مورد"} · ${p.itemCount} صنف`,
+          }
+        : {
+            title: `Purchase received — EGP ${fmtEgp(p.totalEgp)}`,
+            body: `${p.supplierName ?? "Supplier"} · ${p.itemCount} items`,
+          };
+    }
+    case "inventory.low_stock": {
+      const p = payload as LowStockPayload;
+      return ar
+        ? {
+            title: `مخزون منخفض — ${p.productName}`,
+            body: `${p.remainingQty} متبقّي (الحد ${p.threshold})`,
+          }
+        : {
+            title: `Low stock — ${p.productName}`,
+            body: `${p.remainingQty} left (threshold ${p.threshold})`,
+          };
+    }
+    case "payment.deferred_settled": {
+      const p = payload as DeferredSettledPayload;
+      return ar
+        ? {
+            title: `سداد آجل — ${p.customerName}`,
+            body: `دفع ${fmtEgp(p.amountEgp)} ج.م · متبقّي ${fmtEgp(p.newBalanceEgp)} ج.م`,
+          }
+        : {
+            title: `Deferred payment — ${p.customerName}`,
+            body: `Paid EGP ${fmtEgp(p.amountEgp)} · balance EGP ${fmtEgp(p.newBalanceEgp)}`,
+          };
+    }
+    case "leave.requested": {
+      const p = payload as LeaveRequestedPayload;
+      return ar
+        ? {
+            title: `طلب إجازة — ${p.requesterName}`,
+            body: `بانتظار الموافقة · ${p.dayCount} يوم`,
+          }
+        : {
+            title: `Leave request — ${p.requesterName}`,
+            body: `Awaiting approval · ${p.dayCount} day${p.dayCount === 1 ? "" : "s"}`,
+          };
+    }
+    default:
+      return { title: eventType, body: null };
+  }
+}
 
 function renderEmail<E extends NotificationEventType>(
   eventType: E,
@@ -265,60 +365,61 @@ function renderEmail<E extends NotificationEventType>(
   tenantName: string,
   locale: "ar" | "en",
 ): { subject: string; text: string } {
-  const isAr = locale === "ar";
+  const ar = locale === "ar";
   const store = tenantName ? ` — ${tenantName}` : "";
+  const footer = ar
+    ? `\n\nستورو${tenantName ? ` — ${tenantName}` : ""}`
+    : `\n\nTheStoro${tenantName ? ` — ${tenantName}` : ""}`;
+  const inApp = renderInApp(eventType, payload, locale);
+  const body = `${inApp.title}${inApp.body ? `\n${inApp.body}` : ""}${footer}`;
 
   switch (eventType) {
     case "sale.created": {
       const p = payload as SaleCreatedPayload;
       return {
-        subject: isAr
-          ? `بيع جديد #${p.saleNumber}${store}`
-          : `New sale #${p.saleNumber}${store}`,
-        text: isAr
-          ? `${p.title}\n\n${p.body ?? ""}\n\nستورو — ${tenantName}`
-          : `${p.title}\n\n${p.body ?? ""}\n\nTheStoro — ${tenantName}`,
+        subject: ar
+          ? `بيع جديد — ${fmtEgp(p.totalEgp)} ج.م${store}`
+          : `New sale — EGP ${fmtEgp(p.totalEgp)}${store}`,
+        text: body,
       };
     }
     case "purchase.received": {
       const p = payload as PurchaseReceivedPayload;
       return {
-        subject: isAr
-          ? `توريد جديد${p.poNumber ? ` #${p.poNumber}` : ""}${store}`
-          : `Purchase received${p.poNumber ? ` #${p.poNumber}` : ""}${store}`,
-        text: `${p.title}\n\n${p.body ?? ""}`,
+        subject: ar
+          ? `استلام شحنة #${p.poShortId}${store}`
+          : `Purchase received #${p.poShortId}${store}`,
+        text: body,
       };
     }
     case "inventory.low_stock": {
       const p = payload as LowStockPayload;
       return {
-        subject: isAr
+        subject: ar
           ? `تنبيه مخزون منخفض — ${p.productName}${store}`
           : `Low stock — ${p.productName}${store}`,
-        text: `${p.title}\n\n${p.body ?? ""}`,
+        text: body,
       };
     }
     case "payment.deferred_settled": {
       const p = payload as DeferredSettledPayload;
       return {
-        subject: isAr
-          ? `تم سداد آجل — ${p.customerName}${store}`
+        subject: ar
+          ? `سداد آجل — ${p.customerName}${store}`
           : `Deferred payment settled — ${p.customerName}${store}`,
-        text: `${p.title}\n\n${p.body ?? ""}`,
+        text: body,
       };
     }
     case "leave.requested": {
       const p = payload as LeaveRequestedPayload;
       return {
-        subject: isAr
-          ? `طلب إجازة جديد — ${p.requesterName}${store}`
+        subject: ar
+          ? `طلب إجازة — ${p.requesterName}${store}`
           : `Leave request — ${p.requesterName}${store}`,
-        text: `${p.title}\n\n${p.body ?? ""}`,
+        text: body,
       };
     }
-    default: {
-      const p = payload as BaseEventPayload;
-      return { subject: p.title, text: `${p.title}\n\n${p.body ?? ""}` };
-    }
+    default:
+      return { subject: inApp.title, text: body };
   }
 }

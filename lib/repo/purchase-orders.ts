@@ -10,6 +10,7 @@ import {
   categories,
 } from "@/lib/db/schema";
 import { adjustSupplierBalance } from "./suppliers";
+import { fanoutEvent } from "@/lib/notifications/dispatch";
 
 export type PurchaseOrderStatus = "draft" | "received" | "cancelled";
 
@@ -271,9 +272,9 @@ export async function deletePurchaseOrder(
 export async function receivePurchaseOrder(
   tenantId: string,
   id: string,
-  options: { updateCost?: boolean } = {},
+  options: { updateCost?: boolean; actorUserId?: string | null } = {},
 ): Promise<void> {
-  await withTenant(tenantId, async (tx) => {
+  const summary = await withTenant(tenantId, async (tx) => {
     const [po] = await tx
       .select()
       .from(purchaseOrders)
@@ -530,5 +531,41 @@ export async function receivePurchaseOrder(
 
     // Debit supplier balance (we now owe them the PO total).
     await adjustSupplierBalance(tx, tenantId, po.supplierId, Number(po.total));
+
+    // Resolve supplier + branch names for the post-commit fanout so we
+    // avoid a second round-trip after the tx closes.
+    const [supplier] = await tx
+      .select({ name: suppliers.name })
+      .from(suppliers)
+      .where(and(eq(suppliers.tenantId, tenantId), eq(suppliers.id, po.supplierId)))
+      .limit(1);
+    let branchName: string | null = null;
+    if (po.branchId) {
+      const [b] = await tx
+        .select({ name: branches.name })
+        .from(branches)
+        .where(and(eq(branches.tenantId, tenantId), eq(branches.id, po.branchId)))
+        .limit(1);
+      branchName = b?.name ?? null;
+    }
+
+    return {
+      branchId: po.branchId ?? null,
+      shortId: id.slice(0, 8),
+      totalEgp: Number(po.total),
+      itemCount: items.length,
+      supplierName: supplier?.name ?? null,
+      branchName,
+    };
+  });
+
+  void fanoutEvent(tenantId, summary.branchId, "purchase.received", {
+    poShortId: summary.shortId,
+    supplierName: summary.supplierName,
+    totalEgp: summary.totalEgp,
+    itemCount: summary.itemCount,
+    branchName: summary.branchName,
+    link: `/purchases/${id}`,
+    actorUserId: options.actorUserId ?? null,
   });
 }

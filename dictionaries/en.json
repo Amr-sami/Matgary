@@ -2163,6 +2163,10 @@
         "title": "Daily WhatsApp digest",
         "subtitle": "Receive a daily message with the day's highlights per branch."
       },
+      "notificationsTile": {
+        "title": "Notifications",
+        "subtitle": "Pick which events ping you in-app or by email."
+      },
       "activityTile": {
         "title": "Activity log",
         "subtitle": "Who did what — every edit, sale, return, and staff action."
@@ -2978,6 +2982,49 @@
           ]
         }
       }
+    },
+    "notificationSettings": {
+      "title": "Notifications",
+      "intro": "Choose how you want to be notified for each event. In-app pings show in the notification bell; email is sent to your account address.",
+      "role": {
+        "owner": "Store owner",
+        "staff": "Staff"
+      },
+      "headers": {
+        "event": "Event",
+        "inApp": "In-app",
+        "email": "Email",
+        "delivery": "Delivery"
+      },
+      "events": {
+        "sale.created": {
+          "title": "New sale",
+          "hint": "Fires each time a sale is rung up."
+        },
+        "purchase.received": {
+          "title": "Purchase received",
+          "hint": "Fires when a purchase order is marked received."
+        },
+        "inventory.low_stock": {
+          "title": "Low stock alert",
+          "hint": "Fires when a product drops to or below its threshold after a sale."
+        },
+        "payment.deferred_settled": {
+          "title": "Deferred payment settled",
+          "hint": "Fires when a customer fully clears an outstanding invoice."
+        },
+        "leave.requested": {
+          "title": "Leave request",
+          "hint": "Fires when a staff member submits a leave request."
+        }
+      },
+      "delivery": {
+        "instant": "Instant",
+        "digest": "Daily digest"
+      },
+      "defaultBadge": "Default",
+      "savedToast": "Saved",
+      "errorToast": "Could not save"
     },
     "digestSettings": {
       "title": "Daily WhatsApp digest",

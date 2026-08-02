@@ -1,6 +1,7 @@
 import { and, eq, desc, gte, sql, inArray } from "drizzle-orm";
 import { withTenant } from "@/lib/db";
 import {
+  branches as branchesTable,
   products,
   productAttributeValues,
   categoryAttributes,
@@ -18,6 +19,7 @@ import type {
 } from "@/lib/types";
 import { calcLineDiscount, calcOrderDiscount } from "@/lib/repo/sale-discounts";
 import { bustInsightsCache } from "@/lib/repo/insights";
+import { fanoutEvent } from "@/lib/notifications/dispatch";
 import { DomainError } from "@/lib/errors";
 import { withSpan } from "@/lib/observability/tracing";
 import {
@@ -421,13 +423,14 @@ export async function recordSale(
 
     const attrs = await loadAttributeSnapshot(tx, tenantId, input.productId);
     const paymentMethod: PaymentMethod = input.paymentMethod || "cash";
+    const invoiceId = input.invoiceId || makeInvoiceId();
 
     const [created] = await tx
       .insert(sales)
       .values({
         tenantId,
         branchId: input.branchId,
-        invoiceId: input.invoiceId || makeInvoiceId(),
+        invoiceId,
         productId: input.productId,
         productName: product.name,
         categoryId: product.categoryId,
@@ -466,10 +469,71 @@ export async function recordSale(
       quantityAfter: nextBranchQty,
     });
 
-    return { saleId: created.id };
+    // Snapshot everything the post-commit fanout needs so we don't hold a
+    // reference to `product` across the tx boundary.
+    return {
+      saleId: created.id,
+      invoiceId,
+      totalPrice,
+      productName: product.name,
+      priorQty: product.quantity,
+      nextBranchQty,
+      lowStockThreshold: product.lowStockThreshold,
+    };
   });
   await bustInsightsCache(tenantId);
-  return result;
+
+  const branchName = await resolveBranchName(tenantId, input.branchId);
+  void fanoutEvent(tenantId, input.branchId, "sale.created", {
+    invoiceId: result.invoiceId || result.saleId.slice(0, 8),
+    totalEgp: result.totalPrice,
+    lineCount: 1,
+    branchName,
+    link: "/sales",
+    actorUserId: input.recordedByUserId ?? null,
+  });
+  if (
+    result.priorQty > result.lowStockThreshold &&
+    result.nextBranchQty <= result.lowStockThreshold
+  ) {
+    void fanoutEvent(tenantId, input.branchId, "inventory.low_stock", {
+      productName: result.productName,
+      remainingQty: result.nextBranchQty,
+      threshold: result.lowStockThreshold,
+      branchName,
+      link: "/inventory",
+      actorUserId: input.recordedByUserId ?? null,
+    });
+  }
+
+  return { saleId: result.saleId };
+}
+
+// Small helper — used by the fanout hooks to enrich payloads with the
+// branch's display name. Returns null when the branch isn't found so
+// callers can gracefully omit the field.
+async function resolveBranchName(
+  tenantId: string,
+  branchId: string | null,
+): Promise<string | null> {
+  if (!branchId) return null;
+  try {
+    const rows = await withTenant(tenantId, async (tx) =>
+      tx
+        .select({ name: branchesTable.name })
+        .from(branchesTable)
+        .where(
+          and(
+            eq(branchesTable.tenantId, tenantId),
+            eq(branchesTable.id, branchId),
+          ),
+        )
+        .limit(1),
+    );
+    return rows[0]?.name ?? null;
+  } catch {
+    return null;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -738,6 +802,14 @@ async function recordCartSaleImpl(
     const lineSummaries: CartSaleLineSummary[] = [];
     let cartTotal = 0;
     let allocated = 0;
+    // Track the LAST post-decrement quantity per product so the post-commit
+    // low-stock fanout can compare against `product.quantity` (pre-cart). A
+    // single cart can have multiple lines for the same SKU — only the final
+    // remaining matters for the threshold check.
+    const finalQtyByProduct = new Map<
+      string,
+      { productName: string; priorQty: number; threshold: number; nextQty: number }
+    >();
 
     // Partial payments: distribute the cashier-entered "amount paid now"
     // proportionally across the lines so per-customer outstanding math is
@@ -848,6 +920,16 @@ async function recordCartSaleImpl(
         delta: -p.line.quantity,
         quantityAfter: nextBranchQty,
       });
+
+      finalQtyByProduct.set(p.line.productId, {
+        productName: p.product.name,
+        // `p.product.quantity` is the pre-cart snapshot (loaded once above,
+        // never mutated in the loop), so it's stable across repeated lines
+        // for the same product.
+        priorQty: p.product.quantity,
+        threshold: p.product.lowStockThreshold,
+        nextQty: nextBranchQty,
+      });
     }
 
     // ── Loyalty post-pass ─────────────────────────────────────────────
@@ -921,10 +1003,43 @@ async function recordCartSaleImpl(
       customerName: options.customerName?.trim() || null,
       customerPhone: options.customerPhone?.trim() || null,
       note: options.note ?? null,
+      lowStockCrossings: Array.from(finalQtyByProduct.values()).filter(
+        (f) => f.priorQty > f.threshold && f.nextQty <= f.threshold,
+      ),
     };
   });
   await bustInsightsCache(tenantId);
-  return result;
+
+  const branchName = await resolveBranchName(tenantId, options.branchId);
+  void fanoutEvent(tenantId, options.branchId, "sale.created", {
+    invoiceId: result.invoiceId,
+    totalEgp: result.total,
+    lineCount: result.lines.length,
+    branchName,
+    link: "/sales",
+    actorUserId: options.recordedByUserId ?? null,
+  });
+  for (const cross of result.lowStockCrossings) {
+    void fanoutEvent(tenantId, options.branchId, "inventory.low_stock", {
+      productName: cross.productName,
+      remainingQty: cross.nextQty,
+      threshold: cross.threshold,
+      branchName,
+      link: "/inventory",
+      actorUserId: options.recordedByUserId ?? null,
+    });
+  }
+
+  return {
+    invoiceId: result.invoiceId,
+    saleIds: result.saleIds,
+    lines: result.lines,
+    total: result.total,
+    paymentMethod: result.paymentMethod,
+    customerName: result.customerName,
+    customerPhone: result.customerPhone,
+    note: result.note,
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1293,16 +1408,48 @@ export async function settleCustomerPayment(
          AND is_paid        = false
     `)) as unknown as Array<{ owed: string }>;
 
+    // Grab a customer name for the fanout payload. The sales table stores
+    // it per-row so we just take the newest non-null one.
+    const nameRows = (await tx.execute(sql`
+      SELECT customer_name
+        FROM sales
+       WHERE tenant_id      = ${tenantId}
+         AND customer_phone = ${input.customerPhone}
+         AND customer_name IS NOT NULL
+       ORDER BY sale_date DESC
+       LIMIT 1
+    `)) as unknown as Array<{ customer_name: string | null }>;
+
     return {
       appliedAmount: applied,
       overpay,
       fullySettledInvoices: fullySettledInvoices.size,
       newBalance: Number(owed),
+      customerName: nameRows[0]?.customer_name ?? null,
     };
   });
 
   await bustInsightsCache(tenantId);
-  return result;
+
+  // Only fanout when at least one invoice went from partially- to fully-paid
+  // — this is the moment the owner cares about ("customer cleared their tab").
+  if (result.fullySettledInvoices > 0) {
+    void fanoutEvent(tenantId, input.branchId, "payment.deferred_settled", {
+      customerName: result.customerName ?? input.customerPhone,
+      amountEgp: result.appliedAmount,
+      invoicesSettled: result.fullySettledInvoices,
+      newBalanceEgp: result.newBalance,
+      link: "/customers",
+      actorUserId: input.recordedByUserId,
+    });
+  }
+
+  return {
+    appliedAmount: result.appliedAmount,
+    overpay: result.overpay,
+    fullySettledInvoices: result.fullySettledInvoices,
+    newBalance: result.newBalance,
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

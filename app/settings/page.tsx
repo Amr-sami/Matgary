@@ -505,6 +505,26 @@ function SettingsPageInner() {
           </Link>
         )}
 
+        {/* Notifications preferences — available to every member (each user
+            manages their own row). */}
+        <Link
+          href="/settings/notifications"
+          className="group block bg-white rounded-xl border border-border p-5 hover:border-accent transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <MessageCircle className="w-5 h-5 text-text-secondary shrink-0 group-hover:text-accent transition-colors" />
+            <div className="flex-1 min-w-0">
+              <h3 className="font-bold text-text-primary">
+                {t.notificationsTile.title}
+              </h3>
+              <p className="text-xs text-text-secondary mt-0.5">
+                {t.notificationsTile.subtitle}
+              </p>
+            </div>
+            <ChevronLeft className="w-5 h-5 text-text-secondary shrink-0 group-hover:text-accent transition-colors" />
+          </div>
+        </Link>
+
         {/* Activity log — moved here from the sidebar. Owner-only by default
             (matches the `view_activity_log` permission catalog default). */}
         {isOwner && (

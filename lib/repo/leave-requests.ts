@@ -2,6 +2,7 @@ import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { withTenant } from "@/lib/db";
 import { leaveRequests, users, tenantMembers } from "@/lib/db/schema";
 import { createNotification } from "./notifications";
+import { fanoutEvent } from "@/lib/notifications/dispatch";
 
 export type LeaveStatus = "pending" | "approved" | "rejected";
 
@@ -111,7 +112,7 @@ export async function submitLeaveRequest(
   if (input.startDate > input.endDate) {
     throw new LeaveConflictError("تاريخ الانتهاء قبل تاريخ البداية");
   }
-  return withTenant(tenantId, async (tx) => {
+  const result = await withTenant(tenantId, async (tx) => {
     const [created] = await tx
       .insert(leaveRequests)
       .values({
@@ -125,18 +126,6 @@ export async function submitLeaveRequest(
       })
       .returning({ id: leaveRequests.id });
 
-    // Notify the tenant owner(s) so they can approve. Notification carries
-    // the branch context so multi-store owners viewing one branch don't get
-    // approval pings about the other.
-    const owners = await tx
-      .select({ userId: tenantMembers.userId })
-      .from(tenantMembers)
-      .where(
-        and(
-          eq(tenantMembers.tenantId, tenantId),
-          eq(tenantMembers.role, "owner"),
-        ),
-      );
     const [reqUser] = await tx
       .select({ name: NAME_EXPR })
       .from(users)
@@ -149,19 +138,28 @@ export async function submitLeaveRequest(
       )
       .where(eq(users.id, userId))
       .limit(1);
-    for (const o of owners) {
-      if (o.userId === userId) continue;
-      await createNotification(tx, tenantId, branchId, {
-        userId: o.userId,
-        kind: "leave_submitted",
-        title: "طلب إجازة جديد",
-        body: `${reqUser?.name ?? "موظف"} قدّم طلب إجازة بانتظار الموافقة.`,
-        link: "/leave",
-      });
-    }
 
-    return { id: created.id };
+    return { id: created.id, requesterName: reqUser?.name ?? null };
   });
+
+  // Fanout after commit — dispatcher handles owner-role filtering, per-user
+  // preferences (in-app vs email vs digest), and locale-specific copy. The
+  // requester is excluded via `actorUserId`.
+  const dayCount = Math.max(
+    1,
+    Math.ceil(
+      (input.endDate.getTime() - input.startDate.getTime()) /
+        (24 * 60 * 60 * 1000),
+    ) + 1,
+  );
+  void fanoutEvent(tenantId, branchId, "leave.requested", {
+    requesterName: result.requesterName ?? "—",
+    dayCount,
+    link: "/leave",
+    actorUserId: userId,
+  });
+
+  return { id: result.id };
 }
 
 export async function decideLeaveRequest(
