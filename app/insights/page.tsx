@@ -9,6 +9,7 @@ import { TrendChart } from "@/components/insights/TrendChart";
 import { CategoryPieChart } from "@/components/insights/CategoryPieChart";
 import { TopProducts } from "@/components/insights/TopProducts";
 import { StaffPerformance } from "@/components/insights/StaffPerformance";
+import { DeepDive } from "@/components/insights/deep/DeepDive";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { Tabs } from "@/components/ui/Tabs";
@@ -26,7 +27,7 @@ import {
 } from "@/lib/icons";
 import { type DateRangeKey } from "@/components/sales/SalesFilters";
 
-type TabKey = "overview" | "staff";
+type TabKey = "overview" | "deep" | "staff";
 
 const DATE_FILTER_ORDER: DateRangeKey[] = [
   "all",
@@ -101,6 +102,7 @@ export default function InsightsPage() {
   const comparison = t.comparison as Record<DateRangeKey, string>;
   const INSIGHTS_TABS = [
     { key: "overview" as const, label: t.tabs.overview },
+    { key: "deep" as const, label: t.tabs.deep },
     { key: "staff" as const, label: t.tabs.staff },
   ];
 
@@ -245,6 +247,13 @@ export default function InsightsPage() {
             rangeLabel={
               dateRange === "all" ? t.staff.rangeFallback : dateLabels[dateRange]
             }
+          />
+        ) : tab === "deep" ? (
+          <DeepDive
+            window={insightsWindow}
+            branchScope={branchScopeParam}
+            isOwner={isOwner}
+            locale={locale}
           />
         ) : (
           <>

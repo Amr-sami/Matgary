@@ -4,6 +4,8 @@ import { ReactNode, useEffect, useState } from "react";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { MobileBottomNav } from "./MobileBottomNav";
+import { OnboardingReminder } from "./OnboardingReminder";
+import { DemoBanner } from "./DemoBanner";
 import { CatalogProvider } from "@/components/catalog-context";
 import { SettingsProvider } from "@/components/settings-context";
 import { ImpersonationBanner } from "@/components/broadcasts/ImpersonationBanner";
@@ -46,6 +48,8 @@ export function AppShell({ children, title }: AppShellProps) {
           including the sidebar, so an admin acting as the owner sees the
           red strip persistently on every screen. */}
       <ImpersonationBanner />
+      <DemoBanner />
+      <OnboardingReminder />
       {/* Desktop Sidebar */}
       <div
         suppressHydrationWarning

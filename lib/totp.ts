@@ -8,7 +8,7 @@ import bcrypt from "bcryptjs";
 //
 // authorize / account-security routes import these; tests cover them.
 
-const SERVICE = "Matgary";
+const SERVICE = "TheStoro";
 const PERIOD_SECONDS = 30;
 const WINDOW_TOLERANCE = 1; // accept previous + current + next step
 const DIGITS = 6;

@@ -158,6 +158,13 @@ textarea {
   opacity: 0.85;
 }
 
+#app-splash .app-splash__png {
+  width: 320px;
+  height: 80px;
+  object-fit: cover;
+  display: block;
+}
+
 #app-splash.app-splash--hidden {
   opacity: 0;
   visibility: hidden;

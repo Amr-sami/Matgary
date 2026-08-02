@@ -104,6 +104,13 @@ export const tenants = pgTable(
      *  requests get bounced to /service-paused. */
     suspendedAt: timestamp("suspended_at", { withTimezone: true }),
     suspendedReason: text("suspended_reason"),
+    /** Demo store — true on the seeded template AND on every visitor's clone. */
+    isDemo: boolean("is_demo").notNull().default(false),
+    /** Demo store — NULL on the template; set to the template's id on clones.
+     *  Cleanup cron deletes clones (not the template) older than the idle TTL. */
+    demoTemplateId: uuid("demo_template_id"),
+    /** Demo store — bumped on each demo request; cleanup uses it as idle clock. */
+    demoLastActiveAt: timestamp("demo_last_active_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .default(sql`now()`),
@@ -1324,6 +1331,71 @@ export const notifications = pgTable(
   (t) => [
     index("notifications_tenant_user_idx").on(t.tenantId, t.userId, t.createdAt),
     index("notifications_tenant_user_unread_idx").on(t.tenantId, t.userId, t.isRead),
+  ],
+);
+
+// Per-user notification preferences (migration 0044). A row exists only when
+// the user has flipped a channel away from the code default; the dispatcher
+// treats a missing row as "use lib/notifications/event-types.ts default".
+export const notificationPreferences = pgTable(
+  "notification_preferences",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** Matches NotificationEventType in lib/notifications/event-types.ts. */
+    eventType: text("event_type").notNull(),
+    inApp: boolean("in_app").notNull().default(true),
+    email: boolean("email").notNull().default(false),
+    /** 'instant' | 'digest' — digest buffers to notification_digest_queue. */
+    digestMode: text("digest_mode").notNull().default("instant"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [
+    uniqueIndex("notification_preferences_uniq").on(
+      t.tenantId,
+      t.userId,
+      t.eventType,
+    ),
+    index("notification_preferences_tenant_event_idx").on(t.tenantId, t.eventType),
+  ],
+);
+
+// Digest queue (migration 0045). Populated when a user's preference for a
+// high-volume event is `email + digest`. The daily cron drains it.
+export const notificationDigestQueue = pgTable(
+  "notification_digest_queue",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    eventType: text("event_type").notNull(),
+    payload: jsonb("payload").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+  },
+  (t) => [
+    // Partial index (WHERE sent_at IS NULL) — defined in migration.
+    index("notification_digest_queue_tenant_user_idx").on(
+      t.tenantId,
+      t.userId,
+      t.createdAt,
+    ),
   ],
 );
 

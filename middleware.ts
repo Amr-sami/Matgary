@@ -90,6 +90,29 @@ function applyCsp(
   return response;
 }
 
+// True iff the request is a top-level HTML navigation (i.e. user typed an
+// address, hit refresh, or followed an external link) — not an RSC partial
+// fetch from a client-side <Link>, not an asset request, not an API call.
+// Used by the demo-store reset hook so client-side router navigation keeps
+// the visitor's edits alive while a hard refresh wipes them.
+function isFullPageHtmlNav(req: NextRequest, pathname: string): boolean {
+  if (pathname.startsWith("/api/")) return false;
+  if (pathname.startsWith("/_next/")) return false;
+  // Next.js client-side router fetch — carries this header, full-page loads do not.
+  if (req.headers.get("rsc") || req.headers.get("next-router-state-tree")) {
+    return false;
+  }
+  // Server Actions POSTs carry this header — they're not navigations.
+  if (req.headers.get("next-action")) return false;
+  const fetchMode = req.headers.get("sec-fetch-mode");
+  // sec-fetch-mode is "navigate" only for top-level document loads. When the
+  // header is absent (older browsers / non-standard clients) fall back to
+  // checking that the Accept header asks for HTML.
+  if (fetchMode && fetchMode !== "navigate") return false;
+  const accept = req.headers.get("accept") ?? "";
+  return accept.includes("text/html") || fetchMode === "navigate";
+}
+
 const PUBLIC_PATHS = new Set<string>([
   "/login",
   "/signup",
@@ -316,32 +339,30 @@ export default auth((req) => {
     );
   }
 
-  // Onboarding gate. New signups carry onboardingComplete=false until they
-  // finish the 3-step wizard at /onboarding. Without this guard, the signup
-  // action's redirect to /onboarding was the ONLY thing keeping users in
-  // the wizard — typing "/" or "/dashboard" let them sail past it.
-  // Allowed while incomplete: the wizard page itself (server action POSTs
-  // hit the same path), sign-out, and account/password endpoints.
-  const onboardingAllowed =
-    normalizedPath === "/onboarding" ||
-    normalizedPath === "/account/change-password" ||
-    normalizedPath.startsWith("/api/account/") ||
-    normalizedPath.startsWith("/api/auth/");
-  if (session.user.onboardingComplete === false && !onboardingAllowed) {
-    if (pathname.startsWith("/api/")) {
-      return applyCsp(
-        req,
-        nonce,
-        NextResponse.json({ error: "ONBOARDING_REQUIRED" }, { status: 403 }),
-      );
-    }
-    return applyCsp(
-      req,
-      nonce,
-      NextResponse.redirect(
-        new URL(`/${activeLocale}/onboarding`, nextUrl),
-      ),
-    );
+  // Soft onboarding gate (Stripe / Shopify pattern). Users with
+  // onboardingComplete=false can roam the app freely; the persistent
+  // <OnboardingReminder /> banner rendered inside AppShell nudges them
+  // back to /onboarding. Previously this block hard-redirected every
+  // navigation to /onboarding, which felt like a trap. The banner is the
+  // industry-standard substitute — visible on every page, dismissible per
+  // session, but un-dismissible permanently until the wizard finishes.
+  //
+  // Intentionally left empty so the request falls through to the next
+  // (subscription) gate.
+
+  // Demo store reset hook. Middleware runs on the Edge runtime where
+  // postgres + node:crypto aren't available, so we can't actually do the
+  // DB work here — we just tag the request with a header. The root layout
+  // (Node runtime) reads the header and calls resetDemoClone() before
+  // rendering. Client-side router fetches and asset requests don't get
+  // tagged, so navigating via <Link> keeps the visitor's state alive.
+  if (
+    session.user.isDemo &&
+    session.user.tenantId &&
+    session.user.id &&
+    isFullPageHtmlNav(req, pathname)
+  ) {
+    requestHeaders.set("x-demo-reset", "1");
   }
 
   // Subscription gate. When the trial has expired without a paid subscription

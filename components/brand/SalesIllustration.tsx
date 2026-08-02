@@ -10,7 +10,7 @@ export function SalesIllustration({ className }: { className?: string }) {
       viewBox="0 0 480 480"
       xmlns="http://www.w3.org/2000/svg"
       role="img"
-      aria-label="مندوب يسجّل بيعاً عبر تطبيق متجري"
+      aria-label="مندوب يسجّل بيعاً عبر تطبيق ستورو"
       className={className}
     >
       {/* Background decorative circles */}
@@ -115,7 +115,7 @@ export function SalesIllustration({ className }: { className?: string }) {
           textAnchor="middle"
           fontFamily="ui-sans-serif, system-ui"
         >
-          متجري
+          ستورو
         </text>
 
         {/* Search bar */}

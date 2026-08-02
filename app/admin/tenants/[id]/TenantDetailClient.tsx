@@ -198,12 +198,7 @@ export function TenantDetailClient({ id }: { id: string }) {
             )}
             <ActionButton
               onClick={() => setExtendOpen(true)}
-              disabled={data.subscription?.status !== "trialing"}
-              title={
-                data.subscription?.status !== "trialing"
-                  ? t.actions.extendModal.errorNotTrialing
-                  : undefined
-              }
+              disabled={!data.subscription}
             >
               {t.actions.extendTrial}
             </ActionButton>
@@ -450,25 +445,6 @@ export function TenantDetailClient({ id }: { id: string }) {
         <Toast type={toast.type} message={toast.message} onClose={() => setToast(null)} />
       )}
     </div>
-  );
-}
-
-function DisabledButton({
-  children,
-  title,
-}: {
-  children: React.ReactNode;
-  title: string;
-}) {
-  return (
-    <button
-      type="button"
-      disabled
-      title={title}
-      className="inline-flex h-9 px-3 rounded-lg border border-border bg-white text-text-secondary text-xs items-center cursor-not-allowed opacity-60"
-    >
-      {children}
-    </button>
   );
 }
 

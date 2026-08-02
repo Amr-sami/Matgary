@@ -48,7 +48,7 @@ export function LandingFooter() {
         <div className="grid md:grid-cols-12 gap-10">
           {/* Brand block */}
           <div className="md:col-span-4 space-y-4">
-            <Logo size="md" />
+            <Logo size="md" locale={locale} />
             <p className="text-sm text-text-secondary leading-relaxed max-w-xs">
               {dict.footer.tagline}
             </p>

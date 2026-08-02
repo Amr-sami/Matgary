@@ -37,9 +37,11 @@ export function ExtendTrialModal({
   const previewDate = useMemo(() => {
     const n = Number(days);
     if (!Number.isFinite(n) || n < 1 || n > 90) return null;
-    return new Date(
-      new Date(currentTrialEndsAt).getTime() + n * 24 * 60 * 60 * 1000,
-    );
+    // Mirror server behaviour in lib/admin/tenant-actions.ts extendTrial:
+    // an already-expired trial gets a fresh N days from now, not from the
+    // stale past date.
+    const base = Math.max(Date.now(), new Date(currentTrialEndsAt).getTime());
+    return new Date(base + n * 24 * 60 * 60 * 1000);
   }, [days, currentTrialEndsAt]);
 
   const submit = async () => {

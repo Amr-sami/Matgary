@@ -42,6 +42,8 @@ export const authConfig = {
           (token.tenantSuspendedAt as string | null) ?? null;
         session.user.tenantSuspendedReason =
           (token.tenantSuspendedReason as string | null) ?? null;
+        // Demo store — missing claim on older tokens reads as "not a demo".
+        session.user.isDemo = !!token.isDemo;
         // Spec 07 — impersonation context. The hard cap is enforced here:
         // any token whose claim says it's past the cap is treated as
         // logged-out so AppShell + middleware bounce the request.

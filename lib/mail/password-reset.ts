@@ -24,14 +24,14 @@ interface TemplateInput {
 
 function arabicTemplate({ link, ttlMinutes = 30 }: TemplateInput): Built {
   return {
-    subject: "إعادة ضبط كلمة المرور — متجري",
+    subject: "إعادة ضبط كلمة المرور — ستورو",
     text:
-      `لقد طُلب إعادة ضبط كلمة المرور لحسابك على متجري.\n\n` +
+      `لقد طُلب إعادة ضبط كلمة المرور لحسابك على ستورو.\n\n` +
       `افتح هذا الرابط خلال ${ttlMinutes} دقيقة لاختيار كلمة مرور جديدة:\n${link}\n\n` +
       `إذا لم تكن أنت، يمكنك تجاهل هذه الرسالة. كلمة المرور الحالية ستبقى كما هي.`,
     html:
       `<div dir="rtl" style="font-family:system-ui,-apple-system,Segoe UI,Tajawal,Cairo,sans-serif;font-size:15px;line-height:1.7;color:#222">` +
-      `<p>لقد طُلب إعادة ضبط كلمة المرور لحسابك على متجري.</p>` +
+      `<p>لقد طُلب إعادة ضبط كلمة المرور لحسابك على ستورو.</p>` +
       `<p><a href="${link}" style="display:inline-block;background:#1203E3;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">اختر كلمة مرور جديدة</a></p>` +
       `<p style="font-size:13px;color:#666">الرابط صالح لمدة ${ttlMinutes} دقيقة. إذا لم تكن أنت، يمكنك تجاهل هذه الرسالة.</p>` +
       `</div>`,
@@ -40,14 +40,14 @@ function arabicTemplate({ link, ttlMinutes = 30 }: TemplateInput): Built {
 
 function englishTemplate({ link, ttlMinutes = 30 }: TemplateInput): Built {
   return {
-    subject: "Reset your password — Matgary",
+    subject: "Reset your password — TheStoro",
     text:
-      `Someone requested a password reset for your Matgary account.\n\n` +
+      `Someone requested a password reset for your TheStoro account.\n\n` +
       `Open this link within ${ttlMinutes} minutes to choose a new password:\n${link}\n\n` +
       `If this wasn't you, you can ignore this email. Your current password will stay the same.`,
     html:
       `<div dir="ltr" style="font-family:system-ui,-apple-system,Segoe UI,Inter,Arial,sans-serif;font-size:15px;line-height:1.7;color:#222">` +
-      `<p>Someone requested a password reset for your Matgary account.</p>` +
+      `<p>Someone requested a password reset for your TheStoro account.</p>` +
       `<p><a href="${link}" style="display:inline-block;background:#1203E3;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">Choose a new password</a></p>` +
       `<p style="font-size:13px;color:#666">The link is valid for ${ttlMinutes} minutes. If this wasn't you, you can ignore this email.</p>` +
       `</div>`,

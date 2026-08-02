@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { AuthShowcase } from "./AuthShowcase";
 import { Logo } from "@/components/brand/Logo";
 import { LangSwitcher } from "@/components/i18n/LangSwitcher";
+import { DemoLoginPill } from "@/components/auth/DemoLoginPill";
 
 /**
  * Auth shell.
@@ -13,7 +15,14 @@ import { LangSwitcher } from "@/components/i18n/LangSwitcher";
  *
  * Page never scrolls (h-screen on lg+).
  */
-export default function AuthLayout({ children }: { children: ReactNode }) {
+export default async function AuthLayout({
+  children,
+  params,
+}: {
+  children: ReactNode;
+  params: Promise<{ lang: string }>;
+}) {
+  const { lang } = await params;
   return (
     <div
       className="lg:h-screen min-h-screen relative bg-white overflow-hidden"
@@ -22,8 +31,9 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
         backgroundRepeat: "repeat",
       }}
     >
-      {/* Locale switcher — floats above the form column, top-end corner. */}
-      <div className="absolute top-3 end-3 z-20">
+      {/* Locale switcher + demo CTA — top-end corner above the form column. */}
+      <div className="absolute top-3 end-3 z-20 flex items-center gap-2">
+        <DemoLoginPill />
         <LangSwitcher />
       </div>
 
@@ -36,9 +46,13 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
         <div className="relative w-full lg:w-3/5 min-h-screen lg:min-h-0 lg:h-screen flex-shrink-0">
           <main className="relative h-full min-h-screen lg:min-h-0 lg:h-screen flex flex-col items-center justify-center py-8">
             <div className="w-full max-w-md mx-auto flex flex-col items-center px-4">
-              <div className="mb-6 text-accent">
-                <Logo size="lg" />
-              </div>
+              <Link
+                href={`/${lang}/welcome`}
+                aria-label="TheStoro"
+                className="mb-6 text-accent rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 transition-transform hover:scale-[1.02] active:scale-[0.99]"
+              >
+                <Logo size="lg" locale={lang} />
+              </Link>
               {children}
             </div>
           </main>

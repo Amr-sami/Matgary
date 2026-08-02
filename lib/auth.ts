@@ -81,6 +81,10 @@ declare module "next-auth" {
       /** Spec 03: the reason text the admin entered when suspending. Surfaced
        *  on the /service-paused page so the owner knows what to fix. */
       tenantSuspendedReason: string | null;
+      /** Demo store — true when the session belongs to an ephemeral demo
+       *  tenant. AppShell shows the demo banner; middleware resets the
+       *  tenant's data on every full-page reload. */
+      isDemo: boolean;
     } & DefaultSession["user"];
     /** Platform-admin Spec 07. Truthy iff the current session was minted
      *  via the impersonation flow — the owner is being viewed by an admin.
@@ -113,6 +117,8 @@ declare module "@auth/core/jwt" {
     /** Platform-admin Spec 03 — null = active, ISO string = suspended at. */
     tenantSuspendedAt: string | null;
     tenantSuspendedReason: string | null;
+    /** Demo store — see session.user.isDemo. */
+    isDemo: boolean;
     /** Platform-admin Spec 07 — impersonation claims. Populated only when
      *  the credentials provider authorized this JWT via an
      *  impersonationToken (i.e. an admin is acting as the owner). */
@@ -169,6 +175,8 @@ interface UserContext {
   /** Platform-admin Spec 03 — non-null when the tenant is suspended. */
   tenantSuspendedAt: Date | null;
   tenantSuspendedReason: string | null;
+  /** Demo store — see session.user.isDemo declaration. */
+  isDemo: boolean;
 }
 
 async function resolveTenantContext(userId: string): Promise<UserContext> {
@@ -209,6 +217,7 @@ async function resolveTenantContext(userId: string): Promise<UserContext> {
     let tenantSlug: string | null = null;
     let tenantSuspendedAt: Date | null = null;
     let tenantSuspendedReason: string | null = null;
+    let isDemo = false;
 
     if (tenantId) {
       const [tenant] = await db
@@ -216,6 +225,8 @@ async function resolveTenantContext(userId: string): Promise<UserContext> {
           slug: tenants.slug,
           suspendedAt: tenants.suspendedAt,
           suspendedReason: tenants.suspendedReason,
+          isDemo: tenants.isDemo,
+          demoTemplateId: tenants.demoTemplateId,
         })
         .from(tenants)
         .where(eq(tenants.id, tenantId))
@@ -223,6 +234,9 @@ async function resolveTenantContext(userId: string): Promise<UserContext> {
       tenantSlug = tenant?.slug ?? null;
       tenantSuspendedAt = tenant?.suspendedAt ?? null;
       tenantSuspendedReason = tenant?.suspendedReason ?? null;
+      // A "demo session" is one that owns a CLONE — the template itself is
+      // not surfaced to anyone, only the data source.
+      isDemo = !!(tenant?.isDemo && tenant?.demoTemplateId);
 
       // shop_settings IS RLS-protected — set app.tenant_id first.
       // Multi-store: settings are now per (tenant, branch). Onboarding
@@ -278,6 +292,7 @@ async function resolveTenantContext(userId: string): Promise<UserContext> {
       locale,
       tenantSuspendedAt,
       tenantSuspendedReason,
+      isDemo,
     };
   });
 }
@@ -451,6 +466,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.locale = ctx.locale;
         token.tenantSuspendedAt = ctx.tenantSuspendedAt?.toISOString() ?? null;
         token.tenantSuspendedReason = ctx.tenantSuspendedReason;
+        token.isDemo = ctx.isDemo;
         // Spec 07 — propagate the impersonation marker into the JWT.
         const imp = (user as { __impersonation?: {
           adminId: string;
@@ -495,6 +511,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           token.subscriptionStatus = null;
           token.tenantSuspendedAt = null;
           token.tenantSuspendedReason = null;
+          token.isDemo = false;
           return token;
         }
         token.tenantId = ctx.tenantId;
@@ -509,6 +526,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.locale = ctx.locale;
         token.tenantSuspendedAt = ctx.tenantSuspendedAt?.toISOString() ?? null;
         token.tenantSuspendedReason = ctx.tenantSuspendedReason;
+        token.isDemo = ctx.isDemo;
       }
       return token;
     },

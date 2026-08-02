@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
     customer: {
       email: actor?.email ?? "no-reply@matgary.local",
       firstName: member?.displayName ?? actor?.name ?? tenant?.name ?? "Customer",
-      lastName: tenant?.name ?? "Matgary",
+      lastName: tenant?.name ?? "TheStoro",
       phone: member?.phone ?? "+201000000000",
     },
   });

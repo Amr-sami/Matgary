@@ -12,7 +12,7 @@ export function AppIllustration({ className }: { className?: string }) {
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 880.208 829.278"
       role="img"
-      aria-label="مندوب يستخدم تطبيق متجري لتسجيل الطلبات"
+      aria-label="مندوب يستخدم تطبيق ستورو لتسجيل الطلبات"
       className={className}
     >
       <g transform="translate(-520.002 -84.467)">

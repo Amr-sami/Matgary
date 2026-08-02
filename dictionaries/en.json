@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Matgary — All-in-one shop management",
+    "title": "TheStoro — All-in-one shop management",
     "description": "Point of sale, inventory, reports, team — everything your store needs in one system. Free to start."
   },
   "app": {
@@ -80,6 +80,7 @@
       "title": "Business analytics",
       "tabs": {
         "overview": "Overview",
+        "deep": "Deep dive",
         "staff": "Team"
       },
       "scope": {
@@ -148,6 +149,109 @@
           "gross": "Gross profit",
           "expenses": "Operating expenses",
           "net": "Net profit"
+        }
+      },
+      "deep": {
+        "picker": {
+          "compare": {
+            "label": "Compare periods",
+            "hint": "See this window against the previous one on the same chart."
+          },
+          "heatmap": {
+            "label": "Peak hours",
+            "hint": "Which weekdays and hours actually make money."
+          },
+          "payments": {
+            "label": "Payment mix",
+            "hint": "Cash, InstaPay, card, deferred — how customers pay."
+          },
+          "branches": {
+            "label": "Branch comparison",
+            "hint": "Side-by-side revenue, orders, margin per branch.",
+            "ownerOnly": "Owner-only view."
+          },
+          "product": {
+            "label": "Product drill-down",
+            "hint": "Pick a product and inspect its trend and margin."
+          }
+        },
+        "compare": {
+          "title": "Period-over-period",
+          "subtitle": "Current window overlaid against the equal-length window immediately before it.",
+          "empty": "No sales in either period.",
+          "needsWindow": "Pick a date range to compare against the previous one.",
+          "currentTotal": "This period",
+          "previousTotal": "Previous period",
+          "growth": "Change",
+          "legend": {
+            "current": "This period",
+            "previous": "Previous period"
+          }
+        },
+        "heatmap": {
+          "title": "Revenue by day × hour",
+          "subtitle": "Colour intensity = revenue. Spot your busiest slots.",
+          "empty": "No sales in this window.",
+          "peakLine": "Peak: {day} at {hour}:00 — {revenue}",
+          "dayHeader": "Day",
+          "rowTotal": "Row total",
+          "hourTotal": "Hour total",
+          "cellTooltip": "{day} · {hour} · {revenue} ({count} sales)",
+          "legendLess": "Less",
+          "legendMore": "More"
+        },
+        "payments": {
+          "title": "Payment method mix",
+          "subtitle": "Stacked daily revenue split by how customers paid.",
+          "empty": "No sales in this window.",
+          "methods": {
+            "cash": "Cash",
+            "instapay": "InstaPay",
+            "card": "Card",
+            "deferred": "Deferred",
+            "unknown": "Unknown"
+          }
+        },
+        "branches": {
+          "title": "Branch comparison",
+          "subtitle": "Owner-only side-by-side view across every branch.",
+          "empty": "No branch has recorded a sale in this window.",
+          "ownerOnly": "This report is only available to the shop owner.",
+          "legend": {
+            "revenue": "Revenue",
+            "gross": "Gross profit"
+          },
+          "col": {
+            "branch": "Branch",
+            "revenue": "Revenue",
+            "transactions": "Orders",
+            "aov": "Avg order value",
+            "gross": "Gross profit",
+            "margin": "Margin",
+            "discounts": "Discounts"
+          }
+        },
+        "product": {
+          "title": "Product drill-down",
+          "subtitle": "Pick any product to see its own trend, volume, and margin.",
+          "searchPlaceholder": "Search a product by name or brand…",
+          "noMatches": "No matching products in this window.",
+          "unitsSold": "{n} sold",
+          "viewingLabel": "Viewing",
+          "changeProduct": "Change",
+          "emptyDaily": "This product has no sales in the selected window.",
+          "metric": {
+            "revenue": "Revenue",
+            "units": "Units",
+            "transactions": "Orders",
+            "aov": "Avg order value",
+            "gross": "Gross profit",
+            "margin": "Margin"
+          },
+          "chart": {
+            "revenue": "Daily revenue",
+            "units": "Daily units sold"
+          }
         }
       },
       "staff": {
@@ -969,7 +1073,7 @@
     },
     "admin": {
       "shell": {
-        "brand": "Matgary",
+        "brand": "TheStoro",
         "title": "Platform admin",
         "nav": {
           "dashboard": "Dashboard",
@@ -988,7 +1092,7 @@
         "signOutEverywhereConfirm": "Sign out from every device? You'll have to log in again here too."
       },
       "login": {
-        "brand": "Matgary",
+        "brand": "TheStoro",
         "title": "Platform admin",
         "subtitle": "Restricted access — sign in to continue.",
         "emailLabel": "Email",
@@ -2341,6 +2445,38 @@
         "saveFailed": "Couldn't save",
         "saveSuccess": "Saved"
       },
+      "monthly": {
+        "heading": "Monthly report",
+        "loading": "Loading…",
+        "loadFailed": "Couldn't load monthly report",
+        "empty": "No attendance in this month yet.",
+        "noShifts": "No shifts recorded for this month.",
+        "prevMonth": "Previous month",
+        "nextMonth": "Next month",
+        "thisMonth": "This month",
+        "downloadCsv": "Download CSV",
+        "workingDays": "Working days this month: {n}",
+        "expectedPerEmployee": "Expected hours per employee: {n}",
+        "rowSubline": "{days} days · {shifts} shifts",
+        "metric": {
+          "total": "Total",
+          "regular": "Regular",
+          "weekend": "Weekend",
+          "expected": "Expected"
+        },
+        "table": {
+          "date": "Date",
+          "day": "Day",
+          "checkIn": "Check-in",
+          "checkOut": "Check-out",
+          "hours": "Hours",
+          "status": "Status",
+          "open": "Still open",
+          "review": "Needs review",
+          "weekend": "Weekend",
+          "regular": "Working day"
+        }
+      },
       "attendanceSettings": {
         "loading": "Loading…",
         "workHoursSection": "Work hours and days off",
@@ -3242,7 +3378,7 @@
     },
     "servicePaused": {
       "title": "Your service is paused",
-      "message": "Access to your store has been temporarily paused by Matgary support. Contact us to resolve the issue and reactivate your account.",
+      "message": "Access to your store has been temporarily paused by TheStoro support. Contact us to resolve the issue and reactivate your account.",
       "reasonLabel": "Reason from support",
       "contactHint": "Get in touch on WhatsApp to learn how to restore service.",
       "signOut": "Sign out"
@@ -3273,7 +3409,7 @@
       "collapseSidebar": "Collapse sidebar",
       "expandSidebar": "Expand sidebar",
       "newItems": "new items",
-      "storeFallback": "Matgary",
+      "storeFallback": "TheStoro",
       "version": "Version 1.0.0",
       "todayLabel": "Today",
       "userMenu": {
@@ -3302,7 +3438,7 @@
     }
   },
   "common": {
-    "brand": "Matgary",
+    "brand": "TheStoro",
     "startFree": "Start free",
     "signIn": "Sign in",
     "haveAccount": "I have an account",
@@ -3326,7 +3462,7 @@
   "hero": {
     "headlineA": "POS, inventory, reports",
     "headlineB": "in one place",
-    "subhead": "Matgary is a unified system for everything your shop needs daily — from sales and inventory to staff and real-time reports.",
+    "subhead": "TheStoro is a unified system for everything your shop needs daily — from sales and inventory to staff and real-time reports.",
     "badgeFree": "Free to start",
     "badgeNoCard": "No credit card",
     "badgeSupport": "Dedicated support",
@@ -3575,7 +3711,7 @@
         }
       }
     },
-    "disclaimer": "Matgary is an operational shop-management system. Receipts it issues are for operational use and are not a substitute for the Egyptian Tax Authority (ETA) e-invoicing system. Tax-registered merchants must issue their tax invoices through the ETA portal separately.",
+    "disclaimer": "TheStoro is an operational shop-management system. Receipts it issues are for operational use and are not a substitute for the Egyptian Tax Authority (ETA) e-invoicing system. Tax-registered merchants must issue their tax invoices through the ETA portal separately.",
     "copyright": "All rights reserved."
   },
   "auth": {
@@ -3588,8 +3724,8 @@
     },
     "login": {
       "meta": {
-        "title": "Sign in — Matgary",
-        "description": "Sign in to your Matgary account to run your shop."
+        "title": "Sign in — TheStoro",
+        "description": "Sign in to your TheStoro account to run your shop."
       },
       "title": "Sign in",
       "subhead": "Welcome back",
@@ -3614,8 +3750,8 @@
     },
     "signup": {
       "meta": {
-        "title": "Create account — Matgary",
-        "description": "Create your Matgary account and start running your shop in a minute."
+        "title": "Create account — TheStoro",
+        "description": "Create your TheStoro account and start running your shop in a minute."
       },
       "title": "Create a new account",
       "step1Sub": "Start by creating your account",
@@ -3657,7 +3793,7 @@
     },
     "forgot": {
       "meta": {
-        "title": "Forgot password — Matgary",
+        "title": "Forgot password — TheStoro",
         "description": "Request a password reset link for your account."
       },
       "title": "Forgot your password?",
@@ -3675,7 +3811,7 @@
     },
     "reset": {
       "meta": {
-        "title": "New password — Matgary",
+        "title": "New password — TheStoro",
         "description": "Choose a new password for your account."
       },
       "title": "New password",
@@ -3698,8 +3834,14 @@
     },
     "onboarding": {
       "meta": {
-        "title": "Set up your store — Matgary",
+        "title": "Set up your store — TheStoro",
         "description": "Quick steps to finish setting up your store."
+      },
+      "reminder": {
+        "title": "Finish setting up your store",
+        "subtitle": "Two quick steps — pick a starting point and take a tour of the system.",
+        "cta": "Finish setup",
+        "dismiss": "Dismiss"
       },
       "errors": {
         "unauthorized": "Your session expired. Please sign in again.",
@@ -3767,7 +3909,7 @@
         "next": "Take a tour"
       },
       "tour": {
-        "title": "A quick tour of Matgary",
+        "title": "A quick tour of TheStoro",
         "subhead": "Every corner of the app in 13 screens — skip anytime",
         "slides": [
           {
@@ -3842,18 +3984,34 @@
         "skip": "Skip",
         "finish": "Get started"
       }
+    },
+    "demo": {
+      "cta": "Browse the demo store",
+      "sub": "No signup. Edit anything — refresh resets it.",
+      "or": "or",
+      "busy": "Preparing the demo…",
+      "errors": {
+        "rateLimited": "Too many demo requests. Try again in a minute.",
+        "unavailable": "Demo store is unavailable right now."
+      },
+      "banner": {
+        "title": "Demo mode",
+        "subtitle": "Your changes reset on refresh. Edit anything safely.",
+        "exit": "Exit demo",
+        "exitting": "Exiting…"
+      }
     }
   },
   "marketing": {
     "about": {
       "meta": {
-        "title": "About — Matgary",
-        "description": "Matgary is a shop-management system built for Arabic-speaking merchants — our story, mission, and values."
+        "title": "About — TheStoro",
+        "description": "TheStoro is a shop-management system built for Arabic-speaking merchants — our story, mission, and values."
       },
       "eyebrow": "About",
       "title": "We build the tool we wished we had",
-      "lead": "We started Matgary because shop owners were stuck with complex systems, spreadsheets, or paper ledgers — each costing them time or money. We set out to build one system: Arabic-first, simple, and reliable.",
-      "p1": "Matgary is a complete shop-management system — point of sale, inventory, reports, team and permissions — all in one place. We serve small and medium retailers across Egypt and the Arab region, and we treat every shop as a personal project, not a number.",
+      "lead": "We started TheStoro because shop owners were stuck with complex systems, spreadsheets, or paper ledgers — each costing them time or money. We set out to build one system: Arabic-first, simple, and reliable.",
+      "p1": "TheStoro is a complete shop-management system — point of sale, inventory, reports, team and permissions — all in one place. We serve small and medium retailers across Egypt and the Arab region, and we treat every shop as a personal project, not a number.",
       "p2": "Our philosophy is simple: shops don't need more than they need. They need one working tool that understands what's happening in the store and helps the owner decide right. For every feature we build, we ask first: will the merchant use this every day? If the answer is no, we don't build it.",
       "values": [
         {
@@ -3869,11 +4027,11 @@
           "body": "Every screen, every button, every report — written natively in Arabic by people who understand the market."
         }
       ],
-      "tryCta": "Try Matgary"
+      "tryCta": "Try TheStoro"
     },
     "blog": {
       "meta": {
-        "title": "Blog — Matgary",
+        "title": "Blog — TheStoro",
         "description": "Short, practical articles for shop owners — coming soon."
       },
       "eyebrow": "Blog",
@@ -3884,8 +4042,8 @@
     },
     "contact": {
       "meta": {
-        "title": "Contact — Matgary",
-        "description": "Ways to reach the Matgary team — email, WhatsApp, and technical support."
+        "title": "Contact — TheStoro",
+        "description": "Ways to reach the TheStoro team — email, WhatsApp, and technical support."
       },
       "eyebrow": "Contact us",
       "title": "Our team is ready to listen",
@@ -3893,7 +4051,7 @@
       "channels": {
         "email": {
           "title": "Email",
-          "detail": "hello@matjari.app",
+          "detail": "support@thestoro.com",
           "note": "Reply within 24 hours on business days."
         },
         "whatsapp": {
@@ -3917,8 +4075,8 @@
     },
     "help": {
       "meta": {
-        "title": "Help center — Matgary",
-        "description": "Quick answers and guides for everything Matgary."
+        "title": "Help center — TheStoro",
+        "description": "Quick answers and guides for everything TheStoro."
       },
       "eyebrow": "Help center",
       "title": "Find a quick answer",
@@ -3948,8 +4106,8 @@
     },
     "status": {
       "meta": {
-        "title": "Service status — Matgary",
-        "description": "Status of every Matgary service — updated in real time."
+        "title": "Service status — TheStoro",
+        "description": "Status of every TheStoro service — updated in real time."
       },
       "eyebrow": "Service status",
       "title": "All systems operational",
@@ -3969,8 +4127,8 @@
     },
     "privacy": {
       "meta": {
-        "title": "Privacy policy — Matgary",
-        "description": "How we handle your data in Matgary, in line with the Egyptian Personal Data Protection Law."
+        "title": "Privacy policy — TheStoro",
+        "description": "How we handle your data in TheStoro, in line with the Egyptian Personal Data Protection Law."
       },
       "eyebrow": "Privacy policy",
       "title": "Your data belongs to you",
@@ -3978,7 +4136,7 @@
       "sections": [
         {
           "title": "1. Who controls your data",
-          "body": "Matgary (the \"Platform\") is the data controller within the meaning of the Egyptian Personal Data Protection Law (Law No. 151 of 2020). For any matter relating to your data, use the contact page below."
+          "body": "TheStoro (the \"Platform\") is the data controller within the meaning of the Egyptian Personal Data Protection Law (Law No. 151 of 2020). For any matter relating to your data, use the contact page below."
         },
         {
           "title": "2. Data we collect",
@@ -4028,20 +4186,20 @@
     },
     "terms": {
       "meta": {
-        "title": "Terms of use — Matgary",
-        "description": "Terms of use for the Matgary platform."
+        "title": "Terms of use — TheStoro",
+        "description": "Terms of use for the TheStoro platform."
       },
       "eyebrow": "Terms of use",
-      "title": "Matgary terms of use",
+      "title": "TheStoro terms of use",
       "lead": "Last updated: 7 May 2026.",
       "sections": [
         {
           "title": "1. Acceptance of terms",
-          "body": "By using the Matgary platform (the \"Service\") you confirm you are of legal age (18+) and have full capacity to contract, and you agree to be bound by these terms and the privacy policy. If you do not agree to any clause, please do not use the Service."
+          "body": "By using the TheStoro platform (the \"Service\") you confirm you are of legal age (18+) and have full capacity to contract, and you agree to be bound by these terms and the privacy policy. If you do not agree to any clause, please do not use the Service."
         },
         {
           "title": "2. Service description",
-          "body": "Matgary is a software-as-a-service (SaaS) platform for managing retail stores: point of sale, inventory, invoices, staff, reports, and related features. The Service is provided online without local software installation. We aim to keep it available with reasonable uptime (with no 99.9% contractual SLA on the base plans)."
+          "body": "TheStoro is a software-as-a-service (SaaS) platform for managing retail stores: point of sale, inventory, invoices, staff, reports, and related features. The Service is provided online without local software installation. We aim to keep it available with reasonable uptime (with no 99.9% contractual SLA on the base plans)."
         },
         {
           "title": "3. Account and responsibility",
@@ -4049,7 +4207,7 @@
         },
         {
           "title": "4. Acceptable use",
-          "body": "You may use Matgary only to manage lawful commercial activity. It is prohibited to: (a) carry out any activity contrary to Egyptian law or public morals, (b) attempt to breach the Platform or access another shop's data, (c) misuse the APIs or overload the infrastructure with excessive requests, (d) use the Service to send unsolicited promotional messages (spam) over WhatsApp or otherwise."
+          "body": "You may use TheStoro only to manage lawful commercial activity. It is prohibited to: (a) carry out any activity contrary to Egyptian law or public morals, (b) attempt to breach the Platform or access another shop's data, (c) misuse the APIs or overload the infrastructure with excessive requests, (d) use the Service to send unsolicited promotional messages (spam) over WhatsApp or otherwise."
         },
         {
           "title": "5. Payment and subscriptions",
@@ -4057,7 +4215,7 @@
         },
         {
           "title": "6. E-invoices and taxes",
-          "body": "If you are a merchant registered with the Egyptian Tax Authority, you alone are responsible for issuing your electronic tax invoices via the ETA system. Matgary's invoicing features in the current version are for internal operational purposes and may not substitute for the official e-invoicing system. Check the features page for updates."
+          "body": "If you are a merchant registered with the Egyptian Tax Authority, you alone are responsible for issuing your electronic tax invoices via the ETA system. TheStoro's invoicing features in the current version are for internal operational purposes and may not substitute for the official e-invoicing system. Check the features page for updates."
         },
         {
           "title": "7. Data ownership",

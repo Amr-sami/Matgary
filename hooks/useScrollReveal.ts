@@ -2,25 +2,23 @@
 
 import { useEffect, useRef, useState } from "react";
 
-/**
- * Sets `shown=true` the first time the ref enters the viewport.
- * Disconnects after firing so it never reverses on scroll-up.
- * Falls back to `shown=true` immediately when IntersectionObserver
- * is unavailable (older browsers, SSR-only env).
- */
+// SSR renders shown=true so the page is visible without JS. On mount, below-fold
+// elements snap to hidden (off-screen, so the user can't see the flash) then
+// animate in as they scroll into view.
 export function useScrollReveal<T extends HTMLElement = HTMLDivElement>(
   rootMargin = "-50px 0px",
 ) {
   const ref = useRef<T | null>(null);
-  const [shown, setShown] = useState(false);
+  const [shown, setShown] = useState(true);
 
   useEffect(() => {
     const node = ref.current;
     if (!node) return;
-    if (typeof IntersectionObserver === "undefined") {
-      setShown(true);
-      return;
-    }
+    if (typeof IntersectionObserver === "undefined") return;
+    const rect = node.getBoundingClientRect();
+    const inView = rect.top < window.innerHeight && rect.bottom > 0;
+    if (inView) return;
+    setShown(false);
     const obs = new IntersectionObserver(
       ([entry]) => {
         if (entry?.isIntersecting) {

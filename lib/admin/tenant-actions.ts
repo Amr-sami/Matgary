@@ -199,17 +199,22 @@ export async function extendTrial(
   if (!sub) {
     throw new TenantActionError("NOT_FOUND", "Subscription not found", 404);
   }
-  if (sub.status !== "trialing") {
-    throw new TenantActionError(
-      "NOT_TRIALING",
-      "Trial can only be extended while the subscription is in 'trialing' state.",
-    );
-  }
 
-  const newEndsAt = new Date(sub.trialEndsAt.getTime() + extraDays * 24 * 60 * 60 * 1000);
+  // Admins can extend a trial regardless of current status. If the trial has
+  // already ended (or the tenant is on a paid plan / expired), base the new
+  // end date on "now" instead of a stale past date — otherwise adding 14
+  // days to a trial that ended a month ago still leaves it in the past. We
+  // also force status back to "trialing" so the tenant regains trial access.
+  const now = Date.now();
+  const base = Math.max(now, sub.trialEndsAt.getTime());
+  const newEndsAt = new Date(base + extraDays * 24 * 60 * 60 * 1000);
   await db
     .update(subscriptions)
-    .set({ trialEndsAt: newEndsAt, updatedAt: sql`now()` })
+    .set({
+      trialEndsAt: newEndsAt,
+      status: "trialing",
+      updatedAt: sql`now()`,
+    })
     .where(eq(subscriptions.tenantId, tenantId));
 
   await logAuditEvent({

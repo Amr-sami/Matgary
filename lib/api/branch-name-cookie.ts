@@ -8,7 +8,7 @@ import type { NextResponse } from "next/server";
  * validates it against the user's accessible-branch list. This cookie is
  * a UI hint *only*: it lets the SSR layer render the correct branch
  * heading on the very first paint without doing a DB lookup, eliminating
- * the "متجري → elhenawystore → Elhenawy Stores → Main" flicker that
+ * the "ستورو → elhenawystore → Elhenawy Stores → Main" flicker that
  * happens when the active branch lives only in client-side state.
  *
  * If a user tampers with this cookie they only mis-label their own

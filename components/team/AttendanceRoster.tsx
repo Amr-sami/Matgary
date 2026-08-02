@@ -16,6 +16,7 @@ import { Modal } from "@/components/ui/Modal";
 import { cn } from "@/lib/utils";
 import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
 import { formatTime } from "@/lib/i18n/format";
+import { MonthlyAttendance } from "./MonthlyAttendance";
 
 type Toast = { type: "success" | "error"; message: string };
 
@@ -158,7 +159,7 @@ export function AttendanceRoster({ onToast }: Props) {
   };
 
   return (
-    <>
+    <div className="space-y-4">
       <div className="bg-white rounded-xl border border-border overflow-hidden">
         <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2">
@@ -245,7 +246,9 @@ export function AttendanceRoster({ onToast }: Props) {
           onToast={onToast}
         />
       )}
-    </>
+
+      <MonthlyAttendance onToast={onToast} />
+    </div>
   );
 }
 

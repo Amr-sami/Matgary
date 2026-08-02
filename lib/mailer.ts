@@ -47,7 +47,7 @@ export interface MailerSendResult {
 export async function sendMail(input: SendInput): Promise<MailerSendResult> {
   const transport = getTransport();
   const from =
-    process.env.MAIL_FROM ?? "Matgary <no-reply@matgary.local>";
+    process.env.MAIL_FROM ?? "TheStoro <no-reply@thestoro.com>";
 
   if (!transport) {
     // Dev path — show the body in the server console so the operator can

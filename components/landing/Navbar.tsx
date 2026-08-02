@@ -62,7 +62,7 @@ export function LandingNavbar() {
           className="flex items-center shrink-0"
           aria-label={dict.common.brand}
         >
-          <Logo size="sm" />
+          <Logo size="sm" locale={locale} />
         </Link>
 
         <div className="hidden md:flex items-center gap-1">

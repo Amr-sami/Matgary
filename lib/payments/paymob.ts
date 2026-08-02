@@ -140,7 +140,7 @@ export async function createCheckout(
     currency: "EGP",
     items: [
       {
-        name: `Matgary plan: ${input.planKey}`,
+        name: `TheStoro plan: ${input.planKey}`,
         amount_cents: piastres,
         description: `Subscription for tenant ${input.tenantId}`,
         quantity: 1,

@@ -18,6 +18,7 @@
     "db:seed": "tsx scripts/seed-test-user.ts",
     "db:seed:three": "tsx scripts/seed-three-users.ts",
     "db:seed:rich": "tsx scripts/seed-rich-data.ts",
+    "db:seed:demo": "tsx scripts/seed-demo-template.ts",
     "tour:screenshots": "tsx scripts/capture-tour-screenshots.ts",
     "test": "vitest run",
     "test:watch": "vitest",

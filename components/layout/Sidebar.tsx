@@ -214,9 +214,14 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         {collapsed ? (
           <span
             aria-label={shellT.storeFallback}
-            className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-accent text-white font-display font-extrabold text-lg leading-none shadow-sm"
+            className="inline-flex items-center justify-center w-9 h-9"
           >
-            م
+            <img
+              src="/logothestoro.png"
+              alt="TheStoro"
+              className="w-9 h-9 object-contain"
+              draggable={false}
+            />
           </span>
         ) : (
           // suppressHydrationWarning on the wrapper silences CONTENT

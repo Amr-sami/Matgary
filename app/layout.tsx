@@ -38,7 +38,7 @@ const lemonada = Lemonada({
 });
 
 export const metadata: Metadata = {
-  title: "Matjary - نظام إدارة المخزن والمبيعات",
+  title: "ستورو - نظام إدارة المخزن والمبيعات",
   description: "نظام نقطة البيع وإدارة المخزن لمتجرك الساعات والبرفانات والنظارات",
 };
 
@@ -67,12 +67,33 @@ export default async function RootLayout({
   const dict = await getDictionary(locale);
   // Active branch name from the non-HttpOnly companion cookie. Lets the
   // Sidebar render the right store heading on the SSR HTML — no
-  // "متجري → elhenawystore → Main" cascade on hard refresh. Null when
+  // "ستورو → elhenawystore → Main" cascade on hard refresh. Null when
   // the cookie isn't set yet (first ever load); falls back to the
   // locale's storeFallback until `/api/branches` populates the cookie.
   const cookieStore = await cookies();
   const activeBranchName =
     cookieStore.get(BRANCH_NAME_COOKIE)?.value ?? null;
+
+  // Demo-store reset hook. Middleware (Edge runtime) flags the request with
+  // x-demo-reset on every full-page navigation belonging to a demo session;
+  // we do the actual DB wipe here in the root layout (Node runtime) so the
+  // page renders against a freshly-cloned tenant. Wrapped in try/catch so a
+  // DB hiccup can't take down every page render.
+  if (hdrs.get("x-demo-reset") === "1") {
+    try {
+      const { auth } = await import("@/lib/auth");
+      const session = await auth();
+      if (session?.user?.isDemo && session.user.tenantId && session.user.id) {
+        const { resetDemoClone } = await import("@/lib/demo/clone-tenant");
+        await resetDemoClone({
+          cloneId: session.user.tenantId,
+          ownerUserId: session.user.id,
+        });
+      }
+    } catch (err) {
+      console.warn("[demo-reset] failed in root layout:", err);
+    }
+  }
   return (
     <html lang={locale} dir={dir} className={`${cairo.variable} ${tajawal.variable} ${lemonada.variable}`}>
       <body className="min-h-screen flex flex-col antialiased">
@@ -92,8 +113,11 @@ export default async function RootLayout({
               latency relative to the rest of the page. Mirrors
               components/brand/Logo.tsx visually. */}
           <div className="app-splash__brand">
-            <span className="app-splash__ar" dir="rtl">متجري</span>
-            <span className="app-splash__en" dir="ltr">MATJARI</span>
+            <img
+              src={locale === "en" ? "/thestorologoenglish.png" : "/storoarabic.png"}
+              alt={locale === "en" ? "TheStoro" : "ذا ستورو"}
+              className="app-splash__png"
+            />
           </div>
         </div>
         {/* React 19 refuses to execute inline <script> tags rendered as JSX
