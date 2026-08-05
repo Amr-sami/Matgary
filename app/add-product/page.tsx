@@ -223,12 +223,11 @@ export default function AddProductPage() {
 
       {/* Sticky action footer — keeps Back / Next / Save anchored at the
           bottom regardless of scroll. Replaces the duplicate submit button
-          that lived inside Step 3 and the loose ghost-pair below the card. */}
+          that lived inside Step 3 and the loose ghost-pair below the card.
+          On mobile it sits ABOVE the bottom nav (nav is ~60px + safe area);
+          on desktop the nav is hidden so we anchor to the viewport bottom. */}
       <div
-        className="fixed bottom-0 inset-x-0 lg:ms-52 z-30 bg-white/95 backdrop-blur border-t border-border px-4 py-3 lg:py-3.5"
-        style={{
-          paddingBottom: "calc(env(safe-area-inset-bottom) + 0.75rem)",
-        }}
+        className="fixed inset-x-0 lg:ms-52 z-40 bg-white/95 backdrop-blur border-t border-border px-4 py-3 lg:py-3.5 bottom-[calc(3.75rem+env(safe-area-inset-bottom))] lg:bottom-0"
       >
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-3">
           <Button
