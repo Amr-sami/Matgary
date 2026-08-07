@@ -58,6 +58,9 @@ next-env.d.ts
 # local scratch (seed / verify logs)
 /tmp
 
+# per-machine docker port remaps / service tweaks
+docker-compose.override.yml
+
 # Playwright shared-owner storage state — provisioned per dev box
 tests/e2e/.auth/
 tests/perf/.cookies/

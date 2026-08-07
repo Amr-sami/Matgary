@@ -33,6 +33,32 @@ ENV AUTH_SECRET=build-placeholder-secret
 ENV SECRET_KEY=build-placeholder-secret
 RUN npm run build
 
+# Schema provisioning. The runner stage below carries only the ~26 packages
+# Next's tracer kept for the standalone server — no tsx, no drizzle-orm — so
+# `npm run db:migrate` cannot run there despite the migrations being bundled.
+# This stage keeps the full dependency tree instead, and is the only supported
+# way to create or upgrade a database:
+#
+#   docker compose -f docker-compose.prod.yml run --rm migrate
+#
+# Doubles as the maintenance image: the seed scripts (notably
+# scripts/seed-demo-template.ts, without which the "Browse the demo store"
+# button fails with TEMPLATE_MISSING) import @/ path aliases across lib/, so
+# tsconfig.json and the full lib/ + scripts/ tree come along. All source, no
+# build output — it adds a couple of MB.
+#
+#   docker compose -f docker-compose.prod.yml run --rm migrate
+#   docker compose -f docker-compose.prod.yml run --rm --entrypoint \
+#     "npx tsx scripts/seed-demo-template.ts" migrate
+FROM node:20-alpine AS migrator
+WORKDIR /app
+RUN apk add --no-cache libc6-compat
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json tsconfig.json tsconfig.scripts.json drizzle.config.ts ./
+COPY lib ./lib
+COPY scripts ./scripts
+CMD ["npx", "tsx", "lib/db/migrate.ts"]
+
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production

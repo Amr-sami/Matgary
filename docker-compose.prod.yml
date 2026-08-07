@@ -1,0 +1,249 @@
+# Production stack for a single self-managed VPS behind nginx + Cloudflare.
+#
+# Differs from docker-compose.yml (a laptop-oriented file) in the ways that
+# matter once the host has a public IP:
+#   * every published port is bound to 127.0.0.1 — nginx is the only ingress,
+#     and ufw only opens 22/80/443 anyway
+#   * no default credentials; everything comes from .env
+#   * Redis requires a password and runs `noeviction` (see the redis service)
+#   * a one-shot `migrate` service, because the app image physically cannot
+#     run migrations (see the migrator stage in the Dockerfile)
+#   * log rotation on every service, so a chatty container cannot fill the
+#     disk out from under Postgres
+#
+# First boot:
+#   docker compose -f docker-compose.prod.yml up -d postgres redis
+#   docker compose -f docker-compose.prod.yml run --rm migrate
+#   docker compose -f docker-compose.prod.yml up -d app cron backup
+#
+# This host also runs unrelated production stacks (jameel, midsync). Ports are
+# chosen to avoid theirs: jameel holds 5433/6381/9000-9001/3100/4001.
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: matgary-postgres
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      POSTGRES_USER: matgary
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: matgary
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?APP_DB_PASSWORD is required}
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - matgary_pg_data:/var/lib/postgresql/data
+      - ./infra/init-postgres-prod.sh:/docker-entrypoint-initdb.d/00-init.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U matgary -d matgary"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Dedicated to Matgary — jameel and midsync keep their own instances.
+  #
+  # `noeviction` is deliberate and differs from the dev compose file. This one
+  # Redis backs both the opportunistic cache AND two BullMQ queues (WhatsApp
+  # sends, activity log). Under allkeys-lru, Redis is free to evict live job
+  # keys, which BullMQ itself warns about on boot and which silently loses
+  # customer messages. Every cache call in lib/cache.ts is wrapped in
+  # try/catch, so if memory does fill, cache writes fail closed and the app
+  # falls back to Postgres — the queue stays intact. AOF is on for the same
+  # reason: a restart must not drop queued jobs.
+  redis:
+    image: redis:7-alpine
+    container_name: matgary-redis
+    restart: unless-stopped
+    logging: *default-logging
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+      - --maxmemory
+      - 384mb
+      - --maxmemory-policy
+      - noeviction
+      - --appendonly
+      - "yes"
+    ports:
+      - "127.0.0.1:6382:6379"
+    volumes:
+      - matgary_redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+  # One-shot. Creates/upgrades the schema, provisions the matgary_admin
+  # BYPASSRLS role, seeds the bootstrap admin and the plan catalogue.
+  # Run it before `up -d app` on first boot and after every deploy that
+  # carries new migrations.
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: migrator
+    image: matgary-migrate:latest
+    container_name: matgary-migrate
+    restart: "no"
+    logging: *default-logging
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      # All four must be rewritten, not just DATABASE_URL. migrate.ts only uses
+      # its own DATABASE_URL client, but the seed scripts import @/lib/db and
+      # @/lib/redis, which read APP_DATABASE_URL and REDIS_URL — left at their
+      # .env values those resolve to this container's own loopback and the
+      # script dies partway through with ECONNREFUSED 127.0.0.1:5434.
+      DATABASE_URL: postgres://matgary:${POSTGRES_PASSWORD}@postgres:5432/matgary
+      APP_DATABASE_URL: postgres://matgary_app:${APP_DB_PASSWORD}@postgres:5432/matgary
+      ADMIN_DATABASE_URL: postgres://matgary_admin:${ADMIN_DB_PASSWORD}@postgres:5432/matgary
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    image: matgary-app:${APP_TAG:-latest}
+    container_name: matgary-app
+    restart: unless-stopped
+    logging: *default-logging
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+      # Rewrite every host-targeted URL from .env to compose-network DNS.
+      # ADMIN_DATABASE_URL is included on purpose: the dev compose file omits
+      # it, so it stays pointed at localhost:543x — which inside the container
+      # is its own loopback — and every /admin page plus all 28 /api/admin/*
+      # routes fail with ECONNREFUSED.
+      DATABASE_URL: postgres://matgary:${POSTGRES_PASSWORD}@postgres:5432/matgary
+      APP_DATABASE_URL: postgres://matgary_app:${APP_DB_PASSWORD}@postgres:5432/matgary
+      ADMIN_DATABASE_URL: postgres://matgary_admin:${ADMIN_DB_PASSWORD}@postgres:5432/matgary
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+    ports:
+      - "127.0.0.1:3000:3000"
+    healthcheck:
+      # /readyz pings Postgres and Redis; /healthz is a static 200 and would
+      # keep a wedged process marked healthy.
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/readyz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # Pokes the app's internal cron routes. Holds no DB credentials — only the
+  # shared bearer token. All six routes are scheduled here; the dev compose
+  # file wires only three, which is why admin lockouts are never applied,
+  # digests never send, and demo clones accumulate.
+  cron:
+    image: alpine:3.20
+    container_name: matgary-cron
+    restart: unless-stopped
+    logging: *default-logging
+    depends_on:
+      app:
+        condition: service_healthy
+    volumes:
+      - ./logs/cron:/var/log
+    environment:
+      CRON_SECRET: ${CRON_SECRET:?CRON_SECRET is required}
+      CRON_TARGET_URL: http://app:3000
+      RECURRING_EXPENSES_CRON: "0 * * * *"
+      ACTIVITY_CLEANUP_CRON: "30 3 * * *"
+      TENANT_DELETION_CRON: "0 3 * * *"
+      ADMIN_SESSION_CLEANUP_CRON: "*/15 * * * *"
+      DIGEST_TICK_CRON: "*/30 * * * *"
+      DEMO_CLEANUP_CRON: "15 4 * * *"
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -e
+        apk add --no-cache curl tini >/dev/null
+        umask 077
+        printf 'CRON_SECRET=%s\nCRON_TARGET_URL=%s\n' \
+          "$$CRON_SECRET" "$$CRON_TARGET_URL" > /etc/cron-env
+        cat > /usr/local/bin/poke-cron.sh <<'WRAPPER'
+        #!/bin/sh
+        set -e
+        . /etc/cron-env
+        endpoint="$$1"
+        label="$$2"
+        curl -fsS -X POST \
+          -H "Authorization: Bearer $$CRON_SECRET" \
+          "$$CRON_TARGET_URL$$endpoint" \
+          | sed "s|^|[cron $$label] |"
+        WRAPPER
+        chmod 700 /usr/local/bin/poke-cron.sh
+        {
+          echo "$$RECURRING_EXPENSES_CRON /usr/local/bin/poke-cron.sh /api/cron/recurring-expenses recurring-expenses >> /var/log/cron.log 2>&1"
+          echo "$$ACTIVITY_CLEANUP_CRON /usr/local/bin/poke-cron.sh /api/cron/activity-log-cleanup activity-cleanup >> /var/log/cron.log 2>&1"
+          echo "$$TENANT_DELETION_CRON /usr/local/bin/poke-cron.sh /api/cron/tenant-deletion tenant-deletion >> /var/log/cron.log 2>&1"
+          echo "$$ADMIN_SESSION_CLEANUP_CRON /usr/local/bin/poke-cron.sh /api/cron/admin-session-cleanup admin-session-cleanup >> /var/log/cron.log 2>&1"
+          echo "$$DIGEST_TICK_CRON /usr/local/bin/poke-cron.sh /api/cron/digest-tick digest-tick >> /var/log/cron.log 2>&1"
+          echo "$$DEMO_CLEANUP_CRON /usr/local/bin/poke-cron.sh /api/cron/demo-cleanup demo-cleanup >> /var/log/cron.log 2>&1"
+        } > /etc/crontabs/root
+        echo "[cron] target: $$CRON_TARGET_URL — 6 jobs scheduled"
+        exec tini -- crond -f -d 8
+
+  backup:
+    image: postgres:16-alpine
+    container_name: matgary-backup
+    restart: unless-stopped
+    logging: *default-logging
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: matgary
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: matgary
+      BACKUP_DIR: /backups
+      BACKUP_CRON: "30 2 * * *"
+      DAILY_KEEP: "14"
+      WEEKLY_KEEP: "8"
+    volumes:
+      - ./infra/backup.sh:/usr/local/bin/backup.sh:ro
+      - ./infra/restore.sh:/usr/local/bin/restore.sh:ro
+      - ./backups:/backups
+      - ./logs/backup:/var/log
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -e
+        echo "$$BACKUP_CRON /usr/local/bin/backup.sh >> /var/log/backup.log 2>&1" > /etc/crontabs/root
+        if ! ls /backups/*.sql.gz >/dev/null 2>&1; then
+          /usr/local/bin/backup.sh || echo "[backup] initial run failed (non-fatal)"
+        fi
+        echo "[backup] cron schedule: $$BACKUP_CRON"
+        exec crond -f -d 8
+
+volumes:
+  matgary_pg_data:
+  matgary_redis_data:

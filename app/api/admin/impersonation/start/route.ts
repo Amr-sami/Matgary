@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { signIn } from "@/lib/auth";
+import { appOrigin } from "@/lib/url-safe";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,7 +29,7 @@ export async function GET(req: NextRequest) {
       // Internal-only flow.
     });
     // signIn sets the cookie on the response. We just need to redirect.
-    return NextResponse.redirect(new URL("/", req.url));
+    return NextResponse.redirect(new URL("/", appOrigin(req)));
   } catch (err) {
     // The credentials provider returns null when the token is bad / expired
     // / already consumed; NextAuth surfaces that as a CredentialsSignin

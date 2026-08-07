@@ -37,6 +37,7 @@ import {
 } from "@/lib/whatsapp/oauth-state";
 import { upsertConnection } from "@/lib/whatsapp/connections";
 import { logger } from "@/lib/logger";
+import { appOrigin } from "@/lib/url-safe";
 
 export const runtime = "nodejs";
 
@@ -46,7 +47,7 @@ function flashRedirect(
   detail?: string,
   cookieName?: string,
 ): NextResponse {
-  const url = new URL("/settings", req.url);
+  const url = new URL("/settings", appOrigin(req));
   url.searchParams.set("wa", status);
   if (detail) url.searchParams.set("wa_detail", detail.slice(0, 200));
   const res = NextResponse.redirect(url);

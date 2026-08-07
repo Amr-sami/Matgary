@@ -1,0 +1,19 @@
+// tsconfig for CLI tooling under scripts/ (seeds, probes, maintenance).
+//
+// The base tsconfig.json excludes scripts/ and is tuned for the Next build.
+// This one exists purely so tsx can resolve `server-only` — see
+// scripts/stubs/server-only.ts for why that specifier is unresolvable outside
+// Next. `paths` is replaced wholesale by "extends" rather than merged, so the
+// "@/*" alias has to be restated here.
+//
+// Used via: tsx --tsconfig tsconfig.scripts.json scripts/<file>.ts
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["./*"],
+      "server-only": ["./scripts/stubs/server-only.ts"]
+    }
+  },
+  "include": ["scripts/**/*.ts", "lib/**/*.ts"]
+}

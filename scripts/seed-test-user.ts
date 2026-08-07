@@ -7,6 +7,7 @@ import {
   users,
   tenants,
   tenantMembers,
+  branches,
   shopSettings,
   products,
   productHistory,
@@ -37,7 +38,7 @@ async function main() {
       returns, sales, expenses,
       product_attribute_values, product_history, products,
       brands, category_attribute_values, category_attributes, categories,
-      shop_settings, tenant_members, sessions, accounts, users, tenants
+      shop_settings, branches, tenant_members, sessions, accounts, users, tenants
     restart identity cascade
   `);
 
@@ -55,23 +56,39 @@ async function main() {
       .values({ name: TEST_STORE, slug: "test-store" })
       .returning({ id: tenants.id });
 
+    // branches and shop_settings are both RLS-protected — set app.tenant_id
+    // for the rest of the tx before either insert.
+    await tx.execute(sql`select set_config('app.tenant_id', ${t.id}, true)`);
+
+    // Mirrors signup (app/[lang]/(auth)/actions.ts): every tenant gets a
+    // primary branch, and shop_settings hangs off it.
+    const [primaryBranch] = await tx
+      .insert(branches)
+      .values({
+        tenantId: t.id,
+        slug: "main",
+        name: TEST_STORE,
+        isPrimary: true,
+        isActive: true,
+      })
+      .returning({ id: branches.id });
+
     await tx.insert(tenantMembers).values({
       tenantId: t.id,
       userId: u.id,
       role: "owner",
     });
 
-    // shop_settings is RLS-protected — set app.tenant_id for the rest of the tx.
-    await tx.execute(sql`select set_config('app.tenant_id', ${t.id}, true)`);
     await tx.insert(shopSettings).values({
       tenantId: t.id,
+      branchId: primaryBranch.id,
       shopName: TEST_STORE,
       shopPhone: "01000000000",
       messageTemplate: DEFAULT_MESSAGE_TEMPLATE,
       onboardingCompletedAt: new Date(),
     });
 
-    await seedCornerStorePreset(tx, t.id);
+    await seedCornerStorePreset(tx, t.id, primaryBranch.id);
 
     // Two sample products in the watches category so /inventory has content.
     const [watchesCat] = await tx
@@ -84,6 +101,7 @@ async function main() {
         .insert(products)
         .values({
           tenantId: t.id,
+          branchId: primaryBranch.id,
           categoryId: watchesCat.id,
           name: "Casio MTP-1374L",
           brand: "Casio",
@@ -98,6 +116,7 @@ async function main() {
         .insert(products)
         .values({
           tenantId: t.id,
+          branchId: primaryBranch.id,
           categoryId: watchesCat.id,
           name: "Citizen Eco-Drive AW1236",
           brand: "Citizen",

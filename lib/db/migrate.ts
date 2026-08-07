@@ -9,7 +9,22 @@ if (!process.env.DATABASE_URL) {
 }
 
 const BOOTSTRAP_EMAIL = process.env.BOOTSTRAP_ADMIN_EMAIL || "admin@matgary.com";
-const BOOTSTRAP_PASSWORD = "12345678";
+
+// The seeded super_admin's first password. `must_rotate` is set on the row,
+// but that flag is only honoured by the /admin *page* components — the 28
+// /api/admin/* routes accept the session regardless — so a well-known default
+// is effectively a permanent backdoor into every tenant. Dev keeps the old
+// convenience value; production must supply its own or migration aborts.
+const BOOTSTRAP_PASSWORD =
+  process.env.BOOTSTRAP_ADMIN_PASSWORD ||
+  (process.env.NODE_ENV === "production"
+    ? (() => {
+        throw new Error(
+          "BOOTSTRAP_ADMIN_PASSWORD must be set when NODE_ENV=production — " +
+            "refusing to seed the platform super_admin with a default password.",
+        );
+      })()
+    : "12345678");
 
 // Three plan defaults seeded into platform_plans so /api/plans (Spec 04) has
 // rows to return immediately after 0034 applies. lib/payments/plans.ts stays

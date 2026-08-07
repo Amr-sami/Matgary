@@ -17,6 +17,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
 import { deleteDemoClone } from "@/lib/demo/clone-tenant";
+import { appOrigin } from "@/lib/url-safe";
 
 const AUTH_COOKIE_NAMES = [
   "authjs.session-token",
@@ -36,7 +37,7 @@ async function exitDemo(req: NextRequest): Promise<NextResponse> {
   }
 
   const locale = req.headers.get("x-locale") === "en" ? "en" : "ar";
-  const redirect = new URL(`/${locale}/login`, req.url);
+  const redirect = new URL(`/${locale}/login`, appOrigin(req));
   const res = NextResponse.redirect(redirect);
   for (const name of AUTH_COOKIE_NAMES) {
     res.cookies.set({

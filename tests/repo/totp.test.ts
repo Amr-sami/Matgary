@@ -69,9 +69,9 @@ describe("verifyTotp — window tolerance", () => {
 describe("buildOtpauthUri", () => {
   it("produces an authenticator-app-compatible otpauth:// URI", () => {
     const uri = buildOtpauthUri("user@example.com", "JBSWY3DPEHPK3PXP");
-    expect(uri).toMatch(/^otpauth:\/\/totp\/Matgary%3Auser%40example\.com\?/);
+    expect(uri).toMatch(/^otpauth:\/\/totp\/TheStoro%3Auser%40example\.com\?/);
     expect(uri).toContain("secret=JBSWY3DPEHPK3PXP");
-    expect(uri).toContain("issuer=Matgary");
+    expect(uri).toContain("issuer=TheStoro");
     expect(uri).toContain("algorithm=SHA1");
     expect(uri).toContain("digits=6");
     expect(uri).toContain("period=30");

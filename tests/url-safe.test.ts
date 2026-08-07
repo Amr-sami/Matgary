@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { safeNext } from "@/lib/url-safe";
+import { afterEach, describe, expect, it } from "vitest";
+import { appOrigin, safeNext } from "@/lib/url-safe";
 
 // Guards the open-redirect closure (#1). Anything that isn't a same-origin
 // relative path MUST collapse to the fallback.
@@ -50,5 +50,43 @@ describe("safeNext", () => {
     expect(safeNext(42)).toBe("/");
     // @ts-expect-error
     expect(safeNext({})).toBe("/");
+  });
+});
+
+// Regression guard for the "https://0.0.0.0:3000/ar/login" class of bug. In a
+// self-hosted standalone build, req.url carries HOSTNAME (0.0.0.0 in the
+// Dockerfile), so any route handler that builds an absolute redirect from it
+// sends the browser somewhere unreachable. Only reproduces in production —
+// `next dev` leaves hostname unset and it resolves to localhost.
+describe("appOrigin", () => {
+  const req = (headers: Record<string, string>, url = "https://0.0.0.0:3000/api/demo/exit") =>
+    ({ headers: new Headers(headers), url }) as { headers: Headers; url: string };
+
+  const saved = process.env.NEXT_PUBLIC_APP_URL;
+  afterEach(() => {
+    if (saved === undefined) delete process.env.NEXT_PUBLIC_APP_URL;
+    else process.env.NEXT_PUBLIC_APP_URL = saved;
+  });
+
+  it("prefers NEXT_PUBLIC_APP_URL over anything on the request", () => {
+    process.env.NEXT_PUBLIC_APP_URL = "https://thestoro.com";
+    expect(appOrigin(req({ host: "0.0.0.0:3000" }))).toBe("https://thestoro.com");
+  });
+
+  it("strips a trailing slash so new URL() joins cleanly", () => {
+    process.env.NEXT_PUBLIC_APP_URL = "https://thestoro.com/";
+    expect(new URL("/ar/login", appOrigin(req({}))).href).toBe("https://thestoro.com/ar/login");
+  });
+
+  it("falls back to the proxy's forwarded host, not req.url", () => {
+    delete process.env.NEXT_PUBLIC_APP_URL;
+    expect(
+      appOrigin(req({ "x-forwarded-host": "thestoro.com", "x-forwarded-proto": "https" })),
+    ).toBe("https://thestoro.com");
+  });
+
+  it("never returns the 0.0.0.0 origin while any host hint exists", () => {
+    delete process.env.NEXT_PUBLIC_APP_URL;
+    expect(appOrigin(req({ host: "thestoro.com" }))).not.toContain("0.0.0.0");
   });
 });

@@ -171,12 +171,12 @@ services:
         #!/bin/sh
         set -e
         . /etc/cron-env
-        endpoint="$1"
-        label="$2"
+        endpoint="$$1"
+        label="$$2"
         curl -fsS -X POST \
-          -H "Authorization: Bearer $CRON_SECRET" \
-          "$CRON_TARGET_URL$endpoint" \
-          | sed "s|^|[cron $label] |"
+          -H "Authorization: Bearer $$CRON_SECRET" \
+          "$$CRON_TARGET_URL$$endpoint" \
+          | sed "s|^|[cron $$label] |"
         WRAPPER
         chmod 700 /usr/local/bin/poke-cron.sh
         {

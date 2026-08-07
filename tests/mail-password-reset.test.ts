@@ -11,9 +11,9 @@ describe("buildPasswordResetEmail", () => {
   it("English template carries an English subject + dir=ltr body", () => {
     const out = buildPasswordResetEmail("en", { link: LINK });
     expect(out.subject).toMatch(/reset your password/i);
-    expect(out.subject).toContain("Matgary");
+    expect(out.subject).toContain("TheStoro");
     expect(out.html).toContain('dir="ltr"');
-    expect(out.text).toMatch(/password reset for your Matgary account/i);
+    expect(out.text).toMatch(/password reset for your TheStoro account/i);
     // Latin-only — Arabic glyphs should NOT appear in the EN template.
     expect(out.text).not.toMatch(/[؀-ۿ]/);
     expect(out.html).not.toMatch(/[؀-ۿ]/);
@@ -22,7 +22,7 @@ describe("buildPasswordResetEmail", () => {
   it("Arabic template carries an Arabic subject + dir=rtl body", () => {
     const out = buildPasswordResetEmail("ar", { link: LINK });
     expect(out.subject).toMatch(/إعادة ضبط كلمة المرور/);
-    expect(out.subject).toContain("متجري");
+    expect(out.subject).toContain("ستورو");
     expect(out.html).toContain('dir="rtl"');
     expect(out.text).toMatch(/كلمة المرور/);
   });

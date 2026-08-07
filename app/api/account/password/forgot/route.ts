@@ -6,6 +6,7 @@ import { issueResetToken } from "@/lib/repo/password-reset";
 import { sendMail } from "@/lib/mailer";
 import { rateLimit } from "@/lib/ratelimit";
 import { buildPasswordResetEmail } from "@/lib/mail/password-reset";
+import { appOrigin } from "@/lib/url-safe";
 
 const schema = z.object({
   email: z.string().email().max(200),
@@ -75,7 +76,9 @@ export async function POST(req: NextRequest) {
     // Use the user's stored locale (set at signup) to pick the email
     // template AND the locale prefix on the link. Falls back to "ar"
     // for legacy rows where locale is missing (the column default).
-    const origin = req.nextUrl.origin;
+    // NOT req.nextUrl.origin — see appOrigin() for why that yields
+    // https://0.0.0.0:3000 on a self-hosted standalone build.
+    const origin = appOrigin(req);
     const link =
       `${origin}/${issued.locale}/reset-password` +
       `?token=${encodeURIComponent(issued.raw)}`;

@@ -73,9 +73,13 @@ const CSP_HEADER_NAME =
 const SECURITY_HEADERS: Record<string, string> = {
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "strict-origin-when-cross-origin",
-  // attendance check-in uses geolocation — left allowed on self;
-  // camera/microphone are not used by any current feature.
-  "Permissions-Policy": "camera=(), microphone=(), geolocation=(self)",
+  // attendance check-in uses geolocation, and the barcode scanner
+  // (components/scanner/BarcodeScannerModal.tsx — reached from inventory,
+  // product search, add-product step 3, and edit-product) calls getUserMedia,
+  // so camera must be allowed on self. `camera=()` is an empty allowlist that
+  // denies even same-origin, which disables scanning on the real HTTPS domain
+  // while looking fine over plain-HTTP localhost. Microphone stays denied.
+  "Permissions-Policy": "camera=(self), microphone=(), geolocation=(self)",
 };
 
 function applyCsp(
