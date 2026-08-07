@@ -177,6 +177,11 @@ services:
       ADMIN_SESSION_CLEANUP_CRON: "*/15 * * * *"
       DIGEST_TICK_CRON: "*/30 * * * *"
       DEMO_CLEANUP_CRON: "15 4 * * *"
+      # Drains notification_digest_queue. Its query takes every row where
+      # sent_at IS NULL with no age filter, so the cron interval IS the digest
+      # period — running it hourly would turn an opt-in daily summary into an
+      # hourly one. Once a day, 17:00 UTC = 20:00 Cairo (19:00 outside DST).
+      NOTIFICATIONS_DIGEST_CRON: "0 17 * * *"
     entrypoint:
       - sh
       - -c
@@ -205,8 +210,9 @@ services:
           echo "$$ADMIN_SESSION_CLEANUP_CRON /usr/local/bin/poke-cron.sh /api/cron/admin-session-cleanup admin-session-cleanup >> /var/log/cron.log 2>&1"
           echo "$$DIGEST_TICK_CRON /usr/local/bin/poke-cron.sh /api/cron/digest-tick digest-tick >> /var/log/cron.log 2>&1"
           echo "$$DEMO_CLEANUP_CRON /usr/local/bin/poke-cron.sh /api/cron/demo-cleanup demo-cleanup >> /var/log/cron.log 2>&1"
+          echo "$$NOTIFICATIONS_DIGEST_CRON /usr/local/bin/poke-cron.sh /api/cron/notifications-digest notifications-digest >> /var/log/cron.log 2>&1"
         } > /etc/crontabs/root
-        echo "[cron] target: $$CRON_TARGET_URL — 6 jobs scheduled"
+        echo "[cron] target: $$CRON_TARGET_URL — 7 jobs scheduled"
         exec tini -- crond -f -d 8
 
   backup:
