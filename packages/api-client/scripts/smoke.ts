@@ -1,0 +1,188 @@
+/**
+ * End-to-end smoke test for the native API client, run in Node against a live
+ * dev server. This exercises the SAME code the app runs — http.ts, the error
+ * taxonomy, and the endpoint modules — so a break here is a real break.
+ *
+ *   cd apps/web && npx next dev -p 3001
+ *   npx tsx packages/api-client/scripts/smoke.ts
+ *
+ * It asserts the things that are easy to get subtly wrong and impossible to
+ * see from a screenshot: that refresh rotates, that a rotated token is refused,
+ * that concurrent 401s collapse into ONE refresh, and that a bogus branch id is
+ * ignored rather than honoured.
+ */
+import { ApiClient, ApiError, auth, dashboard, me } from "../src/index";
+import type { AuthTokens, TokenStore } from "../src/index";
+
+const BASE = process.env.API_URL ?? "http://127.0.0.1:3001";
+const IDENTIFIER = process.env.SMOKE_USER ?? "amr@matgary.local";
+const PASSWORD = process.env.SMOKE_PASS ?? "Test1234!";
+
+let passed = 0;
+let failed = 0;
+
+function check(label: string, ok: boolean, detail = "") {
+  if (ok) {
+    passed++;
+    console.log(`  ok    ${label}${detail ? ` — ${detail}` : ""}`);
+  } else {
+    failed++;
+    console.log(`  FAIL  ${label}${detail ? ` — ${detail}` : ""}`);
+  }
+}
+
+/** Stands in for expo-secure-store. */
+function memoryStore(): TokenStore & { peek: () => AuthTokens | null } {
+  let tokens: AuthTokens | null = null;
+  return {
+    get: async () => tokens,
+    set: async (t) => {
+      tokens = t;
+    },
+    clear: async () => {
+      tokens = null;
+    },
+    peek: () => tokens,
+  };
+}
+
+async function main() {
+  console.log(`\nnative api-client smoke — ${BASE}\n`);
+
+  let branchId: string | null = null;
+  let sessionLostCalls = 0;
+  const store = memoryStore();
+  const client = new ApiClient({
+    baseUrl: BASE,
+    tokens: store,
+    getBranchId: () => branchId,
+    onSessionLost: () => {
+      sessionLostCalls++;
+    },
+  });
+
+  // ---- login ------------------------------------------------------------
+  const login = await auth.login(client, {
+    identifier: IDENTIFIER,
+    password: PASSWORD,
+    deviceName: "smoke-harness",
+    platform: "ios",
+    appVersion: "0.1.0",
+    installId: "smoke-harness-install",
+  });
+  check("login returns tokens", Boolean(login.accessToken && login.refreshToken));
+  check("tokens persisted to the store", store.peek() !== null);
+  check(
+    "expiresAt derived from expiresIn",
+    Math.abs((store.peek()!.expiresAt - Date.now()) / 1000 - login.expiresIn) < 5,
+  );
+
+  // ---- /me --------------------------------------------------------------
+  const identity = await me.getMe(client);
+  check("me resolves tenant", Boolean(identity.tenant.id), identity.tenant.slug ?? "");
+  check("me resolves a branch", Boolean(identity.branch.id), identity.branch.name ?? "");
+  check(
+    "EFFECTIVE permissions are owner-expanded",
+    identity.permissions.length > login.user.permissions.length,
+    `${login.user.permissions.length} raw -> ${identity.permissions.length} effective`,
+  );
+
+  // ---- branch header ----------------------------------------------------
+  const other = identity.branches.find((b) => b.id !== identity.branch.id);
+  if (other) {
+    branchId = other.id;
+    const switched = await me.getMe(client);
+    check("X-Branch-Id switches branch", switched.branch.id === other.id, other.name);
+
+    branchId = "00000000-0000-0000-0000-000000000000";
+    const bogus = await me.getMe(client);
+    check(
+      "a branch id outside the allow-list is ignored, not honoured",
+      bogus.branch.id !== "00000000-0000-0000-0000-000000000000",
+      `fell back to ${bogus.branch.name}`,
+    );
+    branchId = null;
+  } else {
+    console.log("  skip  branch switching — tenant has only one branch");
+  }
+
+  // ---- an authenticated data route --------------------------------------
+  const dash = await dashboard.getDashboard(client);
+  check("dashboard returns stats", typeof dash.stats.productCount === "number",
+    `${dash.stats.productCount} products, month ${dash.stats.monthRevenue}`);
+
+  // ---- refresh rotation --------------------------------------------------
+  const beforeRefresh = store.peek()!;
+  // Force the proactive path by back-dating the expiry past the skew window.
+  await store.set({ ...beforeRefresh, expiresAt: Date.now() + 1_000 });
+  await me.getMe(client);
+  const afterRefresh = store.peek()!;
+  check(
+    "refresh rotates the refresh token",
+    afterRefresh.refreshToken !== beforeRefresh.refreshToken,
+  );
+  check(
+    "refresh mints a new access token",
+    afterRefresh.accessToken !== beforeRefresh.accessToken,
+  );
+
+  // ---- single-flight refresh --------------------------------------------
+  // THE test that matters. Rotation + reuse detection means two concurrent
+  // refreshes would burn the chain and log the user out of every device. Fire
+  // six parallel requests with an expired access token; if the client is
+  // correct, exactly one refresh happens and all six succeed.
+  const current = store.peek()!;
+  await store.set({ ...current, expiresAt: Date.now() - 1 });
+  const results = await Promise.allSettled(
+    Array.from({ length: 6 }, () => me.getMe(client)),
+  );
+  const ok = results.filter((r) => r.status === "fulfilled").length;
+  check(
+    "six concurrent 401s collapse into one refresh",
+    ok === 6,
+    `${ok}/6 succeeded`,
+  );
+  check("no spurious session-lost during concurrent refresh", sessionLostCalls === 0);
+
+  // ---- logout ------------------------------------------------------------
+  await auth.logout(client);
+  check("logout clears local tokens", store.peek() === null);
+
+  // ---- reuse detection (DESTRUCTIVE — must run last) ---------------------
+  // Triggering this revokes EVERY live session for the user, not just this
+  // device (HANDOFF open item 3). Anything sequenced after it would be
+  // testing an already-dead session, so it goes at the end.
+  // Replay the token that was just rotated away. The server must refuse it.
+  const replayStore = memoryStore();
+  await replayStore.set(beforeRefresh);
+  const replayClient = new ApiClient({
+    baseUrl: BASE,
+    tokens: replayStore,
+    onSessionLost: () => {},
+  });
+  await replayStore.set({ ...beforeRefresh, expiresAt: 0 });
+  let reuseKind = "";
+  let reuseCode = "";
+  try {
+    await me.getMe(replayClient);
+  } catch (error) {
+    if (error instanceof ApiError) {
+      reuseKind = error.kind;
+      reuseCode = error.code ?? "";
+    }
+  }
+  check(
+    "replaying a rotated refresh token kills the session",
+    reuseKind === "session",
+    `${reuseCode || "(no code)"}`,
+  );
+  check("local tokens cleared on a dead session", replayStore.peek() === null);
+
+  console.log(`\n${passed} passed, ${failed} failed\n`);
+  process.exit(failed === 0 ? 0 : 1);
+}
+
+main().catch((error) => {
+  console.error("\nharness crashed:", error);
+  process.exit(1);
+});
