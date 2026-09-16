@@ -22,13 +22,19 @@ const colorStyles = {
 export function StatCard({ title, value, subtitle, icon: Icon, color = "accent", href }: StatCardProps) {
   const content = (
     <div className={cn(
-      "bg-white rounded-xl p-5 shadow-sm border border-border h-full transition-all duration-200",
+      // p-4 on phones: at p-5 the two-up grid leaves the value only ~105px,
+      // and "277,575 ج.م" needs 128px at text-2xl — the number was breaking
+      // away from its currency. Measured, not guessed.
+      "bg-white rounded-xl p-4 lg:p-5 shadow-sm border border-border h-full transition-all duration-200",
       href && "hover:shadow-md hover:border-accent group"
     )}>
-      <div className="flex items-start justify-between">
-        <div>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
           <p className="text-sm text-text-secondary group-hover:text-accent transition-colors">{title}</p>
-          <p className="text-2xl font-bold mt-1">{value}</p>
+          {/* A money figure must never split from its currency. text-xl on
+              phones keeps six-figure EGP on one line; lg restores the
+              desktop size, where there is room to spare. */}
+          <p className="text-xl lg:text-2xl font-bold mt-1 whitespace-nowrap tabular-nums">{value}</p>
           {subtitle && (
             <p className="text-xs text-text-secondary mt-1">{subtitle}</p>
           )}

@@ -161,7 +161,7 @@ export default function InsightsPage() {
               <button
                 type="button"
                 onClick={() => setBranchScope("active")}
-                className={`px-3 py-1.5 transition-colors ${
+                className={`px-3 py-1.5 transition-colors whitespace-nowrap shrink-0 min-h-11 lg:min-h-0 ${
                   branchScope === "active"
                     ? "bg-accent text-white"
                     : "text-text-secondary hover:bg-bg-main"
@@ -172,7 +172,7 @@ export default function InsightsPage() {
               <button
                 type="button"
                 onClick={() => setBranchScope("all")}
-                className={`px-3 py-1.5 transition-colors border-s border-border ${
+                className={`px-3 py-1.5 transition-colors border-s border-border whitespace-nowrap shrink-0 min-h-11 lg:min-h-0 ${
                   branchScope === "all"
                     ? "bg-accent text-white"
                     : "text-text-secondary hover:bg-bg-main"
@@ -185,13 +185,13 @@ export default function InsightsPage() {
         )}
 
         <div className="space-y-2">
-          <div className="flex flex-wrap gap-2">
+          <div className="flex gap-2 overflow-x-auto lg:flex-wrap lg:overflow-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {DATE_FILTER_ORDER.map((key) => (
               <button
                 key={key}
                 type="button"
                 onClick={() => setDateRange(key)}
-                className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${
+                className={`px-3 py-1.5 rounded-lg text-sm border transition-colors whitespace-nowrap shrink-0 min-h-11 lg:min-h-0 ${
                   dateRange === key
                     ? "bg-accent text-white border-accent"
                     : "bg-white border-border text-text-secondary hover:border-accent"
@@ -232,7 +232,7 @@ export default function InsightsPage() {
                     setCustomFrom("");
                     setCustomTo("");
                   }}
-                  className="text-xs text-text-secondary hover:text-danger px-2 py-1.5"
+                  className="text-xs text-text-secondary hover:text-danger px-2 py-1.5 whitespace-nowrap shrink-0 min-h-11 lg:min-h-0"
                 >
                   {dict.app.dateRange.clear}
                 </button>
@@ -258,7 +258,7 @@ export default function InsightsPage() {
         ) : (
           <>
             {/* KPI row */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <RevenueCard
                 label={headlineLabel}
                 value={metrics.currentRevenue}
@@ -347,20 +347,24 @@ function RevenueCard({
 }) {
   const locale = useLocale();
   return (
-    <div className="bg-white rounded-xl p-5 shadow-sm border border-border h-full">
-      <div className="flex items-start justify-between gap-3">
+    <div className="bg-white rounded-xl p-4 lg:p-5 shadow-sm border border-border h-full">
+      <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-sm text-text-secondary">{label}</p>
-          <p className="text-2xl font-bold mt-1 tabular-nums">
+          {/* A money figure must never split from its currency — at text-2xl in
+              a two-up phone grid this broke "277,575" away from "ج.م". */}
+          <p className="text-xl lg:text-2xl font-bold mt-1 tabular-nums whitespace-nowrap">
             {formatCurrency(value, locale)}
           </p>
         </div>
         <DollarSign className="w-6 h-6 text-accent shrink-0" />
       </div>
+      {/* The badge carries only the delta so it never wraps in a half-width
+          card; the "compared to…" phrase sits under it as a caption. */}
       <div
-        className={`mt-3 inline-flex items-center gap-1 text-xs font-semibold tabular-nums px-2 py-1 rounded-md ${
+        className={`mt-3 inline-flex items-center gap-1 text-xs font-semibold tabular-nums px-2 py-1 rounded-md whitespace-nowrap ${
           isPositive
-            ? "bg-success-light text-success"
+            ? "bg-success-light text-success-strong"
             : "bg-danger-light text-danger"
         }`}
       >
@@ -371,8 +375,8 @@ function RevenueCard({
         )}
         {isPositive ? "+" : ""}
         {growth.toFixed(1)}%
-        <span className="font-normal opacity-80 ms-1">{comparison}</span>
       </div>
+      <p className="mt-1 text-xs text-text-secondary">{comparison}</p>
     </div>
   );
 }

@@ -104,7 +104,7 @@ export function StaffPerformance({ window, rangeLabel }: StaffPerformanceProps) 
       ) : (
         <>
           {/* Summary cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <div className="bg-white rounded-2xl border border-border p-4">
               <p className="text-xs text-text-secondary">{t.summary.active}</p>
               <p className="text-2xl font-bold mt-1 text-text-primary">

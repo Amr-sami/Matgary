@@ -79,7 +79,7 @@ export function ExpenseTable({ expenses }: ExpenseTableProps) {
                 <td className="py-4 px-6">
                   <Badge variant="other">{categoryLabels[expense.category]}</Badge>
                 </td>
-                <td className="py-4 px-6 font-black text-danger">
+                <td className="py-4 px-6 font-black text-danger whitespace-nowrap tabular-nums">
                   {formatCurrency(expense.amount, locale)}
                 </td>
                 <td className="py-4 px-6 text-center">
