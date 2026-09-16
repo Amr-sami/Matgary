@@ -10,6 +10,10 @@
 # which then failed the CSS parser and 500'd every request. Turbopack cached
 # the broken output, Tailwind rescanned it, and the loop sustained itself
 # across cache wipes.
+# Package-local deps. npm workspaces hoist almost everything to the repo
+# root, but vitest and friends still write caches here.
+/node_modules/
+
 /.next/
 /out/
 /build/
