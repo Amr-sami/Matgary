@@ -338,7 +338,7 @@ export function ReceiptDesigner({ draft, update, onError }: Props) {
             <button
               type="button"
               onClick={addCustomBlock}
-              className="text-xs px-2 py-1 rounded-md bg-accent-light text-accent hover:bg-accent hover:text-white transition-colors"
+              className="inline-flex items-center text-xs px-2 py-1 rounded-md bg-accent-light text-accent hover:bg-accent hover:text-white transition-colors whitespace-nowrap shrink-0 min-h-11 lg:min-h-0"
             >
               {t.addCustom}
             </button>
@@ -347,7 +347,7 @@ export function ReceiptDesigner({ draft, update, onError }: Props) {
               onClick={() => {
                 update("receiptBlockOrder", DEFAULT_RECEIPT_BLOCK_ORDER);
               }}
-              className="text-xs text-text-secondary hover:text-accent"
+              className="inline-flex items-center text-xs text-text-secondary hover:text-accent whitespace-nowrap shrink-0 min-h-11 lg:min-h-0"
             >
               {t.restoreOrder}
             </button>
@@ -401,7 +401,7 @@ export function ReceiptDesigner({ draft, update, onError }: Props) {
                 key={k}
                 type="button"
                 onClick={() => showBlock(k)}
-                className="text-xs px-2 py-1 rounded-md bg-bg-main text-text-secondary hover:bg-accent-light hover:text-accent border border-border transition-colors"
+                className="inline-flex items-center text-xs px-2 py-1 rounded-md bg-bg-main text-text-secondary hover:bg-accent-light hover:text-accent border border-border transition-colors whitespace-nowrap shrink-0 min-h-11 lg:min-h-0"
               >
                 + {t.blockLabels[k]}
               </button>
@@ -414,14 +414,14 @@ export function ReceiptDesigner({ draft, update, onError }: Props) {
                 <button
                   type="button"
                   onClick={() => showBlock(`custom:${id}`)}
-                  className="text-xs px-1 py-1 text-text-secondary hover:text-accent"
+                  className="inline-flex items-center text-xs px-1 py-1 text-text-secondary hover:text-accent whitespace-nowrap min-h-11 lg:min-h-0"
                 >
                   + {b.text.trim().slice(0, 24) || t.customPlaceholder}
                 </button>
                 <button
                   type="button"
                   onClick={() => deleteCustomBlock(id)}
-                  className="text-xs text-danger hover:text-danger/80 px-1"
+                  className="inline-flex items-center justify-center text-xs text-danger hover:text-danger/80 px-1 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
                   title={t.permanentDelete}
                   aria-label={t.permanentDelete}
                 >

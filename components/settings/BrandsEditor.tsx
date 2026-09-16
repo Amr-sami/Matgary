@@ -89,7 +89,7 @@ export function BrandsEditor({ onToast }: Props) {
             key={c.id}
             type="button"
             onClick={() => setSelectedCategoryId(c.id)}
-            className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${
+            className={`px-3 py-1.5 rounded-lg text-sm border transition-colors whitespace-nowrap shrink-0 min-h-11 lg:min-h-0 ${
               selectedCategoryId === c.id
                 ? "bg-accent text-white border-accent"
                 : "bg-white border-border text-text-secondary hover:border-accent"

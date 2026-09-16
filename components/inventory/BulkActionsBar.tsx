@@ -46,7 +46,7 @@ export function BulkActionsBar({ selected, onClear, onAction }: BulkActionsBarPr
 
   return (
     <div className="sticky top-2 z-20 bg-accent text-white rounded-xl shadow-lg p-3 flex flex-wrap items-center gap-2">
-      <span className="font-medium text-sm">
+      <span className="font-medium text-sm whitespace-nowrap shrink-0">
         {t.selectedCount.replace("{n}", String(selected.length))}
       </span>
       <div className="flex-1" />
@@ -55,7 +55,7 @@ export function BulkActionsBar({ selected, onClear, onAction }: BulkActionsBarPr
       <div className="relative">
         <button
           onClick={() => setOpenMenu(openMenu === "tag" ? null : "tag")}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-sm"
+          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-sm whitespace-nowrap shrink-0 min-h-11 lg:min-h-0"
         >
           <Tag className="w-4 h-4" />
           {t.addTag}
@@ -78,7 +78,7 @@ export function BulkActionsBar({ selected, onClear, onAction }: BulkActionsBarPr
                   closeMenus();
                 }
               }}
-              className="px-3 py-1.5 bg-accent text-white rounded text-sm"
+              className="px-3 py-1.5 bg-accent text-white rounded text-sm whitespace-nowrap shrink-0 min-h-11 lg:min-h-0"
             >
               {t.apply}
             </button>
@@ -90,7 +90,7 @@ export function BulkActionsBar({ selected, onClear, onAction }: BulkActionsBarPr
       <div className="relative">
         <button
           onClick={() => setOpenMenu(openMenu === "price" ? null : "price")}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-sm"
+          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-sm whitespace-nowrap shrink-0 min-h-11 lg:min-h-0"
         >
           <Percent className="w-4 h-4" />
           {t.priceAdjust}
@@ -115,7 +115,7 @@ export function BulkActionsBar({ selected, onClear, onAction }: BulkActionsBarPr
                   closeMenus();
                 }
               }}
-              className="px-3 py-1.5 bg-accent text-white rounded text-sm whitespace-nowrap"
+              className="px-3 py-1.5 bg-accent text-white rounded text-sm whitespace-nowrap shrink-0 min-h-11 lg:min-h-0"
             >
               {t.applyPercent}
             </button>
@@ -128,7 +128,7 @@ export function BulkActionsBar({ selected, onClear, onAction }: BulkActionsBarPr
         <div className="relative">
           <button
             onClick={() => setOpenMenu(openMenu === "category" ? null : "category")}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-sm"
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-sm whitespace-nowrap shrink-0 min-h-11 lg:min-h-0"
           >
             <Package className="w-4 h-4" />
             {t.category}
@@ -142,7 +142,7 @@ export function BulkActionsBar({ selected, onClear, onAction }: BulkActionsBarPr
                     onAction({ type: "category", value: c.id });
                     closeMenus();
                   }}
-                  className="text-start px-3 py-1.5 hover:bg-gray-100 rounded text-sm"
+                  className="flex items-center text-start px-3 py-1.5 hover:bg-gray-100 rounded text-sm min-h-11 lg:min-h-0"
                   dir="auto"
                 >
                   {c.label}
@@ -157,7 +157,7 @@ export function BulkActionsBar({ selected, onClear, onAction }: BulkActionsBarPr
       <div className="relative">
         <button
           onClick={() => setOpenMenu(openMenu === "gender" ? null : "gender")}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-sm"
+          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-sm whitespace-nowrap shrink-0 min-h-11 lg:min-h-0"
         >
           <Wrench className="w-4 h-4" />
           {t.gender}
@@ -171,7 +171,7 @@ export function BulkActionsBar({ selected, onClear, onAction }: BulkActionsBarPr
                   onAction({ type: "gender", value: g.value });
                   closeMenus();
                 }}
-                className="text-start px-3 py-1.5 hover:bg-gray-100 rounded text-sm"
+                className="flex items-center text-start px-3 py-1.5 hover:bg-gray-100 rounded text-sm min-h-11 lg:min-h-0"
                 dir="auto"
               >
                 {genderLabel(g.labelKey)}
@@ -185,7 +185,7 @@ export function BulkActionsBar({ selected, onClear, onAction }: BulkActionsBarPr
       <div className="relative">
         <button
           onClick={() => setOpenMenu(openMenu === "supplier" ? null : "supplier")}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-sm"
+          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-sm whitespace-nowrap shrink-0 min-h-11 lg:min-h-0"
         >
           <Truck className="w-4 h-4" />
           {t.supplier}
@@ -206,7 +206,7 @@ export function BulkActionsBar({ selected, onClear, onAction }: BulkActionsBarPr
                 setSupplierInput("");
                 closeMenus();
               }}
-              className="px-3 py-1.5 bg-accent text-white rounded text-sm"
+              className="px-3 py-1.5 bg-accent text-white rounded text-sm whitespace-nowrap shrink-0 min-h-11 lg:min-h-0"
             >
               {t.apply}
             </button>
@@ -218,7 +218,7 @@ export function BulkActionsBar({ selected, onClear, onAction }: BulkActionsBarPr
       <div className="relative">
         <button
           onClick={() => setOpenMenu(openMenu === "location" ? null : "location")}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-sm"
+          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-sm whitespace-nowrap shrink-0 min-h-11 lg:min-h-0"
         >
           <MapPin className="w-4 h-4" />
           {t.location}
@@ -239,7 +239,7 @@ export function BulkActionsBar({ selected, onClear, onAction }: BulkActionsBarPr
                 setLocationInput("");
                 closeMenus();
               }}
-              className="px-3 py-1.5 bg-accent text-white rounded text-sm"
+              className="px-3 py-1.5 bg-accent text-white rounded text-sm whitespace-nowrap shrink-0 min-h-11 lg:min-h-0"
             >
               {t.apply}
             </button>
@@ -250,7 +250,7 @@ export function BulkActionsBar({ selected, onClear, onAction }: BulkActionsBarPr
       {/* Export */}
       <button
         onClick={() => onAction({ type: "exportCsv" })}
-        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-sm"
+        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-sm whitespace-nowrap shrink-0 min-h-11 lg:min-h-0"
       >
         <Download className="w-4 h-4" />
         {t.export}
@@ -259,7 +259,7 @@ export function BulkActionsBar({ selected, onClear, onAction }: BulkActionsBarPr
       {/* Delete */}
       <button
         onClick={() => onAction({ type: "delete" })}
-        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-danger hover:bg-danger/90 text-sm"
+        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-danger hover:bg-danger/90 text-sm whitespace-nowrap shrink-0 min-h-11 lg:min-h-0"
       >
         <Trash2 className="w-4 h-4" />
         {t.delete}
@@ -268,7 +268,7 @@ export function BulkActionsBar({ selected, onClear, onAction }: BulkActionsBarPr
       {/* Clear */}
       <button
         onClick={onClear}
-        className="p-1.5 rounded-lg hover:bg-white/10"
+        className="inline-flex items-center justify-center p-1.5 rounded-lg hover:bg-white/10 shrink-0 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
         title={t.clearTitle}
       >
         <X className="w-4 h-4" />

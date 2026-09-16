@@ -121,7 +121,7 @@ export function CustomerRow({ customer, records, onChange }: CustomerRowProps) {
               </span>
             )}
             {customer.outstandingBalance > 0 && (
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium">
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium whitespace-nowrap">
                 {t.owedBadge.replace(
                   "{amount}",
                   formatCurrency(customer.outstandingBalance, locale),
@@ -166,7 +166,7 @@ export function CustomerRow({ customer, records, onChange }: CustomerRowProps) {
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white border border-border text-xs hover:border-accent"
+          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white border border-border text-xs hover:border-accent whitespace-nowrap shrink-0 min-h-11 lg:min-h-0"
         >
           {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           {expanded ? t.hide : t.showInvoices}
@@ -177,7 +177,7 @@ export function CustomerRow({ customer, records, onChange }: CustomerRowProps) {
         {detailHref && (
           <Link
             href={detailHref}
-            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 min-h-11 lg:min-h-0 ${
               customer.outstandingBalance > 0
                 ? "bg-accent text-white hover:bg-accent/90"
                 : "bg-white border border-border text-text-secondary hover:border-accent hover:text-accent"
@@ -197,7 +197,7 @@ export function CustomerRow({ customer, records, onChange }: CustomerRowProps) {
           )}
           target="_blank"
           rel="noreferrer"
-          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-success-light text-success text-xs hover:bg-success hover:text-white"
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-success-light text-success text-xs hover:bg-success hover:text-white whitespace-nowrap shrink-0 min-h-11 lg:min-h-0"
           title={t.thanksTitle}
         >
           <MessageCircle className="w-3.5 h-3.5" />
@@ -214,7 +214,7 @@ export function CustomerRow({ customer, records, onChange }: CustomerRowProps) {
             )}
             target="_blank"
             rel="noreferrer"
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-orange-100 text-orange-700 text-xs hover:bg-orange-500 hover:text-white"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-orange-100 text-orange-700 text-xs hover:bg-orange-500 hover:text-white whitespace-nowrap shrink-0 min-h-11 lg:min-h-0"
             title={t.reminderTitle}
           >
             <Bell className="w-3.5 h-3.5" />
@@ -231,7 +231,7 @@ export function CustomerRow({ customer, records, onChange }: CustomerRowProps) {
           )}
           target="_blank"
           rel="noreferrer"
-          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-accent-light text-accent text-xs hover:bg-accent hover:text-white"
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-accent-light text-accent text-xs hover:bg-accent hover:text-white whitespace-nowrap shrink-0 min-h-11 lg:min-h-0"
           title={t.newCollectionTitle}
         >
           <Megaphone className="w-3.5 h-3.5" />
@@ -276,7 +276,7 @@ export function CustomerRow({ customer, records, onChange }: CustomerRowProps) {
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <p className="font-bold text-accent tabular-nums">
+                  <p className="font-bold text-accent tabular-nums whitespace-nowrap">
                     {formatCurrency(inv.total, locale)}
                   </p>
                   {!inv.isPaid && (
@@ -284,7 +284,7 @@ export function CustomerRow({ customer, records, onChange }: CustomerRowProps) {
                       type="button"
                       onClick={() => markInvoicePaid(inv.id, inv.saleIds)}
                       disabled={busy}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-success text-white text-xs font-medium hover:bg-success/90 disabled:opacity-60"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-success text-white text-xs font-medium hover:bg-success/90 disabled:opacity-60 whitespace-nowrap shrink-0 min-h-11 lg:min-h-0"
                     >
                       <CheckCircle className="w-3 h-3" />
                       {busy ? t.markPaidBusy : t.markPaid}

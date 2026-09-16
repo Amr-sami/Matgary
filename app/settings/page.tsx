@@ -1301,7 +1301,7 @@ function SettingsPageInner() {
             </div>
             <button
               onClick={handleResetTemplate}
-              className="text-xs text-text-secondary hover:text-accent"
+              className="inline-flex items-center text-xs text-text-secondary hover:text-accent whitespace-nowrap shrink-0 min-h-11 lg:min-h-0"
             >
               {t.messageTemplate.resetDefault}
             </button>
@@ -1325,7 +1325,7 @@ function SettingsPageInner() {
                   key={key}
                   type="button"
                   onClick={() => handleInsertPlaceholder(key)}
-                  className="text-[11px] px-2 py-1 rounded-md bg-accent-light text-accent hover:bg-accent hover:text-white transition-colors"
+                  className="inline-flex items-center text-[11px] px-2 py-1 rounded-md bg-accent-light text-accent hover:bg-accent hover:text-white transition-colors whitespace-nowrap shrink-0 min-h-11 lg:min-h-0"
                   title={t.messageTemplate.vars[key]}
                 >
                   {`{${key}}`}

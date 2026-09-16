@@ -183,7 +183,9 @@ export function FilterSelect({
           "items-center justify-between gap-2 rounded-lg border border-border bg-white transition-colors hover:border-text-secondary/40",
           fullWidth
             ? "flex w-full px-4 py-2.5 text-text-primary focus:outline-none focus:border-accent"
-            : "inline-flex min-w-[140px] px-3 py-2 text-sm",
+            // min-h-11 = 44px, the iOS touch floor. Reset at lg so the desktop
+            // filter row keeps its existing compact height.
+            : "inline-flex min-w-[140px] px-3 py-2 text-sm min-h-11 lg:min-h-0",
           // Neutral colour only — selection state shows via the active row's
           // accent + check in the menu, not via the trigger's border. Matches
           // the rest of the filter chips on /customers, /sales etc.
@@ -240,7 +242,7 @@ export function FilterSelect({
                   aria-selected={value === null}
                   onClick={() => choose(null)}
                   className={cn(
-                    "w-full flex items-center justify-between gap-2 px-3 py-2 text-sm text-start hover:bg-bg-main transition-colors",
+                    "w-full flex items-center justify-between gap-2 px-3 py-2 text-sm text-start hover:bg-bg-main transition-colors min-h-11 lg:min-h-0",
                     value === null && "font-semibold text-accent",
                   )}
                 >
@@ -265,7 +267,7 @@ export function FilterSelect({
                   aria-selected={isActive}
                   onClick={() => choose(opt.value)}
                   className={cn(
-                    "w-full flex items-center justify-between gap-2 px-3 py-2 text-sm text-start hover:bg-bg-main transition-colors",
+                    "w-full flex items-center justify-between gap-2 px-3 py-2 text-sm text-start hover:bg-bg-main transition-colors min-h-11 lg:min-h-0",
                     isActive && "font-semibold text-accent",
                   )}
                   dir="auto"

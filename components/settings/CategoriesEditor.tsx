@@ -125,7 +125,7 @@ export function CategoriesEditor({ onToast }: Props) {
                   key={name}
                   type="button"
                   onClick={() => setNewIcon(name)}
-                  className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${
+                  className={`px-3 py-1.5 rounded-lg text-sm border transition-colors whitespace-nowrap shrink-0 min-h-11 lg:min-h-0 ${
                     newIcon === name
                       ? "bg-accent text-white border-accent"
                       : "bg-white border-border text-text-secondary hover:border-accent"
@@ -400,14 +400,14 @@ function AttributeRow({
         {attr.values.map((v) => (
           <span
             key={v.id}
-            className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-full bg-accent-light text-accent"
+            className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-full bg-accent-light text-accent whitespace-nowrap shrink-0"
             dir="auto"
           >
             {v.label}
             <button
               type="button"
               onClick={() => onRemoveValue(v.id)}
-              className="text-accent/60 hover:text-danger"
+              className="text-accent/60 hover:text-danger shrink-0"
               title={deleteValueTitle}
             >
               ×

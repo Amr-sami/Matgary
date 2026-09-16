@@ -546,7 +546,7 @@ export function InventoryClient() {
             <SortMenu value={sortKey} onChange={setSortKey} />
             <button
               onClick={() => setDeadStockOnly(!deadStockOnly)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm border transition-colors ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm border transition-colors whitespace-nowrap shrink-0 min-h-11 lg:min-h-0 ${
                 deadStockOnly
                   ? "bg-orange-100 border-orange-300 text-orange-700"
                   : "border-border bg-white text-text-secondary hover:border-accent"
@@ -559,7 +559,7 @@ export function InventoryClient() {
             {hasAnyFilter && (
               <button
                 onClick={handleResetFilters}
-                className="px-3 py-2 rounded-lg text-sm text-text-secondary hover:text-accent border border-border bg-white"
+                className="px-3 py-2 rounded-lg text-sm text-text-secondary hover:text-accent border border-border bg-white whitespace-nowrap shrink-0 min-h-11 lg:min-h-0"
               >
                 {t.tools.clearFilters}
               </button>
@@ -576,7 +576,7 @@ export function InventoryClient() {
             </button>
             <button
               onClick={() => setImportOpen(true)}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm border border-border bg-white text-text-secondary hover:border-accent"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm border border-border bg-white text-text-secondary hover:border-accent whitespace-nowrap shrink-0 min-h-11 lg:min-h-0"
             >
               <Upload className="w-4 h-4" />
               {t.tools.import}
@@ -584,7 +584,7 @@ export function InventoryClient() {
             <button
               onClick={handleExportCsv}
               disabled={filteredProducts.length === 0}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm border border-border bg-white text-text-secondary hover:border-accent disabled:opacity-50"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm border border-border bg-white text-text-secondary hover:border-accent disabled:opacity-50 whitespace-nowrap shrink-0 min-h-11 lg:min-h-0"
             >
               <Download className="w-4 h-4" />
               {t.tools.exportCsv}

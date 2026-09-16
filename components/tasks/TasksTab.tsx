@@ -207,19 +207,19 @@ export function TasksTab({ onToast, onUnreadChange }: Props) {
 
         <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
           <span
-            className={`px-1.5 py-0.5 rounded-full font-medium ${PRIORITY_TONES[task.priority]}`}
+            className={`px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap shrink-0 ${PRIORITY_TONES[task.priority]}`}
           >
             {t.priority[task.priority]}
           </span>
           {task.assignedToName && (
-            <span className="px-1.5 py-0.5 rounded-full bg-bg-main text-text-secondary" dir="auto">
+            <span className="px-1.5 py-0.5 rounded-full bg-bg-main text-text-secondary whitespace-nowrap shrink-0" dir="auto">
               {task.assignedToName}
             </span>
           )}
           {task.dueDate && (
             <span
               className={[
-                "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full",
+                "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full whitespace-nowrap shrink-0",
                 overdue
                   ? "bg-danger-light text-danger font-medium"
                   : "bg-bg-main text-text-secondary",
@@ -303,7 +303,7 @@ export function TasksTab({ onToast, onUnreadChange }: Props) {
             type="button"
             onClick={() => setView("board")}
             className={[
-              "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
+              "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap shrink-0 min-h-11 lg:min-h-0",
               view === "board"
                 ? "bg-white text-text-primary shadow-sm"
                 : "text-text-secondary",
@@ -315,7 +315,7 @@ export function TasksTab({ onToast, onUnreadChange }: Props) {
             type="button"
             onClick={() => setView("list")}
             className={[
-              "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
+              "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap shrink-0 min-h-11 lg:min-h-0",
               view === "list"
                 ? "bg-white text-text-primary shadow-sm"
                 : "text-text-secondary",

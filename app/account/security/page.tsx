@@ -83,7 +83,7 @@ function DeleteTenantCard({ isOwner }: { isOwner: boolean }) {
           <p className="text-xs text-text-secondary">{t.confirmHint}</p>
           <Input value={slug} onChange={(e) => setSlug(e.target.value)} placeholder={t.slugPlaceholder} dir="ltr" />
           {error && <p className="text-xs text-danger">{error}</p>}
-          <Button variant="secondary" onClick={schedule} loading={busy} disabled={!slug.trim()}>
+          <Button variant="secondary" onClick={schedule} loading={busy} disabled={!slug.trim()} className="min-h-11">
             {t.startButton}
           </Button>
         </>
@@ -274,7 +274,7 @@ export default function SecurityPage() {
             {t.statusOffLine}
             <span className="text-text-primary font-medium">{t.statusOff}</span>
           </p>
-          <Button onClick={startEnroll} loading={busy}>{t.enableButton}</Button>
+          <Button onClick={startEnroll} loading={busy} className="min-h-11">{t.enableButton}</Button>
         </div>
       )}
 
@@ -385,6 +385,7 @@ export default function SecurityPage() {
               }
             }}
             loading={exporting}
+            className="min-h-11"
           >
             {t.export.button}
           </Button>
@@ -408,6 +409,7 @@ export default function SecurityPage() {
               }
             }}
             loading={revoking}
+            className="min-h-11"
           >
             {t.revoke.button}
           </Button>

@@ -90,14 +90,14 @@ export function PurchasesFilters({
       />
 
       {/* Date range */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex gap-2 overflow-x-auto lg:flex-wrap lg:overflow-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {RANGES.map((r) => (
           <button
             key={r}
             type="button"
             onClick={() => onDateRangeChange(r)}
             className={cn(
-              "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
+              "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 min-h-11 lg:min-h-0",
               dateRange === r
                 ? "bg-accent text-white"
                 : "bg-white border border-border text-text-secondary hover:border-accent",
@@ -109,7 +109,7 @@ export function PurchasesFilters({
       </div>
 
       {dateRange === "custom" && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex gap-2 overflow-x-auto lg:flex-wrap lg:overflow-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <input
             type="date"
             value={customFrom}
@@ -129,7 +129,7 @@ export function PurchasesFilters({
                 onCustomFromChange("");
                 onCustomToChange("");
               }}
-              className="px-3 py-1.5 rounded-lg text-xs text-text-secondary hover:text-danger"
+              className="px-3 py-1.5 rounded-lg text-xs text-text-secondary hover:text-danger whitespace-nowrap shrink-0 min-h-11 lg:min-h-0"
             >
               {t.clear}
             </button>
@@ -138,14 +138,14 @@ export function PurchasesFilters({
       )}
 
       {/* Status */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex gap-2 overflow-x-auto lg:flex-wrap lg:overflow-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {statuses.map((s) => (
           <button
             key={s.value}
             type="button"
             onClick={() => onStatusChange(s.value)}
             className={cn(
-              "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
+              "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 min-h-11 lg:min-h-0",
               selectedStatus === s.value
                 ? "bg-accent text-white"
                 : "bg-white border border-border text-text-secondary hover:border-accent",
@@ -164,10 +164,10 @@ export function PurchasesFilters({
             type="button"
             onClick={() => onPaymentStatusChange(p)}
             className={cn(
-              "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
+              "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 min-h-11 lg:min-h-0",
               paymentStatus === p
-                ? "bg-success text-white"
-                : "bg-white border border-border text-text-secondary hover:border-success",
+                ? "bg-accent text-white"
+                : "bg-white border border-border text-text-secondary hover:border-accent",
             )}
           >
             {t.paymentStatus[p]}

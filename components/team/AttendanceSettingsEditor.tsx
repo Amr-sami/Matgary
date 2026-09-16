@@ -321,7 +321,7 @@ export function AttendanceSettingsEditor({ onToast }: Props) {
                   type="button"
                   onClick={() => toggleWeekend(d.iso)}
                   className={cn(
-                    "px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors",
+                    "px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors whitespace-nowrap shrink-0 min-h-11 lg:min-h-0",
                     active
                       ? "bg-accent text-white border-accent"
                       : "bg-white text-text-secondary border-border hover:border-accent/40",
@@ -421,7 +421,7 @@ export function AttendanceSettingsEditor({ onToast }: Props) {
             {locInput.trim() &&
               (parsedCoords ? (
                 <div
-                  className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-success/10 text-success text-xs font-medium"
+                  className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-success/10 text-success text-xs font-medium whitespace-nowrap"
                   dir="ltr"
                 >
                   <Check className="w-3.5 h-3.5" weight="bold" />

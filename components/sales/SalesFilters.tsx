@@ -118,13 +118,13 @@ export function SalesFilters({
       />
 
       {/* Date range */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex gap-2 overflow-x-auto lg:flex-wrap lg:overflow-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {ranges.map((r) => (
           <button
             key={r}
             onClick={() => onDateRangeChange(r)}
             className={cn(
-              "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
+              "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 min-h-11 lg:min-h-0",
               dateRange === r
                 ? "bg-accent text-white"
                 : "bg-white border border-border text-text-secondary hover:border-accent"
@@ -136,7 +136,7 @@ export function SalesFilters({
       </div>
 
       {dateRange === "custom" && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex gap-2 overflow-x-auto lg:flex-wrap lg:overflow-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <input
             type="date"
             value={customFrom}
@@ -153,13 +153,13 @@ export function SalesFilters({
       )}
 
       {/* Category */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex gap-2 overflow-x-auto lg:flex-wrap lg:overflow-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {categories.map((cat) => (
           <button
             key={cat ?? "all"}
             onClick={() => onCategoryChange(cat)}
             className={cn(
-              "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
+              "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 min-h-11 lg:min-h-0",
               selectedCategory === cat
                 ? "bg-accent text-white"
                 : "bg-white border border-border text-text-secondary hover:border-accent"
@@ -171,13 +171,13 @@ export function SalesFilters({
       </div>
 
       {/* Gender */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex gap-2 overflow-x-auto lg:flex-wrap lg:overflow-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {genders.map((g) => (
           <button
             key={g ?? "all"}
             onClick={() => onGenderChange(g)}
             className={cn(
-              "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
+              "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 min-h-11 lg:min-h-0",
               selectedGender === g
                 ? "bg-accent text-white"
                 : "bg-white border border-border text-text-secondary hover:border-accent"
@@ -195,10 +195,10 @@ export function SalesFilters({
             key={s.value}
             onClick={() => onStatusChange(s.value)}
             className={cn(
-              "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
+              "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 min-h-11 lg:min-h-0",
               selectedStatus === s.value
-                ? "bg-success text-white"
-                : "bg-white border border-border text-text-secondary hover:border-success"
+                ? "bg-accent text-white"
+                : "bg-white border border-border text-text-secondary hover:border-accent"
             )}
           >
             {s.label}
@@ -224,7 +224,7 @@ export function SalesFilters({
           prefix={t.sortPrefix.replace("{label}", "")}
         />
 
-        <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-white text-sm cursor-pointer">
+        <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-white text-sm cursor-pointer whitespace-nowrap shrink-0 min-h-11 lg:min-h-0">
           <input
             type="checkbox"
             checked={discountOnly}
