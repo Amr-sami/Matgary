@@ -101,7 +101,7 @@ services:
       postgres:
         condition: service_healthy
     env_file:
-      - .env
+      - ./apps/web/.env
     environment:
       NODE_ENV: production
       # All four must be rewritten, not just DATABASE_URL. migrate.ts only uses
@@ -129,7 +129,7 @@ services:
       redis:
         condition: service_healthy
     env_file:
-      - .env
+      - ./apps/web/.env
     environment:
       NODE_ENV: production
       HOSTNAME: 0.0.0.0

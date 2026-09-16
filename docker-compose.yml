@@ -114,7 +114,7 @@ services:
       redis:
         condition: service_healthy
     env_file:
-      - .env
+      - ./apps/web/.env
     environment:
       NODE_ENV: production
       HOSTNAME: 0.0.0.0
