@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { db, withTenant } from "@/lib/db";
 import { branches, tenantMembers } from "@/lib/db/schema";
@@ -130,12 +130,28 @@ async function resolveActiveBranchImpl(
   const allowedBranchIds = await getAccessibleBranches(ctx);
   if (allowedBranchIds.length === 0) return null;
 
+  // Branch selection has two transports, in priority order:
+  //
+  //   1. `X-Branch-Id` request header — per-request, and the only option for a
+  //      client that has no cookie jar. A native app sends it on every call, so
+  //      two screens can look at two branches without fighting over one global
+  //      session value.
+  //   2. `mg.branch` HttpOnly cookie — what the web app has always used, and
+  //      still the fallback when no header is present.
+  //
+  // Both are validated against the SAME allow-list below, so the header grants
+  // no authority the cookie did not already have: an id outside
+  // `allowedBranchIds` is ignored exactly as a tampered cookie is, and the user
+  // falls through to their primary branch.
+  const headerStore = await headers();
+  const headerValue = headerStore.get("x-branch-id")?.trim() || null;
   const cookieStore = await cookies();
-  const cookieValue = cookieStore.get(ACTIVE_BRANCH_COOKIE)?.value ?? null;
+  const requested =
+    headerValue ?? cookieStore.get(ACTIVE_BRANCH_COOKIE)?.value ?? null;
 
   return withTenant(ctx.tenantId, async (tx) => {
-    // First try the cookie pick.
-    if (cookieValue && allowedBranchIds.includes(cookieValue)) {
+    // First try the explicitly requested branch (header, else cookie).
+    if (requested && allowedBranchIds.includes(requested)) {
       const [b] = await tx
         .select({
           id: branches.id,
@@ -145,7 +161,7 @@ async function resolveActiveBranchImpl(
         .from(branches)
         .where(
           and(
-            eq(branches.id, cookieValue),
+            eq(branches.id, requested),
             eq(branches.tenantId, ctx.tenantId),
             eq(branches.isActive, true),
           ),

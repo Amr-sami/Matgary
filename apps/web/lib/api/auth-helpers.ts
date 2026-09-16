@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import type { Permission } from "@/lib/permissions";
 import { can } from "@/lib/permissions";
+import { bearerFromHeader, verifyAccessToken } from "@/lib/api/native-token";
 import {
   enterRequestContext,
   getRequestContext,
@@ -60,23 +61,64 @@ export type AuthedBranchContext = AuthedContext & {
 };
 
 /** Resolve session and require an authenticated user with a tenant. */
-export async function requireTenant(): Promise<
-  | { ok: true; ctx: AuthedContext }
-  | { ok: false; response: NextResponse }
-> {
-  // Open the per-request ALS scope so every downstream log line carries
-  // the request id (+ tenantId/userId once we know them).
-  await ensureRequestContext();
-  const session = await auth();
-  if (!session?.user?.id || !session.user.tenantId) {
-    return { ok: false, response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+/**
+ * Resolve the caller from EITHER transport.
+ *
+ * `Authorization: Bearer <jwt>` is checked first — that is the native client.
+ * Anything else falls through to the Auth.js cookie session, so the web app's
+ * behaviour is bit-for-bit unchanged: no header means the original code path.
+ *
+ * This is the single place the two planes meet. Every one of the 165 route
+ * handlers inherits bearer support from here without being touched, because
+ * they all go through requireTenant / requirePermission / requireTenantWithBranch.
+ */
+type SessionResult =
+  | { kind: "none" }
+  | { kind: "ok"; ctx: AuthedContext }
+  /** A valid token whose tenant/account state blocks the request. Mirrors the
+   *  bodies middleware returns for cookie sessions, so a client handles one
+   *  contract regardless of transport. */
+  | { kind: "blocked"; code: "TENANT_SUSPENDED" | "PASSWORD_CHANGE_REQUIRED" | "SUBSCRIPTION_REQUIRED"; status: 402 | 403 };
+
+async function resolveSession(): Promise<SessionResult> {
+  const h = await headers();
+  const bearer = bearerFromHeader(h.get("authorization"));
+  if (bearer) {
+    const claims = await verifyAccessToken(bearer);
+    // A present-but-invalid bearer is NOT silently downgraded to the cookie
+    // path: that would let an expired native token borrow a browser session
+    // that happened to be attached to the same request.
+    if (!claims) return { kind: "none" };
+
+    // middleware.ts applies these three gates to cookie sessions and skips
+    // them for bearer requests, because the edge runtime cannot verify the
+    // token. They are enforced here instead, in the same order, so the two
+    // transports are behaviourally identical.
+    if (claims.susp) {
+      return { kind: "blocked", code: "TENANT_SUSPENDED", status: 403 };
+    }
+    if (claims.mcp) {
+      return { kind: "blocked", code: "PASSWORD_CHANGE_REQUIRED", status: 403 };
+    }
+    if (!claims.sub_ok) {
+      return { kind: "blocked", code: "SUBSCRIPTION_REQUIRED", status: 402 };
+    }
+
+    return {
+      kind: "ok",
+      ctx: {
+        userId: claims.sub,
+        tenantId: claims.tenantId,
+        role: claims.role,
+        permissions: claims.permissions,
+      },
+    };
   }
-  setRequestContext({
-    tenantId: session.user.tenantId,
-    userId: session.user.id,
-  });
+
+  const session = await auth();
+  if (!session?.user?.id || !session.user.tenantId) return { kind: "none" };
   return {
-    ok: true,
+    kind: "ok",
     ctx: {
       userId: session.user.id,
       tenantId: session.user.tenantId,
@@ -84,6 +126,27 @@ export async function requireTenant(): Promise<
       permissions: (session.user.permissions ?? []) as Permission[],
     },
   };
+}
+
+export async function requireTenant(): Promise<
+  | { ok: true; ctx: AuthedContext }
+  | { ok: false; response: NextResponse }
+> {
+  // Open the per-request ALS scope so every downstream log line carries
+  // the request id (+ tenantId/userId once we know them).
+  await ensureRequestContext();
+  const r = await resolveSession();
+  if (r.kind === "none") {
+    return { ok: false, response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  }
+  if (r.kind === "blocked") {
+    return {
+      ok: false,
+      response: NextResponse.json({ error: r.code }, { status: r.status }),
+    };
+  }
+  setRequestContext({ tenantId: r.ctx.tenantId, userId: r.ctx.userId });
+  return { ok: true, ctx: r.ctx };
 }
 
 /**

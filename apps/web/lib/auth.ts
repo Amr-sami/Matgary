@@ -133,7 +133,7 @@ declare module "@auth/core/jwt" {
 // Strip invisible characters that mobile keyboards and RTL copy/paste love to
 // insert — leading spaces, zero-width-space, RLM/LRM marks, BOM. These silently
 // turn a correct-looking identifier into a different string.
-function normalizeIdentifier(s: string): string {
+export function normalizeIdentifier(s: string): string {
   return s
     .normalize("NFKC")
     .replace(/[​-‏‪-‮﻿]/g, "")
@@ -159,7 +159,7 @@ const credentialsSchema = z.object({
   totp: z.string().min(6).max(20).optional(),
 });
 
-interface UserContext {
+export interface UserContext {
   tenantId: string | null;
   tenantSlug: string | null;
   role: string | null;
@@ -179,7 +179,7 @@ interface UserContext {
   isDemo: boolean;
 }
 
-async function resolveTenantContext(userId: string): Promise<UserContext> {
+export async function resolveTenantContext(userId: string): Promise<UserContext> {
   // Cache the resolved context for ~1 min. The JWT callback runs on every
   // page load, so without this we hit 4 tables per request. Callers that
   // mutate any of these fields invoke bustUserContextCache(userId).

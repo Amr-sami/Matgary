@@ -167,6 +167,8 @@ const PUBLIC_PATHS = new Set<string>([
 ]);
 const PUBLIC_PREFIXES = [
   "/api/auth",
+  // Native sign-in / refresh: these MINT a session, so they cannot require one.
+  "/api/v1/auth",
   // Cron sweeps run from a sidecar with no session — they're guarded by
   // a shared-secret bearer token inside the route handler instead.
   "/api/cron",
@@ -279,7 +281,24 @@ export default auth((req) => {
 
   const session = req.auth;
 
-  if (!session?.user) {
+  // A native client authenticates with `Authorization: Bearer`, not a cookie,
+  // so `req.auth` is empty for every one of its requests. Without this bypass
+  // the middleware would 401 them all here — before any route handler runs —
+  // and the bearer support in lib/api/auth-helpers.ts would be unreachable.
+  //
+  // This is NOT a hole: the request is simply allowed to proceed to its
+  // handler, where `requireTenant()` verifies the token's signature, issuer,
+  // audience and expiry and returns the same 401 if it is not valid. The edge
+  // stops guessing; the handler still decides.
+  //
+  // Scoped to /api/* on purpose. A page navigation has no bearer token, so
+  // letting one through would render an authenticated shell to an anonymous
+  // visitor.
+  const hasBearer =
+    pathname.startsWith("/api/") &&
+    /^Bearer\s+\S/i.test(req.headers.get("authorization") ?? "");
+
+  if (!session?.user && !hasBearer) {
     if (pathname.startsWith("/api/")) {
       return applyCsp(req, nonce, NextResponse.json({ error: "Unauthorized" }, { status: 401 }));
     }
@@ -296,6 +315,21 @@ export default auth((req) => {
     // login the user is dropped back on /reports?from=yesterday, not /reports.
     loginUrl.searchParams.set("next", pathname + (nextUrl.search ?? ""));
     return applyCsp(req, nonce, NextResponse.redirect(loginUrl));
+  }
+
+  // Bearer request with no cookie session. Every gate below this point reads
+  // `session.user.*`, which does not exist here — so they are all deferred to
+  // `requireTenant()` in lib/api/auth-helpers.ts, which enforces the identical
+  // three checks from the token's own claims and returns the identical bodies:
+  //
+  //   403 TENANT_SUSPENDED · 403 PASSWORD_CHANGE_REQUIRED · 402 SUBSCRIPTION_REQUIRED
+  //
+  // The edge cannot do it itself: verifying these tokens needs node:crypto,
+  // which the edge runtime does not provide. Letting the request through is
+  // therefore not a bypass — it moves the decision one layer in, to the only
+  // place that can actually make it.
+  if (!session?.user) {
+    return passThrough();
   }
 
   // Spec 03 — tenant suspension. When the JWT carries a non-null
