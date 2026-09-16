@@ -85,3 +85,6 @@ tests/perf/.cookies/
 /tasfiya_PROGRESS.md
 /tasfiya_phases/
 /veroLegal-V1/
+
+# Mobile port working docs (screenshots, specs, design system). Local only.
+/mobile-dev-docs/
