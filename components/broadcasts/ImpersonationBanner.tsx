@@ -49,7 +49,10 @@ export function ImpersonationBanner() {
   return (
     <div
       role="alert"
-      className="sticky top-0 z-50 bg-danger text-white border-b border-danger/30 shadow"
+      // Pins below the status bar, not under it. Matches Header.tsx:20 — at
+      // top-0 this re-pinned beneath the notch on scroll once viewport-fit=cover
+      // made the insets resolve.
+      className="sticky top-[env(safe-area-inset-top)] z-50 bg-danger text-white border-b border-danger/30 shadow"
     >
       <div className="max-w-7xl mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium leading-snug" dir="auto">

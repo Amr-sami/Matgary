@@ -193,7 +193,11 @@ export function MobileBottomNav() {
         aria-modal="true"
         aria-hidden={!moreOpen}
         className={cn(
-          "fixed inset-x-0 bottom-0 z-50 bg-bg-card rounded-t-2xl shadow-[0_-8px_24px_rgba(0,0,0,0.12)] pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 px-4 transition-transform duration-300 ease-out",
+          // The sheet is viewport-fixed, so AppShell's horizontal safe-area
+          // padding doesn't reach it — it carries its own. pl/pr rather than
+          // ps/pe because the notch is a physical edge, not a writing-mode one;
+          // both collapse to the original 1rem when the inset is 0.
+          "fixed inset-x-0 bottom-0 z-50 bg-bg-card rounded-t-2xl shadow-[0_-8px_24px_rgba(0,0,0,0.12)] pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 pl-[calc(1rem+env(safe-area-inset-left))] pr-[calc(1rem+env(safe-area-inset-right))] transition-transform duration-300 ease-out",
           moreOpen ? "translate-y-0" : "translate-y-full"
         )}
       >

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { headers, cookies } from "next/headers";
 import { Cairo, Tajawal, Lemonada } from "next/font/google";
 import Script from "next/script";
@@ -40,6 +40,19 @@ const lemonada = Lemonada({
 export const metadata: Metadata = {
   title: "ستورو - نظام إدارة المخزن والمبيعات",
   description: "نظام نقطة البيع وإدارة المخزن لمتجرك الساعات والبرفانات والنظارات",
+};
+
+// Next 16 resolves the viewport meta tag from this separate export (NOT from
+// `metadata`). `viewportFit: "cover"` is what makes iOS report real values for
+// `env(safe-area-inset-*)`: without it every inset resolves to 0, so the
+// bottom-inset rules in AppShell / MobileBottomNav / SkeletonShell never
+// cleared the home indicator, and nothing cleared the notch / Dynamic Island.
+// width + initialScale are Next's own defaults, restated so the meta tag stays
+// identical apart from the added `viewport-fit=cover`.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default async function RootLayout({

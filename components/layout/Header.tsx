@@ -13,8 +13,11 @@ interface HeaderProps {
 export function Header({ title }: HeaderProps) {
   const today = formatDate(new Date());
 
+  // Sticks BELOW the status bar, not under it: AppShell's root already offsets
+  // the page by the top inset, so pinning at top:0 would slide the header under
+  // the notch as soon as the user scrolls. Resolves to top:0 on desktop.
   return (
-    <header className="sticky top-0 z-30 bg-bg-main/80 backdrop-blur-md border-b border-border">
+    <header className="sticky top-[env(safe-area-inset-top)] z-30 bg-bg-main/80 backdrop-blur-md border-b border-border">
       {/* Side-effect mount: registers the service worker once on first
           render of the app shell. Renders nothing. */}
       <SwRegister />
