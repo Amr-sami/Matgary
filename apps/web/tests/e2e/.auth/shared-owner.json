@@ -1,0 +1,69 @@
+{
+  "cookies": [
+    {
+      "name": "NEXT_LOCALE",
+      "value": "ar",
+      "domain": "localhost",
+      "path": "/",
+      "expires": 1821104448.016216,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "authjs.csrf-token",
+      "value": "60b4e6fea58d761ad87afdc658db7823986377717ede724c24e011326ef122fb%7C27ce5c9b648d7f7073cbdea39209a632f9d24f561108d9ef98e02718d702f826",
+      "domain": "localhost",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "authjs.callback-url",
+      "value": "http%3A%2F%2Flocalhost%3A3102%2F",
+      "domain": "localhost",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "mg.branch_name",
+      "value": "Shared%20Test%20Shop",
+      "domain": "localhost",
+      "path": "/",
+      "expires": 1821104449.817,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "authjs.session-token",
+      "value": "eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2Q0JDLUhTNTEyIiwia2lkIjoiNi1uWUVkNzlNU0NOaGF4VUEwUkNvWnFHcnVfa0ktLXc0dklsaXE5V0w3Skh6YVQ0TWgxajdzZE0tNDNEeDlnQ2xFRy1mRVQyUlJnbTd0cmxRZEtWWFEifQ..7TwcM9A4FIvNuEPkicDgMw.up4uzuL5cZrGNCuDXp0YvFmGpYU9_mi73zCstYMqUYJkTKtlAIAYozS2qpTlYt0VHqDSz_b13lQUyG76--uNoSf9hBQ1EI-okQYTn-G1OyJfQMmZw4TOf-0gxp3D1u5cvT8T7x0ZGQonXggv_Zw3Beka015UVh_JyawXgifOrPS2oo5KnS6M4nU3_1F6uSz4ZEpKJyFLt4G8OxVMxLRwDLH5WiPuDcKFE-89UYoG0IlWlGKrUaocwM2vQZSJHGPAMluSJqVADXmhI-2D-TpwcaQxHdNreFCghyF0I8U0jjJPriDXVR8mCiGzDXLSBkODUV09mdxDQoPJaxhvJnDEJtRyXLtxdZ0JgHmclnXQ0q5t7FC_d0vWsK75VzHvu1msciMkK8fi4AVAXhMgbPInpTGAcQ97tn8qT15jeT5srPAh4Pz3wkm5S1RGBG6gdrijlitlWgTCXju5S-FW7yjNx64ngI4dvX2xk2y7WRnDd9cwxhtxKGB_FaN3ok1u60Y1yvsRJLguWKhF3gkKP1MZuaGi1Rh18tUNbfV4plu7dS0pAqDFzf9-DtKTqAJ-HlcJcsJo5w1ubmY4tLC3MlcdQLnd30f4KE9k9UEpI_Nc90ROyAKHvXK-cmPgXm9KjrFTUnSQlnCZG3jypBzaZ94jhpgJuss3Q3fDw49c_WLhuhP991EBh6stzTyTwekZk8NRQID_I2BP1L8BTnrrXQfvq3NrON_O3JJZxfAjFZcmeio.R7c8xq_IMtzK3q8Fb0pa9rzh9hYiIcUOw1Li5qFUVZk",
+      "domain": "localhost",
+      "path": "/",
+      "expires": 1792160449.823125,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": [
+    {
+      "origin": "http://localhost:3102",
+      "localStorage": [
+        {
+          "name": "branches:v1",
+          "value": "{\"branches\":[{\"id\":\"dd5bc0cf-d8b4-4e49-9629-bddd71204de3\",\"tenantId\":\"e31a6506-61be-448b-8c06-0c2e9a5d83fc\",\"slug\":\"main\",\"name\":\"Shared Test Shop\",\"address\":null,\"phone\":null,\"isActive\":true,\"isPrimary\":true,\"createdAt\":\"2026-09-16T11:15:24.127Z\",\"updatedAt\":\"2026-09-16T11:15:24.127Z\"}],\"currentBranchId\":\"dd5bc0cf-d8b4-4e49-9629-bddd71204de3\"}"
+        },
+        {
+          "name": "shop:settings:v1",
+          "value": "{\"autoOpenWhatsApp\":true,\"messageTemplate\":\"مرحباً {customerName} 👋\\n\\nشكراً لتسوقك من {shopName}.\\nرقم الفاتورة: {invoiceId}\\nالإجمالي: {totalPrice}\",\"shopName\":\"Shared Test Shop\",\"shopPhone\":\"01000000000\",\"greenApiEnabled\":false,\"greenApiInstanceId\":\"\",\"greenApiToken\":\"\",\"greenApiUrl\":\"\",\"whatsappCloudEnabled\":false,\"whatsappCloudPhoneId\":\"\",\"whatsappCloudToken\":\"\",\"whatsappCloudBusinessId\":\"\",\"receiptTemplateName\":\"\",\"receiptTemplateLanguage\":\"\",\"sendAsPdf\":false,\"loyaltyEnabled\":false,\"loyaltyPointsPerEgp\":0,\"loyaltyEgpPerPoint\":0,\"receiptLogoSize\":\"medium\",\"receiptFooterText\":\"\",\"receiptLanguage\":\"ar\",\"receiptShowLoyalty\":true,\"receiptLogoUrl\":\"\",\"receiptBlockOrder\":[\"logo\",\"shopInfo\",\"purchaseDate\",\"items\",\"totals\",\"loyalty\",\"footer\"],\"receiptFontFamily\":\"cairo\",\"receiptCustomBlocks\":{}}"
+        }
+      ]
+    }
+  ]
+}
