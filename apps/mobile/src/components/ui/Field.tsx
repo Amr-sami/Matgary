@@ -8,6 +8,7 @@ import {
   type TextInputProps,
 } from "react-native";
 
+import { RTL_TEXT } from "@/theme/rtl";
 import { colors, fonts, radius } from "@/theme/tokens";
 
 interface FieldProps extends Omit<TextInputProps, "style"> {
@@ -33,16 +34,6 @@ export function Field({ label, secure = false, ...props }: FieldProps) {
     <View style={styles.wrap}>
       <Text style={styles.label}>{label}</Text>
       <View style={[styles.box, focused && styles.boxFocused]}>
-        {secure ? (
-          <Pressable
-            onPress={() => setRevealed((v) => !v)}
-            hitSlop={12}
-            accessibilityRole="button"
-            accessibilityLabel={revealed ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
-          >
-            <Text style={styles.eye}>{revealed ? "◉" : "◎"}</Text>
-          </Pressable>
-        ) : null}
         <TextInput
           {...props}
           secureTextEntry={secure && !revealed}
@@ -57,6 +48,16 @@ export function Field({ label, secure = false, ...props }: FieldProps) {
           placeholderTextColor={colors.textSecondary}
           style={styles.input}
         />
+        {secure ? (
+          <Pressable
+            onPress={() => setRevealed((v) => !v)}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel={revealed ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
+          >
+            <Text style={styles.eye}>{revealed ? "◉" : "◎"}</Text>
+          </Pressable>
+        ) : null}
       </View>
     </View>
   );
@@ -68,6 +69,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.medium,
     fontSize: 14,
     color: colors.textSecondary,
+    ...RTL_TEXT,
   },
   box: {
     flexDirection: "row",

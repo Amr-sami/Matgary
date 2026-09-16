@@ -13,6 +13,7 @@ import {
 } from "@expo-google-fonts/cairo";
 
 import { useSession } from "@/stores/session";
+import { RTL } from "@/theme/rtl";
 import { colors } from "@/theme/tokens";
 
 SplashScreen.preventAutoHideAsync();
@@ -62,7 +63,8 @@ export default function RootLayout() {
         <Stack
           screenOptions={{
             headerShown: false,
-            contentStyle: { backgroundColor: colors.bg },
+            // RTL is applied here, at the one place every screen passes through.
+            contentStyle: { backgroundColor: colors.bg, ...RTL },
           }}
         >
           <Stack.Protected guard={status === "signedIn"}>
