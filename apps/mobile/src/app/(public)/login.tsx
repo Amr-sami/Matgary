@@ -16,7 +16,7 @@ import { DottedGround } from "@/components/DottedGround";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
-import { LOCALE, setLocaleAndReload, t } from "@/i18n";
+import { t, useLocale } from "@/i18n";
 import { useSession } from "@/stores/session";
 import { RTL } from "@/theme/rtl";
 import { colors, fonts, radius, spacing } from "@/theme/tokens";
@@ -42,6 +42,8 @@ export default function LoginScreen() {
 
   const signIn = useSession((s) => s.signIn);
   const startDemo = useSession((s) => s.startDemo);
+  const locale = useLocale((s) => s.locale);
+  const setLocale = useLocale((s) => s.setLocale);
   const signingIn = useSession((s) => s.signingIn);
   const error = useSession((s) => s.signInError);
 
@@ -109,16 +111,16 @@ export default function LoginScreen() {
             <Pressable
               style={styles.langToggle}
               accessibilityRole="button"
-              accessibilityLabel={LOCALE === "ar" ? "English" : "العربية"}
-              onPress={() => void setLocaleAndReload(LOCALE === "ar" ? "en" : "ar")}
+              accessibilityLabel={locale === "ar" ? "English" : "العربية"}
+              onPress={() => void setLocale(locale === "ar" ? "en" : "ar")}
             >
               <Globe size={20} color={colors.textSecondary} />
-              <Text style={styles.langText}>{LOCALE === "ar" ? "ع" : "EN"}</Text>
+              <Text style={styles.langText}>{locale === "ar" ? "ع" : "EN"}</Text>
             </Pressable>
           </View>
 
           <View style={styles.brand}>
-            <Logo size="md" locale={LOCALE} />
+            <Logo size="md" locale={locale} />
           </View>
 
           <Text style={styles.heading}>{t("auth.login.title")}</Text>

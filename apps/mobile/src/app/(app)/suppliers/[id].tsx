@@ -14,6 +14,7 @@ import { At, CaretRight, MapPin, Phone, Receipt, Truck, Wallet } from "phosphor-
 import { ApiError, catalog, type Expense, type PurchaseOrder, type Supplier } from "@matgary/api-client";
 
 import { api } from "@/api/client";
+import { isRTL } from "@/i18n";
 import { Screen } from "@/components/layout/Screen";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -21,7 +22,7 @@ import { Card } from "@/components/ui/Card";
 import { Field } from "@/components/ui/Field";
 import { money, shortDate } from "@/lib/format";
 import { useSession } from "@/stores/session";
-import { RTL, RTL_TEXT } from "@/theme/rtl";
+import { RTL_TEXT, directionStyle } from "@/theme/rtl";
 import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
 
 /**
@@ -409,7 +410,7 @@ function EditSupplierModal({
       transparent
       onRequestClose={onClose}
     >
-      <View style={styles.modalBackdrop}>
+      <View style={[styles.modalBackdrop, directionStyle(isRTL())]}>
         <View style={styles.modalSheet}>
           <ScrollView
             contentContainerStyle={styles.modalContent}
@@ -537,7 +538,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.35)",
     justifyContent: "flex-end",
-    ...RTL,
   },
   modalSheet: {
     maxHeight: "88%",

@@ -21,7 +21,10 @@ function resolveBaseUrl(): string {
   const explicit = process.env.EXPO_PUBLIC_API_URL;
   if (explicit) return explicit.replace(/\/+$/, "");
 
-  const port = 3001;
+  // Port only — the host stays derived from Metro so it cannot go stale.
+  // 3001 is Matgary's dev port, but another project (verolegal) also uses it;
+  // when the two collide, set this rather than pinning the whole URL.
+  const port = Number(process.env.EXPO_PUBLIC_API_PORT) || 3001;
 
   // e.g. "192.168.1.14:8081" — the host running Metro.
   const hostUri =

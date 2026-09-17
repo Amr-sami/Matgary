@@ -4,12 +4,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, catalog } from "@matgary/api-client";
 
 import { api } from "@/api/client";
+import { isRTL } from "@/i18n";
 import { Screen } from "@/components/layout/Screen";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
 import { money, shortDate } from "@/lib/format";
-import { RTL, RTL_TEXT } from "@/theme/rtl";
+import { RTL_TEXT, directionStyle } from "@/theme/rtl";
 import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
 
 /**
@@ -68,7 +69,7 @@ export default function ReturnsScreen() {
           Doc 04 wanted this screen scan-first; until the scanner lands, the
           cashier picks the sale line from the recent list. */}
       <Modal visible={open} animationType="slide" onRequestClose={() => setOpen(false)}>
-        <View style={[styles.modal, RTL]}>
+        <View style={[styles.modal, directionStyle(isRTL())]}>
           <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
             <Text style={styles.modalTitle}>تسجيل مرتجع</Text>
             {!line ? (

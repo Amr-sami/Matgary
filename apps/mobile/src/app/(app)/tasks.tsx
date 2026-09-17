@@ -14,6 +14,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, catalog } from "@matgary/api-client";
 
 import { api } from "@/api/client";
+import { isRTL } from "@/i18n";
 import { Screen } from "@/components/layout/Screen";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -22,7 +23,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
 import { useSession } from "@/stores/session";
 import { shortDate } from "@/lib/format";
-import { RTL, RTL_TEXT } from "@/theme/rtl";
+import { RTL_TEXT, directionStyle } from "@/theme/rtl";
 import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
 
 /** Measured pairs from doc 03 §2: عاجلة on danger-light, عادية on accent-light. */
@@ -252,7 +253,7 @@ function TaskFormSheet({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
-      <View style={[styles.overlay, RTL]}>
+      <View style={[styles.overlay, directionStyle(isRTL())]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="إغلاق" />
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
           <View style={styles.sheet}>

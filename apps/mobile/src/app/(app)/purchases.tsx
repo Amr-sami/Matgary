@@ -5,6 +5,7 @@ import { Minus, Plus, Receipt, Wallet, Package } from "phosphor-react-native";
 import { ApiError, catalog } from "@matgary/api-client";
 
 import { api } from "@/api/client";
+import { isRTL } from "@/i18n";
 import { Screen } from "@/components/layout/Screen";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -14,7 +15,7 @@ import { Field } from "@/components/ui/Field";
 import { SearchField } from "@/components/ui/SearchField";
 import { StatCard } from "@/components/ui/StatCard";
 import { money, shortDate } from "@/lib/format";
-import { RTL, RTL_TEXT } from "@/theme/rtl";
+import { RTL_TEXT, directionStyle } from "@/theme/rtl";
 import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
 
 /** Arabic labels + badge variant per PO status, matching the web's Badge use. */
@@ -101,7 +102,7 @@ export default function PurchasesScreen() {
       <Button label="أمر شراء جديد" onPress={() => setOpen(true)} />
 
       <Modal visible={open} animationType="slide" onRequestClose={() => setOpen(false)}>
-        <View style={[styles.modal, RTL]}>
+        <View style={[styles.modal, directionStyle(isRTL())]}>
           <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
             <Text style={styles.modalTitle}>أمر شراء جديد</Text>
 

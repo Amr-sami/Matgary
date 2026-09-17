@@ -13,7 +13,8 @@ import {
 } from "@expo-google-fonts/cairo";
 
 import { useSession } from "@/stores/session";
-import { RTL } from "@/theme/rtl";
+import { useLocale } from "@/i18n";
+import { directionStyle } from "@/theme/rtl";
 import { colors } from "@/theme/tokens";
 
 SplashScreen.preventAutoHideAsync();
@@ -41,6 +42,7 @@ export default function RootLayout() {
 
   const status = useSession((s) => s.status);
   const bootstrap = useSession((s) => s.bootstrap);
+  const locale = useLocale((s) => s.locale);
 
   useEffect(() => {
     void bootstrap();
@@ -61,10 +63,15 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <StatusBar style="dark" />
         <Stack
+          // Re-keyed on locale: every screen remounts, so every t() re-reads
+          // the dictionary and every layout re-resolves under the new
+          // direction. This is the entire language switch — no reload.
+          key={locale}
           screenOptions={{
             headerShown: false,
-            // RTL is applied here, at the one place every screen passes through.
-            contentStyle: { backgroundColor: colors.bg, ...RTL },
+            // Direction is applied here, at the one place every screen passes
+            // through. Yoga propagates it to every descendant, text included.
+            contentStyle: { backgroundColor: colors.bg, ...directionStyle(locale === "ar") },
           }}
         >
           <Stack.Protected guard={status === "signedIn"}>
