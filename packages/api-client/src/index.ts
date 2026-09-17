@@ -12,3 +12,4 @@ export * as auth from "./endpoints/auth";
 export * as me from "./endpoints/me";
 export * as dashboard from "./endpoints/dashboard";
 export * as catalog from "./endpoints/catalog";
+export * as sales from "./endpoints/sales";

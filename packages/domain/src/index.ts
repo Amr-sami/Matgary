@@ -9,4 +9,4 @@
 //
 // Migration is deliberate and incremental (doc 06 §11): move one module at a
 // time with `git mv`, re-point the web imports, and let tsc prove nothing broke.
-export {};
+export * from "./money/cart-math";

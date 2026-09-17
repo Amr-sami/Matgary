@@ -40,6 +40,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
 
   const signIn = useSession((s) => s.signIn);
+  const startDemo = useSession((s) => s.startDemo);
   const signingIn = useSession((s) => s.signingIn);
   const error = useSession((s) => s.signInError);
 
@@ -92,11 +93,15 @@ export default function LoginScreen() {
           ]}
           keyboardShouldPersistTaps="handled"
         >
-          {/* TODO(phase-4): the demo tenant flow and the locale PATCH are real
-              features on the web; neither target exists natively yet, so these
-              are composed but not wired. */}
+          {/* TODO(phase-4): the locale toggle needs the i18n layer first — the
+              app has no English strings yet, so a PATCH alone would do nothing. */}
           <View style={styles.topBar}>
-            <Pressable style={styles.demoPill} accessibilityRole="button">
+            <Pressable
+              style={styles.demoPill}
+              accessibilityRole="button"
+              disabled={signingIn}
+              onPress={() => void startDemo()}
+            >
               <Lightning size={16} color="#FFFFFF" weight="fill" />
               <Text numberOfLines={1} style={styles.demoPillText}>
                 تصفح المتجر التجريبي

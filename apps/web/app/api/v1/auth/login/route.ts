@@ -1,19 +1,14 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
-import { normalizeIdentifier, resolveTenantContext } from "@/lib/auth";
+import { normalizeIdentifier } from "@/lib/auth";
 import { rateLimit } from "@/lib/ratelimit";
-import {
-  ACCESS_TTL_SEC,
-  REFRESH_TTL_SEC,
-  mintRefreshToken,
-  signAccessToken,
-} from "@/lib/api/native-token";
+import { mintNativeSession } from "@/lib/api/native-session";
 
 // Native sign-in. One POST, one JSON response — no CSRF pre-flight, no
 // redirect, no cookie.
@@ -107,67 +102,17 @@ export async function POST(req: Request) {
     );
   }
 
-  const ctx = await resolveTenantContext(user.id);
-  if (!ctx.tenantId) {
-    return NextResponse.json({ error: "NO_TENANT" }, { status: 403 });
-  }
-
-  // Retire any previous live row for this install before minting a new one,
-  // so a reinstall does not leave a session the user cannot see or revoke.
-  if (body.installId) {
-    await db.execute(sql`
-      UPDATE auth_devices
-         SET revoked_at = now(), revoked_reason = 'reinstall'
-       WHERE user_id = ${user.id}
-         AND install_id = ${body.installId}
-         AND revoked_at IS NULL
-    `);
-  }
-
-  const { token: refreshToken, hash } = mintRefreshToken();
-  const [device] = (await db.execute(sql`
-    INSERT INTO auth_devices
-      (user_id, tenant_id, refresh_token_hash, device_name, platform,
-       app_version, install_id, expires_at)
-    VALUES
-      (${user.id}, ${ctx.tenantId}, ${hash}, ${body.deviceName ?? null},
-       ${body.platform ?? null}, ${body.appVersion ?? null},
-       ${body.installId ?? null},
-       now() + ${`${REFRESH_TTL_SEC} seconds`}::interval)
-    RETURNING id
-  `)) as unknown as Array<{ id: string }>;
-
-  const accessToken = await signAccessToken({
-    sub: user.id,
-    tenantId: ctx.tenantId,
-    role: ctx.role,
-    permissions: ctx.permissions,
-    tv: ctx.tokenVersion,
-    did: device?.id ?? "",
-    susp: ctx.tenantSuspendedAt ? ctx.tenantSuspendedAt.toISOString() : null,
-    mcp: ctx.mustChangePassword,
-    sub_ok: ctx.subscriptionAccessActive,
-  });
-
-  return NextResponse.json({
-    accessToken,
-    refreshToken,
-    expiresIn: ACCESS_TTL_SEC,
-    user: {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: ctx.role,
-      permissions: ctx.permissions,
-      locale: ctx.locale,
+  const session = await mintNativeSession(
+    { id: user.id, email: user.email, name: user.name },
+    {
+      deviceName: body.deviceName,
+      platform: body.platform,
+      appVersion: body.appVersion,
+      installId: body.installId,
     },
-    tenant: {
-      id: ctx.tenantId,
-      slug: ctx.tenantSlug,
-      suspended: Boolean(ctx.tenantSuspendedAt),
-      subscriptionStatus: ctx.subscriptionStatus,
-      subscriptionAccessActive: ctx.subscriptionAccessActive,
-    },
-    deviceId: device?.id ?? null,
-  });
+  );
+  if (!session.ok) {
+    return NextResponse.json({ error: session.error }, { status: 403 });
+  }
+  return NextResponse.json(session.body);
 }

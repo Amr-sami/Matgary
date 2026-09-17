@@ -18,6 +18,13 @@ interface SessionState {
   signIn: (identifier: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   switchBranch: (branchId: string) => Promise<void>;
+  /**
+   * Tokens were just minted by something other than signIn — signup, or the
+   * trial store — and are already in the store. Seed the session from /me.
+   */
+  adoptSession: () => Promise<void>;
+  /** Open the trial store as an ephemeral owner. */
+  startDemo: () => Promise<void>;
 }
 
 /**
@@ -112,6 +119,28 @@ export const useSession = create<SessionState>((set, get) => ({
       const me = await meApi.getMe(api);
       setActiveBranchId(me.branch.id);
       set({ status: "signedIn", me, signingIn: false });
+    } catch (error) {
+      set({ signingIn: false, signInError: messageFor(error) });
+    }
+  },
+
+  async adoptSession() {
+    // Never from the mint response: it carries the RAW permissions column,
+    // which is empty for an owner. /me returns the effective set.
+    const me = await meApi.getMe(api);
+    setActiveBranchId(me.branch.id);
+    set({ status: "signedIn", me, signInError: null, signingIn: false });
+  },
+
+  async startDemo() {
+    set({ signingIn: true, signInError: null });
+    try {
+      await auth.startDemo(api, {
+        platform: deviceMeta.platform,
+        appVersion: deviceMeta.appVersion,
+        installId: await getInstallId(),
+      });
+      await get().adoptSession();
     } catch (error) {
       set({ signingIn: false, signInError: messageFor(error) });
     }

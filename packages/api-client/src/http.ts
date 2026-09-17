@@ -41,6 +41,8 @@ export interface RequestOptions {
   signal?: AbortSignal;
   /** Skip the X-Branch-Id header. Only auth routes want this. */
   noBranch?: boolean;
+  /** Extra request headers, e.g. Idempotency-Key on the POS write. */
+  headers?: Record<string, string>;
 }
 
 /** Refresh this long before the token actually expires. */
@@ -191,6 +193,7 @@ export class ApiClient {
 
     const headers: Record<string, string> = {
       Accept: "application/json",
+      ...opts.headers,
       ...extraHeaders,
     };
     if (opts.body !== undefined) headers["Content-Type"] = "application/json";

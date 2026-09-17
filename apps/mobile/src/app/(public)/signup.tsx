@@ -12,7 +12,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Globe, Lightning } from "phosphor-react-native";
 
-import { api } from "@/api/client";
+import { ApiError, auth } from "@matgary/api-client";
+
+import { api, deviceMeta } from "@/api/client";
+import { getInstallId } from "@/auth/installId";
+import { useSession } from "@/stores/session";
 import { DottedGround } from "@/components/DottedGround";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/Button";
@@ -196,35 +200,32 @@ export default function SignupScreen() {
     setStep(2);
   };
 
-  /**
-   * TODO(phase-4): there is no signup endpoint for a native client to call.
-   *
-   * Measured at HEAD against the running dev server, not assumed:
-   *   - POST /api/auth/signup  → 400 `"Bad request."`. That path is swallowed
-   *     by the NextAuth catch-all (app/api/auth/[...nextauth]/route.ts); it is
-   *     not a signup route and never was.
-   *   - POST /api/v1/auth/signup → 404. The native surface only has
-   *     login / logout / refresh / devices.
-   * The web signs up through the `signupAction` SERVER ACTION in
-   * apps/web/app/[lang]/(auth)/actions.ts. Server actions are invoked with a
-   * build-time action id and the Next-Action header, so React Native cannot
-   * call one — this is a missing API, not a missing fetch.
-   *
-   * Unblocking it needs POST /api/v1/auth/signup on the web side, wrapping the
-   * same repo calls signupAction makes and returning the token pair
-   * /api/v1/auth/login returns so the app can sign in on the spot. Until then
-   * this handler deliberately does nothing rather than fake a success.
-   */
-  const submit = () => {
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async () => {
     setError(null);
     if (!storeName.trim()) {
       setError(t.errors.storeNameRequired);
       return;
     }
-    if (__DEV__) {
-      console.warn(
-        "[signup] no native signup endpoint yet — see the TODO above submit()",
-      );
+    setSubmitting(true);
+    try {
+      await auth.signup(api, {
+        email: email.trim(),
+        password,
+        storeName: storeName.trim(),
+        storeHandle: storeHandle.trim().toLowerCase(),
+        platform: deviceMeta.platform,
+        appVersion: deviceMeta.appVersion,
+        installId: await getInstallId(),
+      });
+      // Signup returns the RAW permissions column; the session must be seeded
+      // from /me, which is what adoptSession does.
+      await useSession.getState().adoptSession();
+    } catch (e) {
+      setError(signupMessage(e));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -410,7 +411,8 @@ export default function SignupScreen() {
                 <Button
                   label={t.submit}
                   style={styles.stepButton}
-                  onPress={submit}
+                  onPress={() => void submit()}
+                  loading={submitting}
                   disabled={
                     handleStatus === "checking" ||
                     handleStatus === "taken" ||
@@ -429,6 +431,33 @@ export default function SignupScreen() {
       </KeyboardAvoidingView>
     </View>
   );
+}
+
+/** Field codes from lib/auth/create-account.ts, in the shopkeeper's language. */
+function signupMessage(e: unknown): string {
+  if (!(e instanceof ApiError)) return "تعذّر إنشاء الحساب";
+  switch (e.code) {
+    case "EMAIL_TAKEN":
+      return "هذا البريد مسجّل بالفعل";
+    case "HANDLE_TAKEN":
+      return "اسم المتجر هذا مستخدم — اختر اسماً آخر";
+    case "BAD_EMAIL_FORMAT":
+      return "البريد الإلكتروني غير صحيح";
+    case "WEAK_PASSWORD":
+      return "كلمة المرور يجب أن تكون 8 أحرف على الأقل";
+    case "HANDLE_INVALID":
+      return "اسم المتجر: حروف إنجليزية صغيرة وأرقام وشرطة فقط";
+    case "STORE_NAME_REQUIRED":
+      return "اسم المتجر مطلوب";
+  }
+  switch (e.kind) {
+    case "offline":
+      return "تعذّر الاتصال بالخادم";
+    case "rateLimited":
+      return "محاولات كثيرة. حاول بعد قليل";
+    default:
+      return "تعذّر إنشاء الحساب";
+  }
 }
 
 const styles = StyleSheet.create({

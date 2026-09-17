@@ -78,3 +78,51 @@ export async function revokeDevice(
     noBranch: true,
   });
 }
+
+export interface SignupInput {
+  email: string;
+  password: string;
+  storeName: string;
+  /** Becomes the @-suffix of every staff login. [a-z0-9-], 2..40. */
+  storeHandle: string;
+  locale?: "ar" | "en";
+  deviceName?: string;
+  platform?: "ios" | "android" | "web";
+  appVersion?: string;
+  installId?: string;
+}
+
+/**
+ * Create an owner account and its store, and sign in. Same account creation
+ * the web's signupAction runs (lib/auth/create-account.ts); only the transport
+ * differs. Field-level validation errors come back as 422 with `field` set,
+ * EMAIL_TAKEN / HANDLE_TAKEN as 409.
+ */
+export async function signup(client: ApiClient, input: SignupInput): Promise<LoginResponse> {
+  const data = await client.request<LoginResponse>("/api/v1/auth/signup", {
+    method: "POST",
+    body: input,
+    auth: false,
+    noBranch: true,
+  });
+  await client.adoptTokens(data.accessToken, data.refreshToken, data.expiresIn);
+  return data;
+}
+
+/**
+ * Open the trial store: an ephemeral owner on a fresh clone of the demo
+ * template, signed in. Rate-limited to 10/hour per IP server-side.
+ */
+export async function startDemo(
+  client: ApiClient,
+  meta: Omit<SignupInput, "email" | "password" | "storeName" | "storeHandle"> = {},
+): Promise<LoginResponse & { demo: true }> {
+  const data = await client.request<LoginResponse & { demo: true }>("/api/v1/auth/demo", {
+    method: "POST",
+    body: meta,
+    auth: false,
+    noBranch: true,
+  });
+  await client.adoptTokens(data.accessToken, data.refreshToken, data.expiresIn);
+  return data;
+}

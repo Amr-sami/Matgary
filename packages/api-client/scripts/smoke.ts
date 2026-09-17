@@ -11,7 +11,7 @@
  * that concurrent 401s collapse into ONE refresh, and that a bogus branch id is
  * ignored rather than honoured.
  */
-import { ApiClient, ApiError, auth, dashboard, me } from "../src/index";
+import { ApiClient, ApiError, auth, catalog, dashboard, me, sales } from "../src/index";
 import type { AuthTokens, TokenStore } from "../src/index";
 
 const BASE = process.env.API_URL ?? "http://127.0.0.1:3001";
@@ -110,6 +110,77 @@ async function main() {
   const dash = await dashboard.getDashboard(client);
   check("dashboard returns stats", typeof dash.stats.productCount === "number",
     `${dash.stats.productCount} products, month ${dash.stats.monthRevenue}`);
+
+  // ---- POS: record a sale, then replay it ---------------------------------
+  // The cart route caches by Idempotency-Key for 24h. Posting the identical
+  // request twice must return the SAME invoice, not two sales — that property
+  // is what the offline outbox (phase 3) is built on.
+  const products = await catalog.listProducts(client);
+  const sellable = products.find((p) => p.quantity >= 2);
+  if (sellable) {
+    const key = `smoke-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    const lines = [{ productId: sellable.id, quantity: 1, pricePerUnit: sellable.price }];
+    const opts = { paymentMethod: "cash" as const, invoiceId: key.toUpperCase().replace(/[^A-Z0-9_-]/g, "-") };
+
+    const first = await sales.recordCartSale(client, lines, opts, key);
+    check("POS records a sale", Boolean(first.invoiceId), `${first.invoiceId} · ${first.total}`);
+    check("sale total matches line price", first.total === sellable.price);
+
+    const replay = await sales.recordCartSale(client, lines, opts, key);
+    check(
+      "replaying the same Idempotency-Key returns the SAME sale",
+      replay.invoiceId === first.invoiceId && replay.saleIds[0] === first.saleIds[0],
+    );
+
+    const after = await catalog.listProducts(client);
+    const stock = after.find((p) => p.id === sellable.id)?.quantity ?? -1;
+    check("stock decremented exactly once", stock === sellable.quantity - 1, `${sellable.quantity} -> ${stock}`);
+
+    // Clean up so the seeded store's numbers stay what the docs say they are.
+    for (const id of first.saleIds) {
+      await client.request(`/api/sales/${id}`, { method: "DELETE" });
+    }
+    const restored = await catalog.listProducts(client);
+    check(
+      "cleanup restored stock",
+      (restored.find((p) => p.id === sellable.id)?.quantity ?? -1) === sellable.quantity,
+    );
+  } else {
+    console.log("  skip  POS — no product with stock >= 2");
+  }
+
+  // ---- trial store + signup (each mints its own session) -------------------
+  {
+    const demoStore = memoryStore();
+    const demoClient = new ApiClient({ baseUrl: BASE, tokens: demoStore });
+    const demo = await auth.startDemo(demoClient, { platform: "ios" });
+    check("trial store mints a session", demo.demo === true && Boolean(demo.accessToken));
+    const demoMe = await me.getMe(demoClient);
+    check("trial owner sees the cloned store", demoMe.isOwner && Boolean(demoMe.tenant.id), demoMe.tenant.slug ?? "");
+    const demoDash = await dashboard.getDashboard(demoClient);
+    check("trial store has products", demoDash.stats.productCount > 0, `${demoDash.stats.productCount} products`);
+  }
+  {
+    const h = `smk${Date.now().toString(36)}`;
+    const suStore = memoryStore();
+    const suClient = new ApiClient({ baseUrl: BASE, tokens: suStore });
+    const su = await auth.signup(suClient, {
+      email: `${h}@smoke.local`,
+      password: "Test1234!",
+      storeName: "متجر الدخان",
+      storeHandle: h,
+      platform: "ios",
+    });
+    check("signup creates an owner and signs in", su.user.role === "owner" && Boolean(su.accessToken), su.tenant.slug ?? "");
+    check("new store starts on a trial", su.tenant.subscriptionStatus === "trialing");
+    let dupKind = "";
+    try {
+      await auth.signup(suClient, { email: `x${h}@smoke.local`, password: "Test1234!", storeName: "x", storeHandle: h });
+    } catch (e) {
+      if (e instanceof ApiError) dupKind = `${e.kind}/${e.code}`;
+    }
+    check("duplicate store handle is refused", dupKind === "conflict/HANDLE_TAKEN", dupKind);
+  }
 
   // ---- refresh rotation --------------------------------------------------
   const beforeRefresh = store.peek()!;
