@@ -1,4 +1,5 @@
 import { Image, StyleSheet, View } from "react-native";
+import { t } from "@/i18n";
 
 /**
  * Port of apps/web/components/brand/Logo.tsx.
@@ -34,7 +35,7 @@ export function Logo({ size = "md", locale = "ar" }: LogoProps) {
         }
         style={styles.img}
         resizeMode="cover"
-        accessibilityLabel={locale === "en" ? "TheStoro" : "ستورو"}
+        accessibilityLabel={locale === "en" ? "TheStoro" : t("common.brand")}
       />
     </View>
   );

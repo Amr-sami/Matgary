@@ -4290,5 +4290,164 @@
         }
       ]
     }
+  },
+  "mobile": {
+    "common": {
+      "owner": "Owner",
+      "recurring": "Recurring",
+      "review": "Review",
+      "cost": "Cost",
+      "barcode": "Barcode",
+      "pieces": "{n} pcs",
+      "step": "Step {step} of {total} — {title}",
+      "tooManyAttempts": "Too many attempts. Wait a moment",
+      "offline": "Can't reach the server",
+      "forbidden": "You don't have permission for this",
+      "checkInput": "Check the entered data",
+      "ownerOnly": "Only the store owner can do this.",
+      "webOnly": "Download is available on the web version for now.",
+      "timeout": "Connection timed out",
+      "serverError": "The server isn't responding",
+      "subscriptionInactive": "Subscription is not active",
+      "notAvailable": "Unavailable",
+      "decrease": "Decrease quantity",
+      "increase": "Increase quantity",
+      "reason": "Reason",
+      "tags": "Tags",
+      "addedOn": "Added on",
+      "assignTo": "Assign to",
+      "noStaffYet": "No staff yet",
+      "noMembers": "No members"
+    },
+    "pos": {
+      "itemsInCart": "{n} items in the invoice",
+      "available": "Available: {n}",
+      "saveFailed": "Couldn't record the sale",
+      "offlineNotSaved": "Can't reach the server — the sale was NOT recorded",
+      "timeoutNotSaved": "Connection timed out — the sale was NOT recorded",
+      "insufficientStock": "Not enough stock for that quantity",
+      "productGone": "One of the products no longer exists",
+      "wrongBranch": "This product belongs to another branch",
+      "cartEmpty": "The invoice is empty",
+      "noPermission": "You don't have permission to record sales"
+    },
+    "product": {
+      "details": "Product details",
+      "priceAndStock": "Price & stock",
+      "openingStock": "Opening stock",
+      "lowStockThreshold": "Low-stock threshold",
+      "costOptional": "Cost price (optional)",
+      "barcodeOptional": "Barcode / SKU (optional)",
+      "scanOrType": "Scan or type the barcode",
+      "another": "Another product",
+      "openInInventory": "Open in inventory",
+      "saveFailed": "Couldn't save the product",
+      "noPermission": "You don't have permission to add products",
+      "notFound": "Product not found.",
+      "detailsOf": "{name} details",
+      "margin": "{amount} · {pct}% margin"
+    },
+    "returns": {
+      "empty": "No returns yet",
+      "emptyHint": "Returns are recorded from the sale invoice on the Sales screen.",
+      "pickLine": "Pick the item from recent sales:",
+      "reasonExample": "e.g. defective item",
+      "saveFailed": "Couldn't record the return",
+      "qtySuffix": "{n} pcs ·",
+      "summary": "{n} returns · {total}",
+      "changeLine": "‹ Change item",
+      "submit": "Record return"
+    },
+    "purchases": {
+      "empty": "No purchase orders",
+      "emptyHint": "Add a purchase order to track what you buy from suppliers.",
+      "createFailed": "Couldn't create the purchase order",
+      "ordered": "Ordered",
+      "orderCount": "Orders",
+      "owedToSuppliers": "Owed to suppliers",
+      "searchProduct": "Search for a product to add…",
+      "create": "Create purchase order"
+    },
+    "expenses": {
+      "empty": "No expenses yet",
+      "summary": "{n} expenses · {total}",
+      "add": "Add expense",
+      "saveFailed": "Couldn't record the expense"
+    },
+    "customers": {
+      "emptyHint": "Customers appear here after the first sale recorded with a name.",
+      "summary": "{n} customers · {owed} outstanding",
+      "owes": "Owes {amount}",
+      "profileOf": "Customer: {name}",
+      "lastVisit": "Last visit",
+      "invoiceCount": "Invoices",
+      "paymentLog": "Payment history",
+      "previousPayment": "Previous payment",
+      "paidOn": "· paid {date}",
+      "noInvoicesBranch": "No invoices for this customer at the current branch.",
+      "loadFailed": "Couldn't load the customer.",
+      "empty": "No customers yet",
+      "backToList": "Back to customers",
+      "invoiceHistory": "Invoice history",
+      "outstandingFromCustomer": "Outstanding from customer"
+    },
+    "suppliers": {
+      "profileOf": "Supplier: {name}",
+      "summary": "{n} suppliers · {owed} owed",
+      "empty": "No suppliers",
+      "noBalance": "Nothing owed",
+      "nameRequired": "Supplier name is required",
+      "saveFailed": "Couldn't save changes",
+      "edit": "Edit supplier"
+    },
+    "team": {
+      "summary": "{n} members"
+    },
+    "tasks": {
+      "summary": "{open} open · {done} done",
+      "newTask": "New task +",
+      "doneCheck": "✓ Done",
+      "completeTitle": "Complete {title}",
+      "reopenTitle": "Reopen {title}"
+    },
+    "insights": {
+      "loadFailed": "Couldn't load insights",
+      "deepDive": "Deep dive",
+      "trendTitle": "Sales trend ({range})",
+      "ofValue": "{pct}% of value"
+    },
+    "inventory": {
+      "searchHint": "Try another search or clear the filters.",
+      "empty": "No products",
+      "backToList": "Back to inventory"
+    },
+    "billing": {
+      "trialDaysLeft": "{days} days left in your free trial.",
+      "activeUntil": "Service active until {date}.",
+      "renewalOn": "Next renewal on {date}."
+    },
+    "settings": {
+      "addBranch": "+ Add branch",
+      "deleteBranchConfirm": "Delete branch “{name}”? This is refused if the branch has any data (sales / expenses / stock).",
+      "securitySub": "Two-factor auth, sign out everywhere, and delete the store.",
+      "digestActive": "✅ On — you'll get a message at {time} in your store's time zone",
+      "switched": "Switched",
+      "openAuthApp": "Open authenticator app",
+      "digestPermission": "Daily digest settings are only available to those with permission to manage it.",
+      "currentStatus": "Current status:"
+    },
+    "signup": {
+      "emailTaken": "This email is already registered",
+      "handleTaken": "That store name is taken — choose another",
+      "badEmail": "Invalid email address",
+      "handleRule": "Store name: lowercase letters, digits and dashes only",
+      "tooMany": "Too many attempts. Try again shortly",
+      "createFailed": "Couldn't create the account"
+    },
+    "a11y": {
+      "showPassword": "Show password",
+      "hidePassword": "Hide password",
+      "scanBarcode": "Scan barcode"
+    }
   }
 }

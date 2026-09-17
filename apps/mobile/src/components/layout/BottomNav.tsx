@@ -35,7 +35,7 @@ interface NavItem {
   requires: string | null;
 }
 
-const ITEMS: NavItem[] = [
+const ITEMS = (): NavItem[] => ([
   { route: "index", label: t("app.shell.primary.dashboardShort"), icon: GridFour, requires: "view_dashboard" },
   { route: "inventory", label: t("app.shell.primary.inventory"), icon: Package, requires: "view_inventory" },
   { route: "sales", label: t("app.shell.primary.sales"), icon: ShoppingCart, requires: "view_sales" },
@@ -43,7 +43,7 @@ const ITEMS: NavItem[] = [
   { route: "purchases", label: t("app.shell.primary.purchases"), icon: Receipt, requires: "view_purchases" },
   { route: "insights", label: t("app.shell.primary.insights"), icon: ChartBar, requires: "view_insights" },
   { route: "more", label: t("app.shell.more"), icon: List, requires: null },
-];
+]);
 
 /**
  * Structural props rather than `BottomTabBarProps`.
@@ -64,7 +64,7 @@ export function BottomNav({ state, navigation }: TabBarProps) {
   const permissions = useSession((s) => s.me?.permissions);
   const allowed = new Set(permissions ?? []);
 
-  const visible = ITEMS.filter((i) => !i.requires || allowed.has(i.requires));
+  const visible = ITEMS().filter((i) => !i.requires || allowed.has(i.requires));
   const activeRoute = state.routes[state.index]?.name;
 
   return (

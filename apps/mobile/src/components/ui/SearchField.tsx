@@ -3,6 +3,7 @@ import { Barcode } from "phosphor-react-native";
 
 import { RTL_TEXT } from "@/theme/rtl";
 import { colors, fonts, radius, spacing } from "@/theme/tokens";
+import { t } from "@/i18n";
 
 /**
  * The inventory / POS search box. The barcode glyph is not decoration — on the
@@ -35,7 +36,7 @@ export function SearchField({
         onPress={onPressScan}
         hitSlop={12}
         accessibilityRole="button"
-        accessibilityLabel="مسح باركود"
+        accessibilityLabel={t("mobile.a11y.scanBarcode")}
       >
         <Barcode size={22} color={colors.accent} />
       </Pressable>

@@ -29,7 +29,8 @@ import { t } from "@/i18n";
  * for ANY of manage_team / request_leave / manage_leave, so a staff member who
  * can only request leave still reaches it.
  */
-const ITEMS = [
+const ITEMS = () =>
+  ([
   { route: "/tasks", label: t("app.shell.secondary.tasks"), icon: ListChecks, requires: "view_dashboard" },
   { route: "/customers", label: t("app.shell.secondary.customers"), icon: Users, requires: "view_customers" },
   { route: "/expenses", label: t("app.shell.secondary.expenses"), icon: Wallet, requires: "view_expenses" },
@@ -38,7 +39,7 @@ const ITEMS = [
   { route: "/team", label: t("app.shell.secondary.team"), icon: UsersThree, requires: "manage_team" },
   { route: "/settings", label: t("app.shell.secondary.settings"), icon: Gear, requires: "view_settings" },
   { route: "/billing", label: t("app.billing.title"), icon: CreditCard, requires: null },
-] as const;
+] as const);;
 
 const TEAM_ANY = ["manage_team", "request_leave", "manage_leave"];
 
@@ -48,7 +49,7 @@ export default function MoreScreen() {
   const signOut = useSession((s) => s.signOut);
   const allowed = new Set(me?.permissions ?? []);
 
-  const visible = ITEMS.filter((i) => {
+  const visible = ITEMS().filter((i) => {
     if (i.route === "/tasks") return Boolean(me);
     if (i.route === "/team") return TEAM_ANY.some((p) => allowed.has(p));
     // Billing is owner-only on the web (app.billing.ownerOnly).

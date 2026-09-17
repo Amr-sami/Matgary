@@ -13,7 +13,9 @@ import { router } from "expo-router";
 import { Globe, Lightning } from "phosphor-react-native";
 
 import { ApiError, auth } from "@matgary/api-client";
+import { dictionaries } from "@matgary/i18n";
 
+import { getLocale, t, useLocale } from "@/i18n";
 import { api, deviceMeta } from "@/api/client";
 import { getInstallId } from "@/auth/installId";
 import { useSession } from "@/stores/session";
@@ -35,38 +37,12 @@ import { colors, fonts, radius, spacing } from "@/theme/tokens";
  *
  * Every string is lifted from apps/web/dictionaries/ar.json (`auth.signup.*`).
  */
-const t = {
-  title: "إنشاء حساب جديد",
-  step1Sub: "ابدأ بإنشاء حسابك",
-  step2Sub: "أخبرنا عن متجرك",
-  emailLabel: "بريدك الإلكتروني",
-  emailPlaceholder: "you@example.com",
-  passwordLabel: "كلمة المرور",
-  passwordPlaceholder: "8 أحرف على الأقل",
-  passwordConfirmLabel: "أعد كتابة كلمة المرور",
-  passwordConfirmPlaceholder: "اكتب كلمة المرور مرة أخرى للتأكد",
-  next: "التالي",
-  previous: "السابق",
-  submit: "إنشاء الحساب",
-  storeNameLabel: "اسم المتجر",
-  storeNamePlaceholder: "متجر السعادة",
-  handleLabel: "اسم تسجيل الدخول للمتجر",
-  handlePlaceholder: "elhenawystore",
-  handleHint: "يستخدمه موظفوك لتسجيل الدخول، مثل",
-  handleAvailable: "متاح ✓",
-  handleTaken: "هذا الاسم مستخدم بالفعل في متجر آخر — اختر اسماً مختلفاً",
-  handleInvalid: "حروف إنجليزية صغيرة وأرقام و - فقط، يبدأ وينتهي بحرف أو رقم",
-  haveAccountQ: "لديك حساب بالفعل؟",
-  signIn: "تسجيل الدخول",
-  emailAvailable: "متاح ✓",
-  emailTaken: "هذا البريد مسجّل بالفعل — استخدم تسجيل الدخول",
-  errors: {
-    badEmail: "أدخل بريداً إلكترونياً صحيحاً",
-    shortPassword: "كلمة المرور يجب أن تكون 8 أحرف على الأقل",
-    passwordMismatch: "كلمتا المرور غير متطابقتين",
-    storeNameRequired: "اسم المتجر مطلوب",
-  },
-} as const;
+/**
+ * The auth.signup subtree, read at render time so the language switch applies.
+ * These strings byte-match the web's dictionary; a module-scope copy would
+ * have frozen the locale at first load.
+ */
+const T = () => dictionaries[getLocale()].auth.signup;
 
 /** The exact predicates the web form uses, so the two clients agree on "valid". */
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -182,19 +158,19 @@ export default function SignupScreen() {
   const goToStep2 = () => {
     setError(null);
     if (!isEmail(email.trim().toLowerCase())) {
-      setError(t.errors.badEmail);
+      setError(T().errors.badEmail);
       return;
     }
     if (emailStatus === "taken") {
-      setError(t.emailTaken);
+      setError(T().emailTaken);
       return;
     }
     if (password.length < 8) {
-      setError(t.errors.shortPassword);
+      setError(T().errors.shortPassword);
       return;
     }
     if (password !== passwordConfirm) {
-      setError(t.errors.passwordMismatch);
+      setError(T().errors.passwordMismatch);
       return;
     }
     setStep(2);
@@ -205,7 +181,7 @@ export default function SignupScreen() {
   const submit = async () => {
     setError(null);
     if (!storeName.trim()) {
-      setError(t.errors.storeNameRequired);
+      setError(T().errors.storeNameRequired);
       return;
     }
     setSubmitting(true);
@@ -255,12 +231,12 @@ export default function SignupScreen() {
             <Pressable style={styles.demoPill} accessibilityRole="button">
               <Lightning size={16} color="#FFFFFF" weight="fill" />
               <Text numberOfLines={1} style={styles.demoPillText}>
-                تصفح المتجر التجريبي
+                {t("auth.demo.cta")}
               </Text>
             </Pressable>
-            <Pressable style={styles.langToggle} accessibilityRole="button">
+            <Pressable style={styles.langToggle} accessibilityRole="button" onPress={() => void useLocale.getState().setLocale(getLocale() === "ar" ? "en" : "ar")}>
               <Globe size={20} color={colors.textSecondary} />
-              <Text style={styles.langText}>ع</Text>
+              <Text style={styles.langText}>{getLocale() === "ar" ? "ع" : "EN"}</Text>
             </Pressable>
           </View>
 
@@ -268,9 +244,9 @@ export default function SignupScreen() {
             <Logo size="md" />
           </View>
 
-          <Text style={styles.heading}>{t.title}</Text>
+          <Text style={styles.heading}>{T().title}</Text>
           <Text style={styles.subheading}>
-            {step === 1 ? t.step1Sub : t.step2Sub}
+            {step === 1 ? T().step1Sub : T().step2Sub}
           </Text>
 
           {/* Decorative: the subheading above already says which step this is,
@@ -289,8 +265,8 @@ export default function SignupScreen() {
             <View style={styles.form}>
               <View style={styles.fieldGroup}>
                 <Field
-                  label={t.emailLabel}
-                  placeholder={t.emailPlaceholder}
+                  label={T().emailLabel}
+                  placeholder={T().emailPlaceholder}
                   value={email}
                   onChangeText={setEmail}
                   autoCapitalize="none"
@@ -300,16 +276,16 @@ export default function SignupScreen() {
                   returnKeyType="next"
                 />
                 {emailStatus === "available" ? (
-                  <Text style={[styles.hint, styles.hintOk]}>{t.emailAvailable}</Text>
+                  <Text style={[styles.hint, styles.hintOk]}>{T().emailAvailable}</Text>
                 ) : null}
                 {emailStatus === "taken" ? (
-                  <Text style={[styles.hint, styles.hintBad]}>{t.emailTaken}</Text>
+                  <Text style={[styles.hint, styles.hintBad]}>{T().emailTaken}</Text>
                 ) : null}
               </View>
 
               <Field
-                label={t.passwordLabel}
-                placeholder={t.passwordPlaceholder}
+                label={T().passwordLabel}
+                placeholder={T().passwordPlaceholder}
                 value={password}
                 onChangeText={setPassword}
                 secure
@@ -319,8 +295,8 @@ export default function SignupScreen() {
               />
 
               <Field
-                label={t.passwordConfirmLabel}
-                placeholder={t.passwordConfirmPlaceholder}
+                label={T().passwordConfirmLabel}
+                placeholder={T().passwordConfirmPlaceholder}
                 value={passwordConfirm}
                 onChangeText={setPasswordConfirm}
                 secure
@@ -337,7 +313,7 @@ export default function SignupScreen() {
               ) : null}
 
               <Button
-                label={t.next}
+                label={T().next}
                 onPress={goToStep2}
                 disabled={
                   emailStatus === "checking" ||
@@ -349,8 +325,8 @@ export default function SignupScreen() {
           ) : (
             <View style={styles.form}>
               <Field
-                label={t.storeNameLabel}
-                placeholder={t.storeNamePlaceholder}
+                label={T().storeNameLabel}
+                placeholder={T().storeNamePlaceholder}
                 value={storeName}
                 onChangeText={setStoreName}
                 textContentType="organizationName"
@@ -359,8 +335,8 @@ export default function SignupScreen() {
 
               <View style={styles.fieldGroup}>
                 <Field
-                  label={t.handleLabel}
-                  placeholder={t.handlePlaceholder}
+                  label={T().handleLabel}
+                  placeholder={T().handlePlaceholder}
                   value={storeHandle}
                   onChangeText={(value) => {
                     setStoreHandle(value.toLowerCase().replace(/[^a-z0-9-]/g, ""));
@@ -373,7 +349,7 @@ export default function SignupScreen() {
                   onSubmitEditing={submit}
                 />
                 <Text style={styles.hint}>
-                  {t.handleHint}{" "}
+                  {T().handleHint}{" "}
                   <Text style={styles.hintStrong}>
                     ahmed@
                     {handleStatus === "invalid" || !storeHandle
@@ -382,13 +358,13 @@ export default function SignupScreen() {
                   </Text>
                 </Text>
                 {handleStatus === "available" ? (
-                  <Text style={[styles.hint, styles.hintOk]}>{t.handleAvailable}</Text>
+                  <Text style={[styles.hint, styles.hintOk]}>{T().handleAvailable}</Text>
                 ) : null}
                 {handleStatus === "taken" ? (
-                  <Text style={[styles.hint, styles.hintBad]}>{t.handleTaken}</Text>
+                  <Text style={[styles.hint, styles.hintBad]}>{T().handleTaken}</Text>
                 ) : null}
                 {handleStatus === "invalid" && storeHandle.length >= 2 ? (
-                  <Text style={[styles.hint, styles.hintBad]}>{t.handleInvalid}</Text>
+                  <Text style={[styles.hint, styles.hintBad]}>{T().handleInvalid}</Text>
                 ) : null}
               </View>
 
@@ -400,7 +376,7 @@ export default function SignupScreen() {
 
               <View style={styles.stepButtons}>
                 <Button
-                  label={t.previous}
+                  label={T().previous}
                   variant="outline"
                   style={styles.stepButton}
                   onPress={() => {
@@ -409,7 +385,7 @@ export default function SignupScreen() {
                   }}
                 />
                 <Button
-                  label={t.submit}
+                  label={T().submit}
                   style={styles.stepButton}
                   onPress={() => void submit()}
                   loading={submitting}
@@ -425,8 +401,8 @@ export default function SignupScreen() {
 
           <View style={styles.rule} />
 
-          <Text style={styles.noAccount}>{t.haveAccountQ}</Text>
-          <Button label={t.signIn} variant="outline" onPress={goToLogin} />
+          <Text style={styles.noAccount}>{T().haveAccountQ}</Text>
+          <Button label={T().signIn} variant="outline" onPress={goToLogin} />
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -435,28 +411,28 @@ export default function SignupScreen() {
 
 /** Field codes from lib/auth/create-account.ts, in the shopkeeper's language. */
 function signupMessage(e: unknown): string {
-  if (!(e instanceof ApiError)) return "تعذّر إنشاء الحساب";
+  if (!(e instanceof ApiError)) return t("mobile.signup.createFailed");
   switch (e.code) {
     case "EMAIL_TAKEN":
-      return "هذا البريد مسجّل بالفعل";
+      return t("mobile.signup.emailTaken");
     case "HANDLE_TAKEN":
-      return "اسم المتجر هذا مستخدم — اختر اسماً آخر";
+      return t("mobile.signup.handleTaken");
     case "BAD_EMAIL_FORMAT":
-      return "البريد الإلكتروني غير صحيح";
+      return t("mobile.signup.badEmail");
     case "WEAK_PASSWORD":
-      return "كلمة المرور يجب أن تكون 8 أحرف على الأقل";
+      return t("auth.signup.errors.shortPassword");
     case "HANDLE_INVALID":
-      return "اسم المتجر: حروف إنجليزية صغيرة وأرقام وشرطة فقط";
+      return t("mobile.signup.handleRule");
     case "STORE_NAME_REQUIRED":
-      return "اسم المتجر مطلوب";
+      return t("auth.signup.errors.storeNameRequired");
   }
   switch (e.kind) {
     case "offline":
-      return "تعذّر الاتصال بالخادم";
+      return t("mobile.common.offline");
     case "rateLimited":
-      return "محاولات كثيرة. حاول بعد قليل";
+      return t("mobile.signup.tooMany");
     default:
-      return "تعذّر إنشاء الحساب";
+      return t("mobile.signup.createFailed");
   }
 }
 

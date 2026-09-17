@@ -5,7 +5,7 @@ import { Minus, Plus, Receipt, Wallet, Package } from "phosphor-react-native";
 import { ApiError, catalog } from "@matgary/api-client";
 
 import { api } from "@/api/client";
-import { isRTL } from "@/i18n";
+import { isRTL, t } from "@/i18n";
 import { Screen } from "@/components/layout/Screen";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -19,12 +19,12 @@ import { RTL_TEXT, directionStyle } from "@/theme/rtl";
 import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
 
 /** Arabic labels + badge variant per PO status, matching the web's Badge use. */
-const STATUS: Record<string, { label: string; variant: "accent" | "success" | "lowstock" | "neutral" }> = {
-  draft: { label: "مسودة", variant: "neutral" },
-  ordered: { label: "تم الطلب", variant: "accent" },
-  received: { label: "تم الاستلام", variant: "success" },
-  cancelled: { label: "ملغي", variant: "lowstock" },
-};
+const STATUS = (): Record<string, { label: string; variant: "accent" | "success" | "lowstock" | "neutral" }> => ({
+  draft: { label: t("app.purchasesStatus.draft"), variant: "neutral" },
+  ordered: { label: t("mobile.purchases.ordered"), variant: "accent" },
+  received: { label: t("app.purchasesStatus.received"), variant: "success" },
+  cancelled: { label: t("app.purchasesStatus.cancelled"), variant: "lowstock" },
+});
 
 /** Port of app__purchases.png — PO list with totals and payment state. */
 type Draft = { productId: string; productName: string; quantity: number; unitCost: number };
@@ -67,7 +67,7 @@ export default function PurchasesScreen() {
       setOpen(false); setSupplierId(null); setItems([]); setError(null);
       void qc.invalidateQueries({ queryKey: ["purchase-orders"] });
     },
-    onError: (e) => setError(e instanceof ApiError && e.kind === "offline" ? "تعذّر الاتصال بالخادم" : "تعذّر إنشاء أمر الشراء"),
+    onError: (e) => setError(e instanceof ApiError && e.kind === "offline" ? t("mobile.common.offline") : t("mobile.purchases.createFailed")),
   });
   const canSubmit = supplierId !== null && items.length > 0 && !create.isPending;
 
@@ -81,17 +81,17 @@ export default function PurchasesScreen() {
 
   return (
     <Screen
-      title="المشتريات"
+      title={t("app.purchases.title")}
       onRefresh={() => void pos.refetch()}
       refreshing={pos.isRefetching}
     >
       <View style={styles.gridRow}>
-        <StatCard title="عدد الأوامر" value={String(stats.count)} icon={Receipt} color="accent" />
-        <StatCard title="إجمالي المشتريات" value={money(stats.total)} icon={Package} color="accent" />
+        <StatCard title={t("mobile.purchases.orderCount")} value={String(stats.count)} icon={Receipt} color="accent" />
+        <StatCard title={t("app.purchases.kpi.totalPurchases")} value={money(stats.total)} icon={Package} color="accent" />
       </View>
       <View style={styles.gridRow}>
         <StatCard
-          title="مستحق للموردين"
+          title={t("mobile.purchases.owedToSuppliers")}
           value={money(stats.outstanding)}
           icon={Wallet}
           color={stats.outstanding > 0 ? "danger" : "success"}
@@ -99,22 +99,22 @@ export default function PurchasesScreen() {
         <View style={styles.spacer} />
       </View>
 
-      <Button label="أمر شراء جديد" onPress={() => setOpen(true)} />
+      <Button label={t("app.purchases.newOrder")} onPress={() => setOpen(true)} />
 
       <Modal visible={open} animationType="slide" onRequestClose={() => setOpen(false)}>
         <View style={[styles.modal, directionStyle(isRTL())]}>
           <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
-            <Text style={styles.modalTitle}>أمر شراء جديد</Text>
+            <Text style={styles.modalTitle}>{t("app.purchases.newOrder")}</Text>
 
-            <Text style={styles.meta}>المورد</Text>
+            <Text style={styles.meta}>{t("app.suppliers.detail.title")}</Text>
             <View style={styles.chipRow}>
               {(suppliers.data ?? []).map((sp) => (
                 <Chip key={sp.id} label={sp.name} active={supplierId === sp.id} onPress={() => setSupplierId(sp.id)} />
               ))}
             </View>
 
-            <Text style={styles.meta}>الأصناف</Text>
-            <SearchField value={q} onChangeText={setQ} placeholder="ابحث عن منتج لإضافته…" />
+            <Text style={styles.meta}>{t("app.activityLabels.fields.lines")}</Text>
+            <SearchField value={q} onChangeText={setQ} placeholder={t("mobile.purchases.searchProduct")} />
             {matches.map((p) => (
               <Pressable key={p.id} style={styles.pick} onPress={() => addItem(p)}>
                 <Text numberOfLines={1} style={styles.supplier}>{p.name}</Text>
@@ -133,8 +133,8 @@ export default function PurchasesScreen() {
             {items.length ? <Text style={styles.total}>الإجمالي: {money(draftTotal)}</Text> : null}
 
             {error ? <Text style={styles.err}>{error}</Text> : null}
-            <Button label="إنشاء أمر الشراء" disabled={!canSubmit} loading={create.isPending} onPress={() => create.mutate()} />
-            <Button label="إلغاء" variant="ghost" onPress={() => setOpen(false)} />
+            <Button label={t("mobile.purchases.create")} disabled={!canSubmit} loading={create.isPending} onPress={() => create.mutate()} />
+            <Button label={t("app.purchases.row.cancel")} variant="ghost" onPress={() => setOpen(false)} />
           </ScrollView>
         </View>
       </Modal>
@@ -142,11 +142,11 @@ export default function PurchasesScreen() {
       {pos.isLoading ? (
         <ActivityIndicator color={colors.accent} />
       ) : orders.length === 0 ? (
-        <EmptyState title="لا توجد أوامر شراء" hint="أضف أمر شراء لتتبع مشترياتك من الموردين." />
+        <EmptyState title={t("mobile.purchases.empty")} hint={t("mobile.purchases.emptyHint")} />
       ) : (
         <View style={styles.list}>
           {orders.map((o) => {
-            const s = STATUS[o.status] ?? { label: o.status, variant: "neutral" as const };
+            const s = STATUS()[o.status] ?? { label: o.status, variant: "neutral" as const };
             const due = o.total - o.paidAmount;
             return (
               <View key={o.id} style={styles.row}>

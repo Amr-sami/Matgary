@@ -21,6 +21,7 @@ import { Field } from "@/components/ui/Field";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
+import { t } from "@/i18n";
 
 /**
  * Port of app__settings-digest.png.
@@ -99,10 +100,10 @@ export default function DigestSettingsScreen() {
       return res.settings;
     },
     onSuccess: () => {
-      setNotice({ tone: "ok", text: "تم الحفظ" });
+      setNotice({ tone: "ok", text: t("app.digestSettings.savedToast") });
       void q.refetch();
     },
-    onError: () => setNotice({ tone: "err", text: "تعذر الحفظ" }),
+    onError: () => setNotice({ tone: "err", text: t("app.digestSettings.errorToast") }),
   });
 
   const preview = useMutation({
@@ -113,7 +114,7 @@ export default function DigestSettingsScreen() {
       return res.message;
     },
     onSuccess: (message) => setPreviewText(message),
-    onError: () => setNotice({ tone: "err", text: "تعذر التحضير" }),
+    onError: () => setNotice({ tone: "err", text: t("app.digestSettings.previewErrorToast") }),
   });
 
   const forbidden = q.error instanceof ApiError && q.error.kind === "forbidden";
@@ -128,12 +129,11 @@ export default function DigestSettingsScreen() {
           style={styles.back}
         >
           <CaretRight size={16} color={colors.textSecondary} />
-          <Text style={styles.backLabel}>الإعدادات</Text>
+          <Text style={styles.backLabel}>{t("app.settingsPage.title")}</Text>
         </Pressable>
-        <Text style={styles.title}>الملخص اليومي على واتساب</Text>
+        <Text style={styles.title}>{t("app.digestSettings.title")}</Text>
         <Text style={styles.subtitle}>
-          كل يوم في الميعاد اللي تختاره، هتيجيلك رسالة واتساب فيها مبيعات اليوم،
-          أعلى منتج، أي تنبيه، وإشارة لو في شيفت محتاج مراجعة.
+          {t("app.digestSettings.intro")}
         </Text>
       </View>
 
@@ -153,7 +153,7 @@ export default function DigestSettingsScreen() {
       {forbidden ? (
         <Card>
           <Text style={styles.sectionHint}>
-            إعدادات الملخص اليومي متاحة لمن يملك صلاحية إدارتها فقط.
+            {t("mobile.settings.digestPermission")}
           </Text>
         </Card>
       ) : !settings ? (
@@ -164,15 +164,15 @@ export default function DigestSettingsScreen() {
           <Card>
             <View style={styles.enableRow}>
               <View style={styles.enableBody}>
-                <Text style={styles.sectionTitle}>تفعيل الملخص</Text>
+                <Text style={styles.sectionTitle}>{t("app.digestSettings.enable.title")}</Text>
                 <Text style={styles.sectionHint}>
                   {settings.enabled
-                    ? `✅ شغّال — هتيجيلك رسالة الساعة ${String(settings.digestHour).padStart(2, "0")}:00 بتوقيت متجرك`
-                    : "⚪ متوقف"}
+                    ? t("mobile.settings.digestActive", { time: `${String(settings.digestHour).padStart(2, "0")}:00` })
+                    : t("app.digestSettings.enable.offLine")}
                 </Text>
               </View>
               <Button
-                label={settings.enabled ? "إيقاف" : "تفعيل"}
+                label={settings.enabled ? t("app.digestSettings.enable.disable") : t("app.digestSettings.enable.enable")}
                 variant={settings.enabled ? "outline" : "primary"}
                 onPress={() => save.mutate({ enabled: !settings.enabled })}
                 loading={save.isPending}
@@ -182,24 +182,23 @@ export default function DigestSettingsScreen() {
           </Card>
 
           {/* رقم الواتساب الأساسي */}
-          <Card title="رقم الواتساب الأساسي">
+          <Card title={t("app.digestSettings.phone.title")}>
             <Text style={styles.sectionHint}>
-              الرقم اللي هيستلم الملخص اليومي. ده مش رقم الواتساب اللي بنبعت منه
-              الفواتير للعملاء — ده رقمك الشخصي اللي هيوصلك عليه التقرير.
+              {t("app.digestSettings.phone.intro")}
             </Text>
             <View style={styles.stack}>
               <Field
-                label="رقم الواتساب"
+                label={t("app.digestSettings.phone.label")}
                 value={phoneInput}
                 onChangeText={(v) => {
                   setPhoneInput(v);
                   setPhoneDirty(true);
                 }}
-                placeholder="مثلاً: 01001112233 أو 201001112233"
+                placeholder={t("app.digestSettings.phone.placeholder")}
                 keyboardType="phone-pad"
               />
               <Button
-                label="حفظ الرقم"
+                label={t("app.digestSettings.phone.save")}
                 variant="outline"
                 disabled={!phoneDirty || save.isPending}
                 onPress={() => {
@@ -211,12 +210,11 @@ export default function DigestSettingsScreen() {
           </Card>
 
           {/* الميعاد */}
-          <Card title="الميعاد">
+          <Card title={t("app.digestSettings.schedule.title")}>
             <Text style={styles.sectionHint}>
-              الافتراضي 12 بعد منتصف الليل (نهاية اليوم). تقدر تخليه أي ساعة تانية
-              تناسب وقت إقفال محلك.
+              {t("app.digestSettings.schedule.intro")}
             </Text>
-            <Text style={styles.fieldLabel}>الساعة (بتوقيت متجرك)</Text>
+            <Text style={styles.fieldLabel}>{t("app.digestSettings.schedule.hourLabel")}</Text>
             <Pressable
               accessibilityRole="button"
               accessibilityState={{ expanded: hoursOpen }}
@@ -246,15 +244,15 @@ export default function DigestSettingsScreen() {
           </Card>
 
           {/* السلوك */}
-          <Card title="السلوك">
+          <Card title={t("app.digestSettings.behavior.title")}>
             <ToggleRow
-              label="ابعث الرسالة حتى لو ميكنش في مبيعات"
+              label={t("app.digestSettings.behavior.sendOnEmpty")}
               value={settings.sendOnEmpty}
               disabled={save.isPending}
               onChange={(v) => save.mutate({ sendOnEmpty: v })}
             />
             <ToggleRow
-              label="ابعث على الإيميل كـ خطة بديلة لو الواتساب فشل"
+              label={t("app.digestSettings.behavior.emailFallback")}
               value={settings.emailFallback}
               disabled={save.isPending}
               onChange={(v) => save.mutate({ emailFallback: v })}
@@ -262,12 +260,12 @@ export default function DigestSettingsScreen() {
           </Card>
 
           {/* مستقبلين إضافيين */}
-          <Card title="مستقبلين إضافيين">
+          <Card title={t("app.digestSettings.extras.title")}>
             <Text style={styles.sectionHint}>
-              ضيف أرقام واتساب أو إيميلات تانية تستقبل نفس الرسالة (مثلاً المحاسب).
+              {t("app.digestSettings.extras.intro")}
             </Text>
             {settings.extraRecipients.length === 0 ? (
-              <Text style={styles.empty}>مفيش حد مضاف</Text>
+              <Text style={styles.empty}>{t("app.digestSettings.extras.empty")}</Text>
             ) : (
               <View style={styles.recipients}>
                 {settings.extraRecipients.map((r, i) => (
@@ -282,7 +280,7 @@ export default function DigestSettingsScreen() {
                     </View>
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel="حذف"
+                      accessibilityLabel={t("app.digestSettings.extras.delete")}
                       disabled={save.isPending}
                       onPress={() =>
                         save.mutate({
@@ -293,7 +291,7 @@ export default function DigestSettingsScreen() {
                       }
                       style={styles.removeButton}
                     >
-                      <Text style={styles.removeLabel}>حذف</Text>
+                      <Text style={styles.removeLabel}>{t("app.digestSettings.extras.delete")}</Text>
                     </Pressable>
                   </View>
                 ))}
@@ -302,25 +300,25 @@ export default function DigestSettingsScreen() {
 
             <View style={styles.stack}>
               <Field
-                label="الاسم"
+                label={t("app.digestSettings.extras.nameLabel")}
                 value={extra.name}
                 onChangeText={(v) => setExtra({ ...extra, name: v })}
               />
               <Field
-                label="واتساب"
+                label={t("app.digestSettings.extras.phoneLabel")}
                 value={extra.phone ?? ""}
                 onChangeText={(v) => setExtra({ ...extra, phone: v })}
                 keyboardType="phone-pad"
               />
               <Field
-                label="إيميل"
+                label={t("app.digestSettings.extras.emailLabel")}
                 value={extra.email ?? ""}
                 onChangeText={(v) => setExtra({ ...extra, email: v })}
                 keyboardType="email-address"
                 autoCapitalize="none"
               />
               <Button
-                label="إضافة مستقبل"
+                label={t("app.digestSettings.extras.add")}
                 variant="outline"
                 disabled={!extra.name.trim() || save.isPending}
                 onPress={() => {
@@ -341,9 +339,9 @@ export default function DigestSettingsScreen() {
           </Card>
 
           {/* معاينة */}
-          <Card title="معاينة">
+          <Card title={t("app.digestSettings.preview.title")}>
             <Text style={styles.sectionHint}>
-              اعرض نسخة من رسالة اليوم زي ما هتيجيلك. مفيدة قبل ما تفعّل لأول مرة.
+              {t("app.digestSettings.preview.intro")}
             </Text>
             <View style={styles.branchChips}>
               {(me?.branches ?? []).map((b) => (
@@ -356,7 +354,7 @@ export default function DigestSettingsScreen() {
               ))}
             </View>
             <Button
-              label="معاينة"
+              label={t("app.digestSettings.preview.title")}
               variant="outline"
               disabled={!previewBranch || preview.isPending}
               loading={preview.isPending}

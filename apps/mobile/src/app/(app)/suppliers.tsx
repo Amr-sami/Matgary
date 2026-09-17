@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { money } from "@/lib/format";
 import { RTL_TEXT } from "@/theme/rtl";
 import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
+import { t } from "@/i18n";
 
 /** Port of app__suppliers.png. Balance > 0 means the shop owes the supplier. */
 export default function SuppliersScreen() {
@@ -24,22 +25,22 @@ export default function SuppliersScreen() {
 
   return (
     <Screen
-      title="الموردون"
-      subtitle={rows.length ? `${rows.length} مورد · مستحق ${money(owed)}` : undefined}
+      title={t("app.activityLabels.categories.supplier")}
+      subtitle={rows.length ? t("mobile.suppliers.summary", { n: rows.length, owed: money(owed) }) : undefined}
       onRefresh={() => void q.refetch()}
       refreshing={q.isRefetching}
     >
       {q.isLoading ? (
         <ActivityIndicator color={colors.accent} />
       ) : rows.length === 0 ? (
-        <EmptyState title="لا يوجد موردون" />
+        <EmptyState title={t("mobile.suppliers.empty")} />
       ) : (
         <View style={styles.list}>
           {rows.map((s) => (
             <Pressable
               key={s.id}
               accessibilityRole="button"
-              accessibilityLabel={`ملف المورد ${s.name}`}
+              accessibilityLabel={t("mobile.suppliers.profileOf", { name: s.name })}
               onPress={() => router.push(`/suppliers/${encodeURIComponent(s.id)}`)}
               style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
             >
@@ -50,7 +51,7 @@ export default function SuppliersScreen() {
                 {s.balance > 0 ? (
                   <Badge label={money(s.balance)} variant="outofstock" />
                 ) : (
-                  <Badge label="لا مستحقات" variant="success" />
+                  <Badge label={t("mobile.suppliers.noBalance")} variant="success" />
                 )}
               </View>
               {s.phone ? <Text style={styles.meta}>{s.phone}</Text> : null}

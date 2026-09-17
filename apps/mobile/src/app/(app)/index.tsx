@@ -17,6 +17,7 @@ import {
 import { ApiError, dashboard as dashboardApi } from "@matgary/api-client";
 
 import { api } from "@/api/client";
+import { money } from "@/lib/format";
 import { StockAlerts } from "@/components/dashboard/StockAlerts";
 import { StatCard } from "@/components/ui/StatCard";
 import { useSession } from "@/stores/session";
@@ -45,8 +46,6 @@ export default function DashboardScreen() {
   // The web formats through Intl; doc 06 §4.3 requires a deterministic
   // formatter on device, because Hermes ships a trimmed ICU and the same
   // number can render differently across platforms.
-  const money = (value: number) =>
-    `${value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")} ج.م`;
 
   return (
     <View style={styles.root}>

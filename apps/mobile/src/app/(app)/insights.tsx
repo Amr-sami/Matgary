@@ -13,6 +13,7 @@ import { StatCard } from "@/components/ui/StatCard";
 import { money } from "@/lib/format";
 import { RTL_TEXT } from "@/theme/rtl";
 import { colors, fonts, spacing } from "@/theme/tokens";
+import { t } from "@/i18n";
 
 interface Overview {
   metrics: {
@@ -30,13 +31,13 @@ interface Overview {
 
 type Range = "all" | "today" | "yesterday" | "7d" | "30d";
 
-const RANGES: { key: Range; label: string }[] = [
-  { key: "all", label: "الكل" },
-  { key: "today", label: "اليوم" },
-  { key: "yesterday", label: "أمس" },
-  { key: "7d", label: "آخر 7 أيام" },
-  { key: "30d", label: "آخر 30 يوم" },
-];
+const RANGES = (): { key: Range; label: string }[] => ([
+  { key: "all", label: t("app.common.all") },
+  { key: "today", label: t("app.insights.deep.heatmap.dayHeader") },
+  { key: "yesterday", label: t("app.dateRange.yesterday") },
+  { key: "7d", label: t("app.dateRange.7d") },
+  { key: "30d", label: t("app.dateRange.30d") },
+]);
 
 /**
  * Port of the preset → window logic in apps/web/app/insights/page.tsx, so the
@@ -116,14 +117,14 @@ export default function InsightsScreen() {
         value={tab}
         onChange={setTab}
         items={[
-          { key: "overview", label: "نظرة عامة" },
-          { key: "deep", label: "تحليل معمّق" },
-          { key: "staff", label: "الموظفون" },
+          { key: "overview", label: t("app.insights.tabs.overview") },
+          { key: "deep", label: t("app.insights.tabs.deep") },
+          { key: "staff", label: t("app.insights.tabs.staff") },
         ]}
       />
 
       <View style={styles.chipRow}>
-        {RANGES.map((r) => (
+        {RANGES().map((r) => (
           <Chip
             key={r.key}
             label={r.label}
@@ -136,60 +137,60 @@ export default function InsightsScreen() {
       {tab !== "overview" ? (
         <Card>
           <Text style={styles.soon}>
-            {tab === "deep" ? "التحليل المعمّق" : "أداء الموظفين"} — قريباً
+            {tab === "deep" ? t("mobile.insights.deepDive") : t("app.insights.staff.title")} — قريباً
           </Text>
         </Card>
       ) : overview.isLoading ? (
         <ActivityIndicator color={colors.accent} />
       ) : !m ? (
         <Card>
-          <Text style={styles.soon}>تعذّر تحميل الإحصائيات</Text>
+          <Text style={styles.soon}>{t("mobile.insights.loadFailed")}</Text>
         </Card>
       ) : (
         <>
           <View style={styles.grid}>
             <View style={styles.gridRow}>
               <StatCard
-                title="مبيعات الشهر الحالي"
+                title={t("app.insights.headline.monthCurrent")}
                 value={money(m.currentRevenue)}
                 icon={CurrencyDollar}
                 color="accent"
                 trendPercent={m.revenueGrowth}
-                subtitle="عن الشهر السابق"
+                subtitle={t("app.insights.comparison.all")}
               />
               <StatCard
-                title="إجمالي المبيعات"
+                title={t("app.insights.kpi.totalSales")}
                 value={String(m.totalSales)}
                 icon={ShoppingCart}
                 color="accent"
-                subtitle="عملية بيع"
+                subtitle={t("app.insights.kpi.totalSalesSubtitle")}
               />
             </View>
             <View style={styles.gridRow}>
               <StatCard
-                title="صافي الربح"
+                title={t("app.insights.kpi.netProfit")}
                 value={money(m.netProfit)}
                 icon={TrendUp}
                 color="success"
-                subtitle="بعد المصاريف والتكلفة"
+                subtitle={t("app.insights.kpi.netProfitSubtitle")}
               />
               <StatCard
-                title="إجمالي الخصومات"
+                title={t("app.insights.kpi.totalDiscounts")}
                 value={money(m.totalDiscounts)}
                 icon={Percent}
                 color="danger"
-                subtitle={`${m.discountPercent.toFixed(1)}% من القيمة`}
+                subtitle={t("mobile.insights.ofValue", { pct: m.discountPercent.toFixed(1) })}
               />
             </View>
           </View>
 
           {trendStats ? (
-            <Card title={`اتجاه المبيعات (${RANGES.find((r) => r.key === range)?.label ?? ""})`}>
+            <Card title={t("mobile.insights.trendTitle", { range: RANGES().find((r) => r.key === range)?.label ?? "" })}>
               <View style={styles.trendStats}>
-                <TrendStat label="الإجمالي" value={money(trendStats.total)} />
-                <TrendStat label="المتوسط" value={money(trendStats.avg)} />
+                <TrendStat label={t("app.insights.trend.stat.total")} value={money(trendStats.total)} />
+                <TrendStat label={t("app.insights.trend.stat.avg")} value={money(trendStats.avg)} />
                 <TrendStat
-                  label="الذروة"
+                  label={t("app.insights.trend.stat.peak")}
                   value={money(trendStats.peak.revenue)}
                   caption={trendStats.peak.date}
                 />

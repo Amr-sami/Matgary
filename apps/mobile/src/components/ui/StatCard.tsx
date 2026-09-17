@@ -49,7 +49,14 @@ export function StatCard({
           </Text>
           {/* A money figure must never split from its currency — this is the
               defect the web shipped and had to be measured to fix. */}
-          <Text style={styles.value} numberOfLines={1}>
+          <Text
+            style={styles.value}
+            numberOfLines={1}
+            // Shrink rather than ellipsize: "EGP 575,2…" is a wrong number,
+            // and English currency is wider than Arabic in the same 2-up card.
+            adjustsFontSizeToFit
+            minimumFontScale={0.7}
+          >
             {value}
           </Text>
 

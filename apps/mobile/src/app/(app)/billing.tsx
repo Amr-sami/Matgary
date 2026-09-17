@@ -11,6 +11,7 @@ import { shortDate } from "@/lib/format";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
 import { colors, fonts, spacing } from "@/theme/tokens";
+import { t } from "@/i18n";
 
 interface BillingMe {
   plan: string;
@@ -34,13 +35,13 @@ interface Plan {
 }
 
 /** dictionaries/ar.json app.billing.status.* */
-const STATUS: Record<string, string> = {
-  trialing: "تجربة مجانية",
-  active: "اشتراك مفعّل",
-  past_due: "تأخر السداد",
-  cancelled: "تم الإلغاء",
-  expired: "منتهي",
-};
+const STATUS = (): Record<string, string> => ({
+  trialing: t("app.billing.status.trialing"),
+  active: t("app.billing.status.active"),
+  past_due: t("app.billing.status.past_due"),
+  cancelled: t("app.billing.status.cancelled"),
+  expired: t("app.billing.status.expired"),
+});
 
 /**
  * Port of app__billing.png — READ-ONLY on iOS, by design.
@@ -67,8 +68,8 @@ export default function BillingScreen() {
 
   if (!isOwner) {
     return (
-      <Screen title="الاشتراك">
-        <EmptyState title="هذه الصفحة مخصَّصة لصاحب المتجر فقط." />
+      <Screen title={t("app.billing.title")}>
+        <EmptyState title={t("app.billing.ownerOnly")} />
       </Screen>
     );
   }
@@ -79,19 +80,19 @@ export default function BillingScreen() {
   const statusLine = (() => {
     if (!b) return null;
     if (b.status === "trialing" && b.daysLeftInTrial !== null)
-      return `متبقي ${b.daysLeftInTrial} يوم في التجربة المجانية.`;
+      return t("mobile.billing.trialDaysLeft", { days: b.daysLeftInTrial });
     if (b.status === "past_due")
-      return "الدفعة الأخيرة فشلت. أعِد المحاولة لتجنب إيقاف الخدمة.";
+      return t("app.billing.statusLine.pastDueWarning");
     if (b.status === "cancelled" && b.currentPeriodEndsAt)
-      return `الخدمة مفعّلة حتى ${shortDate(b.currentPeriodEndsAt)}.`;
-    if (b.currentPeriodEndsAt) return `التجديد القادم في ${shortDate(b.currentPeriodEndsAt)}.`;
+      return t("mobile.billing.activeUntil", { date: shortDate(b.currentPeriodEndsAt) });
+    if (b.currentPeriodEndsAt) return t("mobile.billing.renewalOn", { date: shortDate(b.currentPeriodEndsAt) });
     return null;
   })();
 
   return (
     <Screen
-      title="الاشتراك"
-      subtitle="إدارة باقتك، الدفع، وسجل الفواتير."
+      title={t("app.billing.title")}
+      subtitle={t("app.billing.subtitle")}
       onRefresh={() => void billing.refetch()}
       refreshing={billing.isRefetching}
     >
@@ -103,14 +104,14 @@ export default function BillingScreen() {
               color={b.isAccessActive ? colors.success : colors.danger}
             />
             <Text style={styles.statusTitle}>
-              {STATUS[b.status] ?? b.status}
+              {STATUS()[b.status] ?? b.status}
               {currentPlan ? `  ·  ${currentPlan.labelAr}` : ""}
             </Text>
           </View>
           {statusLine ? <Text style={styles.statusLine}>{statusLine}</Text> : null}
           {!b.paymobConfigured ? (
             <Text style={styles.note}>
-              بوابة الدفع غير مهيأة على هذا الخادم بعد. تواصل معنا للترقية يدوياً حتى نُكمل التهيئة.
+              {t("app.billing.statusLine.paymobNotConfigured")}
             </Text>
           ) : null}
         </Card>
@@ -118,7 +119,7 @@ export default function BillingScreen() {
 
       {(plans.data ?? [])
         // The trial card is only meaningful while ON the trial; the web hides
-        // it afterwards too. "قريباً" is for plans not yet sellable, which the
+        // it afterwards too. t("app.billing.comingSoon") is for plans not yet sellable, which the
         // trial is not — it is simply not purchasable.
         .filter((p) => p.key !== "trial" || b?.status === "trialing")
         .map((p) => {
@@ -131,10 +132,10 @@ export default function BillingScreen() {
             {p.purchasable ? (
               <View style={styles.priceRow}>
                 <Text style={styles.price}>{p.monthlyEgp}</Text>
-                <Text style={styles.priceUnit}>ج / شهر</Text>
+                <Text style={styles.priceUnit}>{t("app.billing.perMonth")}</Text>
               </View>
             ) : p.key !== "trial" ? (
-              <Text style={styles.soon}>قريباً</Text>
+              <Text style={styles.soon}>{t("app.billing.comingSoon")}</Text>
             ) : null}
 
             <View style={styles.features}>
@@ -147,11 +148,11 @@ export default function BillingScreen() {
             </View>
 
             {isCurrent ? (
-              <Button label="باقتك الحالية" disabled onPress={() => {}} />
+              <Button label={t("app.billing.actions.currentPlan")} disabled onPress={() => {}} />
             ) : p.purchasable && Platform.OS === "android" ? (
               // TODO(phase-5): Paymob checkout. Web opens a hosted page; the
               // Android build can open the same URL in a browser.
-              <Button label="اشترك الآن" variant="outline" disabled onPress={() => {}} />
+              <Button label={t("app.billing.actions.subscribeNow")} variant="outline" disabled onPress={() => {}} />
             ) : null}
           </Card>
         );

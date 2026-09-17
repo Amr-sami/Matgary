@@ -21,16 +21,17 @@ import { money } from "@/lib/format";
 import { selectItemCount, selectTotals, useCart } from "@/stores/cart";
 import { RTL_TEXT } from "@/theme/rtl";
 import { colors, fonts, radius, spacing } from "@/theme/tokens";
+import { t } from "@/i18n";
 
 type Payment = salesApi.PaymentMethod;
 
 /** dictionaries/ar.json — the four methods the cart route accepts. */
-const PAYMENTS: { key: Payment; label: string }[] = [
-  { key: "cash", label: "كاش" },
-  { key: "instapay", label: "إنستا باي" },
-  { key: "card", label: "بطاقة" },
-  { key: "deferred", label: "آجل" },
-];
+const PAYMENTS = (): { key: Payment; label: string }[] => ([
+  { key: "cash", label: t("app.catalog.payment.cash") },
+  { key: "instapay", label: t("app.customers.settle.methods.instapay") },
+  { key: "card", label: t("app.catalog.payment.card") },
+  { key: "deferred", label: t("app.admin.sales.tenantDetail.paymentMethods.deferred") },
+]);
 
 /**
  * The POS — app__sales-pos.png, recomposed per doc 04: the sale comes first,
@@ -154,7 +155,7 @@ export default function SalesScreen() {
         <Card>
           <View style={styles.successHead}>
             <CheckCircle size={28} color={colors.success} weight="fill" />
-            <Text style={styles.successTitle}>تم تسجيل البيع بنجاح</Text>
+            <Text style={styles.successTitle}>{t("app.sales.toast.saleSuccess")}</Text>
           </View>
           <Text style={styles.successInvoice}>{lastSale.invoiceId}</Text>
           <View style={styles.receipt}>
@@ -167,20 +168,20 @@ export default function SalesScreen() {
               </View>
             ))}
             <View style={[styles.receiptRow, styles.receiptTotal]}>
-              <Text style={styles.receiptTotalLabel}>الإجمالي</Text>
+              <Text style={styles.receiptTotalLabel}>{t("app.sales.table.col.total")}</Text>
               <Text style={styles.receiptTotalAmt}>{money(lastSale.total)}</Text>
             </View>
           </View>
-          <Button label="بيع جديد" onPress={() => setLastSale(null)} />
+          <Button label={t("app.notificationSettings.events.sale.created.title")} onPress={() => setLastSale(null)} />
         </Card>
       ) : null}
 
-      <Card title="تسجيل بيع جديد">
-        <Text style={styles.label}>ابحث أو امسح المنتج</Text>
+      <Card title={t("app.sales.form.title")}>
+        <Text style={styles.label}>{t("app.sales.form.productSearch.label")}</Text>
         <SearchField
           value={query}
           onChangeText={setQuery}
-          placeholder="الاسم أو SKU أو الباركود…"
+          placeholder={t("app.sales.form.productSearch.placeholder")}
         />
 
         {query.trim() ? (
@@ -204,7 +205,7 @@ export default function SalesScreen() {
                         {p.name}
                       </Text>
                       <Text style={styles.resultStock}>
-                        {out ? "غير متوفر" : `المتاح: ${p.quantity} قطعة`}
+                        {out ? t("mobile.common.notAvailable") : t("mobile.pos.available", { n: p.quantity })}
                       </Text>
                     </View>
                     <Text style={styles.resultPrice}>{money(p.price)}</Text>
@@ -213,11 +214,11 @@ export default function SalesScreen() {
               })}
             </View>
           ) : (
-            <Text style={styles.muted}>لا يوجد منتج بهذا الاسم — أضفه للمخزن</Text>
+            <Text style={styles.muted}>{t("app.sales.form.productSearch.noMatch")}</Text>
           )
         ) : recent.length ? (
           <>
-            <Text style={styles.label}>منتجات حديثة:</Text>
+            <Text style={styles.label}>{t("app.sales.form.recentLabel")}</Text>
             <View style={styles.pillRow}>
               {recent.map((p) => (
                 <Pressable
@@ -237,7 +238,7 @@ export default function SalesScreen() {
       </Card>
 
       {cart.lines.length > 0 ? (
-        <Card title={`${itemCount} منتج في الفاتورة`}>
+        <Card title={t("mobile.pos.itemsInCart", { n: itemCount })}>
           <View style={styles.cartList}>
             {cart.lines.map((l) => (
               <View key={l.productId} style={styles.cartRow}>
@@ -254,7 +255,7 @@ export default function SalesScreen() {
                     style={styles.qtyBtn}
                     onPress={() => cart.setQuantity(l.productId, l.quantity - 1)}
                     accessibilityRole="button"
-                    accessibilityLabel="تقليل الكمية"
+                    accessibilityLabel={t("mobile.common.decrease")}
                   >
                     <Minus size={16} color={colors.accent} weight="bold" />
                   </Pressable>
@@ -264,7 +265,7 @@ export default function SalesScreen() {
                     disabled={l.quantity >= l.available}
                     onPress={() => cart.setQuantity(l.productId, l.quantity + 1)}
                     accessibilityRole="button"
-                    accessibilityLabel="زيادة الكمية"
+                    accessibilityLabel={t("mobile.common.increase")}
                   >
                     <Plus size={16} color={colors.accent} weight="bold" />
                   </Pressable>
@@ -274,7 +275,7 @@ export default function SalesScreen() {
                   onPress={() => cart.remove(l.productId)}
                   hitSlop={10}
                   accessibilityRole="button"
-                  accessibilityLabel="حذف"
+                  accessibilityLabel={t("app.sales.void.confirm")}
                 >
                   <Trash size={18} color={colors.textSecondary} />
                 </Pressable>
@@ -283,19 +284,19 @@ export default function SalesScreen() {
           </View>
 
           <View style={styles.totals}>
-            <TotalRow label="المجموع الفرعي" value={money(totals.subtotalGross)} />
+            <TotalRow label={t("app.sales.form.totals.subtotal")} value={money(totals.subtotalGross)} />
             {totals.lineDiscountTotal > 0 ? (
-              <TotalRow label="خصومات بنود" value={`- ${money(totals.lineDiscountTotal)}`} />
+              <TotalRow label={t("app.sales.form.totals.lineDiscounts")} value={`- ${money(totals.lineDiscountTotal)}`} />
             ) : null}
             {totals.orderDiscount > 0 ? (
-              <TotalRow label="خصم الفاتورة" value={`- ${money(totals.orderDiscount)}`} />
+              <TotalRow label={t("app.sales.form.totals.orderDiscount")} value={`- ${money(totals.orderDiscount)}`} />
             ) : null}
-            <TotalRow label="الإجمالي" value={money(totals.afterOrderDiscount)} strong />
+            <TotalRow label={t("app.sales.table.col.total")} value={money(totals.afterOrderDiscount)} strong />
           </View>
 
-          <Text style={styles.label}>طريقة الدفع</Text>
+          <Text style={styles.label}>{t("app.sales.form.payment.label")}</Text>
           <View style={styles.pillRow}>
-            {PAYMENTS.map((p) => (
+            {PAYMENTS().map((p) => (
               <Chip
                 key={p.key}
                 label={p.label}
@@ -306,18 +307,18 @@ export default function SalesScreen() {
           </View>
           {payment === "deferred" ? (
             <Text style={styles.muted}>
-              هتتسجل الفاتورة على حساب العميل. تقدر تاخد جزء دلوقتي والباقي بعدين.
+              {t("app.sales.form.payment.deferredNote")}
             </Text>
           ) : null}
 
           <View style={styles.customer}>
             <Field
-              label="اسم العميل (اختياري)"
+              label={t("app.sales.form.customer.nameLabel")}
               value={cart.customerName}
               onChangeText={(v) => cart.setCustomer(v, cart.customerPhone)}
             />
             <Field
-              label="رقم الموبايل"
+              label={t("app.sales.form.customer.phoneLabel")}
               value={cart.customerPhone}
               onChangeText={(v) => cart.setCustomer(cart.customerName, v)}
               keyboardType="phone-pad"
@@ -332,7 +333,7 @@ export default function SalesScreen() {
           ) : null}
 
           <Button
-            label="تسجيل الفاتورة"
+            label={t("app.sales.form.submit")}
             loading={checkout.isPending}
             disabled={!canCheckout}
             onPress={() => checkout.mutate()}
@@ -363,28 +364,28 @@ function TotalRow({ label, value, strong }: { label: string; value: string; stro
  * shopkeeper "Expected number, received string".
  */
 function messageFor(e: unknown): string {
-  if (!(e instanceof ApiError)) return "تعذّر تسجيل البيع";
+  if (!(e instanceof ApiError)) return t("mobile.pos.saveFailed");
   switch (e.code) {
     case "INSUFFICIENT_STOCK":
-      return "الكمية المطلوبة غير متوفرة في المخزن";
+      return t("mobile.pos.insufficientStock");
     case "PRODUCT_NOT_FOUND":
-      return "أحد المنتجات لم يعد موجوداً";
+      return t("mobile.pos.productGone");
     case "PRODUCT_WRONG_BRANCH":
-      return "هذا المنتج يخص فرعاً آخر";
+      return t("mobile.pos.wrongBranch");
     case "CART_EMPTY":
-      return "الفاتورة فارغة";
+      return t("mobile.pos.cartEmpty");
   }
   switch (e.kind) {
     case "offline":
-      return "تعذّر الاتصال بالخادم — لم يُسجَّل البيع";
+      return t("mobile.pos.offlineNotSaved");
     case "timeout":
-      return "انتهت مهلة الاتصال — لم يُسجَّل البيع";
+      return t("mobile.pos.timeoutNotSaved");
     case "rateLimited":
-      return "محاولات كثيرة. انتظر قليلاً";
+      return t("mobile.common.tooManyAttempts");
     case "forbidden":
-      return "ليست لديك صلاحية تسجيل البيع";
+      return t("mobile.pos.noPermission");
     default:
-      return "تعذّر تسجيل البيع";
+      return t("mobile.pos.saveFailed");
   }
 }
 

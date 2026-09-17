@@ -8,13 +8,14 @@ import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { RTL_TEXT } from "@/theme/rtl";
 import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
+import { t } from "@/i18n";
 
-const ROLE: Record<string, string> = {
-  owner: "مالك",
-  manager: "مدير",
-  staff: "موظف",
-  cashier: "كاشير",
-};
+const ROLE = (): Record<string, string> => ({
+  owner: t("mobile.common.owner"),
+  manager: t("features.team.members.manager.role"),
+  staff: t("app.teamAdmin.role.staff"),
+  cashier: t("features.team.members.cashier.role"),
+});
 
 /**
  * Port of app__team.png.
@@ -28,15 +29,15 @@ export default function TeamScreen() {
 
   return (
     <Screen
-      title="الفريق"
-      subtitle={rows.length ? `${rows.length} عضو` : undefined}
+      title={t("app.team.heading.manager")}
+      subtitle={rows.length ? t("mobile.team.summary", { n: rows.length }) : undefined}
       onRefresh={() => void q.refetch()}
       refreshing={q.isRefetching}
     >
       {q.isLoading ? (
         <ActivityIndicator color={colors.accent} />
       ) : rows.length === 0 ? (
-        <EmptyState title="لا يوجد أعضاء" />
+        <EmptyState title={t("mobile.common.noMembers")} />
       ) : (
         <View style={styles.list}>
           {rows.map((m) => {
@@ -57,9 +58,9 @@ export default function TeamScreen() {
                   </Text>
                 </View>
                 <View style={styles.badges}>
-                  <Badge label={ROLE[m.role] ?? m.role} variant={isOwner ? "accent" : "neutral"} />
+                  <Badge label={ROLE()[m.role] ?? m.role} variant={isOwner ? "accent" : "neutral"} />
                   {m.mustChangePassword ? (
-                    <Badge label="يجب تغيير كلمة السر" variant="lowstock" />
+                    <Badge label={t("app.teamAdmin.role.mustChange")} variant="lowstock" />
                   ) : null}
                 </View>
               </View>

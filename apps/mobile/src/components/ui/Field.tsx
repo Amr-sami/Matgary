@@ -10,6 +10,7 @@ import {
 
 import { RTL_TEXT } from "@/theme/rtl";
 import { colors, fonts, radius } from "@/theme/tokens";
+import { t } from "@/i18n";
 
 interface FieldProps extends Omit<TextInputProps, "style"> {
   label: string;
@@ -53,7 +54,7 @@ export function Field({ label, secure = false, ...props }: FieldProps) {
             onPress={() => setRevealed((v) => !v)}
             hitSlop={12}
             accessibilityRole="button"
-            accessibilityLabel={revealed ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
+            accessibilityLabel={revealed ? t("mobile.a11y.hidePassword") : t("mobile.a11y.showPassword")}
           >
             <Text style={styles.eye}>{revealed ? "◉" : "◎"}</Text>
           </Pressable>

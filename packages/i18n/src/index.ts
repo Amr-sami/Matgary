@@ -16,15 +16,33 @@ export type Dictionary = typeof ar;
 
 export const dictionaries: Record<Locale, Dictionary> = { ar, en: en as Dictionary };
 
-/** "auth.login.title" -> the string, or the path itself when missing so a gap is visible, not blank. */
+/**
+ * "auth.login.title" -> the string, or the path itself when missing so a gap
+ * is visible, not blank.
+ *
+ * Some dictionary keys contain dots themselves — the notification event
+ * types are stored as "sale.created", "inventory.low_stock" — so a naive
+ * split on "." walks into the wrong subtree. At each level this tries the
+ * longest run of remaining segments that exists as a single key first.
+ */
 export function lookup(dict: Dictionary, path: string): string {
+  const parts = path.split(".");
   let node: unknown = dict;
-  for (const part of path.split(".")) {
-    if (node && typeof node === "object" && part in (node as object)) {
-      node = (node as Record<string, unknown>)[part];
-    } else {
-      return path;
+  let i = 0;
+  while (i < parts.length) {
+    if (!node || typeof node !== "object") return path;
+    const obj = node as Record<string, unknown>;
+    let matched = false;
+    for (let len = parts.length - i; len >= 1; len--) {
+      const key = parts.slice(i, i + len).join(".");
+      if (key in obj) {
+        node = obj[key];
+        i += len;
+        matched = true;
+        break;
+      }
     }
+    if (!matched) return path;
   }
   return typeof node === "string" ? node : path;
 }

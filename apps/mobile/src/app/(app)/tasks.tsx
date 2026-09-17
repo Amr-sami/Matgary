@@ -14,7 +14,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, catalog } from "@matgary/api-client";
 
 import { api } from "@/api/client";
-import { isRTL } from "@/i18n";
+import { isRTL, t } from "@/i18n";
 import { Screen } from "@/components/layout/Screen";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -27,11 +27,11 @@ import { RTL_TEXT, directionStyle } from "@/theme/rtl";
 import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
 
 /** Measured pairs from doc 03 §2: عاجلة on danger-light, عادية on accent-light. */
-const PRIORITY: Record<string, { label: string; variant: "outofstock" | "accent" | "neutral" }> = {
-  high: { label: "عاجلة", variant: "outofstock" },
-  normal: { label: "عادية", variant: "accent" },
-  low: { label: "منخفضة", variant: "neutral" },
-};
+const PRIORITY = (): Record<string, { label: string; variant: "outofstock" | "accent" | "neutral" }> => ({
+  high: { label: t("app.tasks.priority.high"), variant: "outofstock" },
+  normal: { label: t("app.tasks.priority.normal"), variant: "accent" },
+  low: { label: t("app.tasks.priority.low"), variant: "neutral" },
+});
 
 /** The web's own order — ar.json → app.tasks.priority. */
 const PRIORITY_ORDER: catalog.TaskPriority[] = ["low", "normal", "high"];
@@ -50,17 +50,17 @@ function errorMessage(error: unknown, fallback: string): string {
   if (error.code && /[؀-ۿ]/.test(error.code)) return error.code;
   switch (error.kind) {
     case "offline":
-      return "تعذّر الاتصال بالخادم";
+      return t("mobile.common.offline");
     case "timeout":
-      return "انتهت مهلة الاتصال";
+      return t("mobile.common.timeout");
     case "forbidden":
-      return "ليس لديك صلاحية لهذا الإجراء";
+      return t("mobile.common.forbidden");
     case "rateLimited":
-      return "محاولات كثيرة. حاول بعد قليل";
+      return t("mobile.signup.tooMany");
     case "billing":
-      return "الاشتراك غير مفعّل";
+      return t("mobile.common.subscriptionInactive");
     case "server":
-      return "الخادم لا يستجيب";
+      return t("mobile.common.serverError");
     default:
       return fallback;
   }
@@ -88,17 +88,17 @@ export default function TasksScreen() {
       catalog.setTaskStatus(api, task.id, task.status === "done" ? "open" : "done"),
     onMutate: () => setStatusError(null),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["tasks"] }),
-    onError: (err) => setStatusError(errorMessage(err, "تعذر تحديث الحالة")),
+    onError: (err) => setStatusError(errorMessage(err, t("app.tasks.toast.statusFailed"))),
   });
 
   const rows = q.data ?? [];
-  const open = rows.filter((t) => t.status !== "done");
-  const done = rows.filter((t) => t.status === "done");
+  const open = rows.filter((task) => task.status !== "done");
+  const done = rows.filter((task) => task.status === "done");
 
   return (
     <Screen
-      title="المهام"
-      subtitle={rows.length ? `${open.length} مفتوحة · ${done.length} منجزة` : undefined}
+      title={t("app.tasks.page.title")}
+      subtitle={rows.length ? t("mobile.tasks.summary", { open: open.length, done: done.length }) : undefined}
       onRefresh={() => void q.refetch()}
       refreshing={q.isRefetching}
     >
@@ -106,7 +106,7 @@ export default function TasksScreen() {
         // "+ مهمة جديدة" in the capture draws the plus to the LEFT of the
         // words, which in an RTL paragraph is the END of the string — hence
         // the trailing sign here rather than a leading one.
-        <Button label="مهمة جديدة +" onPress={() => setFormOpen(true)} />
+        <Button label={t("mobile.tasks.newTask")} onPress={() => setFormOpen(true)} />
       ) : null}
 
       {statusError ? (
@@ -119,27 +119,27 @@ export default function TasksScreen() {
         <ActivityIndicator color={colors.accent} />
       ) : rows.length === 0 ? (
         <EmptyState
-          title={canManageTasks ? "لا توجد مهام بعد" : "لا توجد مهام موكلة إليك"}
+          title={canManageTasks ? t("app.tasks.empty.managerTitle") : t("app.tasks.empty.staffTitle")}
           hint={
             canManageTasks
-              ? "أنشئ مهام وحدد الموظف المسؤول وموعد التنفيذ. سيرى الموظف إشعاراً فور إسناد المهمة."
-              : "ستظهر هنا أي مهمة يسندها لك المدير."
+              ? t("app.tasks.empty.managerHint")
+              : t("app.tasks.empty.staffHint")
           }
         />
       ) : (
         <View style={styles.list}>
-          {[...open, ...done].map((t) => {
-            const p = PRIORITY[t.priority] ?? { label: t.priority, variant: "neutral" as const };
-            const isDone = t.status === "done";
-            const pending = toggle.isPending && toggle.variables?.id === t.id;
+          {[...open, ...done].map((task) => {
+            const p = PRIORITY()[task.priority] ?? { label: task.priority, variant: "neutral" as const };
+            const isDone = task.status === "done";
+            const pending = toggle.isPending && toggle.variables?.id === task.id;
             return (
               <Pressable
-                key={t.id}
+                key={task.id}
                 accessibilityRole="button"
                 accessibilityState={{ checked: isDone, busy: pending }}
-                accessibilityLabel={isDone ? `إعادة فتح ${t.title}` : `إنهاء ${t.title}`}
+                accessibilityLabel={isDone ? t("mobile.tasks.reopenTitle", { title: task.title }) : t("mobile.tasks.completeTitle", { title: task.title })}
                 disabled={pending}
-                onPress={() => toggle.mutate({ id: t.id, status: t.status })}
+                onPress={() => toggle.mutate({ id: task.id, status: task.status })}
                 style={({ pressed }) => [
                   styles.row,
                   isDone && styles.rowDone,
@@ -148,15 +148,15 @@ export default function TasksScreen() {
               >
                 <View style={styles.head}>
                   <Text numberOfLines={2} style={[styles.title, isDone && styles.titleDone]}>
-                    {t.title}
+                    {task.title}
                   </Text>
                   <Badge label={p.label} variant={p.variant} />
                 </View>
                 <View style={styles.meta}>
                   {isDone ? (
-                    <Badge label="تم الإنجاز" variant="success" />
-                  ) : t.dueDate ? (
-                    <Text style={styles.date}>تستحق {shortDate(t.dueDate)}</Text>
+                    <Badge label={t("app.tasks.card.doneAction")} variant="success" />
+                  ) : task.dueDate ? (
+                    <Text style={styles.date}>تستحق {shortDate(task.dueDate)}</Text>
                   ) : null}
                 </View>
                 {/* What a tap does, spelled out. The web says it with two
@@ -167,7 +167,7 @@ export default function TasksScreen() {
                     <ActivityIndicator color={colors.accent} />
                   ) : (
                     <Text numberOfLines={1} style={styles.action}>
-                      {isDone ? "إعادة فتح" : "✓ تم الإنجاز"}
+                      {isDone ? t("app.tasks.card.reopenAction") : t("mobile.tasks.doneCheck")}
                     </Text>
                   )}
                 </View>
@@ -242,7 +242,7 @@ function TaskFormSheet({
       reset();
       onCreated();
     },
-    onError: (err) => setError(errorMessage(err, "تعذر الحفظ")),
+    onError: (err) => setError(errorMessage(err, t("app.tasks.form.errors.saveFailed"))),
   });
 
   const close = () => {
@@ -254,33 +254,33 @@ function TaskFormSheet({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
       <View style={[styles.overlay, directionStyle(isRTL())]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="إغلاق" />
+        <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel={t("app.common.close")} />
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
           <View style={styles.sheet}>
             <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetBody}>
-              <Text style={styles.sheetTitle}>مهمة جديدة</Text>
+              <Text style={styles.sheetTitle}>{t("app.tasks.toolbar.newTask")}</Text>
 
               <Field
-                label="العنوان *"
+                label={t("app.tasks.form.titleLabel")}
                 value={title}
                 onChangeText={setTitle}
-                placeholder="مثلاً: ترتيب الفترينة الرئيسية"
+                placeholder={t("app.tasks.form.titlePlaceholder")}
               />
               <Field
-                label="الوصف"
+                label={t("app.tasks.form.descriptionLabel")}
                 value={description}
                 onChangeText={setDescription}
-                placeholder="تفاصيل المهمة، خطوات التنفيذ…"
+                placeholder={t("app.tasks.form.descriptionPlaceholder")}
                 multiline
               />
 
               <View>
-                <Text style={styles.label}>الأولوية</Text>
+                <Text style={styles.label}>{t("app.tasks.form.priorityLabel")}</Text>
                 <View style={styles.chipRow}>
                   {PRIORITY_ORDER.map((key) => (
                     <Chip
                       key={key}
-                      label={PRIORITY[key].label}
+                      label={PRIORITY()[key].label}
                       active={priority === key}
                       onPress={() => setPriority(key)}
                     />
@@ -290,17 +290,17 @@ function TaskFormSheet({
 
               {canReadTeam ? (
                 <View>
-                  <Text style={styles.label}>إسناد إلى</Text>
+                  <Text style={styles.label}>{t("mobile.common.assignTo")}</Text>
                   {team.isLoading ? (
                     <ActivityIndicator color={colors.accent} />
                   ) : (team.data ?? []).length === 0 ? (
-                    <Text style={styles.hint}>لا يوجد موظفون بعد</Text>
+                    <Text style={styles.hint}>{t("mobile.common.noStaffYet")}</Text>
                   ) : (
                     <View style={styles.chipRow}>
                       {(team.data ?? []).map((m) => (
                         <Chip
                           key={m.userId}
-                          label={`${m.displayName}${m.role === "owner" ? " (المالك)" : ""}`}
+                          label={`${m.displayName}${m.role === "owner" ? t("app.tasks.form.ownerSuffix") : ""}`}
                           active={assignee === m.userId}
                           onPress={() =>
                             setAssignee((cur) => (cur === m.userId ? null : m.userId))
@@ -320,14 +320,14 @@ function TaskFormSheet({
 
               <View style={styles.actions}>
                 <Button
-                  label="إنشاء"
+                  label={t("app.tasks.form.create")}
                   onPress={() => create.mutate()}
                   disabled={!canSubmit}
                   loading={create.isPending}
                   style={styles.actionGrow}
                 />
                 <Button
-                  label="إلغاء"
+                  label={t("app.tasks.form.cancel")}
                   variant="outline"
                   onPress={close}
                   style={styles.actionGrow}

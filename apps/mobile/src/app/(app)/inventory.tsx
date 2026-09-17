@@ -16,6 +16,7 @@ import { StatCard } from "@/components/ui/StatCard";
 import { money } from "@/lib/format";
 import { RTL_TEXT } from "@/theme/rtl";
 import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
+import { t } from "@/i18n";
 
 type StatusFilter = "all" | "in" | "low" | "out";
 
@@ -88,13 +89,13 @@ export default function InventoryScreen() {
       <View style={styles.grid}>
         <View style={styles.gridRow}>
           <StatCard
-            title="إجمالي المنتجات"
+            title={t("app.inventory.summary.totalProducts")}
             value={String(stats.total)}
             icon={Package}
             color="accent"
           />
           <StatCard
-            title="مخزون منخفض"
+            title={t("app.inventory.summary.lowStock")}
             value={String(stats.low)}
             icon={Warning}
             color="danger"
@@ -102,13 +103,13 @@ export default function InventoryScreen() {
         </View>
         <View style={styles.gridRow}>
           <StatCard
-            title="نفذ المخزون"
+            title={t("app.inventory.summary.outOfStock")}
             value={String(stats.out)}
             icon={WarningOctagon}
             color="danger"
           />
           <StatCard
-            title="قيمة المخزن"
+            title={t("app.inventory.summary.stockValue")}
             value={money(stats.value)}
             icon={Wallet}
             color="accent"
@@ -119,18 +120,18 @@ export default function InventoryScreen() {
       <SearchField
         value={query}
         onChangeText={setQuery}
-        placeholder="ابحث بالاسم، الباركود، التاج، البراند، أو المورد…"
+        placeholder={t("app.inventory.search.placeholder")}
       />
 
       <Pressable style={styles.cta} accessibilityRole="button">
         <Plus size={18} color="#FFFFFF" weight="bold" />
         <Text numberOfLines={1} style={styles.ctaText}>
-          إضافة منتج
+          {t("app.inventory.tools.addProduct")}
         </Text>
       </Pressable>
 
       <ChipRow>
-        <Chip label="كل الأصناف" active={category === "all"} onPress={() => setCategory("all")} />
+        <Chip label={t("app.inventory.filters.allCategories")} active={category === "all"} onPress={() => setCategory("all")} />
         {(categories.data ?? []).map((c) => (
           <Chip
             key={c.id}
@@ -142,20 +143,20 @@ export default function InventoryScreen() {
       </ChipRow>
 
       <ChipRow>
-        <Chip label="كل الحالات" active={status === "all"} onPress={() => setStatus("all")} />
-        <Chip label="متوفر" active={status === "in"} onPress={() => setStatus("in")} />
-        <Chip label="مخزون منخفض" active={status === "low"} onPress={() => setStatus("low")} />
-        <Chip label="نفذ" active={status === "out"} onPress={() => setStatus("out")} />
+        <Chip label={t("app.inventory.filters.allStatuses")} active={status === "all"} onPress={() => setStatus("all")} />
+        <Chip label={t("app.inventory.filters.stockStatus.in")} active={status === "in"} onPress={() => setStatus("in")} />
+        <Chip label={t("app.inventory.summary.lowStock")} active={status === "low"} onPress={() => setStatus("low")} />
+        <Chip label={t("app.inventory.filters.stockStatus.out")} active={status === "out"} onPress={() => setStatus("out")} />
       </ChipRow>
 
-      <Text style={styles.count}>{visible.length} منتج في المخزن</Text>
+      <Text style={styles.count}>{t("app.inventory.count", { n: visible.length })}</Text>
 
       {products.isLoading ? (
         <ActivityIndicator color={colors.accent} />
       ) : visible.length === 0 ? (
         <EmptyState
-          title="لا توجد منتجات"
-          hint={query ? "جرّب بحثاً آخر أو امسح الفلاتر." : undefined}
+          title={t("mobile.inventory.empty")}
+          hint={query ? t("mobile.inventory.searchHint") : undefined}
         />
       ) : (
         <View style={styles.list}>
@@ -166,7 +167,7 @@ export default function InventoryScreen() {
               <Pressable
                 key={p.id}
                 accessibilityRole="button"
-                accessibilityLabel={`تفاصيل ${p.name}`}
+                accessibilityLabel={t("mobile.product.detailsOf", { name: p.name })}
                 onPress={() => router.push(`/inventory/${encodeURIComponent(p.id)}`)}
                 style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
               >
@@ -181,7 +182,7 @@ export default function InventoryScreen() {
                 <View style={styles.rowMeta}>
                   <Text style={styles.price}>{money(p.price)}</Text>
                   <Badge
-                    label={out ? "نفذ" : `${p.quantity} قطعة`}
+                    label={out ? t("app.inventory.filters.stockStatus.out") : t("mobile.common.pieces", { n: p.quantity })}
                     variant={out ? "outofstock" : low ? "lowstock" : "success"}
                   />
                   {p.brand ? (

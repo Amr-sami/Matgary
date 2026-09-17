@@ -14,6 +14,7 @@ import { Field } from "@/components/ui/Field";
 import { money } from "@/lib/format";
 import { RTL_TEXT } from "@/theme/rtl";
 import { colors, fonts, radius, spacing } from "@/theme/tokens";
+import { t } from "@/i18n";
 
 /**
  * Port of app__add-product.png + states/add-product-step2.png, step3.png.
@@ -91,16 +92,16 @@ export default function AddProductScreen() {
 
   if (created) {
     return (
-      <Screen title="إضافة منتج">
+      <Screen title={t("app.inventory.tools.addProduct")}>
         <Card>
           <View style={styles.doneRow}>
             <CheckCircle size={28} color={colors.success} weight="fill" />
-            <Text style={styles.doneTitle}>تمت إضافة المنتج</Text>
+            <Text style={styles.doneTitle}>{t("app.inventory.toast.productAdded")}</Text>
           </View>
           <Text style={styles.doneName}>{name}</Text>
           <View style={styles.doneActions}>
-            <Button label="منتج آخر" onPress={resetAll} />
-            <Button label="فتح في المخزن" variant="outline" onPress={() => { resetAll(); router.push("/inventory"); }} />
+            <Button label={t("mobile.product.another")} onPress={resetAll} />
+            <Button label={t("mobile.product.openInInventory")} variant="outline" onPress={() => { resetAll(); router.push("/inventory"); }} />
           </View>
         </Card>
       </Screen>
@@ -108,7 +109,7 @@ export default function AddProductScreen() {
   }
 
   return (
-    <Screen title="إضافة منتج" subtitle={`الخطوة ${step} من 3 — ${STEP_TITLES[step]}`}>
+    <Screen title={t("app.inventory.tools.addProduct")} subtitle={t("mobile.common.step", { step, total: 3, title: STEP_TITLES()[step] })}>
       <View style={styles.rail}>
         {[1, 2, 3].map((n) => (
           <View key={n} style={[styles.dot, n <= step && styles.dotActive]} />
@@ -118,16 +119,16 @@ export default function AddProductScreen() {
       {step === 1 ? (
         <Card>
           <View style={styles.form}>
-            <Field label="اسم المنتج" value={name} onChangeText={setName} placeholder="مثال: ساعة كاسيو F-91W" />
+            <Field label={t("app.sales.form.quickAddProduct.name")} value={name} onChangeText={setName} placeholder={t("app.sales.form.quickAddProduct.namePlaceholder")} />
             <Field
-              label="الباركود / SKU (اختياري)"
+              label={t("mobile.product.barcodeOptional")}
               value={barcode}
               onChangeText={setBarcode}
-              placeholder="امسح أو اكتب الباركود"
+              placeholder={t("mobile.product.scanOrType")}
               autoCapitalize="none"
             />
             <View>
-              <Text style={styles.label}>الصنف</Text>
+              <Text style={styles.label}>{t("app.sales.form.quickAddProduct.category")}</Text>
               <View style={styles.chipRow}>
                 {(categories.data ?? []).map((c) => (
                   <Chip key={c.id} label={c.label} active={category === c.id}
@@ -137,7 +138,7 @@ export default function AddProductScreen() {
             </View>
             {category ? (
               <View>
-                <Text style={styles.label}>البراند (اختياري)</Text>
+                <Text style={styles.label}>{t("app.inventory.addProduct.step3.fields.brand")}</Text>
                 <View style={styles.chipRow}>
                   {brandsFor.map((b) => (
                     <Chip key={b.id} label={b.name} active={brand === b.id}
@@ -151,22 +152,22 @@ export default function AddProductScreen() {
       ) : step === 2 ? (
         <Card>
           <View style={styles.form}>
-            <Field label="سعر البيع (جنيه)" value={price} onChangeText={setPrice} keyboardType="decimal-pad" placeholder="0" />
-            <Field label="سعر التكلفة (اختياري)" value={cost} onChangeText={setCost} keyboardType="decimal-pad" placeholder="0" />
-            <Field label="الكمية الافتتاحية" value={quantity} onChangeText={setQuantity} keyboardType="number-pad" placeholder="0" />
-            <Field label="حد المخزون المنخفض" value={threshold} onChangeText={setThreshold} keyboardType="number-pad" />
+            <Field label={t("app.sales.form.quickAddProduct.price")} value={price} onChangeText={setPrice} keyboardType="decimal-pad" placeholder="0" />
+            <Field label={t("mobile.product.costOptional")} value={cost} onChangeText={setCost} keyboardType="decimal-pad" placeholder="0" />
+            <Field label={t("mobile.product.openingStock")} value={quantity} onChangeText={setQuantity} keyboardType="number-pad" placeholder="0" />
+            <Field label={t("mobile.product.lowStockThreshold")} value={threshold} onChangeText={setThreshold} keyboardType="number-pad" />
           </View>
         </Card>
       ) : (
-        <Card title="مراجعة">
-          <Row label="الاسم" value={name} />
-          <Row label="الصنف" value={categoryLabel ?? "—"} />
-          <Row label="البراند" value={brandName ?? "—"} />
-          {barcode.trim() ? <Row label="الباركود" value={barcode} /> : null}
-          <Row label="سعر البيع" value={money(num(price))} />
-          {cost.trim() ? <Row label="التكلفة" value={money(num(cost))} /> : null}
-          <Row label="الكمية" value={`${num(quantity)} قطعة`} />
-          <Row label="حد التنبيه" value={`${num(threshold) || 3} قطعة`} />
+        <Card title={t("mobile.common.review")}>
+          <Row label={t("app.common.name")} value={name} />
+          <Row label={t("app.sales.form.quickAddProduct.category")} value={categoryLabel ?? "—"} />
+          <Row label={t("app.sales.table.col.brand")} value={brandName ?? "—"} />
+          {barcode.trim() ? <Row label={t("mobile.common.barcode")} value={barcode} /> : null}
+          <Row label={t("app.inventory.addProduct.step3.fields.price")} value={money(num(price))} />
+          {cost.trim() ? <Row label={t("mobile.common.cost")} value={money(num(cost))} /> : null}
+          <Row label={t("app.inventory.addProduct.step3.preview.quantity")} value={t("mobile.common.pieces", { n: num(quantity) })} />
+          <Row label={t("app.inventory.addProduct.step3.preview.lowStock")} value={t("mobile.common.pieces", { n: num(threshold) || 3 })} />
         </Card>
       )}
 
@@ -178,24 +179,24 @@ export default function AddProductScreen() {
 
       <View style={styles.nav}>
         {step > 1 ? (
-          <Button label="رجوع" variant="outline" onPress={() => setStep((s) => (s - 1) as Step)} style={styles.navBtn} />
+          <Button label={t("app.common.back")} variant="outline" onPress={() => setStep((s) => (s - 1) as Step)} style={styles.navBtn} />
         ) : null}
         {step < 3 ? (
           <Button
-            label="التالي"
+            label={t("app.inventory.addProduct.footer.next")}
             disabled={step === 1 ? !step1Ok : !step2Ok}
             onPress={() => setStep((s) => (s + 1) as Step)}
             style={styles.navBtn}
           />
         ) : (
-          <Button label="حفظ المنتج" loading={create.isPending} onPress={() => create.mutate()} style={styles.navBtn} />
+          <Button label={t("app.inventory.addProduct.footer.save")} loading={create.isPending} onPress={() => create.mutate()} style={styles.navBtn} />
         )}
       </View>
     </Screen>
   );
 }
 
-const STEP_TITLES: Record<Step, string> = { 1: "بيانات المنتج", 2: "السعر والمخزون", 3: "مراجعة" };
+const STEP_TITLES = (): Record<Step, string> => ({ 1: t("mobile.product.details"), 2: t("mobile.product.priceAndStock"), 3: t("mobile.common.review") });
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -207,13 +208,13 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 function messageFor(e: unknown): string {
-  if (!(e instanceof ApiError)) return "تعذّر حفظ المنتج";
+  if (!(e instanceof ApiError)) return t("mobile.product.saveFailed");
   switch (e.kind) {
-    case "offline": return "تعذّر الاتصال بالخادم";
-    case "rateLimited": return "محاولات كثيرة. انتظر قليلاً";
-    case "forbidden": return "ليست لديك صلاحية إضافة منتجات";
-    case "validation": return "تحقق من البيانات المدخلة";
-    default: return "تعذّر حفظ المنتج";
+    case "offline": return t("mobile.common.offline");
+    case "rateLimited": return t("mobile.common.tooManyAttempts");
+    case "forbidden": return t("mobile.product.noPermission");
+    case "validation": return t("mobile.common.checkInput");
+    default: return t("mobile.product.saveFailed");
   }
 }
 

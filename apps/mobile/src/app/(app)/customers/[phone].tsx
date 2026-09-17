@@ -21,6 +21,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { money, shortDate } from "@/lib/format";
 import { RTL_TEXT } from "@/theme/rtl";
 import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
+import { t } from "@/i18n";
 
 /**
  * Port of app__customer-detail.png (/customers/<urlencoded-phone>).
@@ -91,11 +92,11 @@ interface PaymentEvent {
   recordedByName: string | null;
 }
 
-const METHOD_LABELS: Record<string, string> = {
-  cash: "كاش",
-  instapay: "إنستا باي",
-  card: "كارت",
-};
+const METHOD_LABELS = (): Record<string, string> => ({
+  cash: t("app.catalog.payment.cash"),
+  instapay: t("app.customers.settle.methods.instapay"),
+  card: t("app.customers.settle.methods.card"),
+});
 
 /**
  * expo-router hands params already decoded, but a phone arrives as
@@ -174,13 +175,13 @@ export default function CustomerDetailScreen() {
           RTL the caret lands on the right edge, exactly as the capture shows. */}
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="العودة لقائمة العملاء"
+        accessibilityLabel={t("mobile.customers.backToList")}
         hitSlop={8}
         style={styles.crumb}
         onPress={() => router.navigate("/customers")}
       >
         <CaretRight size={16} color={colors.textSecondary} />
-        <Text style={styles.crumbText}>العملاء</Text>
+        <Text style={styles.crumbText}>{t("app.customers.title")}</Text>
       </Pressable>
 
       {ledgerQ.isLoading ? (
@@ -191,8 +192,8 @@ export default function CustomerDetailScreen() {
           <EmptyState
             title={
               ledgerQ.error
-                ? "تعذّر تحميل بيانات العميل."
-                : "لا توجد فواتير لهذا العميل في الفرع الحالي."
+                ? t("mobile.customers.loadFailed")
+                : t("mobile.customers.noInvoicesBranch")
             }
           />
         </View>
@@ -222,7 +223,7 @@ export default function CustomerDetailScreen() {
               {hasDebt ? (
                 <View style={styles.debtBlock}>
                   <Text numberOfLines={1} style={styles.debtLabel}>
-                    متبقي من العميل
+                    {t("mobile.customers.outstandingFromCustomer")}
                   </Text>
                   <Text numberOfLines={1} style={styles.debtValue}>
                     {money(ledger.outstandingBalance)}
@@ -234,22 +235,22 @@ export default function CustomerDetailScreen() {
             <View style={styles.statGrid}>
               <Stat
                 icon={<Wallet size={14} color={colors.textSecondary} />}
-                label="إجمالي الإنفاق"
+                label={t("app.customers.row.lifetime")}
                 value={money(ledger.lifetimeValue)}
               />
               <Stat
                 icon={<CheckCircle size={14} color={colors.success} />}
-                label="مدفوع"
+                label={t("app.sales.deferred.markPaid")}
                 value={money(ledger.paidBalance)}
               />
               <Stat
                 icon={<Receipt size={14} color={colors.textSecondary} />}
-                label="عدد الفواتير"
+                label={t("mobile.customers.invoiceCount")}
                 value={String(ledger.invoiceCount)}
               />
               <Stat
                 icon={<CalendarBlank size={14} color={colors.textSecondary} />}
-                label="آخر زيارة"
+                label={t("mobile.customers.lastVisit")}
                 value={ledger.lastVisit ? shortDate(ledger.lastVisit) : "—"}
               />
             </View>
@@ -258,7 +259,7 @@ export default function CustomerDetailScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHead}>
               <Receipt size={18} color={colors.textSecondary} />
-              <Text style={styles.sectionTitle}>سجل الفواتير</Text>
+              <Text style={styles.sectionTitle}>{t("mobile.customers.invoiceHistory")}</Text>
             </View>
 
             <View style={styles.ledger}>
@@ -281,16 +282,16 @@ export default function CustomerDetailScreen() {
                             {inv.invoiceId}
                           </Text>
                           {inv.isPaid ? (
-                            <Badge label="مدفوع" variant="success" />
+                            <Badge label={t("app.sales.deferred.markPaid")} variant="success" />
                           ) : partial ? (
-                            <Badge label="جزئي" variant="lowstock" />
+                            <Badge label={t("app.purchases.paymentBadge.partial")} variant="lowstock" />
                           ) : (
-                            <Badge label="آجل" variant="outofstock" />
+                            <Badge label={t("app.catalog.payment.deferred")} variant="outofstock" />
                           )}
                         </View>
                         <Text style={styles.invoiceMeta}>
                           {shortDate(inv.date)} · {inv.lines.length} قطعة
-                          {inv.paidAt ? ` · دُفع ${shortDate(inv.paidAt)}` : ""}
+                          {inv.paidAt ? ` ${t("mobile.customers.paidOn", { date: shortDate(inv.paidAt) })}` : ""}
                         </Text>
                       </View>
 
@@ -326,7 +327,7 @@ export default function CustomerDetailScreen() {
 
                     {events.length > 0 ? (
                       <View style={styles.timeline}>
-                        <Text style={styles.timelineTitle}>سجل الدفعات</Text>
+                        <Text style={styles.timelineTitle}>{t("mobile.customers.paymentLog")}</Text>
                         {events.map((p) => (
                           <View key={p.id} style={styles.eventRow}>
                             <View style={styles.eventMain}>
@@ -334,7 +335,7 @@ export default function CustomerDetailScreen() {
                                 {shortDate(p.recordedAt)}
                               </Text>
                               <Badge
-                                label={METHOD_LABELS[p.method] ?? "دفعة سابقة"}
+                                label={METHOD_LABELS()[p.method] ?? t("mobile.customers.previousPayment")}
                                 variant={
                                   p.method === "cash"
                                     ? "success"

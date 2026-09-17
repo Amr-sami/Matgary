@@ -111,7 +111,7 @@ export default function LoginScreen() {
             <Pressable
               style={styles.langToggle}
               accessibilityRole="button"
-              accessibilityLabel={locale === "ar" ? "English" : "العربية"}
+              accessibilityLabel={locale === "ar" ? "English" : t("app.shell.language.arabic")}
               onPress={() => void setLocale(locale === "ar" ? "en" : "ar")}
             >
               <Globe size={20} color={colors.textSecondary} />

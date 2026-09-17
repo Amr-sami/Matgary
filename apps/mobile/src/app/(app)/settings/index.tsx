@@ -14,6 +14,7 @@ import { Card } from "@/components/ui/Card";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
+import { t } from "@/i18n";
 
 /**
  * Port of app__settings.png — the hub.
@@ -50,43 +51,43 @@ export default function SettingsScreen() {
       key: "branches",
       route: "/settings/branches",
       icon: Storefront,
-      title: "إدارة الفروع",
+      title: t("app.settingsPage.branches.title"),
       hint:
         branchCount <= 1
-          ? "أضف فرعاً جديداً لتتبع المبيعات والمخزون لكل موقع على حدة."
-          : "إدارة الفروع، تعطيل أو حذف فرع، وتعديل بيانات الموقع.",
+          ? t("app.settingsPage.branches.hintOne")
+          : t("app.settingsPage.branches.hintMany"),
       ownerOnly: true,
     },
     {
       key: "digest",
       route: "/settings/digest",
       icon: ChatCircle,
-      title: "الملخص اليومي على واتساب",
-      hint: "ابعت لنفسك كل يوم رسالة فيها كل المهم في كل فرع",
+      title: t("app.digestSettings.title"),
+      hint: t("app.settingsPage.digestTile.subtitle"),
       ownerOnly: true,
     },
     {
       key: "notifications",
       route: "/settings/notifications",
       icon: ChatCircle,
-      title: "الإشعارات",
-      hint: "اختر الأحداث اللي تنبّهك داخل التطبيق أو بالبريد.",
+      title: t("app.notificationSettings.title"),
+      hint: t("app.settingsPage.notificationsTile.subtitle"),
       ownerOnly: false,
     },
     {
       key: "security",
       route: "/settings/security",
       icon: ShieldCheck,
-      title: "الأمان",
-      hint: "المصادقة الثنائية، تسجيل الخروج من كل الأجهزة، وحذف المتجر.",
+      title: t("app.accountSecurity.title"),
+      hint: t("mobile.settings.securitySub"),
       ownerOnly: false,
     },
     {
       key: "receipt",
       route: "",
       icon: Receipt,
-      title: "تخصيص الفاتورة",
-      hint: "مظهر ولغة الإيصال المطبوع — كل فرع له إعداداته المستقلة.",
+      title: t("app.settingsPage.receiptCard.heading"),
+      hint: t("app.settingsPage.receiptCard.subhead"),
       ownerOnly: true,
       soon: true,
     },
@@ -95,7 +96,7 @@ export default function SettingsScreen() {
   const visible = tiles.filter((t) => !t.ownerOnly || isOwner);
 
   return (
-    <Screen title="الإعدادات">
+    <Screen title={t("app.settingsPage.title")}>
       <Card>
         <Text numberOfLines={1} style={styles.store}>
           {me?.tenant.name ?? me?.tenant.slug ?? "—"}
@@ -118,10 +119,10 @@ export default function SettingsScreen() {
                   </Text>
                   {tile.key === "branches" ? (
                     <Badge
-                      label={`${branchCount} ${branchCount === 1 ? "فرع" : "فروع"}`}
+                      label={`${branchCount} ${branchCount === 1 ? t("app.settingsPage.branches.countOne") : t("app.settingsPage.branches.countMany")}`}
                     />
                   ) : null}
-                  {tile.soon ? <Badge label="قريباً" variant="lowstock" /> : null}
+                  {tile.soon ? <Badge label={t("app.billing.comingSoon")} variant="lowstock" /> : null}
                 </View>
                 <Text style={styles.tileHint}>{tile.hint}</Text>
               </View>

@@ -29,6 +29,7 @@ import { Field } from "@/components/ui/Field";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
+import { t } from "@/i18n";
 
 /**
  * Port of app__settings-branches.png.
@@ -101,9 +102,9 @@ export default function BranchesScreen() {
     const text =
       error instanceof ApiError
         ? error.kind === "forbidden"
-          ? "العملية متاحة لصاحب المتجر فقط."
+          ? t("mobile.common.ownerOnly")
           : error.kind === "offline"
-            ? "تعذّر الاتصال بالخادم"
+            ? t("mobile.common.offline")
             : fallback
         : fallback;
     setNotice({ tone: "err", text });
@@ -123,11 +124,11 @@ export default function BranchesScreen() {
       }
     },
     onSuccess: (_data, d) => {
-      setNotice({ tone: "ok", text: d.id ? "تم حفظ التعديلات" : "تم إنشاء الفرع" });
+      setNotice({ tone: "ok", text: d.id ? t("app.branchesPage.toast.edited") : t("app.branchesPage.toast.created") });
       setDraft(null);
       void q.refetch();
     },
-    onError: (e) => fail(e, "تعذر الحفظ"),
+    onError: (e) => fail(e, t("app.branchesPage.toast.saveFailed")),
   });
 
   const toggleActive = useMutation({
@@ -137,30 +138,30 @@ export default function BranchesScreen() {
         body: { isActive: !b.isActive },
       }),
     onSuccess: (_d, b) => {
-      setNotice({ tone: "ok", text: b.isActive ? "تم إيقاف الفرع" : "تم تفعيل الفرع" });
+      setNotice({ tone: "ok", text: b.isActive ? t("app.branchesPage.toast.suspended") : t("app.branchesPage.toast.activated") });
       void q.refetch();
     },
-    onError: (e) => fail(e, "تعذر التحديث"),
+    onError: (e) => fail(e, t("app.branchesPage.toast.updateFailed")),
   });
 
   const remove = useMutation({
     mutationFn: (b: BranchRow) =>
       api.request(`/api/branches/${b.id}`, { method: "DELETE" }),
     onSuccess: () => {
-      setNotice({ tone: "ok", text: "تم حذف الفرع" });
+      setNotice({ tone: "ok", text: t("app.branchesPage.toast.deleted") });
       void q.refetch();
     },
-    onError: (e) => fail(e, "تعذر الحذف"),
+    onError: (e) => fail(e, t("app.branchesPage.toast.deleteFailed")),
   });
 
   const switching = useMutation({
     mutationFn: (id: string) => switchBranch(id),
     onSuccess: () => {
-      setNotice({ tone: "ok", text: "تم التبديل" });
+      setNotice({ tone: "ok", text: t("mobile.settings.switched") });
       // Everything on screen elsewhere is branch-scoped and now stale.
       void qc.invalidateQueries();
     },
-    onError: (e) => fail(e, "تعذر التبديل"),
+    onError: (e) => fail(e, t("app.branchesPage.toast.switchFailed")),
   });
 
   const busy =
@@ -171,15 +172,15 @@ export default function BranchesScreen() {
 
   const confirmDelete = (b: BranchRow) => {
     if (b.isPrimary) {
-      setNotice({ tone: "err", text: "لا يمكن حذف الفرع الرئيسي" });
+      setNotice({ tone: "err", text: t("app.branchesPage.toast.primaryDelete") });
       return;
     }
     Alert.alert(
-      "حذف",
-      `هل تريد حذف فرع «${b.name}»؟ سيتم رفض العملية إذا كان الفرع يحتوي على بيانات (مبيعات/مصاريف/مخزون).`,
+      t("app.branchesPage.actions.delete"),
+      t("mobile.settings.deleteBranchConfirm", { name: b.name }),
       [
-        { text: "إلغاء", style: "cancel" },
-        { text: "حذف", style: "destructive", onPress: () => remove.mutate(b) },
+        { text: t("app.branchesPage.cancel"), style: "cancel" },
+        { text: t("app.branchesPage.actions.delete"), style: "destructive", onPress: () => remove.mutate(b) },
       ],
     );
   };
@@ -195,14 +196,14 @@ export default function BranchesScreen() {
         >
           {/* Back points RIGHT in an RTL page — the mirror of CaretLeft. */}
           <CaretRight size={16} color={colors.textSecondary} />
-          <Text style={styles.backLabel}>الإعدادات</Text>
+          <Text style={styles.backLabel}>{t("app.settingsPage.title")}</Text>
         </Pressable>
 
         <View style={styles.titleRow}>
-          <Text style={styles.title}>الفروع</Text>
+          <Text style={styles.title}>{t("app.branchesPage.heading")}</Text>
           {isOwner && !draft ? (
             <Button
-              label="+ إضافة فرع"
+              label={t("mobile.settings.addBranch")}
               onPress={() => setDraft({ ...EMPTY_DRAFT })}
               disabled={busy}
               style={styles.addButton}
@@ -210,7 +211,7 @@ export default function BranchesScreen() {
           ) : null}
         </View>
         <Text style={styles.subtitle}>
-          تعدد الفروع يتيح لك تتبع المبيعات والمخزون لكل موقع على حدة.
+          {t("app.branchesPage.subhead")}
         </Text>
       </View>
 
@@ -228,17 +229,17 @@ export default function BranchesScreen() {
       ) : null}
 
       {draft ? (
-        <Card title={draft.id ? "تعديل فرع" : "فرع جديد"}>
+        <Card title={draft.id ? t("app.branchesPage.editTitle") : t("app.branchesPage.newTitle")}>
           <View style={styles.form}>
             <Field
-              label="اسم الفرع"
+              label={t("app.branchesPage.nameLabel")}
               value={draft.name}
               onChangeText={(v) => setDraft({ ...draft, name: v })}
-              placeholder="مثال: فرع المعادي"
+              placeholder={t("app.branchesPage.namePlaceholder")}
               editable={!busy}
             />
             <Field
-              label="رقم الهاتف"
+              label={t("app.branchesPage.phoneLabel")}
               value={draft.phone}
               onChangeText={(v) => setDraft({ ...draft, phone: v })}
               placeholder="01XXXXXXXXX"
@@ -246,25 +247,25 @@ export default function BranchesScreen() {
               editable={!busy}
             />
             <Field
-              label="العنوان"
+              label={t("app.branchesPage.addressLabel")}
               value={draft.address}
               onChangeText={(v) => setDraft({ ...draft, address: v })}
-              placeholder="شارع X، حي Y، …"
+              placeholder={t("app.branchesPage.addressPlaceholder")}
               editable={!busy}
             />
             <View style={styles.formActions}>
               <Button
-                label="إلغاء"
+                label={t("app.branchesPage.cancel")}
                 variant="ghost"
                 onPress={() => setDraft(null)}
                 disabled={busy}
                 style={styles.flex1}
               />
               <Button
-                label={draft.id ? "حفظ التعديلات" : "إنشاء"}
+                label={draft.id ? t("app.branchesPage.saveChanges") : t("app.branchesPage.create")}
                 onPress={() => {
                   if (!draft.name.trim()) {
-                    setNotice({ tone: "err", text: "اسم الفرع مطلوب" });
+                    setNotice({ tone: "err", text: t("app.branchesPage.toast.nameRequired") });
                     return;
                   }
                   save.mutate(draft);
@@ -281,7 +282,7 @@ export default function BranchesScreen() {
       {q.isLoading && rows.length === 0 ? (
         <ActivityIndicator color={colors.accent} />
       ) : rows.length === 0 ? (
-        <EmptyState title="لا توجد فروع." />
+        <EmptyState title={t("app.branchesPage.empty")} />
       ) : (
         <View style={styles.list}>
           {rows.map((b) => {
@@ -300,11 +301,11 @@ export default function BranchesScreen() {
                       <Text numberOfLines={1} style={styles.name}>
                         {b.name}
                       </Text>
-                      {b.isPrimary ? <Badge label="رئيسي" variant="accent" /> : null}
+                      {b.isPrimary ? <Badge label={t("app.branchesPage.labels.primary")} variant="accent" /> : null}
                       {isCurrent ? (
-                        <Badge label="الفرع الحالي" variant="success" />
+                        <Badge label={t("app.branchesPage.labels.current")} variant="success" />
                       ) : null}
-                      {!b.isActive ? <Badge label="موقوف" /> : null}
+                      {!b.isActive ? <Badge label={t("app.branchesPage.labels.suspended")} /> : null}
                     </View>
                     {b.address ? (
                       <Text numberOfLines={1} style={styles.meta}>
@@ -322,7 +323,7 @@ export default function BranchesScreen() {
                 <View style={styles.actions}>
                   {!isCurrent && b.isActive ? (
                     <Button
-                      label="فتح"
+                      label={t("app.branchesPage.actions.open")}
                       onPress={() => switching.mutate(b.id)}
                       loading={switching.isPending && switching.variables === b.id}
                       disabled={busy}
@@ -335,7 +336,7 @@ export default function BranchesScreen() {
                   {isOwner ? (
                     <>
                       <IconButton
-                        label="تعديل"
+                        label={t("app.branchesPage.actions.edit")}
                         disabled={busy}
                         onPress={() =>
                           setDraft({
@@ -350,7 +351,7 @@ export default function BranchesScreen() {
                       </IconButton>
 
                       <IconButton
-                        label={b.isActive ? "إيقاف الفرع" : "تفعيل الفرع"}
+                        label={b.isActive ? t("app.branchesPage.actions.suspend") : t("app.branchesPage.actions.activate")}
                         disabled={busy || b.isPrimary}
                         onPress={() => toggleActive.mutate(b)}
                       >
@@ -362,7 +363,7 @@ export default function BranchesScreen() {
                       </IconButton>
 
                       <IconButton
-                        label="حذف"
+                        label={t("app.branchesPage.actions.delete")}
                         disabled={busy || b.isPrimary}
                         onPress={() => confirmDelete(b)}
                       >

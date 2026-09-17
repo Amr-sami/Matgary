@@ -14,7 +14,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, catalog } from "@matgary/api-client";
 
 import { api } from "@/api/client";
-import { isRTL } from "@/i18n";
+import { isRTL, t } from "@/i18n";
 import { Screen } from "@/components/layout/Screen";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -43,15 +43,15 @@ const CATEGORY_ORDER: catalog.ExpenseCategory[] = [
   "other",
 ];
 
-const CATEGORY: Record<string, string> = {
-  rent: "إيجار",
-  salaries: "مرتبات",
-  electricity: "كهرباء",
-  water: "مياه",
-  internet: "إنترنت",
-  supplier: "مورد",
-  other: "أخرى",
-};
+const CATEGORY = (): Record<string, string> => ({
+  rent: t("app.catalog.expenseCategory.rent"),
+  salaries: t("app.catalog.expenseCategory.salaries"),
+  electricity: t("app.catalog.expenseCategory.electricity"),
+  water: t("app.catalog.expenseCategory.water"),
+  internet: t("app.catalog.expenseCategory.internet"),
+  supplier: t("app.catalog.expenseCategory.supplier"),
+  other: t("app.catalog.expenseCategory.other"),
+});
 
 /**
  * ApiError → one Arabic line.
@@ -67,17 +67,17 @@ function errorMessage(error: unknown, fallback: string): string {
   if (error.code && /[؀-ۿ]/.test(error.code)) return error.code;
   switch (error.kind) {
     case "offline":
-      return "تعذّر الاتصال بالخادم";
+      return t("mobile.common.offline");
     case "timeout":
-      return "انتهت مهلة الاتصال";
+      return t("mobile.common.timeout");
     case "forbidden":
-      return "ليس لديك صلاحية لهذا الإجراء";
+      return t("mobile.common.forbidden");
     case "rateLimited":
-      return "محاولات كثيرة. حاول بعد قليل";
+      return t("mobile.signup.tooMany");
     case "billing":
-      return "الاشتراك غير مفعّل";
+      return t("mobile.common.subscriptionInactive");
     case "server":
-      return "الخادم لا يستجيب";
+      return t("mobile.common.serverError");
     default:
       return fallback;
   }
@@ -98,17 +98,17 @@ export default function ExpensesScreen() {
 
   return (
     <Screen
-      title="المصاريف"
-      subtitle={rows.length ? `${rows.length} مصروف · ${money(total)}` : undefined}
+      title={t("app.expenses.title")}
+      subtitle={rows.length ? t("mobile.expenses.summary", { n: rows.length, total: money(total) }) : undefined}
       onRefresh={() => void q.refetch()}
       refreshing={q.isRefetching}
     >
-      <Button label="إضافة مصروف" onPress={() => setFormOpen(true)} />
+      <Button label={t("mobile.expenses.add")} onPress={() => setFormOpen(true)} />
 
       {q.isLoading ? (
         <ActivityIndicator color={colors.accent} />
       ) : rows.length === 0 ? (
-        <EmptyState title="لا توجد مصاريف" />
+        <EmptyState title={t("mobile.expenses.empty")} />
       ) : (
         <View style={styles.list}>
           {rows.map((e) => (
@@ -124,9 +124,9 @@ export default function ExpensesScreen() {
                 </Text>
               </View>
               <View style={styles.meta}>
-                <Badge label={CATEGORY[e.category] ?? e.category} variant="neutral" />
+                <Badge label={CATEGORY()[e.category] ?? e.category} variant="neutral" />
                 <Text style={styles.date}>{shortDate(e.date)}</Text>
-                {e.isRecurring ? <Badge label="متكرر" variant="accent" /> : null}
+                {e.isRecurring ? <Badge label={t("mobile.common.recurring")} variant="accent" /> : null}
               </View>
             </View>
           ))}
@@ -192,7 +192,7 @@ function ExpenseFormSheet({
       reset();
       onCreated();
     },
-    onError: (err) => setError(errorMessage(err, "تعذر تسجيل المصروف")),
+    onError: (err) => setError(errorMessage(err, t("mobile.expenses.saveFailed"))),
   });
 
   const close = () => {
@@ -204,22 +204,22 @@ function ExpenseFormSheet({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
       <View style={[styles.overlay, directionStyle(isRTL())]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="إغلاق" />
+        <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel={t("app.common.close")} />
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
           <View style={styles.sheet}>
             <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetBody}>
               {/* The heading is accent-coloured on the web, next to a wallet
                   glyph. The colour is the part that carries the identity. */}
-              <Text style={styles.sheetTitleAccent}>تسجيل مصروف جديد</Text>
+              <Text style={styles.sheetTitleAccent}>{t("app.expenses.form.heading")}</Text>
 
               <Field
-                label="بيان المصروف"
+                label={t("app.expenses.form.titleLabel")}
                 value={title}
                 onChangeText={setTitle}
-                placeholder="مثلاً: إيجار المحل، فاتورة الكهرباء…"
+                placeholder={t("app.expenses.form.titlePlaceholder")}
               />
               <Field
-                label="المبلغ (جنيه)"
+                label={t("app.expenses.form.amountLabel")}
                 value={amount}
                 onChangeText={setAmount}
                 placeholder="0.00"
@@ -227,7 +227,7 @@ function ExpenseFormSheet({
               />
 
               <View>
-                <Text style={styles.label}>التصنيف</Text>
+                <Text style={styles.label}>{t("app.expenses.form.categoryLabel")}</Text>
                 <View style={styles.grid}>
                   {CATEGORY_ORDER.map((key) => (
                     // The cell fixes the two-column grid of the capture; the
@@ -235,7 +235,7 @@ function ExpenseFormSheet({
                     // stretch), so nothing here re-styles the Chip itself.
                     <View key={key} style={styles.gridCell}>
                       <Chip
-                        label={CATEGORY[key]}
+                        label={CATEGORY()[key]}
                         active={category === key}
                         onPress={() => setCategory(key)}
                       />
@@ -245,7 +245,7 @@ function ExpenseFormSheet({
               </View>
 
               <Field
-                label="ملاحظة (اختياري)"
+                label={t("app.expenses.form.noteLabel")}
                 value={note}
                 onChangeText={setNote}
                 placeholder="…"
@@ -259,14 +259,14 @@ function ExpenseFormSheet({
 
               <View style={styles.actions}>
                 <Button
-                  label="تسجيل المصروف"
+                  label={t("app.expenses.form.submit")}
                   onPress={() => create.mutate()}
                   disabled={!canSubmit}
                   loading={create.isPending}
                   style={styles.actionGrow}
                 />
                 <Button
-                  label="إلغاء"
+                  label={t("app.common.cancel")}
                   variant="outline"
                   onPress={close}
                   style={styles.actionGrow}

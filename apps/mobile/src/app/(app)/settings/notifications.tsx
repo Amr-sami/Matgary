@@ -18,6 +18,7 @@ import { Card } from "@/components/ui/Card";
 import { Segmented } from "@/components/ui/Segmented";
 import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
+import { t } from "@/i18n";
 
 /**
  * Port of app__settings-notifications.png.
@@ -50,33 +51,33 @@ interface Payload {
 }
 
 /** apps/web/dictionaries/ar.json → app.notificationSettings.events */
-const EVENTS: Record<EventType, { title: string; hint: string }> = {
+const EVENTS = (): Record<EventType, { title: string; hint: string }> => ({
   "sale.created": {
-    title: "بيع جديد",
-    hint: "يُرسل عند تسجيل أي عملية بيع.",
+    title: t("app.notificationSettings.events.sale.created.title"),
+    hint: t("app.notificationSettings.events.sale.created.hint"),
   },
   "purchase.received": {
-    title: "استلام توريد",
-    hint: "يُرسل عند تعليم أمر شراء كمُستلَم.",
+    title: t("app.notificationSettings.events.purchase.received.title"),
+    hint: t("app.notificationSettings.events.purchase.received.hint"),
   },
   "inventory.low_stock": {
-    title: "تنبيه مخزون منخفض",
-    hint: "يُرسل عندما تصل كمية منتج إلى حد التنبيه بعد بيع.",
+    title: t("app.notificationSettings.events.inventory.low_stock.title"),
+    hint: t("app.notificationSettings.events.inventory.low_stock.hint"),
   },
   "payment.deferred_settled": {
-    title: "سداد مؤجل مكتمل",
-    hint: "يُرسل عندما يسدد العميل فاتورة آجلة بالكامل.",
+    title: t("app.notificationSettings.events.payment.deferred_settled.title"),
+    hint: t("app.notificationSettings.events.payment.deferred_settled.hint"),
   },
   "leave.requested": {
-    title: "طلب إجازة",
-    hint: "يُرسل عندما يقدّم موظف طلب إجازة.",
+    title: t("app.notificationSettings.events.leave.requested.title"),
+    hint: t("app.notificationSettings.events.leave.requested.hint"),
   },
-};
+});
 
-const DELIVERY = [
-  { key: "instant" as const, label: "فوري" },
-  { key: "digest" as const, label: "ملخص يومي" },
-];
+const DELIVERY = () => ([
+  { key: "instant" as const, label: t("app.notificationSettings.delivery.instant") },
+  { key: "digest" as const, label: t("app.notificationSettings.delivery.digest") },
+]);
 
 export default function NotificationSettingsScreen() {
   const router = useRouter();
@@ -101,13 +102,13 @@ export default function NotificationSettingsScreen() {
         },
       }),
     onSuccess: () => {
-      setNotice({ tone: "ok", text: "تم الحفظ" });
+      setNotice({ tone: "ok", text: t("app.notificationSettings.savedToast") });
       // Re-read so `isDefault` flips accurately — the server DELETES the row
       // when a patch happens to match the code default for this role.
       void q.refetch();
     },
     onError: () => {
-      setNotice({ tone: "err", text: "تعذّر الحفظ" });
+      setNotice({ tone: "err", text: t("app.notificationSettings.errorToast") });
       void q.refetch();
     },
   });
@@ -124,16 +125,15 @@ export default function NotificationSettingsScreen() {
           style={styles.back}
         >
           <CaretRight size={16} color={colors.textSecondary} />
-          <Text style={styles.backLabel}>الإعدادات</Text>
+          <Text style={styles.backLabel}>{t("app.settingsPage.title")}</Text>
         </Pressable>
-        <Text style={styles.title}>الإشعارات</Text>
+        <Text style={styles.title}>{t("app.shell.notifications.title")}</Text>
         <Text style={styles.subtitle}>
-          اختر طريقة إشعارك لكل حدث. الإشعار الفوري يظهر في جرس الإشعارات،
-          والبريد يُرسل إلى عنوان حسابك.
+          {t("app.notificationSettings.intro")}
         </Text>
         {q.data ? (
           <Text style={styles.role}>
-            {q.data.role === "owner" ? "صاحب المتجر" : "موظف"}
+            {q.data.role === "owner" ? t("app.notificationSettings.role.owner") : t("app.notificationSettings.role.staff")}
           </Text>
         ) : null}
       </View>
@@ -155,7 +155,7 @@ export default function NotificationSettingsScreen() {
         <ActivityIndicator color={colors.accent} />
       ) : (
         rows.map((p) => {
-          const meta = EVENTS[p.eventType];
+          const meta = EVENTS()[p.eventType];
           const saving = save.isPending && save.variables?.eventType === p.eventType;
           return (
             <Card key={p.eventType}>
@@ -163,7 +163,7 @@ export default function NotificationSettingsScreen() {
                 <Text numberOfLines={1} style={styles.eventTitle}>
                   {meta?.title ?? p.eventType}
                 </Text>
-                {p.isDefault ? <Badge label="افتراضي" /> : null}
+                {p.isDefault ? <Badge label={t("app.notificationSettings.defaultBadge")} /> : null}
               </View>
               <Text style={styles.eventHint}>{meta?.hint}</Text>
 
@@ -171,7 +171,7 @@ export default function NotificationSettingsScreen() {
 
               <View style={styles.toggleRow}>
                 <Text numberOfLines={1} style={styles.toggleLabel}>
-                  داخل التطبيق
+                  {t("app.notificationSettings.headers.inApp")}
                 </Text>
                 <Switch
                   value={p.inApp}
@@ -183,7 +183,7 @@ export default function NotificationSettingsScreen() {
 
               <View style={styles.toggleRow}>
                 <Text numberOfLines={1} style={styles.toggleLabel}>
-                  البريد
+                  {t("app.notificationSettings.headers.email")}
                 </Text>
                 <Switch
                   value={p.email}
@@ -193,7 +193,7 @@ export default function NotificationSettingsScreen() {
                 />
               </View>
 
-              <Text style={styles.deliveryLabel}>التسليم</Text>
+              <Text style={styles.deliveryLabel}>{t("app.notificationSettings.headers.delivery")}</Text>
               {/* The web disables the delivery select while email is off —
                   reproduced with pointerEvents rather than a new prop on
                   Segmented, which has no disabled state to re-style. */}
@@ -202,7 +202,7 @@ export default function NotificationSettingsScreen() {
                 style={!p.email ? styles.disabled : undefined}
               >
                 <Segmented
-                  items={DELIVERY}
+                  items={DELIVERY()}
                   value={p.digestMode}
                   onChange={(v) => save.mutate({ ...p, digestMode: v })}
                 />

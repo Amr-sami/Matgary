@@ -4290,5 +4290,164 @@
         }
       ]
     }
+  },
+  "mobile": {
+    "common": {
+      "owner": "مالك",
+      "recurring": "متكرر",
+      "review": "مراجعة",
+      "cost": "التكلفة",
+      "barcode": "الباركود",
+      "pieces": "{n} قطعة",
+      "step": "الخطوة {step} من {total} — {title}",
+      "tooManyAttempts": "محاولات كثيرة. انتظر قليلاً",
+      "offline": "تعذّر الاتصال بالخادم",
+      "forbidden": "ليس لديك صلاحية لهذا الإجراء",
+      "checkInput": "تحقق من البيانات المدخلة",
+      "ownerOnly": "العملية متاحة لصاحب المتجر فقط.",
+      "webOnly": "التنزيل متاح من نسخة الويب حالياً.",
+      "timeout": "انتهت مهلة الاتصال",
+      "serverError": "الخادم لا يستجيب",
+      "subscriptionInactive": "الاشتراك غير مفعّل",
+      "notAvailable": "غير متوفر",
+      "decrease": "تقليل الكمية",
+      "increase": "زيادة الكمية",
+      "reason": "السبب",
+      "tags": "تاجات",
+      "addedOn": "تاريخ الإضافة",
+      "assignTo": "إسناد إلى",
+      "noStaffYet": "لا يوجد موظفون بعد",
+      "noMembers": "لا يوجد أعضاء"
+    },
+    "pos": {
+      "itemsInCart": "{n} منتج في الفاتورة",
+      "available": "المتاح: {n} قطعة",
+      "saveFailed": "تعذّر تسجيل البيع",
+      "offlineNotSaved": "تعذّر الاتصال بالخادم — لم يُسجَّل البيع",
+      "timeoutNotSaved": "انتهت مهلة الاتصال — لم يُسجَّل البيع",
+      "insufficientStock": "الكمية المطلوبة غير متوفرة في المخزن",
+      "productGone": "أحد المنتجات لم يعد موجوداً",
+      "wrongBranch": "هذا المنتج يخص فرعاً آخر",
+      "cartEmpty": "الفاتورة فارغة",
+      "noPermission": "ليست لديك صلاحية تسجيل البيع"
+    },
+    "product": {
+      "details": "بيانات المنتج",
+      "priceAndStock": "السعر والمخزون",
+      "openingStock": "الكمية الافتتاحية",
+      "lowStockThreshold": "حد المخزون المنخفض",
+      "costOptional": "سعر التكلفة (اختياري)",
+      "barcodeOptional": "الباركود / SKU (اختياري)",
+      "scanOrType": "امسح أو اكتب الباركود",
+      "another": "منتج آخر",
+      "openInInventory": "فتح في المخزن",
+      "saveFailed": "تعذّر حفظ المنتج",
+      "noPermission": "ليست لديك صلاحية إضافة منتجات",
+      "notFound": "المنتج غير موجود.",
+      "detailsOf": "تفاصيل {name}",
+      "margin": "{amount} · هامش {pct}%"
+    },
+    "returns": {
+      "empty": "لا توجد مرتجعات",
+      "emptyHint": "المرتجع يُسجَّل من فاتورة البيع في شاشة المبيعات.",
+      "pickLine": "اختر البند من آخر المبيعات:",
+      "reasonExample": "مثال: عيب في المنتج",
+      "saveFailed": "تعذّر تسجيل المرتجع",
+      "qtySuffix": "{n} قطعة ·",
+      "summary": "{n} مرتجع · {total}",
+      "changeLine": "‹ تغيير البند",
+      "submit": "تسجيل المرتجع"
+    },
+    "purchases": {
+      "empty": "لا توجد أوامر شراء",
+      "emptyHint": "أضف أمر شراء لتتبع مشترياتك من الموردين.",
+      "createFailed": "تعذّر إنشاء أمر الشراء",
+      "ordered": "تم الطلب",
+      "orderCount": "عدد الأوامر",
+      "owedToSuppliers": "مستحق للموردين",
+      "searchProduct": "ابحث عن منتج لإضافته…",
+      "create": "إنشاء أمر الشراء"
+    },
+    "expenses": {
+      "empty": "لا توجد مصاريف",
+      "summary": "{n} مصروف · {total}",
+      "add": "إضافة مصروف",
+      "saveFailed": "تعذر تسجيل المصروف"
+    },
+    "customers": {
+      "emptyHint": "يظهر العملاء هنا بعد أول عملية بيع باسم عميل.",
+      "summary": "{n} عميل · مستحق {owed}",
+      "owes": "عليه {amount}",
+      "profileOf": "ملف العميل {name}",
+      "lastVisit": "آخر زيارة",
+      "invoiceCount": "عدد الفواتير",
+      "paymentLog": "سجل الدفعات",
+      "previousPayment": "دفعة سابقة",
+      "paidOn": "· دُفع {date}",
+      "noInvoicesBranch": "لا توجد فواتير لهذا العميل في الفرع الحالي.",
+      "loadFailed": "تعذّر تحميل بيانات العميل.",
+      "empty": "لا يوجد عملاء",
+      "backToList": "العودة لقائمة العملاء",
+      "invoiceHistory": "سجل الفواتير",
+      "outstandingFromCustomer": "متبقي من العميل"
+    },
+    "suppliers": {
+      "profileOf": "ملف المورد {name}",
+      "summary": "{n} مورد · مستحق {owed}",
+      "empty": "لا يوجد موردون",
+      "noBalance": "لا مستحقات",
+      "nameRequired": "اسم المورد مطلوب",
+      "saveFailed": "تعذّر حفظ التعديلات",
+      "edit": "تعديل المورد"
+    },
+    "team": {
+      "summary": "{n} عضو"
+    },
+    "tasks": {
+      "summary": "{open} مفتوحة · {done} منجزة",
+      "newTask": "مهمة جديدة +",
+      "doneCheck": "✓ تم الإنجاز",
+      "completeTitle": "إنهاء {title}",
+      "reopenTitle": "إعادة فتح {title}"
+    },
+    "insights": {
+      "loadFailed": "تعذّر تحميل الإحصائيات",
+      "deepDive": "التحليل المعمّق",
+      "trendTitle": "اتجاه المبيعات ({range})",
+      "ofValue": "{pct}% من القيمة"
+    },
+    "inventory": {
+      "searchHint": "جرّب بحثاً آخر أو امسح الفلاتر.",
+      "empty": "لا توجد منتجات",
+      "backToList": "العودة للمخزن"
+    },
+    "billing": {
+      "trialDaysLeft": "متبقي {days} يوم في التجربة المجانية.",
+      "activeUntil": "الخدمة مفعّلة حتى {date}.",
+      "renewalOn": "التجديد القادم في {date}."
+    },
+    "settings": {
+      "addBranch": "+ إضافة فرع",
+      "deleteBranchConfirm": "هل تريد حذف فرع «{name}»؟ سيتم رفض العملية إذا كان الفرع يحتوي على بيانات (مبيعات/مصاريف/مخزون).",
+      "securitySub": "المصادقة الثنائية، تسجيل الخروج من كل الأجهزة، وحذف المتجر.",
+      "digestActive": "✅ شغّال — هتيجيلك رسالة الساعة {time} بتوقيت متجرك",
+      "switched": "تم التبديل",
+      "openAuthApp": "فتح تطبيق المصادقة",
+      "digestPermission": "إعدادات الملخص اليومي متاحة لمن يملك صلاحية إدارتها فقط.",
+      "currentStatus": "الحالة الحالية:"
+    },
+    "signup": {
+      "emailTaken": "هذا البريد مسجّل بالفعل",
+      "handleTaken": "اسم المتجر هذا مستخدم — اختر اسماً آخر",
+      "badEmail": "البريد الإلكتروني غير صحيح",
+      "handleRule": "اسم المتجر: حروف إنجليزية صغيرة وأرقام وشرطة فقط",
+      "tooMany": "محاولات كثيرة. حاول بعد قليل",
+      "createFailed": "تعذّر إنشاء الحساب"
+    },
+    "a11y": {
+      "showPassword": "إظهار كلمة المرور",
+      "hidePassword": "إخفاء كلمة المرور",
+      "scanBarcode": "مسح باركود"
+    }
   }
 }

@@ -19,6 +19,7 @@ import { Field } from "@/components/ui/Field";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
 import { colors, fonts, radius, spacing } from "@/theme/tokens";
+import { t } from "@/i18n";
 
 /**
  * Port of app__account-security.png (/account/security on the web).
@@ -43,17 +44,17 @@ interface EnrollmentPreview {
   otpauthUri: string;
 }
 
-const ERRORS: Record<string, string> = {
-  INVALID_TOTP: "الرمز غير صحيح",
-  BAD_PASSWORD: "كلمة المرور غير صحيحة",
-  NOT_ENROLLED: "2FA غير مفعلة",
-  SLUG_MISMATCH: "اسم المتجر لا يطابق",
-  Forbidden: "غير مسموح",
-};
+const ERRORS = (): Record<string, string> => ({
+  INVALID_TOTP: t("app.accountSecurity.errors.badCode"),
+  BAD_PASSWORD: t("app.accountSecurity.errors.badPassword"),
+  NOT_ENROLLED: t("app.accountSecurity.errors.notEnrolled"),
+  SLUG_MISMATCH: t("app.accountSecurity.delete.errors.slugMismatch"),
+  Forbidden: t("app.accountSecurity.delete.errors.forbidden"),
+});
 
 function errorText(e: unknown, fallback: string): string {
   const code = (e as { code?: string | null })?.code ?? "";
-  return ERRORS[code] ?? fallback;
+  return ERRORS()[code] ?? fallback;
 }
 
 export default function SecurityScreen() {
@@ -98,7 +99,7 @@ export default function SecurityScreen() {
       setPreview(p);
       setStatus("enrolling");
     },
-    onError: (e) => setError(errorText(e, "تعذر بدء التفعيل")),
+    onError: (e) => setError(errorText(e, t("app.accountSecurity.errors.startFailed"))),
   });
 
   const confirmEnroll = useMutation({
@@ -113,7 +114,7 @@ export default function SecurityScreen() {
       setStatus("showingCodes");
       setCode("");
     },
-    onError: (e) => setError(errorText(e, "تعذر التفعيل")),
+    onError: (e) => setError(errorText(e, t("app.accountSecurity.errors.enableFailed"))),
   });
 
   const regenerate = useMutation({
@@ -129,7 +130,7 @@ export default function SecurityScreen() {
       setPassword("");
       setCode("");
     },
-    onError: (e) => setError(errorText(e, "تعذر التجديد")),
+    onError: (e) => setError(errorText(e, t("app.accountSecurity.errors.regenerateFailed"))),
   });
 
   const disable = useMutation({
@@ -144,7 +145,7 @@ export default function SecurityScreen() {
       setPassword("");
       setCode("");
     },
-    onError: (e) => setError(errorText(e, "تعذر التعطيل")),
+    onError: (e) => setError(errorText(e, t("app.accountSecurity.errors.disableFailed"))),
   });
 
   const scheduleDelete = useMutation({
@@ -157,7 +158,7 @@ export default function SecurityScreen() {
       setError(null);
       setScheduledAt(body.scheduledAt ?? null);
     },
-    onError: (e) => setError(errorText(e, "تعذر التحديد")),
+    onError: (e) => setError(errorText(e, t("app.accountSecurity.delete.errors.genericError"))),
   });
 
   const cancelDelete = useMutation({
@@ -166,7 +167,7 @@ export default function SecurityScreen() {
       setScheduledAt(null);
       setSlug("");
     },
-    onError: (e) => setError(errorText(e, "تعذر التحديد")),
+    onError: (e) => setError(errorText(e, t("app.accountSecurity.delete.errors.genericError"))),
   });
 
   const revokeAll = useMutation({
@@ -188,15 +189,14 @@ export default function SecurityScreen() {
         style={styles.back}
       >
         <CaretRight size={16} color={colors.textSecondary} />
-        <Text style={styles.backLabel}>الإعدادات</Text>
+        <Text style={styles.backLabel}>{t("app.settingsPage.title")}</Text>
       </Pressable>
       <View style={styles.titleRow}>
-        <Text style={styles.title}>المصادقة الثنائية (2FA)</Text>
+        <Text style={styles.title}>{t("app.accountSecurity.heading")}</Text>
         <ShieldCheck size={26} color={colors.accent} />
       </View>
       <Text style={styles.subtitle}>
-        طبقة حماية إضافية فوق كلمة السر — تطبيق المصادقة على هاتفك يولّد رمزاً
-        من 6 أرقام يتغير كل 30 ثانية.
+        {t("app.accountSecurity.subhead")}
       </Text>
     </View>
   );
@@ -207,7 +207,7 @@ export default function SecurityScreen() {
         {header}
         <Card>
           <Text style={styles.body}>
-            المصادقة الثنائية متاحة لمالك المتجر فقط في هذه النسخة.
+            {t("app.accountSecurity.staffNotice")}
           </Text>
         </Card>
       </Screen>
@@ -229,11 +229,11 @@ export default function SecurityScreen() {
       {status === "off" ? (
         <Card>
           <Text style={styles.body}>
-            الحالة الحالية: <Text style={styles.bodyStrong}>معطلة</Text>
+            {t("mobile.settings.currentStatus")} <Text style={styles.bodyStrong}>{t("app.accountSecurity.statusOff")}</Text>
           </Text>
           <View style={styles.stack}>
             <Button
-              label="تفعيل المصادقة الثنائية"
+              label={t("app.accountSecurity.enableButton")}
               onPress={() => startEnroll.mutate()}
               loading={startEnroll.isPending}
             />
@@ -244,27 +244,25 @@ export default function SecurityScreen() {
       {status === "enrolling" && preview ? (
         <Card>
           <Text style={styles.body}>
-            1) افتح تطبيق المصادقة على هاتفك (Google Authenticator / Microsoft
-            Authenticator / Authy)، ثم أضف الحساب:
+            {t("app.accountSecurity.enrollStep1")}
           </Text>
           <View style={styles.stack}>
             <Button
-              label="فتح تطبيق المصادقة"
+              label={t("mobile.settings.openAuthApp")}
               variant="outline"
               onPress={() => void Linking.openURL(preview.otpauthUri)}
             />
             <Text style={styles.hint}>
-              في تطبيق المصادقة، اختر &quot;إضافة حساب → إدخال يدوي&quot; والصق
-              هذا المفتاح:
+              {t("app.accountSecurity.manualHint")}
             </Text>
             <Text selectable style={styles.mono}>
               {preview.secret.match(/.{1,4}/g)?.join(" ")}
             </Text>
             <Text style={styles.body}>
-              2) أدخل الرمز المكوّن من 6 أرقام الذي يعرضه التطبيق الآن:
+              {t("app.accountSecurity.enrollStep2")}
             </Text>
             <Field
-              label="رمز التطبيق (6 أرقام)"
+              label={t("app.accountSecurity.codePlaceholder")}
               value={code}
               onChangeText={setCode}
               placeholder="123456"
@@ -273,7 +271,7 @@ export default function SecurityScreen() {
             />
             <View style={styles.row}>
               <Button
-                label="إلغاء"
+                label={t("app.accountSecurity.cancel")}
                 variant="ghost"
                 onPress={() => {
                   setStatus("off");
@@ -282,7 +280,7 @@ export default function SecurityScreen() {
                 style={styles.flex1}
               />
               <Button
-                label="تأكيد التفعيل"
+                label={t("app.accountSecurity.confirmEnroll")}
                 onPress={() => confirmEnroll.mutate()}
                 disabled={code.length !== 6}
                 loading={confirmEnroll.isPending}
@@ -296,8 +294,7 @@ export default function SecurityScreen() {
       {status === "showingCodes" ? (
         <Card>
           <Text style={styles.bodyStrong}>
-            احفظ هذه الرموز الاحتياطية في مكان آمن — لن تظهر مرة أخرى. كل رمز
-            يصلح لمرة واحدة فقط ويفتح حسابك إذا فقدت هاتفك.
+            {t("app.accountSecurity.codesHeading")}
           </Text>
           <View style={styles.codes}>
             {recoveryCodes.map((c) => (
@@ -307,7 +304,7 @@ export default function SecurityScreen() {
             ))}
           </View>
           <View style={styles.stack}>
-            <Button label="فهمت، حفظتها" onPress={() => setStatus("on")} />
+            <Button label={t("app.accountSecurity.codesUnderstood")} onPress={() => setStatus("on")} />
           </View>
         </Card>
       ) : null}
@@ -316,18 +313,18 @@ export default function SecurityScreen() {
         <>
           <Card>
             <Text style={styles.body}>
-              الحالة الحالية: <Text style={styles.bodyOn}>مفعّلة</Text>
+              {t("mobile.settings.currentStatus")} <Text style={styles.bodyOn}>{t("app.accountSecurity.statusOn")}</Text>
             </Text>
             <View style={styles.stack}>
-              <Text style={styles.bodyStrong}>تجديد الرموز الاحتياطية</Text>
+              <Text style={styles.bodyStrong}>{t("app.accountSecurity.regenerateHeading")}</Text>
               <Field
-                label="كلمة المرور الحالية"
+                label={t("app.accountSecurity.currentPasswordPlaceholder")}
                 value={password}
                 onChangeText={setPassword}
                 secure
               />
               <Field
-                label="رمز التطبيق (6 أرقام)"
+                label={t("app.accountSecurity.codePlaceholder")}
                 value={code}
                 onChangeText={setCode}
                 placeholder="123456"
@@ -335,7 +332,7 @@ export default function SecurityScreen() {
                 keyboardType="number-pad"
               />
               <Button
-                label="تجديد الرموز"
+                label={t("app.accountSecurity.regenerate")}
                 onPress={() => regenerate.mutate()}
                 disabled={!password || code.length !== 6}
                 loading={regenerate.isPending}
@@ -344,13 +341,13 @@ export default function SecurityScreen() {
           </Card>
 
           <Card>
-            <Text style={styles.dangerTitle}>تعطيل المصادقة الثنائية</Text>
+            <Text style={styles.dangerTitle}>{t("app.accountSecurity.disableHeading")}</Text>
             <Text style={styles.hint}>
-              يضعف حماية حسابك. لا تفعل ذلك إلا إذا كنت متأكداً.
+              {t("app.accountSecurity.disableHint")}
             </Text>
             <View style={styles.stack}>
               <Button
-                label="تعطيل (يستخدم نفس كلمة المرور + الرمز أعلاه)"
+                label={t("app.accountSecurity.disableButton")}
                 variant="outline"
                 onPress={() => disable.mutate()}
                 disabled={!password || code.length !== 6}
@@ -364,10 +361,9 @@ export default function SecurityScreen() {
       {status === "on" || status === "off" ? (
         <>
           <Card style={styles.dangerCard}>
-            <Text style={styles.dangerTitle}>حذف المتجر نهائياً</Text>
+            <Text style={styles.dangerTitle}>{t("app.accountSecurity.delete.title")}</Text>
             <Text style={styles.hint}>
-              يحذف كل البيانات (المنتجات، المبيعات، الموظفين، السجلات) بعد فترة
-              سماح ٣٠ يوماً. يمكنك التراجع خلالها.
+              {t("app.accountSecurity.delete.intro")}
             </Text>
             {scheduledAt ? (
               <View style={styles.stack}>
@@ -376,7 +372,7 @@ export default function SecurityScreen() {
                   <Text style={styles.mono}>{scheduledAt.slice(0, 10)}</Text>
                 </Text>
                 <Button
-                  label="إلغاء الحذف"
+                  label={t("app.accountSecurity.delete.cancelButton")}
                   variant="outline"
                   onPress={() => cancelDelete.mutate()}
                   loading={cancelDelete.isPending}
@@ -385,10 +381,10 @@ export default function SecurityScreen() {
             ) : (
               <View style={styles.stack}>
                 <Text style={styles.hint}>
-                  للتأكيد، اكتب اسم المتجر (slug) كما يظهر في عنوان تسجيل الدخول:
+                  {t("app.accountSecurity.delete.confirmHint")}
                 </Text>
                 <Field
-                  label="اسم المتجر"
+                  label={t("auth.signup.storeNameLabel")}
                   value={slug}
                   onChangeText={setSlug}
                   placeholder="my-store"
@@ -396,7 +392,7 @@ export default function SecurityScreen() {
                   autoCorrect={false}
                 />
                 <Button
-                  label="بدء عملية الحذف (٣٠ يوماً)"
+                  label={t("app.accountSecurity.delete.startButton")}
                   variant="outline"
                   onPress={() => scheduleDelete.mutate()}
                   disabled={!slug.trim()}
@@ -407,26 +403,24 @@ export default function SecurityScreen() {
           </Card>
 
           <Card>
-            <Text style={styles.bodyStrong}>تنزيل نسخة من بيانات متجرك</Text>
+            <Text style={styles.bodyStrong}>{t("app.accountSecurity.export.title")}</Text>
             <Text style={styles.hint}>
-              ملف JSON يحتوي كل الجداول التابعة لهذا المتجر (المنتجات، المبيعات،
-              الموظفين، السجلات…). يتم تحميله مباشرة على جهازك.
+              {t("app.accountSecurity.export.intro")}
             </Text>
             <View style={styles.stack}>
-              <Button label="تنزيل البيانات" variant="outline" disabled onPress={() => {}} />
-              <Text style={styles.hint}>التنزيل متاح من نسخة الويب حالياً.</Text>
+              <Button label={t("app.accountSecurity.export.button")} variant="outline" disabled onPress={() => {}} />
+              <Text style={styles.hint}>{t("mobile.common.webOnly")}</Text>
             </View>
           </Card>
 
           <Card>
-            <Text style={styles.bodyStrong}>تسجيل خروج من جميع الأجهزة</Text>
+            <Text style={styles.bodyStrong}>{t("app.accountSecurity.revoke.title")}</Text>
             <Text style={styles.hint}>
-              ينهي كل جلسات هذا الحساب فوراً، بما في ذلك الجلسة الحالية. مفيد إذا
-              فقدت جهازاً أو شككت في تسريب حسابك.
+              {t("app.accountSecurity.revoke.intro")}
             </Text>
             <View style={styles.stack}>
               <Button
-                label="تسجيل الخروج من كل مكان"
+                label={t("app.accountSecurity.revoke.button")}
                 variant="outline"
                 onPress={() => revokeAll.mutate()}
                 loading={revokeAll.isPending}

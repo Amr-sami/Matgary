@@ -14,7 +14,7 @@ import { At, CaretRight, MapPin, Phone, Receipt, Truck, Wallet } from "phosphor-
 import { ApiError, catalog, type Expense, type PurchaseOrder, type Supplier } from "@matgary/api-client";
 
 import { api } from "@/api/client";
-import { isRTL } from "@/i18n";
+import { isRTL, t } from "@/i18n";
 import { Screen } from "@/components/layout/Screen";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -44,10 +44,10 @@ const STATUS: Record<
 > = {
   // The capture shows مسودة in orange, تم الاستلام green, ملغي grey — the web's
   // STATUS_STYLES, not the purchases-list mapping (which greys out مسودة).
-  draft: { label: "مسودة", variant: "lowstock" },
-  ordered: { label: "تم الطلب", variant: "accent" },
-  received: { label: "تم الاستلام", variant: "success" },
-  cancelled: { label: "ملغي", variant: "neutral" },
+  draft: { label: t("app.purchasesStatus.draft"), variant: "lowstock" },
+  ordered: { label: t("mobile.purchases.ordered"), variant: "accent" },
+  received: { label: t("app.purchasesStatus.received"), variant: "success" },
+  cancelled: { label: t("app.purchasesStatus.cancelled"), variant: "neutral" },
 };
 
 export default function SupplierDetailScreen() {
@@ -147,12 +147,12 @@ export default function SupplierDetailScreen() {
       <View style={styles.crumb}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="العودة لقائمة الموردين"
+          accessibilityLabel={t("app.suppliers.detail.backToList")}
           hitSlop={8}
           style={styles.crumbLink}
           onPress={() => router.navigate("/suppliers")}
         >
-          <Text style={styles.crumbText}>الموردين</Text>
+          <Text style={styles.crumbText}>{t("app.suppliers.title")}</Text>
         </Pressable>
         <CaretRight size={14} color={colors.textSecondary} />
         <Text numberOfLines={1} style={styles.crumbCurrent}>
@@ -164,14 +164,14 @@ export default function SupplierDetailScreen() {
         <ActivityIndicator color={colors.accent} />
       ) : !supplier ? (
         <Card>
-          <Text style={styles.notFound}>المورد غير موجود.</Text>
+          <Text style={styles.notFound}>{t("app.suppliers.detail.notFound")}</Text>
           <Pressable
             accessibilityRole="button"
             hitSlop={8}
             style={styles.backLink}
             onPress={() => router.navigate("/suppliers")}
           >
-            <Text style={styles.backLinkText}>العودة لقائمة الموردين</Text>
+            <Text style={styles.backLinkText}>{t("app.suppliers.detail.backToList")}</Text>
           </Pressable>
         </Card>
       ) : (
@@ -209,7 +209,7 @@ export default function SupplierDetailScreen() {
             </View>
             {canManage ? (
               <Button
-                label="تعديل"
+                label={t("app.common.edit")}
                 variant="outline"
                 style={styles.editButton}
                 onPress={() => setEditOpen(true)}
@@ -218,16 +218,16 @@ export default function SupplierDetailScreen() {
           </Card>
 
           <Figure
-            label="المستحق الحالي"
+            label={t("app.suppliers.detail.stats.balance")}
             value={money(supplier.balance)}
             tone={supplier.balance > 0 ? "danger" : "default"}
           />
-          <Figure label="إجمالي المشتريات" value={money(totalReceived)} />
-          <Figure label="إجمالي المدفوعات" value={money(totalPaid)} tone="success" />
+          <Figure label={t("app.purchases.kpi.totalPurchases")} value={money(totalReceived)} />
+          <Figure label={t("app.suppliers.detail.stats.totalPayments")} value={money(totalPaid)} tone="success" />
 
           {supplier.notes ? (
             <Card>
-              <Text style={styles.figureLabel}>ملاحظات</Text>
+              <Text style={styles.figureLabel}>{t("app.common.notes")}</Text>
               <Text style={styles.notes}>{supplier.notes}</Text>
             </Card>
           ) : null}
@@ -235,12 +235,12 @@ export default function SupplierDetailScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHead}>
               <Receipt size={20} color={colors.text} />
-              <Text style={styles.sectionTitle}>أوامر الشراء</Text>
+              <Text style={styles.sectionTitle}>{t("app.suppliers.detail.purchaseOrders")}</Text>
             </View>
             {ordersQ.isLoading ? (
               <ActivityIndicator color={colors.accent} />
             ) : orders.length === 0 ? (
-              <Text style={styles.sectionEmpty}>لا توجد أوامر شراء لهذا المورد.</Text>
+              <Text style={styles.sectionEmpty}>{t("app.suppliers.detail.purchaseOrdersEmpty")}</Text>
             ) : (
               <View style={styles.rows}>
                 {orders.slice(0, 10).map((o, index) => {
@@ -275,14 +275,13 @@ export default function SupplierDetailScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHead}>
               <Wallet size={20} color={colors.text} />
-              <Text style={styles.sectionTitle}>المدفوعات</Text>
+              <Text style={styles.sectionTitle}>{t("app.suppliers.detail.payments")}</Text>
             </View>
             {expensesQ.isLoading ? (
               <ActivityIndicator color={colors.accent} />
             ) : payments.length === 0 ? (
               <Text style={styles.sectionEmpty}>
-                لا توجد مدفوعات مسجلة. يمكنك إضافة دفعة من صفحة المصاريف بتصنيف
-                «مورد».
+                {t("app.suppliers.detail.paymentsEmpty")}
               </Text>
             ) : (
               <View style={styles.rows}>
@@ -379,7 +378,7 @@ function EditSupplierModal({
 
   const submit = async () => {
     if (!name.trim()) {
-      setError("اسم المورد مطلوب");
+      setError(t("mobile.suppliers.nameRequired"));
       return;
     }
     setBusy(true);
@@ -397,7 +396,7 @@ function EditSupplierModal({
       });
       onSaved();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "تعذّر حفظ التعديلات");
+      setError(e instanceof ApiError ? e.message : t("mobile.suppliers.saveFailed"));
     } finally {
       setBusy(false);
     }
@@ -416,26 +415,26 @@ function EditSupplierModal({
             contentContainerStyle={styles.modalContent}
             keyboardShouldPersistTaps="handled"
           >
-            <Text style={styles.modalTitle}>تعديل المورد</Text>
-            <Field label="اسم المورد" value={name} onChangeText={setName} />
+            <Text style={styles.modalTitle}>{t("mobile.suppliers.edit")}</Text>
+            <Field label={t("app.inventory.bulkActions.supplierPlaceholder")} value={name} onChangeText={setName} />
             <Field
-              label="رقم الهاتف"
+              label={t("app.suppliers.form.phone")}
               value={phone}
               onChangeText={setPhone}
               keyboardType="phone-pad"
             />
             <Field
-              label="البريد الإلكتروني"
+              label={t("auth.forgot.emailLabel")}
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
             />
-            <Field label="العنوان" value={address} onChangeText={setAddress} />
-            <Field label="ملاحظات" value={notes} onChangeText={setNotes} multiline />
+            <Field label={t("app.suppliers.form.address")} value={address} onChangeText={setAddress} />
+            <Field label={t("app.common.notes")} value={notes} onChangeText={setNotes} multiline />
             {error ? <Text style={styles.modalError}>{error}</Text> : null}
-            <Button label="حفظ" onPress={() => void submit()} loading={busy} />
-            <Button label="إلغاء" variant="ghost" onPress={onClose} disabled={busy} />
+            <Button label={t("app.common.save")} onPress={() => void submit()} loading={busy} />
+            <Button label={t("app.common.cancel")} variant="ghost" onPress={onClose} disabled={busy} />
           </ScrollView>
         </View>
       </View>

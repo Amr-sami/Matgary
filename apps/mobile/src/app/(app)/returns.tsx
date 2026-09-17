@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, catalog } from "@matgary/api-client";
 
 import { api } from "@/api/client";
-import { isRTL } from "@/i18n";
+import { isRTL, t } from "@/i18n";
 import { Screen } from "@/components/layout/Screen";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -47,7 +47,7 @@ export default function ReturnsScreen() {
       void qc.invalidateQueries({ queryKey: ["products"] });
       void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
-    onError: (e) => setError(e instanceof ApiError && e.kind === "offline" ? "تعذّر الاتصال بالخادم" : "تعذّر تسجيل المرتجع"),
+    onError: (e) => setError(e instanceof ApiError && e.kind === "offline" ? t("mobile.common.offline") : t("mobile.returns.saveFailed")),
   });
 
   const n = Number(qty);
@@ -58,12 +58,12 @@ export default function ReturnsScreen() {
 
   return (
     <Screen
-      title="المرتجعات"
-      subtitle={rows.length ? `${rows.length} مرتجع · ${money(total)}` : undefined}
+      title={t("app.returns.title")}
+      subtitle={rows.length ? t("mobile.returns.summary", { n: rows.length, total: money(total) }) : undefined}
       onRefresh={() => void q.refetch()}
       refreshing={q.isRefetching}
     >
-      <Button label="تسجيل مرتجع" onPress={() => setOpen(true)} />
+      <Button label={t("app.sales.returnModal.title")} onPress={() => setOpen(true)} />
 
       {/* HANDOFF item 8: on the web a return is taken from /sales, not here.
           Doc 04 wanted this screen scan-first; until the scanner lands, the
@@ -71,10 +71,10 @@ export default function ReturnsScreen() {
       <Modal visible={open} animationType="slide" onRequestClose={() => setOpen(false)}>
         <View style={[styles.modal, directionStyle(isRTL())]}>
           <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
-            <Text style={styles.modalTitle}>تسجيل مرتجع</Text>
+            <Text style={styles.modalTitle}>{t("app.sales.returnModal.title")}</Text>
             {!line ? (
               <>
-                <Text style={styles.meta}>اختر البند من آخر المبيعات:</Text>
+                <Text style={styles.meta}>{t("mobile.returns.pickLine")}</Text>
                 {(sales.data ?? []).slice(0, 30).map((l) => (
                   <Pressable key={l.id} style={styles.pick} onPress={() => { setLine(l); setQty("1"); }}>
                     <Text numberOfLines={1} style={styles.pickName}>{l.productName}</Text>
@@ -84,16 +84,16 @@ export default function ReturnsScreen() {
               </>
             ) : (
               <>
-                <Pressable onPress={() => setLine(null)}><Text style={styles.link}>‹ تغيير البند</Text></Pressable>
+                <Pressable onPress={() => setLine(null)}><Text style={styles.link}>{t("mobile.returns.changeLine")}</Text></Pressable>
                 <Text style={styles.pickName}>{line.productName}</Text>
                 <Text style={styles.meta}>الحد الأقصى: {line.quantitySold}</Text>
-                <Field label="الكمية المرتجعة" value={qty} onChangeText={setQty} keyboardType="number-pad" />
-                <Field label="السبب" value={reason} onChangeText={setReason} placeholder="مثال: عيب في المنتج" />
+                <Field label={t("app.sales.returnModal.quantity")} value={qty} onChangeText={setQty} keyboardType="number-pad" />
+                <Field label={t("mobile.common.reason")} value={reason} onChangeText={setReason} placeholder={t("mobile.returns.reasonExample")} />
                 {error ? <Text style={styles.err}>{error}</Text> : null}
-                <Button label="تسجيل المرتجع" disabled={!canSubmit} loading={create.isPending} onPress={() => create.mutate()} />
+                <Button label={t("mobile.returns.submit")} disabled={!canSubmit} loading={create.isPending} onPress={() => create.mutate()} />
               </>
             )}
-            <Button label="إلغاء" variant="ghost" onPress={() => { setOpen(false); setLine(null); }} />
+            <Button label={t("app.common.cancel")} variant="ghost" onPress={() => { setOpen(false); setLine(null); }} />
           </ScrollView>
         </View>
       </Modal>
@@ -102,8 +102,8 @@ export default function ReturnsScreen() {
         <ActivityIndicator color={colors.accent} />
       ) : rows.length === 0 ? (
         <EmptyState
-          title="لا توجد مرتجعات"
-          hint="المرتجع يُسجَّل من فاتورة البيع في شاشة المبيعات."
+          title={t("mobile.returns.empty")}
+          hint={t("mobile.returns.emptyHint")}
         />
       ) : (
         <View style={styles.list}>
@@ -111,12 +111,12 @@ export default function ReturnsScreen() {
             <View key={r.id ?? String(i)} style={styles.row}>
               <View style={styles.head}>
                 <Text numberOfLines={1} style={styles.name}>
-                  {r.productName ?? r.invoiceId ?? "مرتجع"}
+                  {r.productName ?? r.invoiceId ?? t("app.reports.returnsSubtitle")}
                 </Text>
                 <Text style={styles.amount}>{money(r.amount ?? 0)}</Text>
               </View>
               <Text style={styles.meta}>
-                {r.quantity ? `${r.quantity} قطعة · ` : ""}
+                {r.quantity ? `${t("mobile.returns.qtySuffix", { n: r.quantity })} ` : ""}
                 {shortDate(r.returnDate)}
               </Text>
               {r.reason ? (

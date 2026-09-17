@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { money, shortDate } from "@/lib/format";
 import { RTL_TEXT } from "@/theme/rtl";
 import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
+import { t } from "@/i18n";
 
 /**
  * Port of app__customers.png.
@@ -34,15 +35,15 @@ export default function CustomersScreen() {
 
   return (
     <Screen
-      title="العملاء"
-      subtitle={rows.length ? `${rows.length} عميل · مستحق ${money(owed)}` : undefined}
+      title={t("app.customers.title")}
+      subtitle={rows.length ? t("mobile.customers.summary", { n: rows.length, owed: money(owed) }) : undefined}
       onRefresh={() => void q.refetch()}
       refreshing={q.isRefetching}
     >
       {q.isLoading ? (
         <ActivityIndicator color={colors.accent} />
       ) : rows.length === 0 ? (
-        <EmptyState title="لا يوجد عملاء" hint="يظهر العملاء هنا بعد أول عملية بيع باسم عميل." />
+        <EmptyState title={t("mobile.customers.empty")} hint={t("mobile.customers.emptyHint")} />
       ) : (
         <View style={styles.list}>
           {rows.map((c) => (
@@ -52,7 +53,7 @@ export default function CustomersScreen() {
             <Pressable
               key={c.phone}
               accessibilityRole="button"
-              accessibilityLabel={`ملف العميل ${c.name ?? c.phone}`}
+              accessibilityLabel={t("mobile.customers.profileOf", { name: c.name ?? c.phone })}
               onPress={() =>
                 router.push(`/customers/${encodeURIComponent(c.phone)}`)
               }
@@ -63,7 +64,7 @@ export default function CustomersScreen() {
                   {c.name ?? c.phone}
                 </Text>
                 {c.outstanding > 0 ? (
-                  <Badge label={`عليه ${money(c.outstanding)}`} variant="outofstock" />
+                  <Badge label={t("mobile.customers.owes", { amount: money(c.outstanding) })} variant="outofstock" />
                 ) : null}
               </View>
               <Text style={styles.meta}>

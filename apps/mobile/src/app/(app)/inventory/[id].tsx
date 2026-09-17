@@ -13,6 +13,7 @@ import { StatCard } from "@/components/ui/StatCard";
 import { money, shortDate } from "@/lib/format";
 import { RTL_TEXT } from "@/theme/rtl";
 import { colors, fonts, radius, spacing } from "@/theme/tokens";
+import { t } from "@/i18n";
 
 /**
  * Product detail (/inventory/<id>).
@@ -94,12 +95,12 @@ export default function ProductDetailScreen() {
       <View style={styles.crumb}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="العودة للمخزن"
+          accessibilityLabel={t("mobile.inventory.backToList")}
           hitSlop={8}
           style={styles.crumbLink}
           onPress={() => router.navigate("/inventory")}
         >
-          <Text style={styles.crumbText}>المخزن</Text>
+          <Text style={styles.crumbText}>{t("app.inventory.title")}</Text>
         </Pressable>
         <CaretRight size={14} color={colors.textSecondary} />
         <Text numberOfLines={1} style={styles.crumbCurrent}>
@@ -111,14 +112,14 @@ export default function ProductDetailScreen() {
         <ActivityIndicator color={colors.accent} />
       ) : !product ? (
         <Card>
-          <Text style={styles.notFound}>المنتج غير موجود.</Text>
+          <Text style={styles.notFound}>{t("mobile.product.notFound")}</Text>
           <Pressable
             accessibilityRole="button"
             hitSlop={8}
             style={styles.backLink}
             onPress={() => router.navigate("/inventory")}
           >
-            <Text style={styles.backLinkText}>العودة للمخزن</Text>
+            <Text style={styles.backLinkText}>{t("mobile.inventory.backToList")}</Text>
           </Pressable>
         </Card>
       ) : (
@@ -136,16 +137,16 @@ export default function ProductDetailScreen() {
             <View style={styles.badgeRow}>
               {categoryLabel ? <Badge label={categoryLabel} variant="accent" /> : null}
               <Badge
-                label={out ? "نفذ" : `${product.quantity} قطعة`}
+                label={out ? t("app.dashboard.lowStock.outOfStock") : t("mobile.common.pieces", { n: product.quantity })}
                 variant={out ? "outofstock" : low ? "lowstock" : "success"}
               />
             </View>
           </Card>
 
           <View style={styles.gridRow}>
-            <StatCard title="سعر البيع" value={money(product.price)} icon={Tag} color="accent" />
+            <StatCard title={t("app.inventory.addProduct.step3.fields.price")} value={money(product.price)} icon={Tag} color="accent" />
             <StatCard
-              title="سعر الشراء"
+              title={t("app.activityLabels.fieldNames.costPrice")}
               value={money(product.costPrice)}
               icon={Coins}
               color="accent"
@@ -153,39 +154,39 @@ export default function ProductDetailScreen() {
           </View>
           <View style={styles.gridRow}>
             <StatCard
-              title="الكمية"
+              title={t("app.common.quantity")}
               value={String(product.quantity)}
               icon={Package}
               color={out || low ? "danger" : "accent"}
             />
             <StatCard
-              title="قيمة المخزن"
+              title={t("app.inventory.summary.stockValue")}
               value={money(product.costPrice * product.quantity)}
               icon={Wallet}
               color="accent"
             />
           </View>
 
-          <Card title="تفاصيل المنتج">
+          <Card title={t("app.inventory.addProduct.step3.heading")}>
             <View style={styles.details}>
               <Detail
-                label="هامش الربح"
-                value={`${money(margin)} · هامش ${marginPct}%`}
+                label={t("app.inventory.table.col.margin")}
+                value={t("mobile.product.margin", { amount: money(margin), pct: marginPct })}
                 tone={margin > 0 ? "success" : margin < 0 ? "danger" : "default"}
               />
               <Detail
-                label="حد التنبيه عند انخفاض الكمية"
+                label={t("app.inventory.editForm.fields.lowStockThreshold")}
                 value={String(product.lowStockThreshold)}
               />
-              <Detail label="القسم" value={categoryLabel || "غير مصنّف"} />
-              <Detail label="الماركة" value={product.brand || "—"} />
-              <Detail label="المورد" value={supplierName || "—"} />
+              <Detail label={t("app.common.category")} value={categoryLabel || t("app.catalog.uncategorized")} />
+              <Detail label={t("app.inventory.editForm.fields.brand")} value={product.brand || "—"} />
+              <Detail label={t("app.suppliers.detail.title")} value={supplierName || "—"} />
               <Detail
-                label="كود المنتج / الباركود"
+                label={t("app.inventory.editForm.fields.sku")}
                 value={product.sku || product.barcode || "—"}
                 icon={<Barcode size={14} color={colors.textSecondary} />}
               />
-              <Detail label="تاريخ الإضافة" value={shortDate(product.createdAt)} />
+              <Detail label={t("mobile.common.addedOn")} value={shortDate(product.createdAt)} />
               {attributes.map(([key, value]) => (
                 <Detail key={key} label={key} value={value} />
               ))}
@@ -193,7 +194,7 @@ export default function ProductDetailScreen() {
           </Card>
 
           {product.tags.length > 0 ? (
-            <Card title="تاجات">
+            <Card title={t("mobile.common.tags")}>
               <View style={styles.tagRow}>
                 {product.tags.map((t) => (
                   <Badge key={t} label={t} variant="neutral" />

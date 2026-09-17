@@ -10,8 +10,10 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
+import { dictionaries } from "@matgary/i18n";
 import { Globe, Lightning } from "phosphor-react-native";
 
+import { getLocale, useLocale, t } from "@/i18n";
 import { api } from "@/api/client";
 import { DottedGround } from "@/components/DottedGround";
 import { Logo } from "@/components/Logo";
@@ -29,18 +31,12 @@ import { colors, fonts, radius, spacing } from "@/theme/tokens";
  *
  * Strings come from apps/web/dictionaries/ar.json (`auth.forgot.*`).
  */
-const t = {
-  title: "نسيت كلمة المرور؟",
-  subhead: "أدخل بريدك الإلكتروني وسنرسل لك رابطاً لإعادة الضبط.",
-  emailLabel: "البريد الإلكتروني",
-  emailPlaceholder: "you@example.com",
-  submit: "إرسال رابط إعادة الضبط",
-  backToLogin: "العودة لتسجيل الدخول",
-  successTitleWithEmail:
-    "إذا كان {email} مسجّلاً عندنا، ستجد رسالة بها رابط إعادة الضبط في صندوقك خلال دقائق.",
-  successNote: "الرابط صالح لمدة 30 دقيقة. تذكّر مراجعة مجلد البريد المزعج.",
-  errors: { generic: "تعذر إرسال الطلب" },
-} as const;
+/**
+ * The auth.forgot subtree, read at render time so the language switch applies.
+ * These strings byte-match the web's dictionary; a module-scope copy would
+ * have frozen the locale at first load.
+ */
+const T = () => dictionaries[getLocale()].auth.forgot;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -85,7 +81,7 @@ export default function ForgotPasswordScreen() {
       // whose body carries an English zod message. Neither is worth showing
       // raw on an Arabic-first screen, so both land on the dictionary's
       // generic string.
-      setError(t.errors.generic);
+      setError(T().errors.generic);
     } finally {
       setBusy(false);
     }
@@ -94,7 +90,7 @@ export default function ForgotPasswordScreen() {
   // The email is spliced into the success line as its own run so it stays LTR
   // inside an Arabic paragraph — otherwise the address reorders and reads back
   // wrong, which is exactly the thing the user is checking it for.
-  const [successBefore, successAfter] = t.successTitleWithEmail.split("{email}");
+  const [successBefore, successAfter] = T().successTitleWithEmail.split("{email}");
 
   return (
     <View style={styles.root}>
@@ -117,12 +113,12 @@ export default function ForgotPasswordScreen() {
             <Pressable style={styles.demoPill} accessibilityRole="button">
               <Lightning size={16} color="#FFFFFF" weight="fill" />
               <Text numberOfLines={1} style={styles.demoPillText}>
-                تصفح المتجر التجريبي
+                {t("auth.demo.cta")}
               </Text>
             </Pressable>
-            <Pressable style={styles.langToggle} accessibilityRole="button">
+            <Pressable style={styles.langToggle} accessibilityRole="button" onPress={() => void useLocale.getState().setLocale(getLocale() === "ar" ? "en" : "ar")}>
               <Globe size={20} color={colors.textSecondary} />
-              <Text style={styles.langText}>ع</Text>
+              <Text style={styles.langText}>{getLocale() === "ar" ? "ع" : "EN"}</Text>
             </Pressable>
           </View>
 
@@ -131,8 +127,8 @@ export default function ForgotPasswordScreen() {
               <Logo size="md" />
             </View>
 
-            <Text style={styles.heading}>{t.title}</Text>
-            <Text style={styles.subheading}>{t.subhead}</Text>
+            <Text style={styles.heading}>{T().title}</Text>
+            <Text style={styles.subheading}>{T().subhead}</Text>
 
             {submitted ? (
               <View style={styles.form} accessibilityLiveRegion="polite">
@@ -141,14 +137,14 @@ export default function ForgotPasswordScreen() {
                   <Text style={styles.successEmail}>{submittedEmail}</Text>
                   {successAfter ?? ""}
                 </Text>
-                <Text style={styles.successNote}>{t.successNote}</Text>
-                <Button label={t.backToLogin} variant="outline" onPress={goToLogin} />
+                <Text style={styles.successNote}>{T().successNote}</Text>
+                <Button label={T().backToLogin} variant="outline" onPress={goToLogin} />
               </View>
             ) : (
               <View style={styles.form}>
                 <Field
-                  label={t.emailLabel}
-                  placeholder={t.emailPlaceholder}
+                  label={T().emailLabel}
+                  placeholder={T().emailPlaceholder}
                   value={email}
                   onChangeText={setEmail}
                   autoCapitalize="none"
@@ -166,7 +162,7 @@ export default function ForgotPasswordScreen() {
                 ) : null}
 
                 <Button
-                  label={t.submit}
+                  label={T().submit}
                   loading={busy}
                   disabled={!canSubmit}
                   onPress={() => void onSubmit()}
@@ -177,7 +173,7 @@ export default function ForgotPasswordScreen() {
                   style={styles.back}
                   onPress={goToLogin}
                 >
-                  <Text style={styles.backText}>{t.backToLogin}</Text>
+                  <Text style={styles.backText}>{T().backToLogin}</Text>
                 </Pressable>
               </View>
             )}
