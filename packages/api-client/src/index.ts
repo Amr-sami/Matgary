@@ -19,3 +19,4 @@ export * as team from "./endpoints/team";
 export * as settings from "./endpoints/settings";
 export * as branches from "./endpoints/branches";
 export * as legal from "./endpoints/legal";
+export * as taxonomy from "./endpoints/taxonomy";
