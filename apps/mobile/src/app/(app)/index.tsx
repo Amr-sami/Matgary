@@ -22,6 +22,7 @@ import { StatCard } from "@/components/ui/StatCard";
 import { useSession } from "@/stores/session";
 import { RTL, RTL_TEXT } from "@/theme/rtl";
 import { colors, fonts, spacing } from "@/theme/tokens";
+import { t } from "@/i18n";
 
 /**
  * Port of apps/web/app/[lang]/(app)/page.tsx — the dashboard as it actually
@@ -60,28 +61,28 @@ export default function DashboardScreen() {
         }
       >
         <View style={styles.header}>
-          <Text style={styles.greeting}>أهلاً، {me?.tenant.name ?? "متجرك"}</Text>
-          <Text style={styles.sub}>نتمنى لك يوم عمل موفق</Text>
+          <Text style={styles.greeting}>{t("app.dashboard.greeting", { name: me?.tenant.name ?? "" })}</Text>
+          <Text style={styles.sub}>{t(me?.isOwner ? "app.dashboard.greetingOwner" : "app.dashboard.greetingStaff")}</Text>
         </View>
 
         {isLoading ? (
           <ActivityIndicator color={colors.accent} style={{ marginTop: spacing.xxl }} />
         ) : error ? (
           <Text style={styles.error}>
-            {error instanceof ApiError ? error.message : "تعذّر تحميل البيانات"}
+            {error instanceof ApiError ? error.message : t("app.activity.errors.loadFailed")}
           </Text>
         ) : data ? (
           <>
             <View style={styles.grid}>
               <View style={styles.gridRow}>
                 <StatCard
-                  title="مبيعات اليوم"
+                  title={t("app.dashboard.stats.todaySales")}
                   value={money(data.stats.todayRevenue)}
                   icon={CurrencyDollar}
                   color="success"
                 />
                 <StatCard
-                  title="عدد الأصناف"
+                  title={t("app.dashboard.stats.itemCount")}
                   value={String(data.stats.productCount)}
                   icon={Package}
                   color="accent"
@@ -89,13 +90,13 @@ export default function DashboardScreen() {
               </View>
               <View style={styles.gridRow}>
                 <StatCard
-                  title="مبيعات الشهر"
+                  title={t("app.dashboard.stats.monthSales")}
                   value={money(data.stats.monthRevenue)}
                   icon={ShoppingCart}
                   color="accent"
                 />
                 <StatCard
-                  title="مرتجعات الشهر"
+                  title={t("app.dashboard.stats.monthReturns")}
                   value={String(data.stats.monthReturns)}
                   icon={ArrowCounterClockwise}
                   color="danger"

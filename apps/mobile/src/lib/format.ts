@@ -6,9 +6,16 @@
  * the web produced for the same tenant. These are plain string ops on purpose.
  */
 
-/** 277575 -> "277,575 ج.م". Latin digits, matching the web's screenshots. */
+import { LOCALE } from "@/i18n";
+
+/**
+ * 277575 -> "277,575 ج.م" in Arabic, "EGP 277,575" in English — the same two
+ * shapes the web's formatCurrency produces (currencyDisplay: "code" for en).
+ * Latin digits in both, matching the web's NUM_FORCE_LATIN.
+ */
 export function money(value: number): string {
-  return `${groupDigits(Math.round(value))} ج.م`;
+  const n = groupDigits(Math.round(value));
+  return LOCALE === "en" ? `EGP ${n}` : `${n} ج.م`;
 }
 
 export function groupDigits(value: number): string {

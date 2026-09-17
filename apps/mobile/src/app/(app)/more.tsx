@@ -18,6 +18,7 @@ import { Card } from "@/components/ui/Card";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
 import { colors, fonts, spacing } from "@/theme/tokens";
+import { t } from "@/i18n";
 
 /**
  * Port of states/more-sheet.png — the secondary destinations the six-tab bar
@@ -29,14 +30,14 @@ import { colors, fonts, spacing } from "@/theme/tokens";
  * can only request leave still reaches it.
  */
 const ITEMS = [
-  { route: "/tasks", label: "المهام", icon: ListChecks, requires: "view_dashboard" },
-  { route: "/customers", label: "العملاء", icon: Users, requires: "view_customers" },
-  { route: "/expenses", label: "المصاريف", icon: Wallet, requires: "view_expenses" },
-  { route: "/suppliers", label: "الموردون", icon: Truck, requires: "view_suppliers" },
-  { route: "/returns", label: "المرتجعات", icon: ArrowCounterClockwise, requires: "view_returns" },
-  { route: "/team", label: "الفريق", icon: UsersThree, requires: "manage_team" },
-  { route: "/settings", label: "الإعدادات", icon: Gear, requires: "view_settings" },
-  { route: "/billing", label: "الاشتراك", icon: CreditCard, requires: null },
+  { route: "/tasks", label: t("app.shell.secondary.tasks"), icon: ListChecks, requires: "view_dashboard" },
+  { route: "/customers", label: t("app.shell.secondary.customers"), icon: Users, requires: "view_customers" },
+  { route: "/expenses", label: t("app.shell.secondary.expenses"), icon: Wallet, requires: "view_expenses" },
+  { route: "/suppliers", label: t("app.shell.secondary.suppliers"), icon: Truck, requires: "view_suppliers" },
+  { route: "/returns", label: t("app.shell.secondary.returns"), icon: ArrowCounterClockwise, requires: "view_returns" },
+  { route: "/team", label: t("app.shell.secondary.team"), icon: UsersThree, requires: "manage_team" },
+  { route: "/settings", label: t("app.shell.secondary.settings"), icon: Gear, requires: "view_settings" },
+  { route: "/billing", label: t("app.billing.title"), icon: CreditCard, requires: null },
 ] as const;
 
 const TEAM_ANY = ["manage_team", "request_leave", "manage_leave"];
@@ -56,7 +57,7 @@ export default function MoreScreen() {
   });
 
   return (
-    <Screen title="المزيد">
+    <Screen title={t("app.shell.more")}>
       <Card>
         <Text style={styles.account}>{me?.user.name ?? me?.user.email}</Text>
         <Text style={styles.accountMeta}>
@@ -89,7 +90,7 @@ export default function MoreScreen() {
         onPress={() => void signOut()}
       >
         <SignOut size={22} color={colors.danger} />
-        <Text style={[styles.rowLabel, styles.signOutLabel]}>تسجيل الخروج</Text>
+        <Text style={[styles.rowLabel, styles.signOutLabel]}>{t("app.shell.userMenu.signOut")}</Text>
       </Pressable>
     </Screen>
   );

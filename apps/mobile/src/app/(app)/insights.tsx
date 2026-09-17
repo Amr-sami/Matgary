@@ -39,6 +39,41 @@ const RANGES: { key: Range; label: string }[] = [
 ];
 
 /**
+ * Port of the preset → window logic in apps/web/app/insights/page.tsx, so the
+ * phone and the desktop show the same figures for "آخر 7 أيام". The API needs
+ * both bounds together and as ISO strings with an offset; "الكل" sends neither.
+ */
+function rangeWindow(key: Range): { from: string; to: string } | null {
+  if (key === "all") return null;
+  const now = new Date();
+  const startOfDay = (d: Date) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+  const endOfDay = (d: Date) => { const x = new Date(d); x.setHours(23, 59, 59, 999); return x; };
+  let from: Date;
+  let to: Date = endOfDay(now);
+  switch (key) {
+    case "today":
+      from = startOfDay(now);
+      break;
+    case "yesterday": {
+      const y = new Date(now); y.setDate(y.getDate() - 1);
+      from = startOfDay(y); to = endOfDay(y);
+      break;
+    }
+    case "7d": {
+      const f = new Date(now); f.setDate(f.getDate() - 6);
+      from = startOfDay(f);
+      break;
+    }
+    case "30d": {
+      const f = new Date(now); f.setDate(f.getDate() - 29);
+      from = startOfDay(f);
+      break;
+    }
+  }
+  return { from: from.toISOString(), to: to.toISOString() };
+}
+
+/**
  * Port of app__insights.png (the نظرة عامة tab).
  *
  * The KPI grid is `grid-cols-2` on phones, not `sm:grid-cols-2` — Tailwind's
@@ -50,9 +85,16 @@ export default function InsightsScreen() {
   const [tab, setTab] = useState<"overview" | "deep" | "staff">("overview");
   const [range, setRange] = useState<Range>("all");
 
+  // The range is part of the KEY, not just the params: a chip tap must
+  // refetch, not serve the previous range's numbers from cache. The first
+  // build set `range` state and never read it — the chips did nothing.
+  const window = rangeWindow(range);
   const overview = useQuery({
-    queryKey: ["insights-overview"],
-    queryFn: () => api.request<Overview>("/api/insights/overview"),
+    queryKey: ["insights-overview", range],
+    queryFn: () =>
+      api.request<Overview>("/api/insights/overview", {
+        query: window ? { from: window.from, to: window.to } : undefined,
+      }),
   });
 
   const m = overview.data?.metrics;
@@ -142,7 +184,7 @@ export default function InsightsScreen() {
           </View>
 
           {trendStats ? (
-            <Card title="اتجاه المبيعات (آخر 30 يوم)">
+            <Card title={`اتجاه المبيعات (${RANGES.find((r) => r.key === range)?.label ?? ""})`}>
               <View style={styles.trendStats}>
                 <TrendStat label="الإجمالي" value={money(trendStats.total)} />
                 <TrendStat label="المتوسط" value={money(trendStats.avg)} />

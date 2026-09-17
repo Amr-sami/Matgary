@@ -13,6 +13,7 @@ import {
 
 import { useSession } from "@/stores/session";
 import { colors, fonts, spacing } from "@/theme/tokens";
+import { t } from "@/i18n";
 
 /**
  * Port of apps/web/components/layout/MobileBottomNav.tsx.
@@ -35,13 +36,13 @@ interface NavItem {
 }
 
 const ITEMS: NavItem[] = [
-  { route: "index", label: "لوحة", icon: GridFour, requires: "view_dashboard" },
-  { route: "inventory", label: "المخزن", icon: Package, requires: "view_inventory" },
-  { route: "sales", label: "المبيعات", icon: ShoppingCart, requires: "view_sales" },
-  { route: "add-product", label: "إضافة صنف", icon: PlusSquare, requires: "manage_inventory" },
-  { route: "purchases", label: "المشتريات", icon: Receipt, requires: "view_purchases" },
-  { route: "insights", label: "إحصائيات", icon: ChartBar, requires: "view_insights" },
-  { route: "more", label: "المزيد", icon: List, requires: null },
+  { route: "index", label: t("app.shell.primary.dashboardShort"), icon: GridFour, requires: "view_dashboard" },
+  { route: "inventory", label: t("app.shell.primary.inventory"), icon: Package, requires: "view_inventory" },
+  { route: "sales", label: t("app.shell.primary.sales"), icon: ShoppingCart, requires: "view_sales" },
+  { route: "add-product", label: t("app.shell.primary.addProduct"), icon: PlusSquare, requires: "manage_inventory" },
+  { route: "purchases", label: t("app.shell.primary.purchases"), icon: Receipt, requires: "view_purchases" },
+  { route: "insights", label: t("app.shell.primary.insights"), icon: ChartBar, requires: "view_insights" },
+  { route: "more", label: t("app.shell.more"), icon: List, requires: null },
 ];
 
 /**

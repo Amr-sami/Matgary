@@ -4,6 +4,7 @@ import { CheckCircle, Warning } from "phosphor-react-native";
 import { Badge } from "@/components/ui/Badge";
 import { RTL_TEXT } from "@/theme/rtl";
 import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
+import { t } from "@/i18n";
 import type { LowStockItem } from "@matgary/api-client";
 
 /**
@@ -17,12 +18,12 @@ import type { LowStockItem } from "@matgary/api-client";
 export function StockAlerts({ items }: { items: LowStockItem[] }) {
   return (
     <View style={styles.card}>
-      <Text style={styles.heading}>تنبيهات المخزون</Text>
+      <Text style={styles.heading}>{t("app.dashboard.lowStock.title")}</Text>
 
       {items.length === 0 ? (
         <View style={styles.allGood}>
           <CheckCircle size={20} color={colors.success} />
-          <Text style={styles.allGoodText}>كل الأصناف متوفرة</Text>
+          <Text style={styles.allGoodText}>{t("app.dashboard.lowStock.allGood")}</Text>
         </View>
       ) : (
         <View style={styles.list}>
@@ -39,7 +40,7 @@ export function StockAlerts({ items }: { items: LowStockItem[] }) {
                   </Text>
                   <View style={styles.meta}>
                     <Badge
-                      label={out ? "نفذ" : `${item.quantity} قطعة`}
+                      label={out ? t("app.dashboard.lowStock.outOfStock") : t("app.dashboard.lowStock.pieces", { n: item.quantity })}
                       variant={out ? "outofstock" : "lowstock"}
                     />
                     {item.brand ? (

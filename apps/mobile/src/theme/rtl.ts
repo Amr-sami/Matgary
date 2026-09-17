@@ -1,32 +1,25 @@
 import type { TextStyle, ViewStyle } from "react-native";
 
+import { IS_RTL } from "@/i18n";
+
 /**
- * RTL without I18nManager.
+ * Layout direction, derived from the locale read at boot (src/i18n).
  *
- * `app.config.ts` asks the expo-localization plugin for `forcesRTL`, which is
- * the right mechanism for a real build — it lands in the native config before
- * the JS bundle runs. But config plugins only apply at prebuild, and **Expo Go
- * never runs your prebuild**, so there it is inert. `I18nManager.forceRTL()` is
- * not a fallback either: Expo Go resets the flag on every load, so it never
- * survives the relaunch it needs. Measured, not assumed — the app came back LTR
- * twice.
+ * Yoga's `direction` sets layout direction for a subtree with no relaunch and
+ * behaves identically in Expo Go and a dev client — which `I18nManager` does
+ * not: Expo Go resets its flag on every load. Applied at the root, it puts
+ * stat-card icons on the left and text on the right under Arabic, and flips
+ * cleanly under English.
  *
- * Yoga's `direction` style is the way through. It sets layout direction for a
- * subtree, takes effect on the next render with no relaunch, and behaves
- * identically in Expo Go and in a dev client. Applying it at the root makes
- * every `flexDirection: "row"` below it lay out right-to-left, which is what
- * puts stat-card icons on the left and the text on the right, as the design has
- * them.
+ * `writingDirection` is the text companion: without it a Latin product name in
+ * an Arabic row aligns by its own script rather than the paragraph's.
  *
- * `writingDirection` is the text-level companion. Without it a Latin string in
- * an Arabic screen (`Persol PO3019S`) aligns left, because RN resolves
- * `textAlign: "auto"` from the string's own script rather than the paragraph's.
- * The web renders those right-aligned inside an RTL paragraph, and this matches
- * that.
+ * These are constants on purpose. Every screen spreads them into a static
+ * StyleSheet; switching locale reloads the bundle, so "static" is correct.
  */
-export const RTL: ViewStyle = { direction: "rtl" };
+export const RTL: ViewStyle = { direction: IS_RTL ? "rtl" : "ltr" };
 
 export const RTL_TEXT: TextStyle = {
-  writingDirection: "rtl",
-  textAlign: "right",
+  writingDirection: IS_RTL ? "rtl" : "ltr",
+  textAlign: IS_RTL ? "right" : "left",
 };

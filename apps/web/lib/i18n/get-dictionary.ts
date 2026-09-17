@@ -2,8 +2,8 @@ import "server-only";
 import type { Locale } from "./config";
 
 const dictionaries = {
-  ar: () => import("@/dictionaries/ar.json").then((m) => m.default),
-  en: () => import("@/dictionaries/en.json").then((m) => m.default),
+  ar: () => import("@matgary/i18n/ar").then((m) => m.default),
+  en: () => import("@matgary/i18n/en").then((m) => m.default),
 } as const;
 
 export type Dictionary = Awaited<ReturnType<(typeof dictionaries)["ar"]>>;

@@ -16,6 +16,7 @@ import { DottedGround } from "@/components/DottedGround";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
+import { LOCALE, setLocaleAndReload, t } from "@/i18n";
 import { useSession } from "@/stores/session";
 import { RTL } from "@/theme/rtl";
 import { colors, fonts, radius, spacing } from "@/theme/tokens";
@@ -93,8 +94,6 @@ export default function LoginScreen() {
           ]}
           keyboardShouldPersistTaps="handled"
         >
-          {/* TODO(phase-4): the locale toggle needs the i18n layer first — the
-              app has no English strings yet, so a PATCH alone would do nothing. */}
           <View style={styles.topBar}>
             <Pressable
               style={styles.demoPill}
@@ -104,26 +103,31 @@ export default function LoginScreen() {
             >
               <Lightning size={16} color="#FFFFFF" weight="fill" />
               <Text numberOfLines={1} style={styles.demoPillText}>
-                تصفح المتجر التجريبي
+                {t("auth.demo.cta")}
               </Text>
             </Pressable>
-            <Pressable style={styles.langToggle} accessibilityRole="button">
+            <Pressable
+              style={styles.langToggle}
+              accessibilityRole="button"
+              accessibilityLabel={LOCALE === "ar" ? "English" : "العربية"}
+              onPress={() => void setLocaleAndReload(LOCALE === "ar" ? "en" : "ar")}
+            >
               <Globe size={20} color={colors.textSecondary} />
-              <Text style={styles.langText}>ع</Text>
+              <Text style={styles.langText}>{LOCALE === "ar" ? "ع" : "EN"}</Text>
             </Pressable>
           </View>
 
           <View style={styles.brand}>
-            <Logo size="md" />
+            <Logo size="md" locale={LOCALE} />
           </View>
 
-          <Text style={styles.heading}>تسجيل الدخول</Text>
-          <Text style={styles.subheading}>أهلاً بعودتك</Text>
+          <Text style={styles.heading}>{t("auth.login.title")}</Text>
+          <Text style={styles.subheading}>{t("auth.login.subhead")}</Text>
 
           <View style={styles.form}>
             <Field
-              label="البريد أو اسم المستخدم"
-              placeholder="you@example.com  •  username@yourstore"
+              label={t("auth.login.identifierLabel")}
+              placeholder={t("auth.login.identifierPlaceholder")}
               value={identifier}
               onChangeText={setIdentifier}
               autoCapitalize="none"
@@ -136,7 +140,7 @@ export default function LoginScreen() {
             />
 
             <Field
-              label="كلمة المرور"
+              label={t("auth.login.passwordLabel")}
               value={password}
               onChangeText={setPassword}
               secure
@@ -155,7 +159,7 @@ export default function LoginScreen() {
             ) : null}
 
             <Button
-              label="تسجيل الدخول"
+              label={t("auth.login.submit")}
               loading={signingIn}
               disabled={!canSubmit}
               onPress={() => void signIn(identifier, password)}
@@ -166,15 +170,15 @@ export default function LoginScreen() {
               style={styles.forgot}
               onPress={() => router.push("/forgot-password")}
             >
-              <Text style={styles.forgotText}>نسيت كلمة المرور؟</Text>
+              <Text style={styles.forgotText}>{t("auth.login.forgot")}</Text>
             </Pressable>
           </View>
 
           <View style={styles.rule} />
 
-          <Text style={styles.noAccount}>ليس لديك حساب؟</Text>
+          <Text style={styles.noAccount}>{t("auth.login.noAccount")}</Text>
           <Button
-            label="إنشاء حساب جديد"
+            label={t("auth.login.createAccount")}
             variant="outline"
             onPress={() => router.push("/signup")}
           />
