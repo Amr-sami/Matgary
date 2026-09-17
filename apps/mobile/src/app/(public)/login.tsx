@@ -31,6 +31,9 @@ import { colors, fonts, radius, spacing } from "@/theme/tokens";
  * Every string is lifted from apps/web/dictionaries/ar.json (`auth.login.*`)
  * rather than retyped, so the two clients cannot drift apart in wording.
  */
+/** Module scope, so it survives remounts but not a reload. See the effect below. */
+let autoLoginAttempted = false;
+
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const [identifier, setIdentifier] = useState("");
@@ -51,17 +54,26 @@ export default function LoginScreen() {
   // drive the signed-in screens in CI.
   //
   // Safe by construction: __DEV__ is false in any release build, so the whole
-  // block is dead code Metro strips; the values come from .env, which is
-  // gitignored; and auto-submit is off unless explicitly switched on.
+  // block is dead code Metro strips, and the values come from .env, which is
+  // gitignored.
   useEffect(() => {
     if (!__DEV__) return;
     const devUser = process.env.EXPO_PUBLIC_DEV_IDENTIFIER;
     const devPass = process.env.EXPO_PUBLIC_DEV_PASSWORD;
     if (!devUser || !devPass) return;
 
+    // Prefill is harmless on every mount — it only fills the fields.
     setIdentifier(devUser);
     setPassword(devPass);
-    if (process.env.EXPO_PUBLIC_DEV_AUTOLOGIN === "1") {
+
+    // Auto-submit is NOT. This screen mounts again the instant a user signs
+    // out, so submitting on every mount makes signing out impossible: the
+    // session is cleared, the login screen appears, and this effect logs
+    // straight back in. Auto-login is a LAUNCH convenience, so it fires at most
+    // once per JS runtime. A reload or a fresh launch resets the module and
+    // gives it back; an explicit sign-out does not.
+    if (process.env.EXPO_PUBLIC_DEV_AUTOLOGIN === "1" && !autoLoginAttempted) {
+      autoLoginAttempted = true;
       void signIn(devUser, devPass);
     }
   }, [signIn]);
