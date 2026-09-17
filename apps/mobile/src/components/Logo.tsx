@@ -1,5 +1,5 @@
 import { Image, StyleSheet, View } from "react-native";
-import { t } from "@/i18n";
+import { t, useLocale } from "@/i18n";
 
 /**
  * Port of apps/web/components/brand/Logo.tsx.
@@ -21,10 +21,13 @@ const BOX = {
 
 interface LogoProps {
   size?: keyof typeof BOX;
+  /** Defaults to the live locale; pass one only to pin a wordmark. */
   locale?: "ar" | "en";
 }
 
-export function Logo({ size = "md", locale = "ar" }: LogoProps) {
+export function Logo({ size = "md", locale: pinned }: LogoProps) {
+  const live = useLocale((s) => s.locale);
+  const locale = pinned ?? live;
   return (
     <View style={[styles.wrap, BOX[size]]}>
       <Image
