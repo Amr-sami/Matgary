@@ -19,7 +19,9 @@ const schema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const r = await requireTenant();
+  // A bearer with the must-change-password claim is otherwise 403 everywhere;
+  // this is the one route it has to reach (middleware.ts does the same for cookies).
+  const r = await requireTenant({ allowPasswordChangeRequired: true });
   if (!r.ok) return r.response;
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);

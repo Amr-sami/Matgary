@@ -29,6 +29,8 @@ export function Segmented<T extends string>({
           >
             <Text
               numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
               style={[styles.label, active ? styles.labelActive : styles.labelInactive]}
             >
               {it.label}

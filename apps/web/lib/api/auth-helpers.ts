@@ -81,7 +81,15 @@ type SessionResult =
    *  contract regardless of transport. */
   | { kind: "blocked"; code: "TENANT_SUSPENDED" | "PASSWORD_CHANGE_REQUIRED" | "SUBSCRIPTION_REQUIRED"; status: 402 | 403 };
 
-async function resolveSession(): Promise<SessionResult> {
+type ResolveOptions = {
+  /** Let a caller with the `mcp` (must-change-password) claim through. Only the
+   *  change-password route sets this — it is the one request such a user must
+   *  be able to make, exactly as middleware.ts exempts /api/account/password
+   *  for cookie sessions. */
+  allowPasswordChangeRequired?: boolean;
+};
+
+async function resolveSession(opts: ResolveOptions = {}): Promise<SessionResult> {
   const h = await headers();
   const bearer = bearerFromHeader(h.get("authorization"));
   if (bearer) {
@@ -98,7 +106,7 @@ async function resolveSession(): Promise<SessionResult> {
     if (claims.susp) {
       return { kind: "blocked", code: "TENANT_SUSPENDED", status: 403 };
     }
-    if (claims.mcp) {
+    if (claims.mcp && !opts.allowPasswordChangeRequired) {
       return { kind: "blocked", code: "PASSWORD_CHANGE_REQUIRED", status: 403 };
     }
     if (!claims.sub_ok) {
@@ -129,14 +137,14 @@ async function resolveSession(): Promise<SessionResult> {
   };
 }
 
-export async function requireTenant(): Promise<
+export async function requireTenant(opts: ResolveOptions = {}): Promise<
   | { ok: true; ctx: AuthedContext }
   | { ok: false; response: NextResponse }
 > {
   // Open the per-request ALS scope so every downstream log line carries
   // the request id (+ tenantId/userId once we know them).
   await ensureRequestContext();
-  const r = await resolveSession();
+  const r = await resolveSession(opts);
   if (r.kind === "none") {
     return { ok: false, response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   }
