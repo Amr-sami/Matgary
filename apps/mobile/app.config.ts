@@ -29,7 +29,7 @@ const config: ExpoConfig = {
   android: {
     package: "com.thestoro.app",
     adaptiveIcon: {
-      backgroundColor: "#1203E3",
+      backgroundColor: "#FFFFFF",
       foregroundImage: "./assets/images/android-icon-foreground.png",
       backgroundImage: "./assets/images/android-icon-background.png",
       monochromeImage: "./assets/images/android-icon-monochrome.png",
@@ -54,9 +54,9 @@ const config: ExpoConfig = {
     [
       "expo-splash-screen",
       {
-        backgroundColor: "#1203E3",
+        backgroundColor: "#FFFFFF",
         image: "./assets/images/splash-icon.png",
-        imageWidth: 76,
+        imageWidth: 120,
       },
     ],
   ],

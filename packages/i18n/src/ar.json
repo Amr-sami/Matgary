@@ -4446,13 +4446,14 @@
       "addBranch": "+ إضافة فرع",
       "deleteBranchConfirm": "هل تريد حذف فرع «{name}»؟ سيتم رفض العملية إذا كان الفرع يحتوي على بيانات (مبيعات/مصاريف/مخزون).",
       "securitySub": "المصادقة الثنائية، تسجيل الخروج من كل الأجهزة، وحذف المتجر.",
-      "digestActive": "✅ شغّال — هتيجيلك رسالة الساعة {time} بتوقيت متجرك",
+      "digestActive": "شغّال — هتيجيلك رسالة الساعة {time} بتوقيت متجرك",
       "switched": "تم التبديل",
       "openAuthApp": "فتح تطبيق المصادقة",
       "digestPermission": "إعدادات الملخص اليومي متاحة لمن يملك صلاحية إدارتها فقط.",
       "currentStatus": "الحالة الحالية:",
       "currentBranchLine": "{slug} · الفرع الحالي: {branch}",
-      "deletionDate": "موعد الحذف:"
+      "deletionDate": "موعد الحذف:",
+      "digestOff": "متوقف"
     },
     "signup": {
       "emailTaken": "هذا البريد مسجّل بالفعل",
@@ -4473,6 +4474,9 @@
       "totpRequired": "هذا الحساب يتطلب رمز تحقق",
       "requestFailed": "تعذّر إتمام الطلب",
       "signInFailed": "تعذّر تسجيل الدخول"
+    },
+    "format": {
+      "money": "{amount} ج.م"
     }
   }
 }

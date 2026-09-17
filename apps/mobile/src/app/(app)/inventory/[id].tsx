@@ -197,8 +197,8 @@ export default function ProductDetailScreen() {
           {product.tags.length > 0 ? (
             <Card title={t("mobile.common.tags")}>
               <View style={styles.tagRow}>
-                {product.tags.map((t) => (
-                  <Badge key={t} label={t} variant="neutral" />
+                {product.tags.map((tag) => (
+                  <Badge key={tag} label={tag} variant="neutral" />
                 ))}
               </View>
             </Card>

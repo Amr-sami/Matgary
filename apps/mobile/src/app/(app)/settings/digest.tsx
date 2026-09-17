@@ -10,7 +10,7 @@ import {
 import { useRouter } from "expo-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ApiError } from "@matgary/api-client";
-import { CaretDown } from "phosphor-react-native";
+import { CaretDown, CheckCircle, MinusCircle } from "phosphor-react-native";
 
 import { api } from "@/api/client";
 import { Screen } from "@/components/layout/Screen";
@@ -22,7 +22,7 @@ import { Field } from "@/components/ui/Field";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
-import { t } from "@/i18n";
+import { getLocale, t } from "@/i18n";
 
 /**
  * Port of app__settings-digest.png.
@@ -110,7 +110,7 @@ export default function DigestSettingsScreen() {
   const preview = useMutation({
     mutationFn: async (branchId: string) => {
       const res = await api.request<{ message: string }>("/api/digest/preview", {
-        query: { branchId, locale: "ar" },
+        query: { branchId, locale: getLocale() },
       });
       return res.message;
     },
@@ -166,11 +166,20 @@ export default function DigestSettingsScreen() {
             <View style={styles.enableRow}>
               <View style={styles.enableBody}>
                 <Text style={styles.sectionTitle}>{t("app.digestSettings.enable.title")}</Text>
-                <Text style={styles.sectionHint}>
-                  {settings.enabled
-                    ? t("mobile.settings.digestActive", { time: `${String(settings.digestHour).padStart(2, "0")}:00` })
-                    : t("app.digestSettings.enable.offLine")}
-                </Text>
+                {/* Icon, not an emoji: the dictionary's ⚪/✅ have no glyph in
+                    Cairo on iOS and render as a missing-character box. */}
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  {settings.enabled ? (
+                    <CheckCircle size={16} color={colors.success} weight="fill" />
+                  ) : (
+                    <MinusCircle size={16} color={colors.textSecondary} />
+                  )}
+                  <Text style={styles.sectionHint}>
+                    {settings.enabled
+                      ? t("mobile.settings.digestActive", { time: `${String(settings.digestHour).padStart(2, "0")}:00` })
+                      : t("mobile.settings.digestOff")}
+                  </Text>
+                </View>
               </View>
               <Button
                 label={settings.enabled ? t("app.digestSettings.enable.disable") : t("app.digestSettings.enable.enable")}

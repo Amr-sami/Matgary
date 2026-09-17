@@ -10,7 +10,6 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
-import { dictionaries } from "@matgary/i18n";
 import { Globe, Lightning } from "phosphor-react-native";
 
 import { getLocale, useLocale, t } from "@/i18n";
@@ -29,15 +28,10 @@ import { colors, fonts, radius, spacing } from "@/theme/tokens";
  * capture shows it — the web auth card is centred in the viewport, and with
  * only one field the block sits noticeably lower than it does on login.
  *
- * Strings come from apps/web/dictionaries/ar.json (`auth.forgot.*`).
+ * Every string is a t("auth.forgot.*") call evaluated at render, so the live
+ * language switch applies on remount. Nothing is read at module scope — a
+ * module-scope copy would have frozen the locale at first load.
  */
-/**
- * The auth.forgot subtree, read at render time so the language switch applies.
- * These strings byte-match the web's dictionary; a module-scope copy would
- * have frozen the locale at first load.
- */
-const T = () => dictionaries[getLocale()].auth.forgot;
-
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function ForgotPasswordScreen() {
@@ -81,7 +75,7 @@ export default function ForgotPasswordScreen() {
       // whose body carries an English zod message. Neither is worth showing
       // raw on an Arabic-first screen, so both land on the dictionary's
       // generic string.
-      setError(T().errors.generic);
+      setError(t("auth.forgot.errors.generic"));
     } finally {
       setBusy(false);
     }
@@ -89,8 +83,10 @@ export default function ForgotPasswordScreen() {
 
   // The email is spliced into the success line as its own run so it stays LTR
   // inside an Arabic paragraph — otherwise the address reorders and reads back
-  // wrong, which is exactly the thing the user is checking it for.
-  const [successBefore, successAfter] = T().successTitleWithEmail.split("{email}");
+  // wrong, which is exactly the thing the user is checking it for. t() is
+  // called WITHOUT vars on purpose: that leaves the raw "{email}" placeholder
+  // in place so the template can be split around it instead of interpolated.
+  const [successBefore, successAfter] = t("auth.forgot.successTitleWithEmail").split("{email}");
 
   return (
     <View style={styles.root}>
@@ -127,8 +123,8 @@ export default function ForgotPasswordScreen() {
               <Logo size="md" />
             </View>
 
-            <Text style={styles.heading}>{T().title}</Text>
-            <Text style={styles.subheading}>{T().subhead}</Text>
+            <Text style={styles.heading}>{t("auth.forgot.title")}</Text>
+            <Text style={styles.subheading}>{t("auth.forgot.subhead")}</Text>
 
             {submitted ? (
               <View style={styles.form} accessibilityLiveRegion="polite">
@@ -137,14 +133,14 @@ export default function ForgotPasswordScreen() {
                   <Text style={styles.successEmail}>{submittedEmail}</Text>
                   {successAfter ?? ""}
                 </Text>
-                <Text style={styles.successNote}>{T().successNote}</Text>
-                <Button label={T().backToLogin} variant="outline" onPress={goToLogin} />
+                <Text style={styles.successNote}>{t("auth.forgot.successNote")}</Text>
+                <Button label={t("auth.forgot.backToLogin")} variant="outline" onPress={goToLogin} />
               </View>
             ) : (
               <View style={styles.form}>
                 <Field
-                  label={T().emailLabel}
-                  placeholder={T().emailPlaceholder}
+                  label={t("auth.forgot.emailLabel")}
+                  placeholder={t("auth.forgot.emailPlaceholder")}
                   value={email}
                   onChangeText={setEmail}
                   autoCapitalize="none"
@@ -162,7 +158,7 @@ export default function ForgotPasswordScreen() {
                 ) : null}
 
                 <Button
-                  label={T().submit}
+                  label={t("auth.forgot.submit")}
                   loading={busy}
                   disabled={!canSubmit}
                   onPress={() => void onSubmit()}
@@ -173,7 +169,7 @@ export default function ForgotPasswordScreen() {
                   style={styles.back}
                   onPress={goToLogin}
                 >
-                  <Text style={styles.backText}>{T().backToLogin}</Text>
+                  <Text style={styles.backText}>{t("auth.forgot.backToLogin")}</Text>
                 </Pressable>
               </View>
             )}

@@ -11,7 +11,7 @@ import { shortDate } from "@/lib/format";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
 import { colors, fonts, spacing } from "@/theme/tokens";
-import { t } from "@/i18n";
+import { getLocale, t } from "@/i18n";
 
 interface BillingMe {
   plan: string;
@@ -28,11 +28,25 @@ interface BillingMe {
 interface Plan {
   key: string;
   labelAr: string;
+  labelEn: string;
   taglineAr: string;
+  taglineEn: string;
   monthlyEgp: number;
   purchasable: boolean;
   featuresAr: string[];
+  featuresEn: string[];
 }
+
+/**
+ * Plan copy is API DATA (platform_plans, edited at /admin/plans), not
+ * dictionary text — the server serves both languages side by side and the
+ * web /billing page picks the sibling matching the locale. Same here. Read
+ * at render (never at module scope) so a live locale switch re-picks.
+ */
+const planContent = (p: Plan): { label: string; tagline: string; features: string[] } =>
+  getLocale() === "ar"
+    ? { label: p.labelAr, tagline: p.taglineAr, features: p.featuresAr }
+    : { label: p.labelEn, tagline: p.taglineEn, features: p.featuresEn };
 
 /** dictionaries/ar.json app.billing.status.* */
 const STATUS = (): Record<string, string> => ({
@@ -105,7 +119,7 @@ export default function BillingScreen() {
             />
             <Text style={styles.statusTitle}>
               {STATUS()[b.status] ?? b.status}
-              {currentPlan ? `  ·  ${currentPlan.labelAr}` : ""}
+              {currentPlan ? `  ·  ${planContent(currentPlan).label}` : ""}
             </Text>
           </View>
           {statusLine ? <Text style={styles.statusLine}>{statusLine}</Text> : null}
@@ -124,10 +138,11 @@ export default function BillingScreen() {
         .filter((p) => p.key !== "trial" || b?.status === "trialing")
         .map((p) => {
         const isCurrent = p.key === b?.plan;
+        const content = planContent(p);
         return (
           <Card key={p.key}>
-            <Text style={styles.planName}>{p.labelAr}</Text>
-            <Text style={styles.planTagline}>{p.taglineAr}</Text>
+            <Text style={styles.planName}>{content.label}</Text>
+            <Text style={styles.planTagline}>{content.tagline}</Text>
 
             {p.purchasable ? (
               <View style={styles.priceRow}>
@@ -139,7 +154,7 @@ export default function BillingScreen() {
             ) : null}
 
             <View style={styles.features}>
-              {p.featuresAr.map((f) => (
+              {content.features.map((f) => (
                 <View key={f} style={styles.feature}>
                   <CheckCircle size={18} color={colors.accent} />
                   <Text style={styles.featureText}>{f}</Text>

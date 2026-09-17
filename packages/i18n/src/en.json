@@ -4446,13 +4446,14 @@
       "addBranch": "+ Add branch",
       "deleteBranchConfirm": "Delete branch “{name}”? This is refused if the branch has any data (sales / expenses / stock).",
       "securitySub": "Two-factor auth, sign out everywhere, and delete the store.",
-      "digestActive": "✅ On — you'll get a message at {time} in your store's time zone",
+      "digestActive": "On — you'll get a message at {time} in your store's time zone",
       "switched": "Switched",
       "openAuthApp": "Open authenticator app",
       "digestPermission": "Daily digest settings are only available to those with permission to manage it.",
       "currentStatus": "Current status:",
       "currentBranchLine": "{slug} · Current branch: {branch}",
-      "deletionDate": "Deletion date:"
+      "deletionDate": "Deletion date:",
+      "digestOff": "Off"
     },
     "signup": {
       "emailTaken": "This email is already registered",
@@ -4473,6 +4474,9 @@
       "totpRequired": "This account requires a verification code",
       "requestFailed": "Couldn't complete the request",
       "signInFailed": "Couldn't sign in"
+    },
+    "format": {
+      "money": "EGP {amount}"
     }
   }
 }

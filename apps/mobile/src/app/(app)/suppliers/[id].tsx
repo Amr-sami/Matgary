@@ -39,17 +39,19 @@ import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
  * running column and is shown as-is.
  */
 
-const STATUS: Record<
+// A function, not a constant: a module-scope t() would evaluate once and
+// freeze the locale, so the labels would not follow a live language switch.
+const STATUS = (): Record<
   string,
   { label: string; variant: "success" | "lowstock" | "neutral" | "accent" }
-> = {
+> => ({
   // The capture shows مسودة in orange, تم الاستلام green, ملغي grey — the web's
   // STATUS_STYLES, not the purchases-list mapping (which greys out مسودة).
   draft: { label: t("app.purchasesStatus.draft"), variant: "lowstock" },
   ordered: { label: t("mobile.purchases.ordered"), variant: "accent" },
   received: { label: t("app.purchasesStatus.received"), variant: "success" },
   cancelled: { label: t("app.purchasesStatus.cancelled"), variant: "neutral" },
-};
+});
 
 export default function SupplierDetailScreen() {
   const router = useRouter();
@@ -142,6 +144,9 @@ export default function SupplierDetailScreen() {
     void ordersQ.refetch();
     void expensesQ.refetch();
   };
+
+  // Rebuilt every render so the badge labels track the current locale.
+  const status = STATUS();
 
   return (
     <Screen onRefresh={refresh} refreshing={supplierQ.isRefetching}>
@@ -245,7 +250,7 @@ export default function SupplierDetailScreen() {
             ) : (
               <View style={styles.rows}>
                 {orders.slice(0, 10).map((o, index) => {
-                  const s = STATUS[o.status] ?? {
+                  const s = status[o.status] ?? {
                     label: o.status,
                     variant: "neutral" as const,
                   };

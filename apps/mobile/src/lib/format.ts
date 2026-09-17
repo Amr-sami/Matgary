@@ -6,16 +6,19 @@
  * the web produced for the same tenant. These are plain string ops on purpose.
  */
 
-import { getLocale } from "@/i18n";
+import { t } from "@/i18n";
 
 /**
  * 277575 -> "277,575 ج.م" in Arabic, "EGP 277,575" in English — the same two
  * shapes the web's formatCurrency produces (currencyDisplay: "code" for en).
  * Latin digits in both, matching the web's NUM_FORCE_LATIN.
+ *
+ * The dictionary owns the shape (suffix vs prefix) via `mobile.format.money`,
+ * so a locale switch re-reads it on the next render — no locale branch here.
  */
 export function money(value: number): string {
   const n = groupDigits(Math.round(value));
-  return getLocale() === "en" ? `EGP ${n}` : `${n} ج.م`;
+  return t("mobile.format.money", { amount: n });
 }
 
 export function groupDigits(value: number): string {
