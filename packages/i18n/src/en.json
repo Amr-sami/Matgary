@@ -4491,7 +4491,20 @@
       "currentStatus": "Current status:",
       "currentBranchLine": "{slug} · Current branch: {branch}",
       "deletionDate": "Deletion date:",
-      "digestOff": "Off"
+      "digestOff": "Off",
+      "storeSub": "Store name, address, phone and invoice details",
+      "categories": "Categories",
+      "categoriesSub": "Product categories and their order",
+      "brands": "Brands",
+      "brandsSub": "Brands offered when adding a product",
+      "attributes": "Attributes",
+      "attributesSub": "Size, colour and other product attributes",
+      "printers": "Printers",
+      "printersSub": "Pair a receipt printer, paper width, test print",
+      "appLock": "App lock",
+      "appLockSub": "Biometric or passcode when opening or returning",
+      "about": "About",
+      "aboutSub": "Version, privacy policy and terms"
     },
     "signup": {
       "emailTaken": "This email is already registered",
@@ -4544,6 +4557,15 @@
       "connectFromWeb": "Connect from the web dashboard: Settings → WhatsApp. Meta sign-in needs a browser.",
       "genericError": "Something went wrong. Please try again.",
       "retry": "Retry"
+    },
+    "attendance": {
+      "title": "Check in"
+    },
+    "sync": {
+      "title": "Sync"
+    },
+    "notifications": {
+      "title": "Notifications"
     }
   }
 }

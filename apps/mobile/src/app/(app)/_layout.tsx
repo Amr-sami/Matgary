@@ -40,6 +40,9 @@ export default function AppLayout() {
       <Tabs.Screen name="settings" />
       <Tabs.Screen name="onboarding" />
       <Tabs.Screen name="billing" />
+      <Tabs.Screen name="notifications" />
+      <Tabs.Screen name="attendance" />
+      <Tabs.Screen name="sync" />
     </Tabs>
   );
 }

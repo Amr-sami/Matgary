@@ -40,6 +40,49 @@ const config: ExpoConfig = {
   plugins: [
     "expo-router",
     "expo-secure-store",
+    "expo-sqlite",
+    "expo-sharing",
+    "expo-background-task",
+    [
+      "expo-notifications",
+      {
+        // Monochrome notification icon (Android) is generated from the mark.
+        icon: "./assets/images/icon.png",
+        color: "#1203E3",
+        defaultChannel: "default",
+      },
+    ],
+    [
+      "expo-local-authentication",
+      {
+        faceIDPermission: "نستخدم بصمة الوجه لفتح التطبيق بسرعة وأمان",
+      },
+    ],
+    [
+      "expo-location",
+      {
+        // Attendance check-in geofence; foreground only.
+        locationWhenInUsePermission: "نحتاج موقعك لتسجيل الحضور داخل نطاق المتجر",
+        isAndroidBackgroundLocationEnabled: false,
+      },
+    ],
+    [
+      "react-native-ble-plx",
+      {
+        isBackgroundEnabled: false,
+        modes: [],
+        bluetoothAlwaysPermission: "نحتاج البلوتوث للاتصال بطابعة الفواتير",
+      },
+    ],
+    [
+      "@sentry/react-native/expo",
+      {
+        // Org/project come from EAS secrets at build time; absent locally,
+        // the plugin only wires the native SDK and skips source-map upload.
+        organization: process.env.SENTRY_ORG ?? "thestoro",
+        project: process.env.SENTRY_PROJECT ?? "thestoro-mobile",
+      },
+    ],
     [
       "expo-camera",
       {

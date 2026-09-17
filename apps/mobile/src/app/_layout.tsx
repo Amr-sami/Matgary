@@ -80,6 +80,9 @@ export default function RootLayout() {
           <Stack.Protected guard={status !== "signedIn"}>
             <Stack.Screen name="(public)" />
           </Stack.Protected>
+          {/* Reachable signed in or out: suspended-tenant landing, privacy/terms. */}
+          <Stack.Screen name="service-paused" />
+          <Stack.Screen name="legal/[doc]" />
         </Stack>
       </SafeAreaProvider>
     </QueryClientProvider>

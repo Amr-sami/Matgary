@@ -2,10 +2,16 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import {
   ChatCircle,
+  Info,
   Key,
+  LockKey,
+  Printer,
   Receipt,
   ShieldCheck,
+  SlidersHorizontal,
+  SquaresFour,
   Storefront,
+  Tag,
 } from "phosphor-react-native";
 
 import { Screen } from "@/components/layout/Screen";
@@ -95,13 +101,68 @@ export default function SettingsScreen() {
       ownerOnly: false,
     },
     {
+      key: "store",
+      route: "/settings/store",
+      icon: Storefront,
+      title: t("app.settingsPage.shopInfo.heading"),
+      hint: t("mobile.settings.storeSub"),
+      ownerOnly: true,
+    },
+    {
+      key: "categories",
+      route: "/settings/categories",
+      icon: SquaresFour,
+      title: t("mobile.settings.categories"),
+      hint: t("mobile.settings.categoriesSub"),
+      ownerOnly: false,
+    },
+    {
+      key: "brands",
+      route: "/settings/brands",
+      icon: Tag,
+      title: t("mobile.settings.brands"),
+      hint: t("mobile.settings.brandsSub"),
+      ownerOnly: false,
+    },
+    {
+      key: "attributes",
+      route: "/settings/attributes",
+      icon: SlidersHorizontal,
+      title: t("mobile.settings.attributes"),
+      hint: t("mobile.settings.attributesSub"),
+      ownerOnly: false,
+    },
+    {
       key: "receipt",
-      route: "",
+      route: "/settings/receipt",
       icon: Receipt,
       title: t("app.settingsPage.receiptCard.heading"),
       hint: t("app.settingsPage.receiptCard.subhead"),
       ownerOnly: true,
-      soon: true,
+    },
+    {
+      key: "printers",
+      route: "/settings/printers",
+      icon: Printer,
+      title: t("mobile.settings.printers"),
+      hint: t("mobile.settings.printersSub"),
+      ownerOnly: false,
+    },
+    {
+      key: "app-lock",
+      route: "/settings/app-lock",
+      icon: LockKey,
+      title: t("mobile.settings.appLock"),
+      hint: t("mobile.settings.appLockSub"),
+      ownerOnly: false,
+    },
+    {
+      key: "about",
+      route: "/settings/about",
+      icon: Info,
+      title: t("mobile.settings.about"),
+      hint: t("mobile.settings.aboutSub"),
+      ownerOnly: false,
     },
   ];
 

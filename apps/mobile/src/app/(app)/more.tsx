@@ -2,15 +2,18 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import {
   ArrowCounterClockwise,
+  Bell,
   CalendarBlank,
   ClockCounterClockwise,
+  CloudArrowUp,
   CreditCard,
   Gear,
   ListChecks,
+  MapPinArea,
   SignOut,
   Truck,
-  UsersThree,
   Users,
+  UsersThree,
   Wallet,
   WhatsappLogo,
 } from "phosphor-react-native";
@@ -35,6 +38,9 @@ import { t } from "@/i18n";
 const ITEMS = () =>
   ([
   { route: "/tasks", label: t("app.shell.secondary.tasks"), icon: ListChecks, requires: "view_dashboard" },
+  { route: "/attendance", label: t("mobile.attendance.title"), icon: MapPinArea, requires: null },
+  { route: "/sync", label: t("mobile.sync.title"), icon: CloudArrowUp, requires: "create_sale" },
+  { route: "/notifications", label: t("mobile.notifications.title"), icon: Bell, requires: null },
   { route: "/customers", label: t("app.shell.secondary.customers"), icon: Users, requires: "view_customers" },
   { route: "/expenses", label: t("app.shell.secondary.expenses"), icon: Wallet, requires: "view_expenses" },
   { route: "/suppliers", label: t("app.shell.secondary.suppliers"), icon: Truck, requires: "view_suppliers" },
@@ -61,7 +67,8 @@ export default function MoreScreen() {
     if (i.route === "/leave") return allowed.has("request_leave") || allowed.has("manage_leave");
     // Billing is owner-only on the web (app.billing.ownerOnly).
     if (i.route === "/billing") return Boolean(me?.isOwner);
-    return allowed.has(i.requires);
+    // `requires: null` = any signed-in member (attendance, notifications).
+    return i.requires === null ? Boolean(me) : allowed.has(i.requires);
   });
 
   return (
