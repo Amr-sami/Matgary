@@ -2,6 +2,8 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import {
   ArrowCounterClockwise,
+  CalendarBlank,
+  ClockCounterClockwise,
   CreditCard,
   Gear,
   ListChecks,
@@ -10,6 +12,7 @@ import {
   UsersThree,
   Users,
   Wallet,
+  WhatsappLogo,
 } from "phosphor-react-native";
 
 import { Screen } from "@/components/layout/Screen";
@@ -37,6 +40,9 @@ const ITEMS = () =>
   { route: "/suppliers", label: t("app.shell.secondary.suppliers"), icon: Truck, requires: "view_suppliers" },
   { route: "/returns", label: t("app.shell.secondary.returns"), icon: ArrowCounterClockwise, requires: "view_returns" },
   { route: "/team", label: t("app.shell.secondary.team"), icon: UsersThree, requires: "manage_team" },
+  { route: "/activity", label: t("app.shell.secondary.activity"), icon: ClockCounterClockwise, requires: "view_activity_log" },
+  { route: "/leave", label: t("mobile.leave.title"), icon: CalendarBlank, requires: "request_leave" },
+  { route: "/whatsapp", label: t("app.whatsappInbox.title"), icon: WhatsappLogo, requires: "manage_whatsapp" },
   { route: "/settings", label: t("app.shell.secondary.settings"), icon: Gear, requires: "view_settings" },
   { route: "/billing", label: t("app.billing.title"), icon: CreditCard, requires: null },
 ] as const);
@@ -52,6 +58,7 @@ export default function MoreScreen() {
   const visible = ITEMS().filter((i) => {
     if (i.route === "/tasks") return Boolean(me);
     if (i.route === "/team") return TEAM_ANY.some((p) => allowed.has(p));
+    if (i.route === "/leave") return allowed.has("request_leave") || allowed.has("manage_leave");
     // Billing is owner-only on the web (app.billing.ownerOnly).
     if (i.route === "/billing") return Boolean(me?.isOwner);
     return allowed.has(i.requires);

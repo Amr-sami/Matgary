@@ -34,7 +34,11 @@ export default function AppLayout() {
       <Tabs.Screen name="suppliers" />
       <Tabs.Screen name="returns" />
       <Tabs.Screen name="team" />
+      <Tabs.Screen name="activity" />
+      <Tabs.Screen name="leave" />
+      <Tabs.Screen name="whatsapp" />
       <Tabs.Screen name="settings" />
+      <Tabs.Screen name="onboarding" />
       <Tabs.Screen name="billing" />
     </Tabs>
   );

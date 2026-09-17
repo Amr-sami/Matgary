@@ -56,7 +56,10 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxl * 2,
     gap: spacing.lg,
   },
-  header: { gap: 4 },
+  // flex-start shrink-wraps the texts so Yoga (not the paragraph's natural
+  // alignment) places them at the reading edge — matters for Latin-only titles
+  // like "WhatsApp", which would otherwise hug the left under an RTL layout.
+  header: { gap: 4, alignItems: "flex-start" },
   title: { fontFamily: fonts.bold, fontSize: 26, color: colors.text, ...RTL_TEXT },
   subtitle: { fontFamily: fonts.regular, fontSize: 15, color: colors.textSecondary, ...RTL_TEXT },
 });
