@@ -4,6 +4,7 @@ import {
   requireTenant,
   requireTenantWithBranch,
 } from "@/lib/api/auth-helpers";
+import { requirePermissionWithBranch } from "@/lib/api/auth-helpers";
 import { resolveBranchFilter } from "@/lib/api/branch-context";
 import { addProduct, listProducts } from "@/lib/repo/catalog";
 import { logActivity } from "@/lib/repo/activity";
@@ -45,7 +46,7 @@ const createSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const r = await requireTenantWithBranch();
+  const r = await requirePermissionWithBranch("manage_inventory");
   if (!r.ok) return r.response;
   const rl = await checkTenantRateLimit(r.ctx.tenantId, "write.default");
   if (!rl.ok) return rl.response;

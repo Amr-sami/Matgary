@@ -136,3 +136,48 @@ export const setTaskStatus = (c: ApiClient, id: string, status: TaskStatus) =>
     method: "PATCH",
     body: { status },
   });
+
+/**
+ * apps/web/app/api/products/route.ts createSchema.
+ *
+ * `categoryId`, not `category`: GET /api/products returns the category id in a
+ * field literally named `category`, so round-tripping a fetched product into
+ * this shape without renaming is a 400 that typechecking cannot catch.
+ */
+export interface CreateProductInput {
+  name: string;
+  categoryId: string;
+  brand?: string;
+  quantity: number;
+  price: number;
+  costPrice?: number;
+  lowStockThreshold?: number;
+  sku?: string;
+  tags?: string[];
+  supplierId?: string | null;
+}
+
+export const createProduct = (c: ApiClient, input: CreateProductInput) =>
+  c.request<{ id: string }>("/api/products", { method: "POST", body: input });
+
+/** apps/web/app/api/returns/route.ts — a return is against ONE sale line. `reason` is required. */
+export interface CreateReturnInput {
+  saleId: string;
+  productId: string;
+  returnedQuantity: number;
+  reason: string;
+}
+export const createReturn = (c: ApiClient, input: CreateReturnInput) =>
+  c.request<{ id: string }>("/api/returns", { method: "POST", body: input });
+
+/** apps/web/app/api/purchase-orders/route.ts. `productName` is required even with a productId. */
+export interface CreatePurchaseOrderInput {
+  supplierId: string;
+  notes?: string | null;
+  items: { productId?: string | null; productName: string; quantity: number; unitCost: number }[];
+}
+export const createPurchaseOrder = (c: ApiClient, input: CreatePurchaseOrderInput) =>
+  c.request<{ id: string }>("/api/purchase-orders", { method: "POST", body: input });
+
+export const deleteProduct = (c: ApiClient, id: string) =>
+  c.request<unknown>(`/api/products/${id}`, { method: "DELETE" });

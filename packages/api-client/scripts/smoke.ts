@@ -182,6 +182,27 @@ async function main() {
     check("duplicate store handle is refused", dupKind === "conflict/HANDLE_TAKEN", dupKind);
   }
 
+  // ---- product create --------------------------------------------------------
+  {
+    const cats = await client.request<{ data: { id: string }[] }>("/api/categories");
+    const cat = cats.data[0];
+    if (cat) {
+      const { id } = await catalog.createProduct(client, {
+        name: `Smoke ${Date.now()}`,
+        categoryId: cat.id,
+        price: 100,
+        quantity: 5,
+        lowStockThreshold: 2,
+      });
+      check("product create returns an id", Boolean(id));
+      const list = await catalog.listProducts(client);
+      check("created product is listed at the active branch", list.some((p) => p.id === id));
+      await catalog.deleteProduct(client, id);
+      const after = await catalog.listProducts(client);
+      check("cleanup removed it", !after.some((p) => p.id === id));
+    }
+  }
+
   // ---- refresh rotation --------------------------------------------------
   const beforeRefresh = store.peek()!;
   // Force the proactive path by back-dating the expiry past the skew window.

@@ -35,6 +35,7 @@ export default function AppLayout() {
       <Tabs.Screen name="returns" />
       <Tabs.Screen name="team" />
       <Tabs.Screen name="settings" />
+      <Tabs.Screen name="billing" />
     </Tabs>
   );
 }

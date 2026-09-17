@@ -4,6 +4,7 @@ import {
   requireTenant,
   requireTenantWithBranch,
 } from "@/lib/api/auth-helpers";
+import { requirePermissionWithBranch } from "@/lib/api/auth-helpers";
 import { resolveBranchFilter } from "@/lib/api/branch-context";
 import { resolveSinceWindow } from "@/lib/api/list-window";
 import { listSales, listSalesPage, recordSale } from "@/lib/repo/operations";
@@ -62,7 +63,7 @@ const recordSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const r = await requireTenantWithBranch();
+  const r = await requirePermissionWithBranch("record_sales");
   if (!r.ok) return r.response;
   const rl = await checkTenantRateLimit(r.ctx.tenantId, "write.default");
   if (!rl.ok) return rl.response;

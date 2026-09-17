@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import type { Permission } from "@/lib/permissions";
 import { can } from "@/lib/permissions";
+import { logger } from "@/lib/logger";
 import { bearerFromHeader, verifyAccessToken } from "@/lib/api/native-token";
 import {
   enterRequestContext,
@@ -207,3 +208,66 @@ export async function requireTenantWithBranch(): Promise<
 }
 
 export type { BranchContext };
+
+/**
+ * `requirePermission`, for routes that also need the active branch.
+ *
+ * Every branch-scoped WRITE — sales, products, expenses, returns, catalogue —
+ * went through requireTenantWithBranch() with no permission check at all,
+ * because the only permission helper was built on plain requireTenant() and
+ * cannot resolve a branch. The web UI was the sole gate. A native client is not
+ * the UI, so a staff member without `record_sales` could POST a sale by hand.
+ *
+ * AUDIT MODE FIRST (doc 01 §9 step 10). Enforcing on day one would lock out
+ * any staff row whose permissions array was never curated because nothing ever
+ * read it. So until PERMISSION_ENFORCE_WRITES=1, a denial is logged with
+ * enough context to find the row and the request proceeds. Run it for a week,
+ * grep the logs, fix the rows, then flip the flag.
+ */
+export async function requirePermissionWithBranch(perm: Permission): Promise<
+  | { ok: true; ctx: AuthedBranchContext }
+  | { ok: false; response: NextResponse }
+> {
+  const auth = await requireTenantWithBranch();
+  if (!auth.ok) return auth;
+  if (can(auth.ctx, perm)) return auth;
+
+  const enforce = process.env.PERMISSION_ENFORCE_WRITES === "1";
+  logger.warn({
+    event: enforce ? "permission.denied" : "permission.would_deny",
+    permission: perm,
+    userId: auth.ctx.userId,
+    tenantId: auth.ctx.tenantId,
+    branchId: auth.ctx.branchId,
+    role: auth.ctx.role,
+    enforced: enforce,
+  });
+  if (!enforce) return auth;
+
+  return {
+    ok: false,
+    response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
+  };
+}
+
+/** requirePermission with the same audit-mode switch, for routes without a branch. */
+export async function requirePermissionAudited(perm: Permission): Promise<
+  | { ok: true; ctx: AuthedContext }
+  | { ok: false; response: NextResponse }
+> {
+  const auth = await requireTenant();
+  if (!auth.ok) return auth;
+  if (can(auth.ctx, perm)) return auth;
+
+  const enforce = process.env.PERMISSION_ENFORCE_WRITES === "1";
+  logger.warn({
+    event: enforce ? "permission.denied" : "permission.would_deny",
+    permission: perm,
+    userId: auth.ctx.userId,
+    tenantId: auth.ctx.tenantId,
+    role: auth.ctx.role,
+    enforced: enforce,
+  });
+  if (!enforce) return auth;
+  return { ok: false, response: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+}

@@ -1,16 +1,20 @@
-import { useMemo } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
-import { useQuery } from "@tanstack/react-query";
-import { Receipt, Wallet, Package } from "phosphor-react-native";
-import { catalog } from "@matgary/api-client";
+import { useMemo, useState } from "react";
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Minus, Plus, Receipt, Wallet, Package } from "phosphor-react-native";
+import { ApiError, catalog } from "@matgary/api-client";
 
 import { api } from "@/api/client";
 import { Screen } from "@/components/layout/Screen";
 import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { Chip } from "@/components/ui/Chip";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Field } from "@/components/ui/Field";
+import { SearchField } from "@/components/ui/SearchField";
 import { StatCard } from "@/components/ui/StatCard";
 import { money, shortDate } from "@/lib/format";
-import { RTL_TEXT } from "@/theme/rtl";
+import { RTL, RTL_TEXT } from "@/theme/rtl";
 import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
 
 /** Arabic labels + badge variant per PO status, matching the web's Badge use. */
@@ -22,11 +26,49 @@ const STATUS: Record<string, { label: string; variant: "accent" | "success" | "l
 };
 
 /** Port of app__purchases.png — PO list with totals and payment state. */
+type Draft = { productId: string; productName: string; quantity: number; unitCost: number };
+
 export default function PurchasesScreen() {
+  const qc = useQueryClient();
   const pos = useQuery({
     queryKey: ["purchase-orders"],
     queryFn: () => catalog.listPurchaseOrders(api),
   });
+  const suppliers = useQuery({ queryKey: ["suppliers"], queryFn: () => catalog.listSuppliers(api) });
+  const products = useQuery({ queryKey: ["products"], queryFn: () => catalog.listProducts(api) });
+
+  const [open, setOpen] = useState(false);
+  const [supplierId, setSupplierId] = useState<string | null>(null);
+  const [q, setQ] = useState("");
+  const [items, setItems] = useState<Draft[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const matches = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    if (!t) return [];
+    return (products.data ?? []).filter((p) => p.name.toLowerCase().includes(t)).slice(0, 6);
+  }, [products.data, q]);
+
+  const addItem = (p: { id: string; name: string; costPrice: number }) => {
+    setItems((cur) => cur.some((i) => i.productId === p.id)
+      ? cur.map((i) => i.productId === p.id ? { ...i, quantity: i.quantity + 1 } : i)
+      : [...cur, { productId: p.id, productName: p.name, quantity: 1, unitCost: p.costPrice }]);
+    setQ("");
+  };
+  const bump = (id: string, d: number) =>
+    setItems((cur) => cur.map((i) => i.productId === id ? { ...i, quantity: i.quantity + d } : i).filter((i) => i.quantity > 0));
+
+  const draftTotal = items.reduce((s, i) => s + i.quantity * i.unitCost, 0);
+
+  const create = useMutation({
+    mutationFn: () => catalog.createPurchaseOrder(api, { supplierId: supplierId!, items }),
+    onSuccess: () => {
+      setOpen(false); setSupplierId(null); setItems([]); setError(null);
+      void qc.invalidateQueries({ queryKey: ["purchase-orders"] });
+    },
+    onError: (e) => setError(e instanceof ApiError && e.kind === "offline" ? "تعذّر الاتصال بالخادم" : "تعذّر إنشاء أمر الشراء"),
+  });
+  const canSubmit = supplierId !== null && items.length > 0 && !create.isPending;
 
   const orders = pos.data ?? [];
 
@@ -55,6 +97,46 @@ export default function PurchasesScreen() {
         />
         <View style={styles.spacer} />
       </View>
+
+      <Button label="أمر شراء جديد" onPress={() => setOpen(true)} />
+
+      <Modal visible={open} animationType="slide" onRequestClose={() => setOpen(false)}>
+        <View style={[styles.modal, RTL]}>
+          <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
+            <Text style={styles.modalTitle}>أمر شراء جديد</Text>
+
+            <Text style={styles.meta}>المورد</Text>
+            <View style={styles.chipRow}>
+              {(suppliers.data ?? []).map((sp) => (
+                <Chip key={sp.id} label={sp.name} active={supplierId === sp.id} onPress={() => setSupplierId(sp.id)} />
+              ))}
+            </View>
+
+            <Text style={styles.meta}>الأصناف</Text>
+            <SearchField value={q} onChangeText={setQ} placeholder="ابحث عن منتج لإضافته…" />
+            {matches.map((p) => (
+              <Pressable key={p.id} style={styles.pick} onPress={() => addItem(p)}>
+                <Text numberOfLines={1} style={styles.supplier}>{p.name}</Text>
+                <Text style={styles.meta}>تكلفة {money(p.costPrice)}</Text>
+              </Pressable>
+            ))}
+            {items.map((i) => (
+              <View key={i.productId} style={styles.draftRow}>
+                <Text numberOfLines={1} style={[styles.supplier, { flex: 1 }]}>{i.productName}</Text>
+                <Pressable style={styles.qtyBtn} onPress={() => bump(i.productId, -1)}><Minus size={14} color={colors.accent} weight="bold" /></Pressable>
+                <Text style={styles.qty}>{i.quantity}</Text>
+                <Pressable style={styles.qtyBtn} onPress={() => bump(i.productId, 1)}><Plus size={14} color={colors.accent} weight="bold" /></Pressable>
+                <Text style={styles.total}>{money(i.quantity * i.unitCost)}</Text>
+              </View>
+            ))}
+            {items.length ? <Text style={styles.total}>الإجمالي: {money(draftTotal)}</Text> : null}
+
+            {error ? <Text style={styles.err}>{error}</Text> : null}
+            <Button label="إنشاء أمر الشراء" disabled={!canSubmit} loading={create.isPending} onPress={() => create.mutate()} />
+            <Button label="إلغاء" variant="ghost" onPress={() => setOpen(false)} />
+          </ScrollView>
+        </View>
+      </Modal>
 
       {pos.isLoading ? (
         <ActivityIndicator color={colors.accent} />
@@ -110,4 +192,13 @@ const styles = StyleSheet.create({
   total: { fontFamily: fonts.bold, fontSize: 16, color: colors.text, fontVariant: ["tabular-nums"] },
   meta: { flexShrink: 1, fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },
   due: { fontFamily: fonts.medium, fontSize: 13, color: colors.danger, ...RTL_TEXT },
+  modal: { flex: 1, backgroundColor: colors.bg },
+  modalContent: { padding: spacing.xl, paddingTop: 60, gap: spacing.md },
+  modalTitle: { fontFamily: fonts.bold, fontSize: 24, color: colors.text, ...RTL_TEXT },
+  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  pick: { padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, gap: 2 },
+  draftRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
+  qtyBtn: { width: 32, height: 32, borderRadius: radius.md, borderWidth: 1, borderColor: colors.accent, alignItems: "center", justifyContent: "center" },
+  qty: { minWidth: 24, textAlign: "center", fontFamily: fonts.bold, fontSize: 14, color: colors.text },
+  err: { fontFamily: fonts.medium, fontSize: 14, color: colors.danger, textAlign: "center" },
 });

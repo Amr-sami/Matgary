@@ -3,6 +3,7 @@ import { useRouter } from "expo-router";
 import {
   ArrowCounterClockwise,
   CaretLeft,
+  CreditCard,
   Gear,
   ListChecks,
   SignOut,
@@ -35,6 +36,7 @@ const ITEMS = [
   { route: "/returns", label: "المرتجعات", icon: ArrowCounterClockwise, requires: "view_returns" },
   { route: "/team", label: "الفريق", icon: UsersThree, requires: "manage_team" },
   { route: "/settings", label: "الإعدادات", icon: Gear, requires: "view_settings" },
+  { route: "/billing", label: "الاشتراك", icon: CreditCard, requires: null },
 ] as const;
 
 const TEAM_ANY = ["manage_team", "request_leave", "manage_leave"];
@@ -48,6 +50,8 @@ export default function MoreScreen() {
   const visible = ITEMS.filter((i) => {
     if (i.route === "/tasks") return Boolean(me);
     if (i.route === "/team") return TEAM_ANY.some((p) => allowed.has(p));
+    // Billing is owner-only on the web (app.billing.ownerOnly).
+    if (i.route === "/billing") return Boolean(me?.isOwner);
     return allowed.has(i.requires);
   });
 

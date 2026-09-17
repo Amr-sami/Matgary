@@ -4,6 +4,7 @@ import {
   requireTenant,
   requireTenantWithBranch,
 } from "@/lib/api/auth-helpers";
+import { requirePermissionWithBranch } from "@/lib/api/auth-helpers";
 import { resolveBranchFilter } from "@/lib/api/branch-context";
 import { CATALOG_CACHE, cacheHeaders } from "@/lib/api/cache-headers";
 import { listCategories } from "@/lib/repo/catalog";
@@ -39,7 +40,7 @@ const createSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const r = await requireTenantWithBranch();
+  const r = await requirePermissionWithBranch("manage_catalog");
   if (!r.ok) return r.response;
   const body = await req.json().catch(() => null);
   const parsed = createSchema.safeParse(body);

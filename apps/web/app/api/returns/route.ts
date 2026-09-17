@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireTenant } from "@/lib/api/auth-helpers";
+import { requirePermissionAudited } from "@/lib/api/auth-helpers";
 import { resolveBranchFilter } from "@/lib/api/branch-context";
 import { resolveSinceWindow } from "@/lib/api/list-window";
 import { listReturns, recordReturn } from "@/lib/repo/operations";
@@ -29,7 +30,7 @@ const schema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const r = await requireTenant();
+  const r = await requirePermissionAudited("manage_returns");
   if (!r.ok) return r.response;
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);

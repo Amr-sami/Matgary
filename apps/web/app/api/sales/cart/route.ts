@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireTenantWithBranch } from "@/lib/api/auth-helpers";
+import { requireTenantWithBranch, requirePermissionWithBranch } from "@/lib/api/auth-helpers";
 import { recordCartSale } from "@/lib/repo/operations";
 import { logActivity } from "@/lib/repo/activity";
 import { normalizeEgyptPhone } from "@/lib/validators/egypt";
@@ -51,7 +51,7 @@ const schema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const r = await requireTenantWithBranch();
+  const r = await requirePermissionWithBranch("record_sales");
   if (!r.ok) return r.response;
 
   // Per-tenant rate guard. Cap a runaway POS or leaked-cookie attack to a
