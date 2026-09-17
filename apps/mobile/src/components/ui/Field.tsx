@@ -16,6 +16,12 @@ interface FieldProps extends Omit<TextInputProps, "style"> {
   label: string;
   /** Renders the show/hide eye and manages secureTextEntry. */
   secure?: boolean;
+  /**
+   * Force left-to-right text regardless of the layout direction — for values
+   * that are never Arabic (passwords, codes, URLs). The web sets dir="ltr" on
+   * the same inputs.
+   */
+  ltr?: boolean;
 }
 
 /**
@@ -27,7 +33,7 @@ interface FieldProps extends Omit<TextInputProps, "style"> {
  * which is forced on at build time via the expo-localization plugin. Hardcoding
  * "right" would break the moment an English user switches locale.
  */
-export function Field({ label, secure = false, ...props }: FieldProps) {
+export function Field({ label, secure = false, ltr = false, ...props }: FieldProps) {
   const [focused, setFocused] = useState(false);
   const [revealed, setRevealed] = useState(false);
 
@@ -47,7 +53,7 @@ export function Field({ label, secure = false, ...props }: FieldProps) {
             props.onBlur?.(e);
           }}
           placeholderTextColor={colors.textSecondary}
-          style={styles.input}
+          style={[styles.input, ltr && styles.inputLtr]}
         />
         {secure ? (
           <Pressable
@@ -94,5 +100,6 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
     paddingVertical: 12,
   },
+  inputLtr: { writingDirection: "ltr", textAlign: "left" },
   eye: { fontSize: 18, color: colors.textSecondary },
 });

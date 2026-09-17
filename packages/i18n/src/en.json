@@ -1675,8 +1675,17 @@
       "relative": {
         "now": "Now",
         "minutes": "{n}m ago",
+        "minutesOne": "1m ago",
+        "minutesTwo": "2m ago",
+        "minutesFew": "{n}m ago",
         "hours": "{n}h ago",
-        "days": "{n}d ago"
+        "hoursOne": "1h ago",
+        "hoursTwo": "2h ago",
+        "hoursFew": "{n}h ago",
+        "days": "{n}d ago",
+        "daysOne": "1d ago",
+        "daysTwo": "2d ago",
+        "daysFew": "{n}d ago"
       }
     },
     "customers": {
@@ -2125,6 +2134,7 @@
       "tooShort": "The new password must be at least 8 characters",
       "mismatch": "Passwords don't match",
       "genericError": "Couldn't change password",
+      "rateLimited": "Too many attempts. Try again later.",
       "success": "Password changed"
     },
     "settingsPage": {
@@ -3872,6 +3882,7 @@
       "redirecting": "Redirecting you to sign in…",
       "checkingLink": "Checking the link…",
       "invalidLinkPrefix": "Invalid or expired link. Request a new one from",
+      "invalidLink": "Invalid or expired link. Request a new one.",
       "invalidLinkAction": "Forgot password",
       "errors": {
         "short": "Password must be at least 8 characters",
@@ -4317,7 +4328,9 @@
       "addedOn": "Added on",
       "assignTo": "Assign to",
       "noStaffYet": "No staff yet",
-      "noMembers": "No members"
+      "noMembers": "No members",
+      "yes": "Yes",
+      "no": "No"
     },
     "pos": {
       "itemsInCart": "{n} items in the invoice",
@@ -4429,8 +4442,32 @@
       "loadFailed": "Couldn't load insights",
       "deepDive": "Deep dive",
       "trendTitle": "Sales trend ({range})",
+      "peakDate": "{month} {day}",
+      "month": {
+        "jan": "Jan",
+        "feb": "Feb",
+        "mar": "Mar",
+        "apr": "Apr",
+        "may": "May",
+        "jun": "Jun",
+        "jul": "Jul",
+        "aug": "Aug",
+        "sep": "Sep",
+        "oct": "Oct",
+        "nov": "Nov",
+        "dec": "Dec"
+      },
       "ofValue": "{pct}% of value",
-      "comingSoon": "{section} — coming soon"
+      "comingSoon": "{section} — coming soon",
+      "dow": {
+        "sun": "Sun",
+        "mon": "Mon",
+        "tue": "Tue",
+        "wed": "Wed",
+        "thu": "Thu",
+        "fri": "Fri",
+        "sat": "Sat"
+      }
     },
     "inventory": {
       "searchHint": "Try another search or clear the filters.",
@@ -4446,6 +4483,7 @@
       "addBranch": "+ Add branch",
       "deleteBranchConfirm": "Delete branch “{name}”? This is refused if the branch has any data (sales / expenses / stock).",
       "securitySub": "Two-factor auth, sign out everywhere, and delete the store.",
+      "changePasswordSub": "Replace your sign-in password.",
       "digestActive": "On — you'll get a message at {time} in your store's time zone",
       "switched": "Switched",
       "openAuthApp": "Open authenticator app",
@@ -4477,6 +4515,35 @@
     },
     "format": {
       "money": "EGP {amount}"
+    },
+    "onboarding": {
+      "seedNote": "Ready-made categories can only be set up from the web version for now. To start with them, finish onboarding on the web instead of here.",
+      "webOnly": "Web only",
+      "slideCounter": "{n} / {total}"
+    },
+    "leave": {
+      "title": "Leave requests",
+      "from": "From (YYYY-MM-DD)",
+      "to": "To (YYYY-MM-DD)",
+      "datePlaceholder": "2026-01-31",
+      "invalidDates": "Enter valid dates — the end date must not precede the start.",
+      "filterPending": "Pending",
+      "filterAll": "All",
+      "noPending": "No pending requests",
+      "noPendingHint": "Every request has been decided. Switch to \"All\" to review past ones.",
+      "decisionNoteHint": "Shown to the employee with the decision."
+    },
+    "activity": {
+      "datePlaceholder": "dd/mm/yyyy",
+      "invalidDate": "Enter a date as YYYY-MM-DD or DD/MM/YYYY."
+    },
+    "whatsapp": {
+      "connected": "Connected",
+      "notConnected": "Not connected",
+      "sandbox": "Sandbox",
+      "connectFromWeb": "Connect from the web dashboard: Settings → WhatsApp. Meta sign-in needs a browser.",
+      "genericError": "Something went wrong. Please try again.",
+      "retry": "Retry"
     }
   }
 }

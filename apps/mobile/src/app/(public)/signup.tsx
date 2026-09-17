@@ -198,6 +198,8 @@ export default function SignupScreen() {
       // Signup returns the RAW permissions column; the session must be seeded
       // from /me, which is what adoptSession does.
       await useSession.getState().adoptSession();
+      // Web sends brand-new tenants to /onboarding before the dashboard.
+      router.replace("/onboarding");
     } catch (e) {
       setError(signupMessage(e));
     } finally {

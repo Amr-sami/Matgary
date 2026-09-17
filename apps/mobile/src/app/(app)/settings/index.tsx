@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import {
   ChatCircle,
+  Key,
   Receipt,
   ShieldCheck,
   Storefront,
@@ -83,6 +84,14 @@ export default function SettingsScreen() {
       icon: ShieldCheck,
       title: t("app.accountSecurity.title"),
       hint: t("mobile.settings.securitySub"),
+      ownerOnly: false,
+    },
+    {
+      key: "changePassword",
+      route: "/settings/change-password",
+      icon: Key,
+      title: t("app.changePassword.title"),
+      hint: t("mobile.settings.changePasswordSub"),
       ownerOnly: false,
     },
     {
