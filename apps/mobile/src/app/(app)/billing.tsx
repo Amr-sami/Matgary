@@ -116,7 +116,12 @@ export default function BillingScreen() {
         </Card>
       ) : null}
 
-      {(plans.data ?? []).map((p) => {
+      {(plans.data ?? [])
+        // The trial card is only meaningful while ON the trial; the web hides
+        // it afterwards too. "قريباً" is for plans not yet sellable, which the
+        // trial is not — it is simply not purchasable.
+        .filter((p) => p.key !== "trial" || b?.status === "trialing")
+        .map((p) => {
         const isCurrent = p.key === b?.plan;
         return (
           <Card key={p.key}>
@@ -128,9 +133,9 @@ export default function BillingScreen() {
                 <Text style={styles.price}>{p.monthlyEgp}</Text>
                 <Text style={styles.priceUnit}>ج / شهر</Text>
               </View>
-            ) : (
+            ) : p.key !== "trial" ? (
               <Text style={styles.soon}>قريباً</Text>
-            )}
+            ) : null}
 
             <View style={styles.features}>
               {p.featuresAr.map((f) => (

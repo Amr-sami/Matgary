@@ -54,7 +54,15 @@ export default function SalesScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const cart = useCart();
-  const totals = useCart(selectTotals);
+  // NOT a zustand selector: selectTotals returns a fresh object every call, and
+  // zustand compares selector results with Object.is, so subscribing to it
+  // re-renders on every render — "Maximum update depth exceeded" the first time
+  // the screen opened. useMemo over the actual inputs is the correct shape.
+  const totals = useMemo(
+    () => selectTotals(cart),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [cart.lines, cart.orderDiscountType, cart.orderDiscountValue],
+  );
   const itemCount = useCart(selectItemCount);
 
   const products = useQuery({
