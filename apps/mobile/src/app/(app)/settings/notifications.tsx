@@ -9,10 +9,10 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { CaretRight } from "phosphor-react-native";
 
 import { api } from "@/api/client";
 import { Screen } from "@/components/layout/Screen";
+import { ChevronBack } from "@/components/ui/Chevron";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { Segmented } from "@/components/ui/Segmented";
@@ -124,7 +124,7 @@ export default function NotificationSettingsScreen() {
           hitSlop={12}
           style={styles.back}
         >
-          <CaretRight size={16} color={colors.textSecondary} />
+          <ChevronBack size={16} color={colors.textSecondary} />
           <Text style={styles.backLabel}>{t("app.settingsPage.title")}</Text>
         </Pressable>
         <Text style={styles.title}>{t("app.shell.notifications.title")}</Text>

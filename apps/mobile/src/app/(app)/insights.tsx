@@ -137,7 +137,7 @@ export default function InsightsScreen() {
       {tab !== "overview" ? (
         <Card>
           <Text style={styles.soon}>
-            {tab === "deep" ? t("mobile.insights.deepDive") : t("app.insights.staff.title")} — قريباً
+            {t("mobile.insights.comingSoon", { section: tab === "deep" ? t("mobile.insights.deepDive") : t("app.insights.staff.title") })}
           </Text>
         </Card>
       ) : overview.isLoading ? (

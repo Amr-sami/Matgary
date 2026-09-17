@@ -3,6 +3,7 @@ import * as Device from "expo-device";
 import { ApiError, auth, me as meApi, type MeResponse } from "@matgary/api-client";
 
 import { api, deviceMeta, onSessionLost, setActiveBranchId } from "@/api/client";
+import { t } from "@/i18n";
 import { getInstallId } from "@/auth/installId";
 
 type Status = "loading" | "signedOut" | "signedIn";
@@ -27,32 +28,28 @@ interface SessionState {
   startDemo: () => Promise<void>;
 }
 
-/**
- * Arabic, because every user-facing string in this product is Arabic. These
- * live here rather than in a dictionary for now; they move to @matgary/i18n
- * when the shared dictionaries are wired up (doc 06 §11 step 2).
- */
+/** Error copy, from the shared dictionary so the language switch applies. */
 function messageFor(error: unknown): string {
-  if (!(error instanceof ApiError)) return "حدث خطأ غير متوقع";
+  if (!(error instanceof ApiError)) return t("mobile.auth.unexpected");
   switch (error.kind) {
     case "credentials":
-      return "بيانات الدخول غير صحيحة";
+      return t("mobile.auth.badCredentials");
     case "offline":
-      return "تعذّر الاتصال بالخادم";
+      return t("mobile.common.offline");
     case "timeout":
-      return "انتهت مهلة الاتصال";
+      return t("mobile.common.timeout");
     case "rateLimited":
-      return "محاولات كثيرة. حاول بعد قليل";
+      return t("mobile.signup.tooMany");
     case "billing":
-      return "الاشتراك غير مفعّل";
+      return t("mobile.common.subscriptionInactive");
     case "conflict":
       return error.code === "TOTP_REQUIRED"
-        ? "هذا الحساب يتطلب رمز تحقق"
-        : "تعذّر إتمام الطلب";
+        ? t("mobile.auth.totpRequired")
+        : t("mobile.auth.requestFailed");
     case "server":
-      return "الخادم لا يستجيب";
+      return t("mobile.common.serverError");
     default:
-      return "تعذّر تسجيل الدخول";
+      return t("mobile.auth.signInFailed");
   }
 }
 

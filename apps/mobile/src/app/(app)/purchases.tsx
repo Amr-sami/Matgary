@@ -118,7 +118,7 @@ export default function PurchasesScreen() {
             {matches.map((p) => (
               <Pressable key={p.id} style={styles.pick} onPress={() => addItem(p)}>
                 <Text numberOfLines={1} style={styles.supplier}>{p.name}</Text>
-                <Text style={styles.meta}>تكلفة {money(p.costPrice)}</Text>
+                <Text style={styles.meta}>{t("mobile.purchases.cost", { amount: money(p.costPrice) })}</Text>
               </Pressable>
             ))}
             {items.map((i) => (
@@ -130,7 +130,7 @@ export default function PurchasesScreen() {
                 <Text style={styles.total}>{money(i.quantity * i.unitCost)}</Text>
               </View>
             ))}
-            {items.length ? <Text style={styles.total}>الإجمالي: {money(draftTotal)}</Text> : null}
+            {items.length ? <Text style={styles.total}>{t("mobile.purchases.total", { amount: money(draftTotal) })}</Text> : null}
 
             {error ? <Text style={styles.err}>{error}</Text> : null}
             <Button label={t("mobile.purchases.create")} disabled={!canSubmit} loading={create.isPending} onPress={() => create.mutate()} />
@@ -159,11 +159,11 @@ export default function PurchasesScreen() {
                 <View style={styles.rowMeta}>
                   <Text style={styles.total}>{money(o.total)}</Text>
                   <Text style={styles.meta}>
-                    {o.itemCount} صنف · {shortDate(o.orderDate)}
+                    {t("mobile.purchases.orderMeta", { n: o.itemCount, date: shortDate(o.orderDate) })}
                   </Text>
                 </View>
                 {due > 0 ? (
-                  <Text style={styles.due}>متبقي {money(due)}</Text>
+                  <Text style={styles.due}>{t("mobile.purchases.remaining", { amount: money(due) })}</Text>
                 ) : null}
               </View>
             );

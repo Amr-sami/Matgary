@@ -11,7 +11,6 @@ import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "@matgary/api-client";
 import {
-  CaretRight,
   Eye,
   EyeSlash,
   PencilSimple,
@@ -21,6 +20,7 @@ import {
 
 import { api } from "@/api/client";
 import { Screen } from "@/components/layout/Screen";
+import { ChevronBack } from "@/components/ui/Chevron";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -195,7 +195,7 @@ export default function BranchesScreen() {
           style={styles.back}
         >
           {/* Back points RIGHT in an RTL page — the mirror of CaretLeft. */}
-          <CaretRight size={16} color={colors.textSecondary} />
+          <ChevronBack size={16} color={colors.textSecondary} />
           <Text style={styles.backLabel}>{t("app.settingsPage.title")}</Text>
         </Pressable>
 

@@ -4355,8 +4355,10 @@
       "saveFailed": "Couldn't record the return",
       "qtySuffix": "{n} pcs ·",
       "summary": "{n} returns · {total}",
-      "changeLine": "‹ Change item",
-      "submit": "Record return"
+      "changeLine": "Change item",
+      "submit": "Record return",
+      "lineMeta": "{invoice} · {n} pcs",
+      "maxQty": "Maximum: {n}"
     },
     "purchases": {
       "empty": "No purchase orders",
@@ -4366,7 +4368,12 @@
       "orderCount": "Orders",
       "owedToSuppliers": "Owed to suppliers",
       "searchProduct": "Search for a product to add…",
-      "create": "Create purchase order"
+      "create": "Create purchase order",
+      "cost": "Cost {amount}",
+      "total": "Total: {amount}",
+      "orderMeta": "{n} items · {date}",
+      "remaining": "{amount} remaining",
+      "itemCount": "{n} items"
     },
     "expenses": {
       "empty": "No expenses yet",
@@ -4389,7 +4396,13 @@
       "empty": "No customers yet",
       "backToList": "Back to customers",
       "invoiceHistory": "Invoice history",
-      "outstandingFromCustomer": "Outstanding from customer"
+      "outstandingFromCustomer": "Outstanding from customer",
+      "rowMeta": "{phone} · {n} invoices · {spend}",
+      "lastPurchase": "Last purchase {date}",
+      "branchData": "Branch data: {branch}",
+      "invoiceMeta": "{date} · {n} items",
+      "paid": "Paid: {amount}",
+      "remaining": "Remaining: {amount}"
     },
     "suppliers": {
       "profileOf": "Supplier: {name}",
@@ -4401,20 +4414,23 @@
       "edit": "Edit supplier"
     },
     "team": {
-      "summary": "{n} members"
+      "summary": "{n} members",
+      "memberMeta": "{email} · {n} permissions"
     },
     "tasks": {
       "summary": "{open} open · {done} done",
       "newTask": "New task +",
       "doneCheck": "✓ Done",
       "completeTitle": "Complete {title}",
-      "reopenTitle": "Reopen {title}"
+      "reopenTitle": "Reopen {title}",
+      "due": "Due {date}"
     },
     "insights": {
       "loadFailed": "Couldn't load insights",
       "deepDive": "Deep dive",
       "trendTitle": "Sales trend ({range})",
-      "ofValue": "{pct}% of value"
+      "ofValue": "{pct}% of value",
+      "comingSoon": "{section} — coming soon"
     },
     "inventory": {
       "searchHint": "Try another search or clear the filters.",
@@ -4434,7 +4450,9 @@
       "switched": "Switched",
       "openAuthApp": "Open authenticator app",
       "digestPermission": "Daily digest settings are only available to those with permission to manage it.",
-      "currentStatus": "Current status:"
+      "currentStatus": "Current status:",
+      "currentBranchLine": "{slug} · Current branch: {branch}",
+      "deletionDate": "Deletion date:"
     },
     "signup": {
       "emailTaken": "This email is already registered",
@@ -4448,6 +4466,13 @@
       "showPassword": "Show password",
       "hidePassword": "Hide password",
       "scanBarcode": "Scan barcode"
+    },
+    "auth": {
+      "unexpected": "Something went wrong",
+      "badCredentials": "Incorrect email or password",
+      "totpRequired": "This account requires a verification code",
+      "requestFailed": "Couldn't complete the request",
+      "signInFailed": "Couldn't sign in"
     }
   }
 }

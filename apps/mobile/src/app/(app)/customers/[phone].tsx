@@ -4,7 +4,6 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import {
   CalendarBlank,
-  CaretRight,
   CheckCircle,
   Phone,
   Receipt,
@@ -15,6 +14,7 @@ import { ApiError } from "@matgary/api-client";
 
 import { api } from "@/api/client";
 import { Screen } from "@/components/layout/Screen";
+import { ChevronBack } from "@/components/ui/Chevron";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -180,7 +180,7 @@ export default function CustomerDetailScreen() {
         style={styles.crumb}
         onPress={() => router.navigate("/customers")}
       >
-        <CaretRight size={16} color={colors.textSecondary} />
+        <ChevronBack size={16} color={colors.textSecondary} />
         <Text style={styles.crumbText}>{t("app.customers.title")}</Text>
       </Pressable>
 
@@ -215,7 +215,7 @@ export default function CustomerDetailScreen() {
                 ) : null}
                 {branchName ? (
                   <Text numberOfLines={1} style={styles.branch}>
-                    بيانات الفرع: {branchName}
+                    {t("mobile.customers.branchData", { branch: branchName })}
                   </Text>
                 ) : null}
               </View>
@@ -290,7 +290,7 @@ export default function CustomerDetailScreen() {
                           )}
                         </View>
                         <Text style={styles.invoiceMeta}>
-                          {shortDate(inv.date)} · {inv.lines.length} قطعة
+                          {t("mobile.customers.invoiceMeta", { date: shortDate(inv.date), n: inv.lines.length })}
                           {inv.paidAt ? ` ${t("mobile.customers.paidOn", { date: shortDate(inv.paidAt) })}` : ""}
                         </Text>
                       </View>
@@ -302,10 +302,10 @@ export default function CustomerDetailScreen() {
                         {partial ? (
                           <>
                             <Text numberOfLines={1} style={styles.paidLine}>
-                              مدفوع: {money(inv.amountPaid)}
+                              {t("mobile.customers.paid", { amount: money(inv.amountPaid) })}
                             </Text>
                             <Text numberOfLines={1} style={styles.dueLine}>
-                              متبقي: {money(inv.balance)}
+                              {t("mobile.customers.remaining", { amount: money(inv.balance) })}
                             </Text>
                           </>
                         ) : null}

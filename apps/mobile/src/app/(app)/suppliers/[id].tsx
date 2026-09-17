@@ -10,12 +10,13 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { At, CaretRight, MapPin, Phone, Receipt, Truck, Wallet } from "phosphor-react-native";
+import { At, MapPin, Phone, Receipt, Truck, Wallet } from "phosphor-react-native";
 import { ApiError, catalog, type Expense, type PurchaseOrder, type Supplier } from "@matgary/api-client";
 
 import { api } from "@/api/client";
 import { isRTL, t } from "@/i18n";
 import { Screen } from "@/components/layout/Screen";
+import { ChevronBack } from "@/components/ui/Chevron";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -154,7 +155,7 @@ export default function SupplierDetailScreen() {
         >
           <Text style={styles.crumbText}>{t("app.suppliers.title")}</Text>
         </Pressable>
-        <CaretRight size={14} color={colors.textSecondary} />
+        <ChevronBack size={14} color={colors.textSecondary} />
         <Text numberOfLines={1} style={styles.crumbCurrent}>
           {supplier?.name ?? ""}
         </Text>
@@ -256,7 +257,7 @@ export default function SupplierDetailScreen() {
                       <View style={styles.rowMain}>
                         <View style={styles.rowTitleLine}>
                           <Text numberOfLines={1} style={styles.rowTitle}>
-                            {o.itemCount} صنف
+                            {t("mobile.purchases.itemCount", { n: o.itemCount })}
                           </Text>
                           <Badge label={s.label} variant={s.variant} />
                         </View>

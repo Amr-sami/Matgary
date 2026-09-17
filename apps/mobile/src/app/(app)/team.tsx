@@ -54,7 +54,7 @@ export default function TeamScreen() {
                     {m.displayName || m.username}
                   </Text>
                   <Text numberOfLines={1} style={styles.meta}>
-                    {m.loginEmail} · {m.permissions.length} صلاحية
+                    {t("mobile.team.memberMeta", { email: m.loginEmail, n: m.permissions.length })}
                   </Text>
                 </View>
                 <View style={styles.badges}>

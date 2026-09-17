@@ -2,11 +2,12 @@ import { useMemo } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
-import { Barcode, CaretRight, Coins, Package, Tag, Wallet } from "phosphor-react-native";
+import { Barcode, Coins, Package, Tag, Wallet } from "phosphor-react-native";
 import { ApiError, catalog, type Supplier } from "@matgary/api-client";
 
 import { api } from "@/api/client";
 import { Screen } from "@/components/layout/Screen";
+import { ChevronBack } from "@/components/ui/Chevron";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { StatCard } from "@/components/ui/StatCard";
@@ -102,7 +103,7 @@ export default function ProductDetailScreen() {
         >
           <Text style={styles.crumbText}>{t("app.inventory.title")}</Text>
         </Pressable>
-        <CaretRight size={14} color={colors.textSecondary} />
+        <ChevronBack size={14} color={colors.textSecondary} />
         <Text numberOfLines={1} style={styles.crumbCurrent}>
           {product?.name ?? ""}
         </Text>

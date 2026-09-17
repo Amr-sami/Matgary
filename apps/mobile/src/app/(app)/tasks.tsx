@@ -156,7 +156,7 @@ export default function TasksScreen() {
                   {isDone ? (
                     <Badge label={t("app.tasks.card.doneAction")} variant="success" />
                   ) : task.dueDate ? (
-                    <Text style={styles.date}>تستحق {shortDate(task.dueDate)}</Text>
+                    <Text style={styles.date}>{t("mobile.tasks.due", { date: shortDate(task.dueDate) })}</Text>
                   ) : null}
                 </View>
                 {/* What a tap does, spelled out. The web says it with two

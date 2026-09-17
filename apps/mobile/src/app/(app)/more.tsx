@@ -2,7 +2,6 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import {
   ArrowCounterClockwise,
-  CaretLeft,
   CreditCard,
   Gear,
   ListChecks,
@@ -14,6 +13,7 @@ import {
 } from "phosphor-react-native";
 
 import { Screen } from "@/components/layout/Screen";
+import { ChevronForward } from "@/components/ui/Chevron";
 import { Card } from "@/components/ui/Card";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
@@ -78,8 +78,8 @@ export default function MoreScreen() {
             >
               <Icon size={22} color={colors.accent} />
               <Text style={styles.rowLabel}>{item.label}</Text>
-              {/* CaretLeft, not Right: under RTL "forward" points left. */}
-              <CaretLeft size={16} color={colors.textSecondary} />
+              {/* not Right: under RTL "forward" points left. */}
+              <ChevronForward size={16} color={colors.textSecondary} />
             </Pressable>
           );
         })}

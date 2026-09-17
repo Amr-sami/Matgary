@@ -78,7 +78,7 @@ export default function ReturnsScreen() {
                 {(sales.data ?? []).slice(0, 30).map((l) => (
                   <Pressable key={l.id} style={styles.pick} onPress={() => { setLine(l); setQty("1"); }}>
                     <Text numberOfLines={1} style={styles.pickName}>{l.productName}</Text>
-                    <Text style={styles.meta}>{l.invoiceId} · {l.quantitySold} قطعة</Text>
+                    <Text style={styles.meta}>{t("mobile.returns.lineMeta", { invoice: l.invoiceId, n: l.quantitySold })}</Text>
                   </Pressable>
                 ))}
               </>
@@ -86,7 +86,7 @@ export default function ReturnsScreen() {
               <>
                 <Pressable onPress={() => setLine(null)}><Text style={styles.link}>{t("mobile.returns.changeLine")}</Text></Pressable>
                 <Text style={styles.pickName}>{line.productName}</Text>
-                <Text style={styles.meta}>الحد الأقصى: {line.quantitySold}</Text>
+                <Text style={styles.meta}>{t("mobile.returns.maxQty", { n: line.quantitySold })}</Text>
                 <Field label={t("app.sales.returnModal.quantity")} value={qty} onChangeText={setQty} keyboardType="number-pad" />
                 <Field label={t("mobile.common.reason")} value={reason} onChangeText={setReason} placeholder={t("mobile.returns.reasonExample")} />
                 {error ? <Text style={styles.err}>{error}</Text> : null}

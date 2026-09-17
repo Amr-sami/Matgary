@@ -9,10 +9,11 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { CaretRight, ShieldCheck } from "phosphor-react-native";
+import { ShieldCheck } from "phosphor-react-native";
 
 import { api } from "@/api/client";
 import { Screen } from "@/components/layout/Screen";
+import { ChevronBack } from "@/components/ui/Chevron";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Field } from "@/components/ui/Field";
@@ -188,7 +189,7 @@ export default function SecurityScreen() {
         hitSlop={12}
         style={styles.back}
       >
-        <CaretRight size={16} color={colors.textSecondary} />
+        <ChevronBack size={16} color={colors.textSecondary} />
         <Text style={styles.backLabel}>{t("app.settingsPage.title")}</Text>
       </Pressable>
       <View style={styles.titleRow}>
@@ -368,7 +369,7 @@ export default function SecurityScreen() {
             {scheduledAt ? (
               <View style={styles.stack}>
                 <Text style={styles.hint}>
-                  موعد الحذف:{" "}
+                  {t("mobile.settings.deletionDate")}{" "}
                   <Text style={styles.mono}>{scheduledAt.slice(0, 10)}</Text>
                 </Text>
                 <Button

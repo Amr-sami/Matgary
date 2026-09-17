@@ -1,7 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import {
-  CaretLeft,
   ChatCircle,
   Receipt,
   ShieldCheck,
@@ -9,12 +8,14 @@ import {
 } from "phosphor-react-native";
 
 import { Screen } from "@/components/layout/Screen";
+import { ChevronForward } from "@/components/ui/Chevron";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
+import { Segmented } from "@/components/ui/Segmented";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
-import { t } from "@/i18n";
+import { t, useLocale } from "@/i18n";
 
 /**
  * Port of app__settings.png — the hub.
@@ -43,6 +44,8 @@ interface Tile {
 export default function SettingsScreen() {
   const router = useRouter();
   const me = useSession((s) => s.me);
+  const locale = useLocale((s) => s.locale);
+  const setLocale = useLocale((s) => s.setLocale);
   const isOwner = me?.isOwner ?? false;
   const branchCount = me?.branches.length ?? 0;
 
@@ -102,8 +105,21 @@ export default function SettingsScreen() {
           {me?.tenant.name ?? me?.tenant.slug ?? "—"}
         </Text>
         <Text numberOfLines={1} style={styles.meta}>
-          {me?.tenant.slug} · الفرع الحالي: {me?.branch.name ?? "—"}
+          {t("mobile.settings.currentBranchLine", { slug: me?.tenant.slug ?? "", branch: me?.branch.name ?? "—" })}
         </Text>
+      </Card>
+
+      {/* Language. The web puts this in the user menu; on the phone Settings is
+          where a person looks for it. Same two labels the web uses. */}
+      <Card title={t("app.shell.language.label")}>
+        <Segmented
+          value={locale}
+          onChange={(v) => void setLocale(v)}
+          items={[
+            { key: "ar", label: t("app.shell.language.arabic") },
+            { key: "en", label: t("app.shell.language.english") },
+          ]}
+        />
       </Card>
 
       <View style={styles.list}>
@@ -126,9 +142,9 @@ export default function SettingsScreen() {
                 </View>
                 <Text style={styles.tileHint}>{tile.hint}</Text>
               </View>
-              {/* CaretLeft, not Right: under RTL "forward" points left. */}
+              {/* not Right: under RTL "forward" points left. */}
               {tile.soon ? null : (
-                <CaretLeft size={20} color={colors.textSecondary} />
+                <ChevronForward size={20} color={colors.textSecondary} />
               )}
             </>
           );

@@ -4355,8 +4355,10 @@
       "saveFailed": "تعذّر تسجيل المرتجع",
       "qtySuffix": "{n} قطعة ·",
       "summary": "{n} مرتجع · {total}",
-      "changeLine": "‹ تغيير البند",
-      "submit": "تسجيل المرتجع"
+      "changeLine": "تغيير البند",
+      "submit": "تسجيل المرتجع",
+      "lineMeta": "{invoice} · {n} قطعة",
+      "maxQty": "الحد الأقصى: {n}"
     },
     "purchases": {
       "empty": "لا توجد أوامر شراء",
@@ -4366,7 +4368,12 @@
       "orderCount": "عدد الأوامر",
       "owedToSuppliers": "مستحق للموردين",
       "searchProduct": "ابحث عن منتج لإضافته…",
-      "create": "إنشاء أمر الشراء"
+      "create": "إنشاء أمر الشراء",
+      "cost": "تكلفة {amount}",
+      "total": "الإجمالي: {amount}",
+      "orderMeta": "{n} صنف · {date}",
+      "remaining": "متبقي {amount}",
+      "itemCount": "{n} صنف"
     },
     "expenses": {
       "empty": "لا توجد مصاريف",
@@ -4389,7 +4396,13 @@
       "empty": "لا يوجد عملاء",
       "backToList": "العودة لقائمة العملاء",
       "invoiceHistory": "سجل الفواتير",
-      "outstandingFromCustomer": "متبقي من العميل"
+      "outstandingFromCustomer": "متبقي من العميل",
+      "rowMeta": "{phone} · {n} فاتورة · {spend}",
+      "lastPurchase": "آخر شراء {date}",
+      "branchData": "بيانات الفرع: {branch}",
+      "invoiceMeta": "{date} · {n} قطعة",
+      "paid": "مدفوع: {amount}",
+      "remaining": "متبقي: {amount}"
     },
     "suppliers": {
       "profileOf": "ملف المورد {name}",
@@ -4401,20 +4414,23 @@
       "edit": "تعديل المورد"
     },
     "team": {
-      "summary": "{n} عضو"
+      "summary": "{n} عضو",
+      "memberMeta": "{email} · {n} صلاحية"
     },
     "tasks": {
       "summary": "{open} مفتوحة · {done} منجزة",
       "newTask": "مهمة جديدة +",
       "doneCheck": "✓ تم الإنجاز",
       "completeTitle": "إنهاء {title}",
-      "reopenTitle": "إعادة فتح {title}"
+      "reopenTitle": "إعادة فتح {title}",
+      "due": "تستحق {date}"
     },
     "insights": {
       "loadFailed": "تعذّر تحميل الإحصائيات",
       "deepDive": "التحليل المعمّق",
       "trendTitle": "اتجاه المبيعات ({range})",
-      "ofValue": "{pct}% من القيمة"
+      "ofValue": "{pct}% من القيمة",
+      "comingSoon": "{section} — قريباً"
     },
     "inventory": {
       "searchHint": "جرّب بحثاً آخر أو امسح الفلاتر.",
@@ -4434,7 +4450,9 @@
       "switched": "تم التبديل",
       "openAuthApp": "فتح تطبيق المصادقة",
       "digestPermission": "إعدادات الملخص اليومي متاحة لمن يملك صلاحية إدارتها فقط.",
-      "currentStatus": "الحالة الحالية:"
+      "currentStatus": "الحالة الحالية:",
+      "currentBranchLine": "{slug} · الفرع الحالي: {branch}",
+      "deletionDate": "موعد الحذف:"
     },
     "signup": {
       "emailTaken": "هذا البريد مسجّل بالفعل",
@@ -4448,6 +4466,13 @@
       "showPassword": "إظهار كلمة المرور",
       "hidePassword": "إخفاء كلمة المرور",
       "scanBarcode": "مسح باركود"
+    },
+    "auth": {
+      "unexpected": "حدث خطأ غير متوقع",
+      "badCredentials": "بيانات الدخول غير صحيحة",
+      "totpRequired": "هذا الحساب يتطلب رمز تحقق",
+      "requestFailed": "تعذّر إتمام الطلب",
+      "signInFailed": "تعذّر تسجيل الدخول"
     }
   }
 }

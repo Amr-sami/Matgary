@@ -68,9 +68,9 @@ export default function CustomersScreen() {
                 ) : null}
               </View>
               <Text style={styles.meta}>
-                {c.phone} · {c.invoiceCount} فاتورة · {money(c.totalSpend)}
+                {t("mobile.customers.rowMeta", { phone: c.phone, n: c.invoiceCount, spend: money(c.totalSpend) })}
               </Text>
-              <Text style={styles.meta}>آخر شراء {shortDate(c.lastPurchaseAt)}</Text>
+              <Text style={styles.meta}>{t("mobile.customers.lastPurchase", { date: shortDate(c.lastPurchaseAt) })}</Text>
             </Pressable>
           ))}
         </View>
