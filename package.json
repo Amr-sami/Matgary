@@ -21,6 +21,10 @@
     "db:seed:rich": "npm run db:seed:rich --workspace @matgary/web",
     "db:seed:demo": "npm run db:seed:demo --workspace @matgary/web",
     "db:up": "docker compose up -d postgres",
-    "db:down": "docker compose down"
+    "db:down": "docker compose down",
+    "postinstall": "patch-package"
+  },
+  "devDependencies": {
+    "patch-package": "^8.0.1"
   }
 }
