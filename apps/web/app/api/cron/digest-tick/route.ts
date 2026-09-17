@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq, sql } from "drizzle-orm";
-import { db } from "@/lib/db";
+import { db, withTenant } from "@/lib/db";
 import {
   branches,
   digestSettings,
@@ -77,11 +77,15 @@ export async function POST(req: NextRequest) {
       if (local.hour !== setting.digestHour) continue;
       const businessDate = local.business_date;
 
-      // Active branches for this tenant.
-      const branchRows = await db
-        .select({ id: branches.id, name: branches.name })
-        .from(branches)
-        .where(and(eq(branches.tenantId, t.id), eq(branches.isActive, true)));
+      // Active branches for this tenant. `branches` is FORCE RLS keyed on
+      // app.tenant_id, so this read must run inside withTenant — on the plain
+      // client it silently returns no rows and no digest ever goes out.
+      const branchRows = await withTenant(t.id, (tx) =>
+        tx
+          .select({ id: branches.id, name: branches.name })
+          .from(branches)
+          .where(and(eq(branches.tenantId, t.id), eq(branches.isActive, true))),
+      );
 
       // Build recipient list. Owners get every branch; managers only their
       // subscribed branch; extras come straight off the settings row.

@@ -330,6 +330,13 @@
       "when": 1781900100000,
       "tag": "0046_auth_devices",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1781900200000,
+      "tag": "0047_normalise_customer_phones",
+      "breakpoints": true
     }
   ]
 }

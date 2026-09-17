@@ -9,6 +9,7 @@ import { resolveBranchFilter } from "@/lib/api/branch-context";
 import { resolveSinceWindow } from "@/lib/api/list-window";
 import { listSales, listSalesPage, recordSale } from "@/lib/repo/operations";
 import { logActivity } from "@/lib/repo/activity";
+import { normalizeEgyptPhone } from "@/lib/validators/egypt";
 import { isDomainError, domainErrorBody } from "@/lib/errors";
 import { checkTenantRateLimit } from "@/lib/api/tenant-rate-limit";
 
@@ -72,9 +73,18 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
   }
+  // Customer phone normalises to canonical +20 form, exactly as
+  // /api/sales/cart does, so every reader keyed on customer_phone (the
+  // customer ledger, the v1 customers aggregation, /api/sales/settle) sees
+  // one row per person regardless of which endpoint wrote the sale. Junk
+  // input becomes null rather than rejecting the sale.
+  const normalisedCustomerPhone = parsed.data.customerPhone
+    ? normalizeEgyptPhone(parsed.data.customerPhone) ?? null
+    : null;
   try {
     const result = await recordSale(r.ctx.tenantId, {
       ...parsed.data,
+      customerPhone: normalisedCustomerPhone ?? undefined,
       customDate: parsed.data.customDate ? new Date(parsed.data.customDate) : undefined,
       recordedByUserId: r.ctx.userId,
       branchId: r.ctx.branchId,
