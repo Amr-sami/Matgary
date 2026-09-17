@@ -18,7 +18,6 @@ import { ApiError, dashboard as dashboardApi } from "@matgary/api-client";
 
 import { api } from "@/api/client";
 import { StockAlerts } from "@/components/dashboard/StockAlerts";
-import { BottomNav } from "@/components/layout/BottomNav";
 import { StatCard } from "@/components/ui/StatCard";
 import { useSession } from "@/stores/session";
 import { RTL, RTL_TEXT } from "@/theme/rtl";
@@ -109,7 +108,6 @@ export default function DashboardScreen() {
         ) : null}
       </ScrollView>
 
-      <BottomNav active="dashboard" permissions={me?.permissions ?? []} />
     </View>
   );
 }

@@ -1,0 +1,82 @@
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { useQuery } from "@tanstack/react-query";
+import { catalog } from "@matgary/api-client";
+
+import { api } from "@/api/client";
+import { Screen } from "@/components/layout/Screen";
+import { Badge } from "@/components/ui/Badge";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { money, shortDate } from "@/lib/format";
+import { RTL_TEXT } from "@/theme/rtl";
+import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
+
+/**
+ * Port of app__customers.png.
+ *
+ * Doc 04 marks this RECOMPOSE — receivables first — and that is exactly what
+ * the sort does: anyone with an outstanding balance floats to the top, because
+ * "who owes me money" is the question this screen exists to answer.
+ *
+ * Customers are aggregated from sales; there is no customers table.
+ */
+export default function CustomersScreen() {
+  const q = useQuery({
+    queryKey: ["customers"],
+    queryFn: () => catalog.listCustomers(api),
+  });
+
+  const rows = [...(q.data ?? [])].sort(
+    (a, b) => b.outstanding - a.outstanding || b.totalSpend - a.totalSpend,
+  );
+  const owed = rows.reduce((s, c) => s + c.outstanding, 0);
+
+  return (
+    <Screen
+      title="العملاء"
+      subtitle={rows.length ? `${rows.length} عميل · مستحق ${money(owed)}` : undefined}
+      onRefresh={() => void q.refetch()}
+      refreshing={q.isRefetching}
+    >
+      {q.isLoading ? (
+        <ActivityIndicator color={colors.accent} />
+      ) : rows.length === 0 ? (
+        <EmptyState title="لا يوجد عملاء" hint="يظهر العملاء هنا بعد أول عملية بيع باسم عميل." />
+      ) : (
+        <View style={styles.list}>
+          {rows.map((c) => (
+            <View key={c.phone} style={styles.row}>
+              <View style={styles.head}>
+                <Text numberOfLines={1} style={styles.name}>
+                  {c.name ?? c.phone}
+                </Text>
+                {c.outstanding > 0 ? (
+                  <Badge label={`عليه ${money(c.outstanding)}`} variant="outofstock" />
+                ) : null}
+              </View>
+              <Text style={styles.meta}>
+                {c.phone} · {c.invoiceCount} فاتورة · {money(c.totalSpend)}
+              </Text>
+              <Text style={styles.meta}>آخر شراء {shortDate(c.lastPurchaseAt)}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  list: { gap: spacing.md },
+  row: {
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    gap: 4,
+    ...elevation.card,
+  },
+  head: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  name: { flexShrink: 1, fontFamily: fonts.semibold, fontSize: 15, color: colors.text, ...RTL_TEXT },
+  meta: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },
+});

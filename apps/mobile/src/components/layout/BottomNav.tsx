@@ -11,73 +11,82 @@ import {
   ShoppingCart,
 } from "phosphor-react-native";
 
+import { useSession } from "@/stores/session";
 import { colors, fonts, spacing } from "@/theme/tokens";
 
 /**
  * Port of apps/web/components/layout/MobileBottomNav.tsx.
  *
- * Same six primary destinations, same order, same icons (Phosphor, regular
- * weight — the web aliases them under lucide names in lib/icons.ts), plus the
- * More entry. The active tab is accent-coloured with a short underline.
+ * Same destinations, same order, same Phosphor glyphs (the web aliases them
+ * under lucide names in lib/icons.ts), and the same permission filtering — a
+ * cashier gets a shorter bar rather than tabs that 403 on tap.
  *
- * Items are filtered by permission exactly as the web does, so a cashier sees
- * a shorter bar rather than tabs that 403 on tap. Doc 05 argued for trimming
- * this to five tabs on native; that is a design change, not a port, so it is
- * deliberately NOT made here — the brief is to match the shipped UI.
+ * Doc 05 argues for trimming this to five tabs on native. That is a design
+ * change rather than a port, so it is deliberately NOT made here.
  */
 type PhosphorIcon = ComponentType<{ size?: number; color?: string }>;
 
 interface NavItem {
-  key: string;
+  /** expo-router route name under (app). */
+  route: string;
   label: string;
   icon: PhosphorIcon;
   requires: string | null;
 }
 
-const PRIMARY: NavItem[] = [
-  { key: "dashboard", label: "لوحة", icon: GridFour, requires: "view_dashboard" },
-  { key: "inventory", label: "المخزن", icon: Package, requires: "view_inventory" },
-  { key: "sales", label: "المبيعات", icon: ShoppingCart, requires: "view_sales" },
-  { key: "add-product", label: "إضافة صنف", icon: PlusSquare, requires: "manage_inventory" },
-  { key: "purchases", label: "المشتريات", icon: Receipt, requires: "view_purchases" },
-  { key: "insights", label: "إحصائيات", icon: ChartBar, requires: "view_insights" },
+const ITEMS: NavItem[] = [
+  { route: "index", label: "لوحة", icon: GridFour, requires: "view_dashboard" },
+  { route: "inventory", label: "المخزن", icon: Package, requires: "view_inventory" },
+  { route: "sales", label: "المبيعات", icon: ShoppingCart, requires: "view_sales" },
+  { route: "add-product", label: "إضافة صنف", icon: PlusSquare, requires: "manage_inventory" },
+  { route: "purchases", label: "المشتريات", icon: Receipt, requires: "view_purchases" },
+  { route: "insights", label: "إحصائيات", icon: ChartBar, requires: "view_insights" },
+  { route: "more", label: "المزيد", icon: List, requires: null },
 ];
 
-const MORE: NavItem = { key: "more", label: "المزيد", icon: List, requires: null };
-
-interface BottomNavProps {
-  active: string;
-  permissions: string[];
-  onSelect?: (key: string) => void;
+/**
+ * Structural props rather than `BottomTabBarProps`.
+ *
+ * expo-router bundles its own copy of @react-navigation/bottom-tabs, so the
+ * hoisted types and the ones expo-router passes are two different nominal types
+ * and never assignable to each other. This component only needs the active
+ * route name and a way to navigate, so declaring exactly that sidesteps the
+ * dual-package problem instead of casting around it.
+ */
+interface TabBarProps {
+  state: { index: number; routes: { key: string; name: string }[] };
+  navigation: { navigate: (name: string) => void };
 }
 
-export function BottomNav({ active, permissions, onSelect }: BottomNavProps) {
+export function BottomNav({ state, navigation }: TabBarProps) {
   const insets = useSafeAreaInsets();
-  const allowed = new Set(permissions);
-  const items = [
-    ...PRIMARY.filter((i) => !i.requires || allowed.has(i.requires)),
-    MORE,
-  ];
+  const permissions = useSession((s) => s.me?.permissions);
+  const allowed = new Set(permissions ?? []);
+
+  const visible = ITEMS.filter((i) => !i.requires || allowed.has(i.requires));
+  const activeRoute = state.routes[state.index]?.name;
 
   return (
     <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
-      {items.map((item) => {
-        const isActive = item.key === active;
+      {visible.map((item) => {
+        const isActive = item.route === activeRoute;
         const tint = isActive ? colors.accent : colors.textSecondary;
         const Icon = item.icon;
         return (
           <Pressable
-            key={item.key}
+            key={item.route}
             style={styles.item}
-            onPress={() => onSelect?.(item.key)}
             accessibilityRole="tab"
             accessibilityState={{ selected: isActive }}
+            onPress={() => {
+              if (!isActive) navigation.navigate(item.route);
+            }}
           >
             <Icon size={22} color={tint} />
             <Text numberOfLines={1} style={[styles.label, { color: tint }]}>
               {item.label}
             </Text>
-            {isActive ? <View style={styles.underline} /> : null}
+            <View style={[styles.underline, !isActive && styles.underlineHidden]} />
           </Pressable>
         );
       })}
@@ -95,13 +104,7 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     paddingTop: spacing.sm,
   },
-  item: {
-    flex: 1,
-    alignItems: "center",
-    gap: 4,
-    // 44px minimum target — the web still has 348 controls under this.
-    minHeight: 44,
-  },
+  item: { flex: 1, alignItems: "center", gap: 4, minHeight: 44 },
   label: { fontFamily: fonts.medium, fontSize: 10 },
   underline: {
     height: 2,
@@ -110,4 +113,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
     marginTop: 2,
   },
+  // Kept mounted so the label never shifts when the active tab changes.
+  underlineHidden: { opacity: 0 },
 });
