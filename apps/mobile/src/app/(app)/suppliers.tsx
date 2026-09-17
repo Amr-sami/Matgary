@@ -1,4 +1,5 @@
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { catalog } from "@matgary/api-client";
 
@@ -12,6 +13,7 @@ import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
 
 /** Port of app__suppliers.png. Balance > 0 means the shop owes the supplier. */
 export default function SuppliersScreen() {
+  const router = useRouter();
   const q = useQuery({
     queryKey: ["suppliers"],
     queryFn: () => catalog.listSuppliers(api),
@@ -34,7 +36,13 @@ export default function SuppliersScreen() {
       ) : (
         <View style={styles.list}>
           {rows.map((s) => (
-            <View key={s.id} style={styles.row}>
+            <Pressable
+              key={s.id}
+              accessibilityRole="button"
+              accessibilityLabel={`ملف المورد ${s.name}`}
+              onPress={() => router.push(`/suppliers/${encodeURIComponent(s.id)}`)}
+              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+            >
               <View style={styles.head}>
                 <Text numberOfLines={1} style={styles.name}>
                   {s.name}
@@ -51,7 +59,7 @@ export default function SuppliersScreen() {
                   {s.address}
                 </Text>
               ) : null}
-            </View>
+            </Pressable>
           ))}
         </View>
       )}
@@ -70,6 +78,7 @@ const styles = StyleSheet.create({
     gap: 4,
     ...elevation.card,
   },
+  rowPressed: { backgroundColor: colors.accentLight },
   head: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   name: { flexShrink: 1, fontFamily: fonts.semibold, fontSize: 15, color: colors.text, ...RTL_TEXT },
   meta: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },

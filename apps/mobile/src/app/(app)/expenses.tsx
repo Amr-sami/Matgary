@@ -1,32 +1,96 @@
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
-import { useQuery } from "@tanstack/react-query";
-import { catalog } from "@matgary/api-client";
+import { useState } from "react";
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ApiError, catalog } from "@matgary/api-client";
 
 import { api } from "@/api/client";
 import { Screen } from "@/components/layout/Screen";
 import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { Chip } from "@/components/ui/Chip";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Field } from "@/components/ui/Field";
 import { money, shortDate } from "@/lib/format";
-import { RTL_TEXT } from "@/theme/rtl";
+import { RTL, RTL_TEXT } from "@/theme/rtl";
 import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
 
-/** The web's expense category keys, in Arabic. */
+/**
+ * The expense categories, in the web's own order.
+ *
+ * This is a CLOSED enum on the server (app/api/expenses/route.ts) — a free-text
+ * category is a 400 — and these seven keys with these seven labels are exactly
+ * what app__expenses.png shows, read from
+ * apps/web/dictionaries/ar.json → app.catalog.expenseCategory.
+ */
+const CATEGORY_ORDER: catalog.ExpenseCategory[] = [
+  "rent",
+  "salaries",
+  "electricity",
+  "water",
+  "internet",
+  "supplier",
+  "other",
+];
+
 const CATEGORY: Record<string, string> = {
-  salaries: "رواتب",
   rent: "إيجار",
-  utilities: "مرافق",
-  supplies: "مستلزمات",
-  marketing: "تسويق",
-  shipping: "شحن",
+  salaries: "مرتبات",
+  electricity: "كهرباء",
+  water: "مياه",
+  internet: "إنترنت",
+  supplier: "مورد",
   other: "أخرى",
 };
 
+/**
+ * ApiError → one Arabic line.
+ *
+ * These handlers answer a domain failure with a RAW Arabic string in `error`,
+ * which the transport reads into `code` (and `message`) because it only treats
+ * `detail` as prose. So: if the code is Arabic it IS the message and is shown
+ * verbatim; anything else is a machine code the cashier must never see, and is
+ * mapped by kind instead.
+ */
+function errorMessage(error: unknown, fallback: string): string {
+  if (!(error instanceof ApiError)) return fallback;
+  if (error.code && /[؀-ۿ]/.test(error.code)) return error.code;
+  switch (error.kind) {
+    case "offline":
+      return "تعذّر الاتصال بالخادم";
+    case "timeout":
+      return "انتهت مهلة الاتصال";
+    case "forbidden":
+      return "ليس لديك صلاحية لهذا الإجراء";
+    case "rateLimited":
+      return "محاولات كثيرة. حاول بعد قليل";
+    case "billing":
+      return "الاشتراك غير مفعّل";
+    case "server":
+      return "الخادم لا يستجيب";
+    default:
+      return fallback;
+  }
+}
+
 /** Port of app__expenses.png. */
 export default function ExpensesScreen() {
+  const queryClient = useQueryClient();
   const q = useQuery({
     queryKey: ["expenses"],
     queryFn: () => catalog.listExpenses(api),
   });
+
+  const [formOpen, setFormOpen] = useState(false);
 
   const rows = q.data ?? [];
   const total = rows.reduce((s, e) => s + e.amount, 0);
@@ -38,6 +102,8 @@ export default function ExpensesScreen() {
       onRefresh={() => void q.refetch()}
       refreshing={q.isRefetching}
     >
+      <Button label="إضافة مصروف" onPress={() => setFormOpen(true)} />
+
       {q.isLoading ? (
         <ActivityIndicator color={colors.accent} />
       ) : rows.length === 0 ? (
@@ -65,7 +131,151 @@ export default function ExpensesScreen() {
           ))}
         </View>
       )}
+
+      <ExpenseFormSheet
+        visible={formOpen}
+        onClose={() => setFormOpen(false)}
+        onCreated={() => {
+          setFormOpen(false);
+          void queryClient.invalidateQueries({ queryKey: ["expenses"] });
+        }}
+      />
     </Screen>
+  );
+}
+
+/**
+ * The web renders this form inline above the table; on a phone that pushes the
+ * record it belongs to off-screen, so it becomes a bottom sheet opened by the
+ * button. The CONTENT is the capture's, field for field and label for label.
+ *
+ * RTL is re-applied here on purpose: a Modal mounts its own native root, so the
+ * `direction` set on the screen root does not reach inside it.
+ */
+function ExpenseFormSheet({
+  visible,
+  onClose,
+  onCreated,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [amount, setAmount] = useState("");
+  const [category, setCategory] = useState<catalog.ExpenseCategory>("other");
+  const [note, setNote] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const amountValue = Number(amount.trim());
+  const amountValid = amount.trim().length > 0 && Number.isFinite(amountValue) && amountValue > 0;
+  const canSubmit = title.trim().length > 0 && amountValid;
+
+  const reset = () => {
+    setTitle("");
+    setAmount("");
+    setCategory("other");
+    setNote("");
+    setError(null);
+  };
+
+  const create = useMutation({
+    mutationFn: () =>
+      catalog.createExpense(api, {
+        title: title.trim(),
+        amount: amountValue,
+        category,
+        note: note.trim() ? note.trim() : undefined,
+      }),
+    onSuccess: () => {
+      reset();
+      onCreated();
+    },
+    onError: (err) => setError(errorMessage(err, "تعذر تسجيل المصروف")),
+  });
+
+  const close = () => {
+    if (create.isPending) return;
+    setError(null);
+    onClose();
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
+      <View style={[styles.overlay, RTL]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="إغلاق" />
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
+          <View style={styles.sheet}>
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetBody}>
+              {/* The heading is accent-coloured on the web, next to a wallet
+                  glyph. The colour is the part that carries the identity. */}
+              <Text style={styles.sheetTitleAccent}>تسجيل مصروف جديد</Text>
+
+              <Field
+                label="بيان المصروف"
+                value={title}
+                onChangeText={setTitle}
+                placeholder="مثلاً: إيجار المحل، فاتورة الكهرباء…"
+              />
+              <Field
+                label="المبلغ (جنيه)"
+                value={amount}
+                onChangeText={setAmount}
+                placeholder="0.00"
+                keyboardType="decimal-pad"
+              />
+
+              <View>
+                <Text style={styles.label}>التصنيف</Text>
+                <View style={styles.grid}>
+                  {CATEGORY_ORDER.map((key) => (
+                    // The cell fixes the two-column grid of the capture; the
+                    // Chip stretches to fill it (a column's default align is
+                    // stretch), so nothing here re-styles the Chip itself.
+                    <View key={key} style={styles.gridCell}>
+                      <Chip
+                        label={CATEGORY[key]}
+                        active={category === key}
+                        onPress={() => setCategory(key)}
+                      />
+                    </View>
+                  ))}
+                </View>
+              </View>
+
+              <Field
+                label="ملاحظة (اختياري)"
+                value={note}
+                onChangeText={setNote}
+                placeholder="…"
+              />
+
+              {error ? (
+                <Text numberOfLines={3} style={styles.error}>
+                  {error}
+                </Text>
+              ) : null}
+
+              <View style={styles.actions}>
+                <Button
+                  label="تسجيل المصروف"
+                  onPress={() => create.mutate()}
+                  disabled={!canSubmit}
+                  loading={create.isPending}
+                  style={styles.actionGrow}
+                />
+                <Button
+                  label="إلغاء"
+                  variant="outline"
+                  onPress={close}
+                  style={styles.actionGrow}
+                />
+              </View>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
   );
 }
 
@@ -91,4 +301,29 @@ const styles = StyleSheet.create({
   },
   meta: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   date: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary },
+
+  overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.45)" },
+  sheet: {
+    backgroundColor: colors.card,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    maxHeight: "90%",
+    ...elevation.modal,
+  },
+  sheetBody: { padding: spacing.xl, gap: spacing.lg },
+  sheetTitleAccent: { fontFamily: fonts.bold, fontSize: 18, color: colors.accent, ...RTL_TEXT },
+  label: {
+    fontFamily: fonts.medium,
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+    ...RTL_TEXT,
+  },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  gridCell: { width: "48%" },
+  error: { fontFamily: fonts.medium, fontSize: 14, color: colors.danger, ...RTL_TEXT },
+  actions: { flexDirection: "row", gap: spacing.sm },
+  actionGrow: { flex: 1 },
 });

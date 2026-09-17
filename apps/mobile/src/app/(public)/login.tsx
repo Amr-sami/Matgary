@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { router } from "expo-router";
 import { Globe, Lightning } from "phosphor-react-native";
 
 import { DottedGround } from "@/components/DottedGround";
@@ -143,7 +144,11 @@ export default function LoginScreen() {
               onPress={() => void signIn(identifier, password)}
             />
 
-            <Pressable accessibilityRole="button" style={styles.forgot}>
+            <Pressable
+              accessibilityRole="button"
+              style={styles.forgot}
+              onPress={() => router.push("/forgot-password")}
+            >
               <Text style={styles.forgotText}>نسيت كلمة المرور؟</Text>
             </Pressable>
           </View>
@@ -151,7 +156,11 @@ export default function LoginScreen() {
           <View style={styles.rule} />
 
           <Text style={styles.noAccount}>ليس لديك حساب؟</Text>
-          <Button label="إنشاء حساب جديد" variant="outline" onPress={() => {}} />
+          <Button
+            label="إنشاء حساب جديد"
+            variant="outline"
+            onPress={() => router.push("/signup")}
+          />
         </ScrollView>
       </KeyboardAvoidingView>
     </View>

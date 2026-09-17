@@ -52,3 +52,87 @@ export async function listCustomers(c: ApiClient): Promise<CustomerSummary[]> {
   const res = await c.request<{ data: CustomerSummary[] }>("/api/v1/customers");
   return res.data ?? [];
 }
+
+// ---------------------------------------------------------------------------
+// Writes.
+//
+// Same reasoning as the readers above: these are the web's own handlers, which
+// already enforce tenant isolation, branch scoping and (where they check at
+// all) permissions. The payload shapes below mirror the zod schema in each
+// route file 1:1 — anything the schema rejects is not offered here, because a
+// field the server drops silently is worse than one that never existed.
+// ---------------------------------------------------------------------------
+
+/** apps/web/app/api/expenses/route.ts — a closed enum, NOT free text. */
+export type ExpenseCategory =
+  | "rent"
+  | "salaries"
+  | "electricity"
+  | "water"
+  | "internet"
+  | "supplier"
+  | "other";
+
+export interface CreateExpenseInput {
+  title: string;
+  amount: number;
+  category: ExpenseCategory;
+  supplierId?: string | null;
+  isRecurring?: boolean;
+  recurrencePeriod?: "monthly" | "weekly" | null;
+  /** ISO datetime. Omitted = now, server-side. */
+  date?: string;
+  note?: string;
+  /**
+   * Omit to book against the active branch (X-Branch-Id). An explicit `null`
+   * means tenant-wide and is OWNER-ONLY — the server answers 403
+   * TENANT_WIDE_EXPENSE_OWNER_ONLY for anyone else.
+   */
+  branchId?: string | null;
+}
+
+/**
+ * POST /api/expenses — 201.
+ *
+ * The body is `{ id }` only, not the created row: `addExpense` returns the
+ * insert's returning-id. Measured against the dev server, not assumed. Callers
+ * refetch the list rather than splicing a response row in.
+ */
+export const createExpense = (c: ApiClient, input: CreateExpenseInput) =>
+  c.request<{ id: string }>("/api/expenses", { method: "POST", body: input });
+
+export type TaskPriority = "low" | "normal" | "high";
+export type TaskStatus = "open" | "in_progress" | "done" | "cancelled";
+
+export interface CreateTaskInput {
+  title: string;
+  description?: string | null;
+  /** From listTeam(). Null/omitted leaves the task unassigned. */
+  assignedToUserId?: string | null;
+  priority?: TaskPriority;
+  /** ISO datetime, or null. */
+  dueDate?: string | null;
+}
+
+/**
+ * POST /api/tasks — 201. Like createExpense, the body is `{ id }` only.
+ *
+ * Requires `manage_tasks` (owners bypass); a plain cashier gets 403 Forbidden.
+ * A 409 carries an Arabic message, e.g. when the assignee is not in the tenant.
+ */
+export const createTask = (c: ApiClient, input: CreateTaskInput) =>
+  c.request<{ id: string }>("/api/tasks", { method: "POST", body: input });
+
+/**
+ * PATCH /api/tasks/[id] — the done/reopen toggle.
+ *
+ * The body must be EXACTLY `{ status }`: the route's schema is `.strict()`, so
+ * one extra key is a 400, and a status-only patch is the single edit the
+ * assignee themselves is allowed to make without `manage_tasks`. Sending any
+ * second field turns this into a manager-only call.
+ */
+export const setTaskStatus = (c: ApiClient, id: string, status: TaskStatus) =>
+  c.request<{ ok: true }>(`/api/tasks/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: { status },
+  });

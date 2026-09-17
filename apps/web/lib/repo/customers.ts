@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { withTenant } from "@/lib/db";
 import { sales, salePayments } from "@/lib/db/schema";
 
@@ -56,6 +56,32 @@ export interface CustomerLedger {
  * the ledger shape the detail page renders. Returns null when the
  * customer has zero non-returned sales at the active branch.
  */
+/**
+ * Every shape a given Egyptian number may already be stored in.
+ *
+ * `sales.customer_phone` is NOT consistently normalised, because two writers
+ * disagree: POST /api/sales/cart runs the number through normalizeEgyptPhone
+ * and stores E.164 ("+201001234008"), while the older POST /api/sales stores
+ * whatever the client sent — in practice the local form ("01001234008"). On the
+ * seeded store that is 3 rows E.164 against 106 local.
+ *
+ * The read path normalises to E.164 and matched on equality, so it could only
+ * ever find the rows the cart route wrote — every other customer 404'd from
+ * their own detail page, on web and mobile alike.
+ *
+ * Matching the variants fixes the existing data without a migration and keeps
+ * working after one. The real repair is to normalise on write in /api/sales too
+ * and backfill; until then this is what makes the ledger reachable.
+ */
+function phoneVariants(normalised: string): string[] {
+  const variants = new Set<string>([normalised]);
+  // "+201001234008" -> "01001234008"
+  variants.add(normalised.replace(/^\+20/, "0"));
+  // "+201001234008" -> "201001234008"
+  variants.add(normalised.replace(/^\+/, ""));
+  return [...variants];
+}
+
 export async function getCustomerLedger(
   tenantId: string,
   branchId: string,
@@ -69,7 +95,7 @@ export async function getCustomerLedger(
         and(
           eq(sales.tenantId, tenantId),
           eq(sales.branchId, branchId),
-          eq(sales.customerPhone, customerPhone),
+          inArray(sales.customerPhone, phoneVariants(customerPhone)),
           eq(sales.isReturned, false),
         ),
       )
@@ -211,7 +237,7 @@ export async function markCustomerAllPaid(
         and(
           eq(sales.tenantId, tenantId),
           eq(sales.branchId, branchId),
-          eq(sales.customerPhone, customerPhone),
+          inArray(sales.customerPhone, phoneVariants(customerPhone)),
           eq(sales.isReturned, false),
           eq(sales.isPaid, false),
         ),

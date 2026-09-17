@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Package, Plus, WarningOctagon, Wallet, Warning } from "phosphor-react-native";
 import { catalog } from "@matgary/api-client";
@@ -31,6 +32,7 @@ type StatusFilter = "all" | "in" | "low" | "out";
  * phones (session-record §1g).
  */
 export default function InventoryScreen() {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<string>("all");
   const [status, setStatus] = useState<StatusFilter>("all");
@@ -161,7 +163,13 @@ export default function InventoryScreen() {
             const out = p.quantity === 0;
             const low = p.quantity > 0 && p.quantity <= p.lowStockThreshold;
             return (
-              <View key={p.id} style={styles.row}>
+              <Pressable
+                key={p.id}
+                accessibilityRole="button"
+                accessibilityLabel={`تفاصيل ${p.name}`}
+                onPress={() => router.push(`/inventory/${encodeURIComponent(p.id)}`)}
+                style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+              >
                 <View style={styles.rowHead}>
                   <Text numberOfLines={1} style={styles.name}>
                     {p.name}
@@ -182,7 +190,7 @@ export default function InventoryScreen() {
                     </Text>
                   ) : null}
                 </View>
-              </View>
+              </Pressable>
             );
           })}
         </View>
@@ -230,6 +238,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     ...elevation.card,
   },
+  rowPressed: { backgroundColor: colors.accentLight },
   rowHead: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   name: { flexShrink: 1, fontFamily: fonts.semibold, fontSize: 15, color: colors.text, ...RTL_TEXT },
   rowMeta: { flexDirection: "row", alignItems: "center", gap: spacing.sm },

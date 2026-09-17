@@ -1,4 +1,5 @@
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { catalog } from "@matgary/api-client";
 
@@ -20,6 +21,7 @@ import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
  * Customers are aggregated from sales; there is no customers table.
  */
 export default function CustomersScreen() {
+  const router = useRouter();
   const q = useQuery({
     queryKey: ["customers"],
     queryFn: () => catalog.listCustomers(api),
@@ -44,7 +46,18 @@ export default function CustomersScreen() {
       ) : (
         <View style={styles.list}>
           {rows.map((c) => (
-            <View key={c.phone} style={styles.row}>
+            // The phone is the route key AND can start with "+", which has to
+            // survive the URL — hence encodeURIComponent on the way out and a
+            // decode on the way in.
+            <Pressable
+              key={c.phone}
+              accessibilityRole="button"
+              accessibilityLabel={`ملف العميل ${c.name ?? c.phone}`}
+              onPress={() =>
+                router.push(`/customers/${encodeURIComponent(c.phone)}`)
+              }
+              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+            >
               <View style={styles.head}>
                 <Text numberOfLines={1} style={styles.name}>
                   {c.name ?? c.phone}
@@ -57,7 +70,7 @@ export default function CustomersScreen() {
                 {c.phone} · {c.invoiceCount} فاتورة · {money(c.totalSpend)}
               </Text>
               <Text style={styles.meta}>آخر شراء {shortDate(c.lastPurchaseAt)}</Text>
-            </View>
+            </Pressable>
           ))}
         </View>
       )}
@@ -76,6 +89,7 @@ const styles = StyleSheet.create({
     gap: 4,
     ...elevation.card,
   },
+  rowPressed: { backgroundColor: colors.accentLight },
   head: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   name: { flexShrink: 1, fontFamily: fonts.semibold, fontSize: 15, color: colors.text, ...RTL_TEXT },
   meta: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },
