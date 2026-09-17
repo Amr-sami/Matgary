@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { HeaderAccessories } from "@/components/shell/HeaderAccessories";
 import { RTL, RTL_TEXT } from "@/theme/rtl";
 import { colors, fonts, spacing } from "@/theme/tokens";
 
@@ -38,6 +39,7 @@ export function Screen({
       >
         {title ? (
           <View style={styles.header}>
+            <HeaderAccessories />
             <Text style={styles.title}>{title}</Text>
             {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
           </View>

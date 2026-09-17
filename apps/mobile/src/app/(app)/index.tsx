@@ -17,6 +17,7 @@ import {
 import { ApiError, dashboard as dashboardApi } from "@matgary/api-client";
 
 import { api } from "@/api/client";
+import { HeaderAccessories } from "@/components/shell/HeaderAccessories";
 import { money } from "@/lib/format";
 import { StockAlerts } from "@/components/dashboard/StockAlerts";
 import { StatCard } from "@/components/ui/StatCard";
@@ -59,6 +60,7 @@ export default function DashboardScreen() {
           <RefreshControl refreshing={isRefetching} onRefresh={() => void refetch()} />
         }
       >
+        <HeaderAccessories />
         <View style={styles.header}>
           <Text style={styles.greeting}>{t("app.dashboard.greeting", { name: me?.tenant.name ?? "" })}</Text>
           <Text style={styles.sub}>{t(me?.isOwner ? "app.dashboard.greetingOwner" : "app.dashboard.greetingStaff")}</Text>

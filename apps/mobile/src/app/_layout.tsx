@@ -12,6 +12,9 @@ import {
   useFonts,
 } from "@expo-google-fonts/cairo";
 
+import { AppEffects } from "@/effects/AppEffects";
+import { AppLockGate } from "@/components/shell/AppLockGate";
+import { initSentry, wrapRoot } from "@/observability/sentry";
 import { useSession } from "@/stores/session";
 import { useLocale } from "@/i18n";
 import { directionStyle } from "@/theme/rtl";
@@ -32,7 +35,9 @@ const queryClient = new QueryClient({
   },
 });
 
-export default function RootLayout() {
+initSentry();
+
+function RootLayout() {
   const [fontsLoaded] = useFonts({
     Cairo_400Regular,
     Cairo_500Medium,
@@ -62,6 +67,8 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
         <StatusBar style="dark" />
+        <AppEffects />
+        <AppLockGate>
         <Stack
           // Re-keyed on locale: every screen remounts, so every t() re-reads
           // the dictionary and every layout re-resolves under the new
@@ -84,7 +91,10 @@ export default function RootLayout() {
           <Stack.Screen name="service-paused" />
           <Stack.Screen name="legal/[doc]" />
         </Stack>
+        </AppLockGate>
       </SafeAreaProvider>
     </QueryClientProvider>
   );
 }
+
+export default wrapRoot(RootLayout);
