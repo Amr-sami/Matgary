@@ -229,9 +229,16 @@ export class ApiClient {
       if (timer.signal.aborted) {
         throw new ApiError({ kind: "timeout", message: "Request timed out" });
       }
+      // Name the host that failed. A stale EXPO_PUBLIC_API_URL pointing at a
+      // LAN IP the Mac no longer holds looks exactly like "the server is down",
+      // and without the URL in the message it costs a measurement pass to tell
+      // the two apart. Host only — never the path or query, which can carry
+      // identifiers.
       throw new ApiError({
         kind: "offline",
-        message: cause instanceof Error ? cause.message : "Network unreachable",
+        message: `Cannot reach ${url.host}${
+          cause instanceof Error ? ` (${cause.message})` : ""
+        }`,
       });
     } finally {
       clearTimeout(timeoutId);
