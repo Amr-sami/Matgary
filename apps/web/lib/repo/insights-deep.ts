@@ -31,6 +31,8 @@ export interface CompareReport {
   // 7-day vs 7-day compare show up cleanly on the same x-axis.
   points: Array<{
     dayIndex: number;
+    /** Calendar day of the *current* window (YYYY-MM-DD) — clients format it locally. */
+    day: string;
     label: string;
     current: number;
     previous: number;
@@ -104,6 +106,7 @@ export async function loadCompareReport(
       previousTotal += prev;
       points.push({
         dayIndex: i,
+        day: dayKey(curDay),
         label: format(curDay, "MMM dd"),
         current: cur,
         previous: prev,

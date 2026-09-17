@@ -33,3 +33,11 @@ export function shortDate(iso: string | null | undefined): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
 }
+
+/** "YYYY-MM-DD" (or ISO) -> "14/09" — axis ticks, locale-neutral like shortDate. */
+export function dayMonth(day: string | null | undefined): string {
+  if (!day) return "";
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(day);
+  if (!m) return "";
+  return `${m[3]}/${m[2]}`;
+}

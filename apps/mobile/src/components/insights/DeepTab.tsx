@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SearchField } from "@/components/ui/SearchField";
-import { groupDigits, money } from "@/lib/format";
+import { dayMonth, groupDigits, money } from "@/lib/format";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
 import { colors, fonts, MIN_TOUCH, radius, spacing } from "@/theme/tokens";
@@ -28,12 +28,16 @@ import { t } from "@/i18n";
 export type InsightsRange = "all" | "today" | "yesterday" | "7d" | "30d";
 
 interface TabProps {
+  /** `insights?tab=deep&report=heatmap` opens straight on a report. */
+  initialReport?: string;
   range: InsightsRange;
   from?: string;
   to?: string;
 }
 
 type ReportKey = "compare" | "heatmap" | "payments" | "branches" | "product";
+const isReportKey = (v: unknown): v is ReportKey =>
+  v === "compare" || v === "heatmap" || v === "payments" || v === "branches" || v === "product";
 
 const REPORTS = (): { key: ReportKey; label: string; hint: string }[] => ([
   { key: "compare", label: t("app.insights.deep.picker.compare.label"), hint: t("app.insights.deep.picker.compare.hint") },
@@ -76,7 +80,12 @@ function useDeep<T>(
 
 export function DeepTab(props: TabProps) {
   const isOwner = useSession((s) => s.me?.isOwner ?? false);
-  const [report, setReport] = useState<ReportKey>("compare");
+  const [report, setReport] = useState<ReportKey>(
+    isReportKey(props.initialReport) ? props.initialReport : "compare",
+  );
+  useEffect(() => {
+    if (isReportKey(props.initialReport)) setReport(props.initialReport);
+  }, [props.initialReport]);
   const active = REPORTS().find((r) => r.key === report);
 
   return (
@@ -168,7 +177,7 @@ const BAR_H = 140;
 /* --------------------------------------------------------------- compare */
 
 interface CompareData {
-  points: { dayIndex: number; label: string; current: number; previous: number }[];
+  points: { dayIndex: number; day: string; label: string; current: number; previous: number }[];
   totals: { current: number; previous: number; growth: number };
 }
 
@@ -215,7 +224,7 @@ function CompareReport(props: TabProps) {
               </View>
             ))}
           </View>
-          <AxisEnds first={points[0]?.label} last={points[points.length - 1]?.label} />
+          <AxisEnds first={dayMonth(points[0]?.day)} last={dayMonth(points[points.length - 1]?.day)} />
           <View style={styles.legend}>
             <LegendDot color={colors.accent} label={t("app.insights.deep.compare.legend.current")} />
             <LegendDot color={colors.accentLight} label={t("app.insights.deep.compare.legend.previous")} />
@@ -432,7 +441,7 @@ function PaymentsReport(props: TabProps) {
               </View>
             ))}
           </View>
-          <AxisEnds first={model.series[0]?.label} last={model.series[model.series.length - 1]?.label} />
+          <AxisEnds first={dayMonth(model.series[0]?.day)} last={dayMonth(model.series[model.series.length - 1]?.day)} />
         </>
       )}
     </Card>
@@ -628,7 +637,7 @@ function ProductDetail({ data }: { data: ProductData }) {
               </View>
             ))}
           </View>
-          <AxisEnds first={daily[0]?.date} last={daily[daily.length - 1]?.date} />
+          <AxisEnds first={dayMonth(daily[0]?.date)} last={dayMonth(daily[daily.length - 1]?.date)} />
 
           <Text style={styles.chartTitle}>{t("app.insights.deep.product.chart.units")}</Text>
           <View style={styles.bars}>
@@ -638,7 +647,7 @@ function ProductDetail({ data }: { data: ProductData }) {
               </View>
             ))}
           </View>
-          <AxisEnds first={daily[0]?.date} last={daily[daily.length - 1]?.date} />
+          <AxisEnds first={dayMonth(daily[0]?.date)} last={dayMonth(daily[daily.length - 1]?.date)} />
         </>
       )}
     </>

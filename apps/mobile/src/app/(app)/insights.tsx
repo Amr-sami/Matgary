@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocalSearchParams } from "expo-router";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -33,6 +33,8 @@ interface Overview {
 
 type Range = "all" | "today" | "yesterday" | "7d" | "30d";
 type Tab = "overview" | "deep" | "staff";
+const isRange = (v: unknown): v is Range =>
+  v === "all" || v === "today" || v === "yesterday" || v === "7d" || v === "30d";
 const isTab = (v: unknown): v is Tab => v === "overview" || v === "deep" || v === "staff";
 
 const RANGES = (): { key: Range; label: string }[] => ([
@@ -108,9 +110,12 @@ function rangeWindow(key: Range): { from: string; to: string } | null {
  */
 export default function InsightsScreen() {
   // `insights?tab=deep|staff` deep-links straight to a tab (notifications, dev probes).
-  const { tab: initialTab } = useLocalSearchParams<{ tab?: string }>();
-  const [tab, setTab] = useState<Tab>(isTab(initialTab) ? initialTab : "overview");
-  const [range, setRange] = useState<Range>("all");
+  const params = useLocalSearchParams<{ tab?: string; range?: string; report?: string }>();
+  const [tab, setTab] = useState<Tab>(isTab(params.tab) ? params.tab : "overview");
+  const [range, setRange] = useState<Range>(isRange(params.range) ? params.range : "all");
+  // Tab screens stay mounted, so a later deep link only changes the params.
+  useEffect(() => { if (isTab(params.tab)) setTab(params.tab); }, [params.tab]);
+  useEffect(() => { if (isRange(params.range)) setRange(params.range); }, [params.range]);
 
   // The range is part of the KEY, not just the params: a chip tap must
   // refetch, not serve the previous range's numbers from cache. The first
@@ -181,7 +186,7 @@ export default function InsightsScreen() {
       </View>
 
       {tab === "deep" ? (
-        <DeepTab range={range} from={window?.from} to={window?.to} />
+        <DeepTab range={range} from={window?.from} to={window?.to} initialReport={params.report} />
       ) : tab === "staff" ? (
         <StaffTab range={range} from={window?.from} to={window?.to} />
       ) : overview.isLoading ? (
