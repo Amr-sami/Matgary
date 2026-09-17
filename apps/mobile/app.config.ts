@@ -41,6 +41,18 @@ const config: ExpoConfig = {
     "expo-router",
     "expo-secure-store",
     [
+      "expo-camera",
+      {
+        // iOS NSCameraUsageDescription. Arabic-first, like the display name;
+        // the dictionaries carry no permission rationale (app.ui.scanner.* is
+        // the web's in-page copy), so this is the one scanner string not
+        // routed through t() — it is baked into Info.plist at build time.
+        cameraPermission: "نحتاج الكاميرا لمسح باركود المنتجات",
+        // No audio: the scanner never records video.
+        recordAudioAndroid: false,
+      },
+    ],
+    [
       "expo-localization",
       {
         // Applied natively at build time. I18nManager.forceRTL() at runtime

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -7,6 +7,7 @@ import {
   View,
 } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import * as Haptics from "expo-haptics";
 import { CheckCircle, Minus, Plus, Trash } from "phosphor-react-native";
 import { ApiError, catalog, sales as salesApi } from "@matgary/api-client";
 
@@ -17,6 +18,7 @@ import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
 import { Field } from "@/components/ui/Field";
 import { SearchField } from "@/components/ui/SearchField";
+import { ScannerSheet, type ScanTone } from "@/components/scanner/ScannerSheet";
 import { money } from "@/lib/format";
 import { selectItemCount, selectTotals, useCart } from "@/stores/cart";
 import { RTL_TEXT } from "@/theme/rtl";
@@ -44,8 +46,13 @@ const PAYMENTS = (): { key: Payment; label: string }[] => ([
  * minted client-side and doubles as the Idempotency-Key, so a retry after a
  * dropped connection returns the original sale rather than booking a second.
  *
- * The camera scanner is phase 2 — it needs expo-camera, which Expo Go does not
- * carry for this app. The barcode glyph on the search field is where it lands.
+ * Scanning has two entry points that share one resolver (`resolveCode`): the
+ * camera ScannerSheet, and a keyboard-wedge scanner typing code+Enter into the
+ * search field. Both go to GET /api/v1/products?barcode= rather than the
+ * in-memory list, because the server owns the UPC-A/EAN-13 collapsing rule
+ * and the branch scope (route.ts comments). The sheet stays open between
+ * scans; the toast strip inside it is the cashier's only confirmation, so it
+ * names the product.
  */
 export default function SalesScreen() {
   const qc = useQueryClient();
@@ -53,6 +60,11 @@ export default function SalesScreen() {
   const [payment, setPayment] = useState<Payment>("cash");
   const [lastSale, setLastSale] = useState<salesApi.CartSaleResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scan, setScan] = useState<{ text: string; tone: ScanTone } | null>(null);
+  // Guards a slow lookup answering after a faster later one.
+  const scanSeq = useRef(0);
 
   const cart = useCart();
   // NOT a zustand selector: selectTotals returns a fresh object every call, and
@@ -146,6 +158,47 @@ export default function SalesScreen() {
 
   const canCheckout = cart.lines.length > 0 && !checkout.isPending;
 
+  const resolveCode = useCallback(
+    async (raw: string) => {
+      const code = raw.trim();
+      if (!code) return;
+      const seq = ++scanSeq.current;
+      setScan({ text: t("app.ui.scanner.detected", { code }), tone: "info" });
+      let result: catalog.BarcodeLookup;
+      try {
+        result = await catalog.findProductByBarcode(api, code);
+      } catch (e) {
+        if (seq !== scanSeq.current) return;
+        setScan({ text: messageFor(e), tone: "error" });
+        return;
+      }
+      if (seq !== scanSeq.current) return;
+      const p = result.product;
+      if (!p) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+        setScan({ text: t("app.sales.form.productSearch.scannedNotFound", { code }), tone: "error" });
+        return;
+      }
+      if (p.quantity <= 0) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+        setScan({ text: `${p.name} — ${t("app.sales.form.productSearch.scannedOutOfStock")}`, tone: "error" });
+        return;
+      }
+      // Read the store directly: this callback outlives the render it was
+      // created in, and the sheet fires it once per item.
+      const store = useCart.getState();
+      const already = store.lines.some((l) => l.productId === p.id);
+      store.add(p);
+      setScan({
+        text: already
+          ? t("app.sales.form.productSearch.scannedIncremented", { name: p.name })
+          : t("app.sales.form.productSearch.scannedAdded", { name: p.name }),
+        tone: "success",
+      });
+    },
+    [],
+  );
+
   return (
     <Screen
       onRefresh={() => void products.refetch()}
@@ -180,9 +233,43 @@ export default function SalesScreen() {
         <Text style={styles.label}>{t("app.sales.form.productSearch.label")}</Text>
         <SearchField
           value={query}
-          onChangeText={setQuery}
+          onChangeText={(v) => {
+            setQuery(v);
+            if (scan) setScan(null);
+          }}
           placeholder={t("app.sales.form.productSearch.placeholder")}
+          onPressScan={() => {
+            setScan(null);
+            setScannerOpen(true);
+          }}
+          onSubmitEditing={(v) => {
+            // Keyboard-wedge scanner: the code arrives as typed text + Enter.
+            if (!v.trim()) return;
+            setQuery("");
+            void resolveCode(v);
+          }}
         />
+        {scan && !scannerOpen ? (
+          <View
+            style={[
+              styles.scanStrip,
+              scan.tone === "success" && styles.scanStripSuccess,
+              scan.tone === "error" && styles.scanStripError,
+            ]}
+            accessibilityLiveRegion="polite"
+          >
+            <Text
+              numberOfLines={2}
+              style={[
+                styles.scanStripText,
+                scan.tone === "success" && styles.scanStripTextSuccess,
+                scan.tone === "error" && styles.scanStripTextError,
+              ]}
+            >
+              {scan.text}
+            </Text>
+          </View>
+        ) : null}
 
         {query.trim() ? (
           matches.length ? (
@@ -342,6 +429,15 @@ export default function SalesScreen() {
       ) : null}
 
       {products.isLoading ? <ActivityIndicator color={colors.accent} /> : null}
+
+      <ScannerSheet
+        visible={scannerOpen}
+        mode="continuous"
+        onClose={() => setScannerOpen(false)}
+        onScan={(code) => void resolveCode(code)}
+        message={scan?.text ?? null}
+        tone={scan?.tone ?? "info"}
+      />
     </Screen>
   );
 }
@@ -419,6 +515,12 @@ const styles = StyleSheet.create({
   totalStrong: { fontFamily: fonts.bold, fontSize: 18, color: colors.text },
   customer: { gap: spacing.md, marginTop: spacing.sm, marginBottom: spacing.lg },
   errorBox: { backgroundColor: colors.dangerLight, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md },
+  scanStrip: { marginTop: spacing.sm, minHeight: 44, justifyContent: "center", borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, backgroundColor: colors.neutralTint },
+  scanStripSuccess: { backgroundColor: colors.successLight },
+  scanStripError: { backgroundColor: colors.dangerLight },
+  scanStripText: { fontFamily: fonts.medium, fontSize: 14, color: colors.neutralText, textAlign: "center", ...RTL_TEXT },
+  scanStripTextSuccess: { color: colors.successStrong },
+  scanStripTextError: { color: colors.danger },
   errorText: { fontFamily: fonts.medium, fontSize: 14, color: colors.danger, textAlign: "center" },
   successHead: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginBottom: 4 },
   successTitle: { fontFamily: fonts.bold, fontSize: 18, color: colors.successStrong, ...RTL_TEXT },

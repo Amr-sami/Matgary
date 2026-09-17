@@ -12,6 +12,7 @@ import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SearchField } from "@/components/ui/SearchField";
+import { ScannerSheet } from "@/components/scanner/ScannerSheet";
 import { StatCard } from "@/components/ui/StatCard";
 import { money } from "@/lib/format";
 import { RTL_TEXT } from "@/theme/rtl";
@@ -37,6 +38,7 @@ export default function InventoryScreen() {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<string>("all");
   const [status, setStatus] = useState<StatusFilter>("all");
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   const products = useQuery({
     queryKey: ["products"],
@@ -117,10 +119,21 @@ export default function InventoryScreen() {
         </View>
       </View>
 
+      {/* Single-shot: one scan fills the search box, the list filters on
+          barcode/sku, and the sheet closes itself. No server lookup here —
+          the catalogue is already in memory and the filter matches on both
+          fields, which is the lookup a stock check needs. */}
       <SearchField
         value={query}
         onChangeText={setQuery}
         placeholder={t("app.inventory.search.placeholder")}
+        onPressScan={() => setScannerOpen(true)}
+      />
+      <ScannerSheet
+        visible={scannerOpen}
+        mode="single"
+        onClose={() => setScannerOpen(false)}
+        onScan={setQuery}
       />
 
       <Pressable style={styles.cta} accessibilityRole="button">

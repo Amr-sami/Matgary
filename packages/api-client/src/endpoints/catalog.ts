@@ -181,3 +181,37 @@ export const createPurchaseOrder = (c: ApiClient, input: CreatePurchaseOrderInpu
 
 export const deleteProduct = (c: ApiClient, id: string) =>
   c.request<unknown>(`/api/products/${id}`, { method: "DELETE" });
+
+// ---------------------------------------------------------------------------
+// Scanner lookup.
+// ---------------------------------------------------------------------------
+
+/**
+ * GET /api/v1/products?barcode=<code> — apps/web/app/api/v1/products/route.ts.
+ *
+ * The server does the normalisation (`normalizeSku`: decoder junk stripped,
+ * case-folded, UPC-A ↔ EAN-13 collapsed) on BOTH the scanned code and every
+ * stored sku, so the client sends the raw decoder output untouched. Answers
+ * `{ data: Product[] (0 or 1), nextCursor: null, total }` — zero matches is a
+ * 200 with an empty array, never a 404, so an unknown barcode is a normal
+ * result here and not an ApiError. `total` can exceed 1 when two rows share
+ * the code; the server hands back the in-stock one.
+ *
+ * An out-of-stock product still comes back (quantity 0) — the caller decides
+ * whether that is "top up stock" or "not sellable", not this function.
+ */
+export interface BarcodeLookup {
+  product: Product | null;
+  /** Matches across the branch's catalogue, which can be more than `product`. */
+  total: number;
+}
+
+export async function findProductByBarcode(
+  c: ApiClient,
+  code: string,
+): Promise<BarcodeLookup> {
+  const res = await c.request<{ data: Product[]; nextCursor: null; total: number }>(
+    `/api/v1/products?barcode=${encodeURIComponent(code)}`,
+  );
+  return { product: res.data?.[0] ?? null, total: res.total ?? 0 };
+}

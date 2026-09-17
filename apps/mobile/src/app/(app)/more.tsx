@@ -39,7 +39,7 @@ const ITEMS = () =>
   { route: "/team", label: t("app.shell.secondary.team"), icon: UsersThree, requires: "manage_team" },
   { route: "/settings", label: t("app.shell.secondary.settings"), icon: Gear, requires: "view_settings" },
   { route: "/billing", label: t("app.billing.title"), icon: CreditCard, requires: null },
-] as const);;
+] as const);
 
 const TEAM_ANY = ["manage_team", "request_leave", "manage_leave"];
 

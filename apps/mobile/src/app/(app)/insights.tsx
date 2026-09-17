@@ -33,7 +33,7 @@ type Range = "all" | "today" | "yesterday" | "7d" | "30d";
 
 const RANGES = (): { key: Range; label: string }[] => ([
   { key: "all", label: t("app.common.all") },
-  { key: "today", label: t("app.insights.deep.heatmap.dayHeader") },
+  { key: "today", label: t("app.dateRange.today") },
   { key: "yesterday", label: t("app.dateRange.yesterday") },
   { key: "7d", label: t("app.dateRange.7d") },
   { key: "30d", label: t("app.dateRange.30d") },
