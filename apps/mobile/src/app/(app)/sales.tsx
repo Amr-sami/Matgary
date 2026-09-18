@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -8,24 +8,48 @@ import {
 } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
-import { CheckCircle, Minus, Plus, Trash } from "phosphor-react-native";
+import { useRouter } from "expo-router";
+import { CheckCircle, CloudSlash, Minus, Plus, Trash, WarningCircle } from "phosphor-react-native";
 import { ApiError, catalog, sales as salesApi } from "@matgary/api-client";
+import { calcLineDiscount } from "@matgary/domain";
 
 import { api } from "@/api/client";
 import { Screen } from "@/components/layout/Screen";
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
 import { SearchField } from "@/components/ui/SearchField";
 import { ScannerSheet, type ScanTone } from "@/components/scanner/ScannerSheet";
+import { ReceiptActions } from "@/components/receipt/ReceiptActions";
 import { money } from "@/lib/format";
+import { useOffline, useOutbox } from "@/offline";
+import { enqueueSale, ensureSaleHandler, isQueueableFailure, type SaleOutboxItem } from "@/offline/sales";
+import type { ReceiptSale } from "@/receipt/html";
+import { toReceiptSale } from "@/receipt/share";
 import { selectItemCount, selectTotals, useCart } from "@/stores/cart";
+import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
 import { colors, fonts, radius, spacing } from "@/theme/tokens";
 import { t } from "@/i18n";
 
 type Payment = salesApi.PaymentMethod;
+
+/**
+ * The card shown after تسجيل الفاتورة. `rowId` is set when the sale went to
+ * the outbox instead of the server; the card then follows that row (§6.4:
+ * never say "synced" until the engine marks it done).
+ */
+interface LastSale {
+  result: salesApi.CartSaleResult;
+  receipt: ReceiptSale;
+  rowId: string | null;
+  queuedReason: "offline" | "network" | null;
+  /** Local wall-clock of the ring — what options.customDate books it under. */
+  rungAt: Date;
+}
 
 /** dictionaries/ar.json — the four methods the cart route accepts. */
 const PAYMENTS = (): { key: Payment; label: string }[] => ([
@@ -58,8 +82,29 @@ export default function SalesScreen() {
   const qc = useQueryClient();
   const [query, setQuery] = useState("");
   const [payment, setPayment] = useState<Payment>("cash");
-  const [lastSale, setLastSale] = useState<salesApi.CartSaleResult | null>(null);
+  // The server result (what was booked) plus the receipt built from the cart
+  // as it was rung up — gross prices, per-line discounts and brands do not
+  // survive `cart.reset()`, and the result alone carries only net line totals.
+  const [lastSale, setLastSale] = useState<LastSale | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+  // The cart route runs requirePermissionWithBranch("record_sales"); the web
+  // hides the form for a user without it, so do the same here rather than
+  // letting them build a cart and learn on submit via a 403. `me` unknown
+  // (mid-refresh) → do not block; the server is still the authority.
+  const permissions = useSession((s) => s.me?.permissions);
+  const canRecord = permissions == null || permissions.includes("record_sales");
+
+  // The outbox handler must exist before a drain looks at a queued sale.
+  useEffect(() => {
+    ensureSaleHandler();
+  }, []);
+  // A queued sale's card follows its outbox row: pending → synced / failed.
+  const outbox = useOutbox<unknown, salesApi.CartSaleResult>();
+  const queuedRow = useMemo(
+    () => (lastSale?.rowId ? (outbox.find((r) => r.id === lastSale.rowId) as SaleOutboxItem | undefined) ?? null : null),
+    [outbox, lastSale?.rowId],
+  );
 
   const [scannerOpen, setScannerOpen] = useState(false);
   const [scan, setScan] = useState<{ text: string; tone: ScanTone } | null>(null);
@@ -118,10 +163,21 @@ export default function SalesScreen() {
   }, [products.data, recentSales.data]);
 
   const checkout = useMutation({
-    mutationFn: () =>
-      salesApi.recordCartSale(
-        api,
-        cart.lines.map((l) => ({
+    mutationFn: async (): Promise<LastSale> => {
+      // Snapshot before the request: the cart may be edited while it is in
+      // flight and is reset on success, and the receipt must show what was
+      // actually sent.
+      const byId = new Map((products.data ?? []).map((p) => [p.id, p]));
+      const rungAt = new Date();
+      const snapshot = {
+        lines: cart.lines.map((l) => ({ ...l, brand: byId.get(l.productId)?.brand ?? null })),
+        orderDiscountType: cart.orderDiscountType,
+        orderDiscountValue: cart.orderDiscountValue,
+      };
+      // One body for both paths (live POST and outbox) — byte-identical, so
+      // a replay under the same Idempotency-Key is a replay, not a new sale.
+      const body = salesApi.buildCartSaleBody(
+        snapshot.lines.map((l) => ({
           productId: l.productId,
           quantity: l.quantity,
           pricePerUnit: l.pricePerUnit,
@@ -132,6 +188,10 @@ export default function SalesScreen() {
         {
           paymentMethod: payment,
           invoiceId: cart.invoiceId,
+          // Book it under the moment it was rung, not the moment it drains:
+          // a sale rung offline at 22:00 and synced at 09:00 belongs to
+          // yesterday's reports, digest and shift — the day on the receipt.
+          customDate: rungAt.toISOString(),
           ...(cart.customerName.trim() ? { customerName: cart.customerName.trim() } : {}),
           ...(cart.customerPhone.trim() ? { customerPhone: cart.customerPhone.trim() } : {}),
           ...(cart.note.trim() ? { note: cart.note.trim() } : {}),
@@ -139,15 +199,57 @@ export default function SalesScreen() {
             ? { orderDiscountType: cart.orderDiscountType, orderDiscountValue: cart.orderDiscountValue }
             : {}),
         },
-        cart.invoiceId,
-      ),
-    onSuccess: (result) => {
-      setLastSale(result);
+      );
+      // What the receipt shows while the server has not answered: the same
+      // totals the server will book (computeCartTotals mirrors the route).
+      const localResult: salesApi.CartSaleResult = {
+        invoiceId: cart.invoiceId,
+        saleIds: [],
+        lines: snapshot.lines.map((l) => ({
+          productId: l.productId,
+          productName: l.name,
+          quantity: l.quantity,
+          lineTotal: l.quantity * l.pricePerUnit - calcLineDiscount(l.quantity, l.pricePerUnit, l.lineDiscountType, l.lineDiscountValue),
+        })),
+        total: totals.afterOrderDiscount,
+        paymentMethod: payment,
+        customerName: body.options.customerName ?? null,
+        customerPhone: body.options.customerPhone ?? null,
+        note: body.options.note ?? null,
+      };
+      // Product names ride along in the outbox row (client-only sidecar) so the
+      // sync screen can list the lines and Edit can rebuild the cart offline.
+      const names = Object.fromEntries(snapshot.lines.map((l) => [l.productId, l.name]));
+      const queued = (reason: "offline" | "network"): LastSale => ({
+        result: localResult,
+        receipt: toReceiptSale(snapshot, localResult),
+        rowId: enqueueSale(body, cart.invoiceId, names),
+        queuedReason: reason,
+        rungAt,
+      });
+
+      // Known offline: do not even try — queue, and the cashier keeps selling.
+      if (!useOffline.getState().online) return queued("offline");
+
+      try {
+        const result = await salesApi.sendCartSale(api, body, cart.invoiceId);
+        return { result, receipt: toReceiptSale(snapshot, result), rowId: null, queuedReason: null, rungAt };
+      } catch (e) {
+        // Never reached the server / server failed: the outbox owns it from
+        // here under the SAME key, so a half-sent sale cannot double-post.
+        // Auth walls and terminal 4xx are shown, never queued.
+        if (isQueueableFailure(e)) return queued("network");
+        throw e;
+      }
+    },
+    onSuccess: (sale) => {
+      setLastSale(sale);
       setError(null);
       cart.reset();
       setQuery("");
       // Stock moved and the dashboard's numbers are stale — everything that
-      // reads either must refetch.
+      // reads either must refetch. (A queued sale invalidates too: cheap, and
+      // it means the caches are fresh the moment the drain lands it.)
       void qc.invalidateQueries({ queryKey: ["products"] });
       void qc.invalidateQueries({ queryKey: ["sales"] });
       void qc.invalidateQueries({ queryKey: ["dashboard"] });
@@ -156,7 +258,23 @@ export default function SalesScreen() {
     onError: (e) => setError(messageFor(e)),
   });
 
-  const canCheckout = cart.lines.length > 0 && !checkout.isPending;
+  // The queued row landed: prefer the server's own lines / total on the card.
+  const shownResult = queuedRow?.status === "done" && queuedRow.response ? queuedRow.response : lastSale?.result ?? null;
+  // "removed": the row was queued but is no longer in the outbox — the cashier
+  // discarded or edited it on /sync (tabs stay mounted), or the tenant scope
+  // changed. Never show that as "pending": nothing is going to sync it.
+  const rowGone = lastSale?.rowId != null && !queuedRow;
+  const syncState: "synced" | "pending" | "failed" | "removed" | null = !lastSale
+    ? null
+    : lastSale.rowId == null || queuedRow?.status === "done"
+      ? "synced"
+      : rowGone
+        ? "removed"
+        : queuedRow?.status === "failed"
+          ? "failed"
+          : "pending";
+
+  const canCheckout = canRecord && cart.lines.length > 0 && !checkout.isPending;
 
   const resolveCode = useCallback(
     async (raw: string) => {
@@ -201,18 +319,67 @@ export default function SalesScreen() {
 
   return (
     <Screen
+      title={t("app.shell.primary.sales")}
       onRefresh={() => void products.refetch()}
       refreshing={products.isRefetching}
     >
-      {lastSale ? (
+      {lastSale && shownResult ? (
         <Card>
-          <View style={styles.successHead}>
-            <CheckCircle size={28} color={colors.success} weight="fill" />
-            <Text style={styles.successTitle}>{t("app.sales.toast.saleSuccess")}</Text>
+          <View style={styles.successHead} testID="pos-sale-result">
+            {syncState === "synced" ? (
+              <CheckCircle size={28} color={colors.success} weight="fill" />
+            ) : syncState === "failed" ? (
+              <WarningCircle size={28} color={colors.danger} weight="fill" />
+            ) : syncState === "removed" ? (
+              <Trash size={28} color={colors.textSecondary} weight="fill" />
+            ) : (
+              <CloudSlash size={28} color={colors.warningStrong} weight="fill" />
+            )}
+            <Text
+              style={[
+                styles.successTitle,
+                syncState === "pending" && styles.successTitlePending,
+                syncState === "failed" && styles.successTitleFailed,
+                syncState === "removed" && styles.successTitleRemoved,
+              ]}
+            >
+              {syncState === "synced"
+                ? t("app.sales.toast.saleSuccess")
+                : syncState === "removed"
+                  ? t("mobile.pos.removedBadge")
+                  : t("mobile.pos.queuedTitle")}
+            </Text>
           </View>
-          <Text style={styles.successInvoice}>{lastSale.invoiceId}</Text>
-          <View style={styles.receipt}>
-            {lastSale.lines.map((l) => (
+          <View style={styles.successMeta}>
+            <Text style={styles.successInvoice}>{shownResult.invoiceId}</Text>
+            {syncState === "pending" ? (
+              <Badge label={t("mobile.pos.queuedBadge")} variant="lowstock" />
+            ) : syncState === "failed" ? (
+              <Badge label={t("mobile.pos.syncFailedBadge")} variant="outofstock" />
+            ) : syncState === "removed" ? (
+              <Badge label={t("mobile.pos.removedBadge")} variant="neutral" />
+            ) : lastSale.rowId ? (
+              <Badge label={t("mobile.pos.syncedBadge")} variant="success" />
+            ) : null}
+          </View>
+          {syncState === "pending" ? (
+            <>
+              <Text style={styles.successHint}>
+                {lastSale.queuedReason === "network" ? t("mobile.pos.queuedNetworkHint") : t("mobile.pos.queuedHint")}
+              </Text>
+              <Text style={styles.successHint}>{t("mobile.pos.rungAt", { when: localTime(lastSale.rungAt) })}</Text>
+            </>
+          ) : null}
+          {syncState === "removed" ? <Text style={styles.successHint}>{t("mobile.pos.removedHint")}</Text> : null}
+          {syncState === "failed" ? (
+            <Pressable onPress={() => router.push("/sync")} hitSlop={8}>
+              <Text style={[styles.successHint, styles.successHintDanger]}>
+                {t("mobile.pos.syncFailedHint")} {t("mobile.pos.openSync")}
+              </Text>
+            </Pressable>
+          ) : null}
+          <View style={styles.receipt} testID="pos-receipt">
+            {shownResult.lines.map((l) => (
               <View key={l.productId} style={styles.receiptRow}>
                 <Text numberOfLines={1} style={styles.receiptName}>
                   {l.productName} ×{l.quantity}
@@ -222,13 +389,25 @@ export default function SalesScreen() {
             ))}
             <View style={[styles.receiptRow, styles.receiptTotal]}>
               <Text style={styles.receiptTotalLabel}>{t("app.sales.table.col.total")}</Text>
-              <Text style={styles.receiptTotalAmt}>{money(lastSale.total)}</Text>
+              <Text style={styles.receiptTotalAmt}>{money(shownResult.total)}</Text>
             </View>
           </View>
+          <ReceiptActions sale={lastSale.receipt} />
           <Button label={t("app.notificationSettings.events.sale.created.title")} onPress={() => setLastSale(null)} />
         </Card>
       ) : null}
 
+      {!canRecord ? (
+        <Card>
+          <View style={styles.successHead}>
+            <WarningCircle size={24} color={colors.danger} weight="fill" />
+            <Text style={[styles.successTitle, styles.successTitleFailed]}>{t("mobile.pos.noPermission")}</Text>
+          </View>
+          <Text style={styles.successHint}>{t("mobile.pos.noPermissionHint")}</Text>
+        </Card>
+      ) : null}
+
+      {canRecord ? (
       <Card title={t("app.sales.form.title")}>
         <Text style={styles.label}>{t("app.sales.form.productSearch.label")}</Text>
         <SearchField
@@ -311,8 +490,11 @@ export default function SalesScreen() {
                 <Pressable
                   key={p.id}
                   style={styles.pill}
+                  testID="pos-recent-chip"
                   onPress={() => cart.add(p)}
+                  hitSlop={{ top: 4, bottom: 4 }}
                   accessibilityRole="button"
+                  accessibilityLabel={p.name}
                 >
                   <Text numberOfLines={1} style={styles.pillText}>
                     {p.name}
@@ -323,8 +505,13 @@ export default function SalesScreen() {
           </>
         ) : null}
       </Card>
+      ) : null}
 
-      {cart.lines.length > 0 ? (
+      {canRecord && cart.lines.length === 0 && !lastSale ? (
+        <EmptyState title={t("mobile.pos.cartEmpty")} hint={t("mobile.pos.emptyCartHint")} />
+      ) : null}
+
+      {canRecord && cart.lines.length > 0 ? (
         <Card title={t("mobile.pos.itemsInCart", { n: itemCount })}>
           <View style={styles.cartList}>
             {cart.lines.map((l) => (
@@ -370,7 +557,7 @@ export default function SalesScreen() {
             ))}
           </View>
 
-          <View style={styles.totals}>
+          <View style={styles.totals} testID="pos-cart-totals">
             <TotalRow label={t("app.sales.form.totals.subtotal")} value={money(totals.subtotalGross)} />
             {totals.lineDiscountTotal > 0 ? (
               <TotalRow label={t("app.sales.form.totals.lineDiscounts")} value={`- ${money(totals.lineDiscountTotal)}`} />
@@ -442,6 +629,13 @@ export default function SalesScreen() {
   );
 }
 
+/** Local HH:MM of a Date — no Intl on device (see lib/format). */
+function localTime(d: Date): string {
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
+
 function TotalRow({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
     <View style={styles.totalRow}>
@@ -489,8 +683,14 @@ const styles = StyleSheet.create({
   label: { fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary, marginBottom: spacing.sm, ...RTL_TEXT },
   muted: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, marginTop: spacing.sm, ...RTL_TEXT },
   pillRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginBottom: spacing.sm },
-  pill: { backgroundColor: colors.accentLight, borderRadius: radius.full, paddingHorizontal: spacing.lg, minHeight: 44, justifyContent: "center", flexShrink: 1 },
-  pillText: { fontFamily: fonts.medium, fontSize: 14, color: colors.accent },
+  // Recent-product chips. flexShrink 0 + numberOfLines 1 is the Chip lesson
+  // (a shrinking child breaks its text at every space); maxWidth 48% is what
+  // keeps this a chip ROW — five 44pt pills with real product names ("Chanel
+  // Coco Mademoiselle 50ml") each measured wider than half the card, so Yoga
+  // wrapped every one onto its own line and the row read as a vertical list.
+  // The cap ellipsises a long name instead; the full name shows in the cart.
+  pill: { backgroundColor: colors.accentLight, borderRadius: radius.full, paddingHorizontal: spacing.md, minHeight: 36, justifyContent: "center", flexShrink: 0, maxWidth: "48%" },
+  pillText: { fontFamily: fonts.medium, fontSize: 13, color: colors.accent },
   results: { marginTop: spacing.md, gap: spacing.sm },
   result: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md, minHeight: 56, paddingHorizontal: spacing.lg, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border },
   resultOut: { opacity: 0.45 },
@@ -524,7 +724,13 @@ const styles = StyleSheet.create({
   errorText: { fontFamily: fonts.medium, fontSize: 14, color: colors.danger, textAlign: "center" },
   successHead: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginBottom: 4 },
   successTitle: { fontFamily: fonts.bold, fontSize: 18, color: colors.successStrong, ...RTL_TEXT },
-  successInvoice: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, marginBottom: spacing.md, ...RTL_TEXT },
+  successTitlePending: { color: colors.warningStrong },
+  successTitleFailed: { color: colors.danger },
+  successTitleRemoved: { color: colors.textSecondary },
+  successInvoice: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },
+  successMeta: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm, flexWrap: "wrap", marginBottom: spacing.md },
+  successHint: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, marginTop: -spacing.xs, ...RTL_TEXT },
+  successHintDanger: { color: colors.danger },
   receipt: { gap: 6, marginBottom: spacing.lg, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
   receiptRow: { flexDirection: "row", justifyContent: "space-between", gap: spacing.md },
   receiptName: { flexShrink: 1, fontFamily: fonts.regular, fontSize: 14, color: colors.text, ...RTL_TEXT },
