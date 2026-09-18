@@ -54,14 +54,19 @@ export async function mintNativeSession(
   }
 
   const { token: refreshToken, hash } = mintRefreshToken();
+  // token_version is the users.token_version this session is issued under.
+  // /api/v1/auth/refresh compares it against the live value on every
+  // rotation, so "sign out everywhere" reaches this device even when it
+  // refreshes without a bearer. The same value rides in the access token as
+  // `tv`; the row is the copy the client cannot omit.
   const [device] = (await db.execute(sql`
     INSERT INTO auth_devices
       (user_id, tenant_id, refresh_token_hash, device_name, platform,
-       app_version, install_id, expires_at)
+       app_version, install_id, token_version, expires_at)
     VALUES
       (${user.id}, ${ctx.tenantId}, ${hash}, ${meta.deviceName ?? null},
        ${meta.platform ?? null}, ${meta.appVersion ?? null},
-       ${meta.installId ?? null},
+       ${meta.installId ?? null}, ${ctx.tokenVersion},
        now() + ${`${REFRESH_TTL_SEC} seconds`}::interval)
     RETURNING id
   `)) as unknown as Array<{ id: string }>;

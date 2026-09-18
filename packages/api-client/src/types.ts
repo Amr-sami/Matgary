@@ -85,6 +85,13 @@ export interface MeResponse {
    */
   permissions: string[];
   isOwner: boolean;
+  /**
+   * False until the onboarding wizard's Finish/Skip has run for the tenant
+   * (shop_settings.shopName set) — the web's session.user.onboardingComplete.
+   * The wizard is a soft gate: offer a way back to /onboarding while false.
+   * Optional: older servers omit it.
+   */
+  onboardingComplete?: boolean;
 }
 
 /** apps/web/app/api/v1/auth/devices/route.ts */
@@ -169,6 +176,8 @@ export interface Product {
   supplierId: string | null;
   sku?: string | null;
   barcode?: string | null;
+  /** Relative photo URL (/api/uploads/product-image/…); null = none. Prefix with the API base. */
+  imageUrl?: string | null;
   createdAt: string;
 }
 

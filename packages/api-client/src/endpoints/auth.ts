@@ -182,3 +182,49 @@ export async function startDemo(
   await client.adoptTokens(data.accessToken, data.refreshToken, data.expiresIn);
   return data;
 }
+
+// ---------------------------------------------------------------------------
+// Onboarding — the wizard the owner lands on right after signup.
+// ---------------------------------------------------------------------------
+
+export type OnboardingPreset = "cornerstore" | "blank";
+
+/**
+ * Body of POST /api/v1/onboarding/complete
+ * (apps/web/app/api/v1/onboarding/complete/route.ts). `shopPhone` is free-form
+ * and normalised server-side; a typed-but-invalid one is 400 INVALID_PHONE.
+ */
+export interface CompleteOnboardingInput {
+  preset: OnboardingPreset;
+  shopName: string;
+  shopPhone?: string;
+  locale?: "ar" | "en";
+}
+
+/**
+ * Error codes the route answers with (`ApiError.code`), same set as the web's
+ * completeOnboardingAction. 400 for the three input codes, 409 for
+ * PRIMARY_BRANCH_MISSING, 500 INTERNAL.
+ */
+export type OnboardingErrorCode =
+  | "SHOP_NAME_REQUIRED"
+  | "INVALID_PHONE"
+  | "INVALID_INPUT"
+  | "PRIMARY_BRANCH_MISSING"
+  | "INTERNAL";
+
+/**
+ * Finish onboarding for the caller's tenant: writes the primary branch's shop
+ * name / phone, flips `onboardingComplete`, and for `preset: "cornerstore"`
+ * seeds the starter catalog (Watches / Perfumes / Sunglasses + attributes).
+ * The seed is idempotent — a retry after a dropped response is safe.
+ */
+export async function completeOnboarding(
+  client: ApiClient,
+  input: CompleteOnboardingInput,
+): Promise<{ ok: true }> {
+  return client.request<{ ok: true }>("/api/v1/onboarding/complete", {
+    method: "POST",
+    body: input,
+  });
+}

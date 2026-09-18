@@ -198,12 +198,26 @@ export async function verifySecondFactor(
 
 /** H09 — atomic increment of `users.token_version`. Invalidates every JWT
  *  issued for this user before the call. Callers should also bust the
- *  user-context cache so the bump is visible on the next request. */
+ *  user-context cache so the bump is visible on the next request.
+ *
+ *  Native sessions (auth_devices) are swept in the same call. Their refresh
+ *  route would refuse them anyway — each row records the token_version it
+ *  was issued under (migration 0052) and is compared on every rotation —
+ *  but tombstoning here makes the "your devices" list truthful immediately
+ *  instead of after each device's next refresh, and leaves a reason on the
+ *  row. Access tokens already in hand stay valid for their remaining life
+ *  (≤ 15 minutes): they are verified statelessly, by design. */
 export async function bumpTokenVersion(userId: string): Promise<void> {
   await db
     .update(users)
     .set({ tokenVersion: sql`${users.tokenVersion} + 1` })
     .where(eq(users.id, userId));
+  await db.execute(sql`
+    UPDATE auth_devices
+       SET revoked_at = now(), revoked_reason = 'token_version_bump'
+     WHERE user_id = ${userId}
+       AND revoked_at IS NULL
+  `);
   await bustUserContextCache(userId);
 }
 

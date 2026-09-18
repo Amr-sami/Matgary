@@ -7,6 +7,11 @@ import { checkTenantRateLimit } from "@/lib/api/tenant-rate-limit";
 import { withTenant } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { normalizeEgyptPhoneAny } from "@/lib/validators/egypt";
+import {
+  LAST_PURCHASE_AT_TO_CHAR,
+  decodeCustomerCursor,
+  encodeCustomerCursor,
+} from "@/lib/repo/customer-cursor";
 
 // GET /api/v1/customers — the customer list, aggregated on the server.
 //
@@ -49,38 +54,9 @@ const querySchema = z.object({
   q: z.string().max(120).nullable(),
 });
 
-interface Cursor {
-  lastPurchaseAt: Date;
-  phone: string;
-}
-
-/**
- * Cursors are base64url. The payload is `<iso>|<phone>` and phones are stored
- * canonically as `+201…` — a bare `+` in a query string decodes to a space, so
- * an unencoded cursor would silently corrupt itself on the way back to us.
- */
-function encodeCursor(c: Cursor): string {
-  return Buffer.from(
-    `${c.lastPurchaseAt.toISOString()}|${c.phone}`,
-    "utf8",
-  ).toString("base64url");
-}
-
-function decodeCursor(raw: string | null): Cursor | null {
-  if (!raw) return null;
-  let decoded: string;
-  try {
-    decoded = Buffer.from(raw, "base64url").toString("utf8");
-  } catch {
-    return null;
-  }
-  const i = decoded.indexOf("|");
-  if (i < 0) return null;
-  const at = new Date(decoded.slice(0, i));
-  const phone = decoded.slice(i + 1);
-  if (Number.isNaN(at.getTime()) || !phone) return null;
-  return { lastPurchaseAt: at, phone };
-}
+// The cursor codec lives in lib/repo/customer-cursor.ts: it carries the
+// timestamp as Postgres text (microseconds intact), never as a Date, and the
+// unit test there is what proves a page boundary cannot skip a customer.
 
 /** Escape the LIKE metacharacters so a customer searching for "50%" does not
  *  get a wildcard. Backslash is Postgres' default LIKE escape character. */
@@ -166,6 +142,8 @@ interface CustomerRow {
   // Widened to match reality and funnelled through toDate() below; assuming a
   // Date here is what made every request to this route throw.
   last_purchase_at: Date | string;
+  /** to_char() output, LAST_PURCHASE_AT_TO_CHAR shape: "2026-09-16T14:05:54.947665Z". */
+  last_purchase_at_iso: string;
   outstanding: string;
   oldest_unpaid_at: Date | string | null;
 }
@@ -207,7 +185,7 @@ export async function GET(req: NextRequest) {
   // A cursor we cannot parse is rejected instead of being ignored: silently
   // restarting at page 1 would hand a paging client the first page forever.
   const rawCursor = parsed.data.cursor;
-  const cursor = decodeCursor(rawCursor);
+  const cursor = decodeCustomerCursor(rawCursor);
   if (rawCursor && !cursor) {
     return NextResponse.json({ error: "INVALID_CURSOR" }, { status: 400 });
   }
@@ -235,8 +213,14 @@ export async function GET(req: NextRequest) {
     // tiebreak matters: several customers can share a lastPurchaseAt to the
     // microsecond when one cart was rung up for a group, and a date-only
     // cursor would skip all but one of them.
+    //
+    // `lastPurchaseAt` is the text Postgres itself rendered for the previous
+    // page's last row (see the SELECT below), cast straight back. It is NOT
+    // passed through a Date: that would round to the millisecond, and a
+    // customer whose MAX(sale_date) shares the boundary row's millisecond
+    // but not its microseconds would compare as not-below and be skipped.
     havingParts.push(
-      sql`(MAX(sale_date), customer_phone) < (${cursor.lastPurchaseAt.toISOString()}::timestamptz, ${cursor.phone})`,
+      sql`(MAX(sale_date), customer_phone) < (${cursor.lastPurchaseAt}::timestamptz, ${cursor.phone})`,
     );
   }
   const having =
@@ -255,6 +239,11 @@ export async function GET(req: NextRequest) {
         SUM(CAST(total_price AS numeric(14,2)))::text AS total_spend,
         COUNT(DISTINCT COALESCE(invoice_id, id::text))::int AS invoice_count,
         MAX(sale_date) AS last_purchase_at,
+        -- The same instant as text at full precision, for the cursor only.
+        -- The driver turns the column above into a JS Date (milliseconds);
+        -- this one never touches a Date and so round-trips exactly.
+        to_char(MAX(sale_date) AT TIME ZONE 'UTC', ${LAST_PURCHASE_AT_TO_CHAR})
+          AS last_purchase_at_iso,
         COALESCE(
           SUM(GREATEST(CAST(total_price AS numeric(14,2)) - amount_paid, 0)),
           0
@@ -317,8 +306,8 @@ export async function GET(req: NextRequest) {
     })),
     nextCursor:
       hasMore && last
-        ? encodeCursor({
-            lastPurchaseAt: toDate(last.last_purchase_at),
+        ? encodeCustomerCursor({
+            lastPurchaseAt: last.last_purchase_at_iso,
             phone: last.phone,
           })
         : null,

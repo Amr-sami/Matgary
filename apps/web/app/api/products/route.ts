@@ -42,6 +42,8 @@ const createSchema = z.object({
   supplier: z.string().max(120).optional(),
   supplierId: z.string().uuid().nullable().optional(),
   location: z.string().max(120).optional(),
+  /** Relative URL minted by POST /api/uploads/product-image. */
+  imageUrl: z.string().max(500).regex(/^\/api\/uploads\/product-image\/[A-Za-z0-9\-]+\/products\/[A-Za-z0-9\-]+\.(jpg|png|webp)$/).nullable().optional(),
   attributeValueIds: z.array(z.string().uuid()).optional(),
 });
 
@@ -54,6 +56,13 @@ export async function POST(req: NextRequest) {
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+  }
+  if (
+    parsed.data.imageUrl &&
+    !parsed.data.imageUrl.startsWith(`/api/uploads/product-image/${r.ctx.tenantId}/products/`)
+  ) {
+    // Shape is checked by zod; the tenant segment must be the caller's own.
+    return NextResponse.json({ error: "رابط الصورة غير صالح" }, { status: 400 });
   }
   // Multi-store: the product is born at the active branch and stays there.
   const { id } = await addProduct(r.ctx.tenantId, r.ctx.branchId, parsed.data);

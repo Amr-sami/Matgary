@@ -50,11 +50,32 @@ export interface RequestOptions {
   noBranch?: boolean;
   /** Extra request headers, e.g. Idempotency-Key on the POS write. */
   headers?: Record<string, string>;
+  /** Overrides the client-wide timeout for this one request (uploads). */
+  timeoutMs?: number;
+  /**
+   * Multipart body (uploads). Sent as-is with NO Content-Type header so the
+   * runtime writes the boundary itself. Mutually exclusive with `body`.
+   */
+  formData?: FormData;
+}
+
+/** A file to upload — the shape expo-image-picker hands back. */
+export interface UploadFilePart {
+  /** file:// (native) or blob:/data: (web) URI. */
+  uri: string;
+  name: string;
+  /** MIME type, e.g. image/jpeg. */
+  type: string;
 }
 
 /** Refresh this long before the token actually expires. */
 const REFRESH_SKEW_MS = 60_000;
 const DEFAULT_TIMEOUT_MS = 15_000;
+/**
+ * Uploads carry up to 3 MB; on a ~1 Mbps mobile uplink that is ~25 s, so the
+ * JSON timeout would abort every file near the cap.
+ */
+const UPLOAD_TIMEOUT_MS = 90_000;
 
 export class ApiClient {
   private readonly baseUrl: string;
@@ -235,7 +256,9 @@ export class ApiClient {
       ...opts.headers,
       ...extraHeaders,
     };
-    if (opts.body !== undefined) headers["Content-Type"] = "application/json";
+    if (opts.body !== undefined && !opts.formData) {
+      headers["Content-Type"] = "application/json";
+    }
 
     if (useAuth) {
       const tokens = await this.store.get();
@@ -251,7 +274,7 @@ export class ApiClient {
 
     // Two abort sources: our timeout and the caller's (screen unmounted).
     const timer = new AbortController();
-    const timeoutId = setTimeout(() => timer.abort(), this.timeoutMs);
+    const timeoutId = setTimeout(() => timer.abort(), opts.timeoutMs ?? this.timeoutMs);
     const onCallerAbort = () => timer.abort();
     opts.signal?.addEventListener("abort", onCallerAbort);
 
@@ -259,7 +282,11 @@ export class ApiClient {
       return await fetch(url.toString(), {
         method: opts.method ?? "GET",
         headers,
-        body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+        body: opts.formData
+          ? opts.formData
+          : opts.body === undefined
+            ? undefined
+            : JSON.stringify(opts.body),
         signal: timer.signal,
       });
     } catch (cause) {
@@ -327,6 +354,33 @@ export class ApiClient {
 }
 
 // -------------------------------------------------------------------- helpers
+
+/**
+ * Multipart upload through the same client: bearer, X-Branch-Id, proactive
+ * refresh and the 401 retry all apply. `file` goes in the `file` field the
+ * upload routes expect; `extraFields` (e.g. `{ kind: "receipt-logo" }`) are
+ * appended as plain text parts. React Native's FormData accepts the
+ * `{ uri, name, type }` object directly and streams the file from disk.
+ */
+export function uploadFile<T>(
+  c: ApiClient,
+  path: string,
+  file: UploadFilePart,
+  extraFields: Record<string, string> = {},
+  opts: Pick<RequestOptions, "signal" | "headers" | "noBranch" | "timeoutMs"> = {},
+): Promise<T> {
+  const form = new FormData();
+  for (const [k, v] of Object.entries(extraFields)) form.append(k, v);
+  // RN's FormData polyfill takes the descriptor object; the DOM typing does
+  // not know that shape, hence the cast.
+  form.append("file", file as unknown as Blob, file.name);
+  return c.request<T>(path, {
+    timeoutMs: UPLOAD_TIMEOUT_MS,
+    ...opts,
+    method: "POST",
+    formData: form,
+  });
+}
 
 function isDeadSession(code: string): boolean {
   return (

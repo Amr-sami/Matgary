@@ -25,8 +25,28 @@ import type { Permission } from "@/lib/permissions";
 //     which is exactly what a lost handset needs. Only the SHA-256 of the
 //     token is stored, so a database leak does not yield usable credentials.
 //
-// `token_version` is still checked on every refresh, so the existing
-// "sign out everywhere" flow keeps working for native sessions for free.
+// REVOCATION, and where it bites (migration 0052):
+//
+//   Access tokens are verified statelessly — `verifyAccessToken` is a
+//   signature check and nothing else, no database on the hot path. That is
+//   deliberate (one JWT verify per request, on every route) and it means a
+//   revocation of any kind is enforced at the REFRESH, not on the next
+//   request. A revoked device therefore keeps working for at most
+//   ACCESS_TTL_SEC (15 minutes): the remaining life of the access token it
+//   already holds. Both revocation paths land at the same place:
+//
+//     "sign out this device"  DELETE /api/v1/auth/devices?id=  tombstones the
+//                             auth_devices row → its next refresh is refused.
+//     "sign out everywhere"   bumps users.token_version AND tombstones every
+//                             live row (lib/repo/account-security.ts). Each
+//                             row also carries the users.token_version it was
+//                             issued under (`auth_devices.token_version`), so
+//                             a refresh whose row is behind the live value is
+//                             refused even when the row was not swept — the
+//                             2FA and password-reset bumps go that way — and
+//                             even when the client sends no bearer at all.
+//
+//   `judgeRefresh` below is that decision, kept pure so it is unit-testable.
 
 export const ACCESS_TTL_SEC = 15 * 60;
 export const REFRESH_TTL_SEC = 90 * 24 * 60 * 60;
@@ -42,7 +62,9 @@ export interface AccessClaims {
   permissions: Permission[];
   /** Mirrors users.token_version. Checked on refresh, not on every request. */
   tv: number;
-  /** The device this token was minted for, so a leak is attributable. */
+  /** The auth_devices row this token was minted for, so a leak is
+   *  attributable and the devices list can mark "this device". Not checked
+   *  per request — see the REVOCATION note above. */
   did: string;
   /** Tenant suspended at this instant, or null. Mirrors the web JWT claim. */
   susp: string | null;
@@ -143,4 +165,59 @@ export function bearerFromHeader(header: string | null): string | null {
   if (!header) return null;
   const m = /^Bearer\s+(.+)$/i.exec(header.trim());
   return m?.[1]?.trim() || null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Refresh verdict
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** The auth_devices facts a refresh decision needs. Column names as SELECTed
+ *  by /api/v1/auth/refresh, camel-cased. */
+export interface RefreshRowFacts {
+  /** revoked_at IS NOT NULL */
+  revoked: boolean;
+  /** replaced_by_id — set only by a successful rotation. */
+  replacedById: string | null;
+  /** expires_at <= now() */
+  expired: boolean;
+  /** auth_devices.token_version — users.token_version at issue time. */
+  tokenVersion: number;
+}
+
+export type RefreshVerdict =
+  /** Rotate and mint. */
+  | { kind: "ok" }
+  /** Revoked AND superseded: this token was already rotated, yet someone
+   *  still presents it. Two parties hold the secret. Kill the whole chain. */
+  | { kind: "reuse" }
+  /** Ordinary dead token — logout, a device the user revoked, a reinstall. */
+  | { kind: "revoked" }
+  /** Past expires_at. Tombstone so the devices list stops showing it. */
+  | { kind: "expired" }
+  /** users.token_version moved since this session was issued: the user
+   *  signed out everywhere (or rotated a credential that implies it). Every
+   *  live session of theirs must go, this one included. */
+  | { kind: "stale_version" };
+
+/**
+ * Decide what a presented refresh token gets, from the row it hashed to and
+ * the user's LIVE token_version. Pure: the route does the SQL around it.
+ *
+ * Order matters. Reuse is checked before the plain revoked case because a
+ * reused token IS revoked — the successor pointer is what distinguishes the
+ * leak from an honest dead token. The version check comes last so that a
+ * swept row (revoked by the sweep) reports `revoked`, not `stale_version`;
+ * only a row the sweep never reached — a 2FA toggle, a password reset, or a
+ * bump that raced the tombstone — reaches the version comparison. The
+ * bearer is deliberately NOT an input: the baseline lives on the row.
+ */
+export function judgeRefresh(
+  row: RefreshRowFacts,
+  liveTokenVersion: number,
+): RefreshVerdict {
+  if (row.revoked && row.replacedById) return { kind: "reuse" };
+  if (row.revoked) return { kind: "revoked" };
+  if (row.expired) return { kind: "expired" };
+  if (row.tokenVersion !== liveTokenVersion) return { kind: "stale_version" };
+  return { kind: "ok" };
 }

@@ -133,5 +133,9 @@ export async function GET() {
     // Effective, already owner-expanded — see effectivePermissions above.
     permissions: effectivePermissions(ctx.role, ctx.permissions),
     isOwner: ctx.role === "owner",
+    // Same flag the web session carries (session.user.onboardingComplete):
+    // shop_settings.shopName is set, i.e. the wizard's Finish/Skip ran. The
+    // app's soft gate reads it to offer "Finish setup" until it flips.
+    onboardingComplete: userCtx.onboardingComplete,
   });
 }

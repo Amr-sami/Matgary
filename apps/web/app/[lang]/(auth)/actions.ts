@@ -1,14 +1,19 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { redirect } from "next/navigation";
 import { headers, cookies } from "next/headers";
 import { BRANCH_NAME_COOKIE } from "@/lib/api/branch-name-cookie";
-import { db, withTenant } from "@/lib/db";
-import { tenants, shopSettings, branches } from "@/lib/db/schema";
-import { signIn, signOut, auth, bustUserContextCache } from "@/lib/auth";
-import { seedCornerStorePreset } from "@/lib/seeds/cornerstore";
+import { db } from "@/lib/db";
+import { tenants } from "@/lib/db/schema";
+import { signIn, signOut, auth } from "@/lib/auth";
+import {
+  completeOnboarding,
+  parseOnboardingInput,
+  type OnboardingErrorCode,
+  type OnboardingResult,
+} from "@/lib/onboarding/complete";
 import { logActivity } from "@/lib/repo/activity";
 import { rateLimit } from "@/lib/ratelimit";
 import {
@@ -17,7 +22,6 @@ import {
   type SignupField,
 } from "@/lib/auth/create-account";
 import { defaultLocale, isLocale, type Locale } from "@/lib/i18n/config";
-import { normalizeEgyptPhoneAny } from "@/lib/validators/egypt";
 
 // Public signup is wide open — cap it so a script can't churn out tenants.
 // 5 / hour / IP is generous enough for legitimate retries on a flaky form.
@@ -122,23 +126,9 @@ export async function loginAction(formData: FormData): Promise<LoginResult> {
   }
 }
 
-const onboardingSchema = z.object({
-  shopName: z.string().min(1).max(80),
-  shopPhone: z.string().max(40).optional().or(z.literal("")),
-  preset: z.enum(["cornerstore", "blank"]),
-});
-
-export type OnboardingErrorCode =
-  | "UNAUTHORIZED"
-  | "SHOP_NAME_REQUIRED"
-  | "INVALID_PHONE"
-  | "INVALID_INPUT"
-  | "PRIMARY_BRANCH_MISSING"
-  | "INTERNAL";
-
-export type OnboardingResult =
-  | { ok: true }
-  | { ok: false; code: OnboardingErrorCode };
+// Schema, codes and the DB work live in lib/onboarding/complete.ts, shared
+// with POST /api/v1/onboarding/complete (the native app's transport).
+export type { OnboardingErrorCode, OnboardingResult };
 
 // Snapshot of the tenant the wizard pre-fills from. Returned by
 // `getOnboardingDefaults()` so the page can render the values the user
@@ -168,86 +158,19 @@ export async function completeOnboardingAction(
     return { ok: false, code: "UNAUTHORIZED" };
   }
 
-  const parsed = onboardingSchema.safeParse({
+  const parsed = parseOnboardingInput({
     shopName: formData.get("shopName"),
     shopPhone: formData.get("shopPhone") ?? "",
     preset: formData.get("preset"),
   });
-  if (!parsed.success) {
-    const first = parsed.error.issues[0];
-    const path = String(first.path[0] ?? "");
-    return {
-      ok: false,
-      code: path === "shopName" ? "SHOP_NAME_REQUIRED" : "INVALID_INPUT",
-    };
-  }
+  if (!parsed.ok) return parsed;
 
-  // Normalize the phone to canonical `+201XXXXXXXXX` (or landline) so the
-  // DB never stores free-form digit soup. Empty phone is allowed (optional
-  // field); a typed-but-invalid phone trips INVALID_PHONE.
-  let normalizedPhone: string | null = null;
-  const rawPhone = (parsed.data.shopPhone ?? "").trim();
-  if (rawPhone.length > 0) {
-    normalizedPhone = normalizeEgyptPhoneAny(rawPhone);
-    if (!normalizedPhone) {
-      return { ok: false, code: "INVALID_PHONE" };
-    }
-  }
-
-  const tenantId = session.user.tenantId;
-
-  try {
-    await withTenant(tenantId, async (tx) => {
-      // Onboarding fills the tenant's primary-branch settings row + seeds
-      // its catalog. Multi-store: secondary branches are created later from
-      // /settings/branches and start empty by design.
-      const [primary] = await tx
-        .select({ id: branches.id })
-        .from(branches)
-        .where(
-          and(eq(branches.tenantId, tenantId), eq(branches.isPrimary, true)),
-        )
-        .limit(1);
-      if (!primary) {
-        // Sentinel so the catch below can return the typed code instead of
-        // a generic INTERNAL — primary-branch-missing is recoverable
-        // (admin can fix) and worth surfacing distinctly.
-        throw Object.assign(new Error("PRIMARY_BRANCH_MISSING"), {
-          code: "PRIMARY_BRANCH_MISSING",
-        });
-      }
-
-      await tx
-        .update(shopSettings)
-        .set({
-          shopName: parsed.data.shopName,
-          shopPhone: normalizedPhone,
-          onboardingCompletedAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(shopSettings.tenantId, tenantId),
-            eq(shopSettings.branchId, primary.id),
-          ),
-        );
-
-      if (parsed.data.preset === "cornerstore") {
-        await seedCornerStorePreset(tx, tenantId, primary.id);
-      }
-    });
-    // onboardingComplete just flipped — drop the cached context so the next
-    // page render reflects it without waiting for the 60s TTL.
-    await bustUserContextCache(session.user.id!);
-  } catch (err) {
-    console.error("[onboarding] failed", err);
-    if ((err as { code?: string } | null)?.code === "PRIMARY_BRANCH_MISSING") {
-      return { ok: false, code: "PRIMARY_BRANCH_MISSING" };
-    }
-    return { ok: false, code: "INTERNAL" };
-  }
-
-  return { ok: true };
+  return completeOnboarding(
+    session.user.tenantId,
+    session.user.id!,
+    parsed.data,
+    await activeLocale(),
+  );
 }
 
 export async function logoutAction() {

@@ -4395,7 +4395,7 @@
       "takePhoto": "Take photo",
       "choosePhoto": "Choose",
       "removePhoto": "Remove",
-      "photoHint": "Preview only for now — the photo stays on this phone and isn't saved with the product yet",
+      "photoHint": "Shows in the inventory list and on the product page",
       "photoUploading": "Uploading the photo…",
       "photoReady": "Photo uploaded",
       "photoUploadFailed": "Couldn't upload the photo — the product will be saved without it",
@@ -4408,7 +4408,10 @@
       "openSettings": "Open Settings",
       "skuFromPos": "Barcode carried over from the sale: {code}",
       "a11yPhotoPreview": "Product photo preview",
-      "photoPickFailed": "Couldn't open the photo — try again"
+      "photoPickFailed": "Couldn't open the photo — try again",
+      "changePhoto": "Change photo",
+      "addPhoto": "Add photo",
+      "photoFailedBlocksSave": "Photo upload failed — retry or remove it in the Photo step before saving"
     },
     "returns": {
       "empty": "No returns yet",
@@ -4690,7 +4693,14 @@
       "loadFailed": "Couldn't load settings",
       "retry": "Retry",
       "loyaltyRateMax": "Maximum is {max} — lower the value before saving.",
-      "fixFieldsFirst": "Fix the highlighted fields before saving"
+      "fixFieldsFirst": "Fix the highlighted fields before saving",
+      "changeLogo": "Change logo",
+      "addLogo": "Add logo",
+      "logoUploading": "Uploading the logo…",
+      "logoUploaded": "Logo updated",
+      "logoTooBig": "Logo too big — pick an image under 190 KB",
+      "logoUploadFailed": "Couldn't upload the logo — try again",
+      "logoHint": "JPG or PNG up to 190 KB — a square image prints best on receipts"
     },
     "signup": {
       "emailTaken": "This email is already registered",
@@ -5285,6 +5295,10 @@
         "count_other": "{n} devices"
       },
       "signOutEverywhereConfirm": "Every device will be signed out, including this one. You will have to log in again."
+    },
+    "dateField": {
+      "placeholder": "Pick a date",
+      "done": "Done"
     }
   }
 }

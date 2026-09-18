@@ -84,6 +84,63 @@ export const verificationTokens = pgTable(
   (t) => [primaryKey({ columns: [t.identifier, t.token] })],
 );
 
+/**
+ * Native-client refresh tokens, one row per device (migrations 0046, 0052).
+ *
+ * Auth bootstrap like `users` / `sessions`: read before a tenant context
+ * exists, so it carries no RLS policy and every query filters on user_id.
+ * The routes under app/api/v1/auth/** still speak raw SQL to it; this
+ * definition documents the columns and types the RETURNING rows. `tenants`
+ * is declared further down — the lazy `references` callback is fine with it.
+ */
+export const authDevices = pgTable(
+  "auth_devices",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    /** SHA-256 hex of the refresh token. The plaintext is never stored. */
+    refreshTokenHash: text("refresh_token_hash").notNull().unique(),
+    deviceName: text("device_name"),
+    platform: text("platform"),
+    appVersion: text("app_version"),
+    installId: text("install_id"),
+    /** Rotation lineage: the successor row minted by /auth/refresh. */
+    replacedById: uuid("replaced_by_id"),
+    /**
+     * users.token_version this session was issued under. Written at login,
+     * carried forward on rotation, compared against the live value on every
+     * refresh — the server-held baseline for "sign out everywhere", so a
+     * device refreshing without a bearer can no longer slip past the sweep.
+     */
+    tokenVersion: integer("token_version").notNull().default(0),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    lastUsedAt: timestamp("last_used_at", { mode: "date", withTimezone: true }),
+    expiresAt: timestamp("expires_at", { mode: "date", withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { mode: "date", withTimezone: true }),
+    revokedReason: text("revoked_reason"),
+  },
+  // Byte-for-byte what migration 0046 created. The unique partial index is
+  // load-bearing: the login upsert (lib/api/native-session.ts) and the
+  // per-device revoke both rely on "one live row per (user, install)". A
+  // declaration that omitted it would make the next `drizzle-kit generate`
+  // emit its DROP.
+  (t) => [
+    index("auth_devices_user_idx").on(t.userId).where(sql`revoked_at IS NULL`),
+    index("auth_devices_user_created_idx").on(t.userId, t.createdAt.desc()),
+    uniqueIndex("auth_devices_user_install_live_idx")
+      .on(t.userId, t.installId)
+      .where(sql`revoked_at IS NULL AND install_id IS NOT NULL`),
+    index("auth_devices_expiry_idx").on(t.expiresAt).where(sql`revoked_at IS NULL`),
+  ],
+);
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Tenancy (global)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -449,6 +506,9 @@ export const products = pgTable(
     /** Linked supplier record. Coexists with the legacy `supplier` text column. */
     supplierId: uuid("supplier_id"),
     location: text("location"),
+    /** Product photo (migration 0051). Relative URL under
+     *  /api/uploads/product-image/<tenant>/products/<uuid>.<ext>; null = no photo. */
+    imageUrl: text("image_url"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .default(sql`now()`),

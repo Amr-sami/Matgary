@@ -1,4 +1,4 @@
-import type { ApiClient } from "../http";
+import { uploadFile, type ApiClient, type UploadFilePart } from "../http";
 import type {
   Brand,
   Category,
@@ -345,6 +345,8 @@ export interface CreateProductInput {
   sku?: string;
   tags?: string[];
   supplierId?: string | null;
+  /** Relative URL from uploadProductImage(); omit for no photo. */
+  imageUrl?: string | null;
 }
 
 export const createProduct = (c: ApiClient, input: CreateProductInput) =>
@@ -563,6 +565,8 @@ export interface UpdateProductInput {
   price?: number;
   costPrice?: number | null;
   lowStockThreshold?: number;
+  /** Relative URL from uploadProductImage(); null clears the photo. */
+  imageUrl?: string | null;
 }
 
 /** PATCH /api/products/[id] — `{ ok: true }`; a failed check is a 400 with the zod message. */
@@ -571,3 +575,36 @@ export const updateProduct = (c: ApiClient, id: string, input: UpdateProductInpu
     method: "PATCH",
     body: input,
   });
+
+// ---------------------------------------------------------------------------
+// Product photos & receipt logo — POST /api/uploads/product-image (multipart).
+
+/**
+ * Uploads a product photo (jpg/png/webp ≤ 3 MB, requires manage_inventory).
+ * Returns the RELATIVE url to store on the product; render it through
+ * `resolveUploadUrl(baseUrl, url)`. Server errors (too big, wrong type) are a
+ * 400 ApiError whose message is already user-facing Arabic.
+ */
+export const uploadProductImage = (c: ApiClient, file: UploadFilePart) =>
+  uploadFile<{ url: string }>(c, "/api/uploads/product-image", file);
+
+/**
+ * Owner-only. Same route with `kind=receipt-logo`: the server converts the
+ * file (≤ 190 KB) to a data URI and writes settings.receiptLogoUrl for the
+ * active branch itself — no follow-up PATCH needed. Returns that data URI.
+ */
+export const uploadReceiptLogo = (c: ApiClient, file: UploadFilePart) =>
+  uploadFile<{ url: string }>(c, "/api/uploads/product-image", file, {
+    kind: "receipt-logo",
+  });
+
+/**
+ * Product image URLs are stored relative (`/api/uploads/product-image/…`) so
+ * the same row works from a LAN dev host, the simulator and production.
+ * Absolute and data: URLs pass through untouched.
+ */
+export function resolveUploadUrl(baseUrl: string, url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (/^(https?:|data:)/i.test(url)) return url;
+  return `${baseUrl.replace(/\/+$/, "")}${url.startsWith("/") ? "" : "/"}${url}`;
+}

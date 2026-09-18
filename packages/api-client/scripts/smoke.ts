@@ -187,19 +187,106 @@ async function main() {
     const cats = await client.request<{ data: { id: string }[] }>("/api/categories");
     const cat = cats.data[0];
     if (cat) {
+      const sku = `smk-${Date.now().toString(36)}`;
       const { id } = await catalog.createProduct(client, {
         name: `Smoke ${Date.now()}`,
         categoryId: cat.id,
         price: 100,
         quantity: 5,
         lowStockThreshold: 2,
+        sku,
       });
       check("product create returns an id", Boolean(id));
       const list = await catalog.listProducts(client);
       check("created product is listed at the active branch", list.some((p) => p.id === id));
+
+      // ---- scanner lookup (HANDOFF §8 #6) ----------------------------------
+      // The server resolves the code across the whole tenant with the web
+      // scanner's normalisation, and reports which branch holds it. Scan the
+      // fresh product's sku UPPER-cased with decoder junk appended: the match
+      // must be this row, `total` counts this branch, and `stock` names the
+      // branch.
+      const scan = await client.request<{
+        data: { id: string; quantity: number }[];
+        total: number;
+        stock: { productId: string; branchId: string; branchName: string; quantity: number; current: boolean }[];
+      }>(`/api/v1/products?barcode=${encodeURIComponent(sku.toUpperCase() + "\u200B")}`);
+      check("barcode scan resolves the sku tenant-wide", scan.data[0]?.id === id, `total=${scan.total}`);
+      check(
+        "barcode scan reports which branch holds stock",
+        scan.stock.some((s) => s.productId === id && s.current && s.quantity === 5 && Boolean(s.branchName)),
+        scan.stock.map((s) => `${s.branchName}:${s.quantity}`).join(", "),
+      );
+      const miss = await client.request<{ data: unknown[]; stock: unknown[] }>(
+        "/api/v1/products?barcode=no-such-code-smoke",
+      );
+      check("unknown barcode is a 200 with nothing held anywhere", miss.data.length === 0 && miss.stock.length === 0);
+
+      // The two normalisations only the SQL half of findProductBySku performs
+      // (lib/repo/catalog.ts): the 12<->13 digit collapse (a UPC-A stored as
+      // an EAN-13 with a leading 0) and a NBSP inside the stored sku, which
+      // Postgres `\s` does NOT strip and the write path does not trim.
+      // Exercised here on every smoke run so the repo query is proven live
+      // even when the unit suite's DB-gated cases are skipped.
+      const digits = `6${Date.now().toString().slice(-11)}`; // 12 digits
+      const ean = await catalog.createProduct(client, {
+        name: `Smoke EAN ${Date.now()}`,
+        categoryId: cat.id,
+        price: 1,
+        quantity: 1,
+        lowStockThreshold: 0,
+        sku: `0${digits}`,
+      });
+      const collapsed = await client.request<{ data: { id: string }[] }>(
+        `/api/v1/products?barcode=${digits}`,
+      );
+      check("EAN-13 stored with a leading 0, UPC-A scanned: same product", collapsed.data[0]?.id === ean.id);
+      const nbspSku = `nb-\u00a0${Date.now().toString(36)}`;
+      const nbsp = await catalog.createProduct(client, {
+        name: `Smoke NBSP ${Date.now()}`,
+        categoryId: cat.id,
+        price: 1,
+        quantity: 1,
+        lowStockThreshold: 0,
+        sku: nbspSku,
+      });
+      const nbspScan = await client.request<{ data: { id: string }[] }>(
+        `/api/v1/products?barcode=${encodeURIComponent(nbspSku.replace("\u00a0", ""))}`,
+      );
+      check("a stored sku carrying a NBSP is still found", nbspScan.data[0]?.id === nbsp.id);
+      await catalog.deleteProduct(client, ean.id);
+      await catalog.deleteProduct(client, nbsp.id);
+
       await catalog.deleteProduct(client, id);
       const after = await catalog.listProducts(client);
       check("cleanup removed it", !after.some((p) => p.id === id));
+    }
+  }
+
+  // ---- customers cursor (HANDOFF §8 #5) ------------------------------------
+  // The keyset cursor carries MAX(sale_date) as the microsecond text Postgres
+  // rendered — never a millisecond Date — so a page boundary cannot skip a
+  // customer. Pin the wire format: base64url of "<iso with 6 fraction digits>|<phone>".
+  {
+    const page = await client.request<{ data: { phone: string }[]; nextCursor: string | null }>(
+      "/api/v1/customers?limit=1",
+    );
+    if (page.nextCursor) {
+      const decoded = Buffer.from(page.nextCursor, "base64url").toString("utf8");
+      check(
+        "customers cursor keeps microseconds",
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z\|\+\d+$/.test(decoded),
+        decoded,
+      );
+      const next = await client.request<{ data: { phone: string }[] }>(
+        `/api/v1/customers?limit=1&cursor=${encodeURIComponent(page.nextCursor)}`,
+      );
+      check(
+        "customers page 2 does not repeat the boundary row",
+        next.data.length === 0 || next.data[0]!.phone !== page.data[0]!.phone,
+      );
+    } else {
+      check("customers cursor keeps microseconds", true, "single page — nothing to page");
     }
   }
 

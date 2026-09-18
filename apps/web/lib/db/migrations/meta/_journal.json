@@ -358,6 +358,27 @@
       "when": 1781900500000,
       "tag": "0050_stock_discrepancies",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1781900600000,
+      "tag": "0051_product_image_url",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1781900700000,
+      "tag": "0052_auth_devices_token_version",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1781900800000,
+      "tag": "0053_products_norm_sku_idx",
+      "breakpoints": true
     }
   ]
 }

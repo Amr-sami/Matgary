@@ -17,6 +17,8 @@ const patchSchema = z.object({
   supplierId: z.string().uuid().nullable().optional(),
   location: z.string().max(120).nullable().optional(),
   categoryId: z.string().uuid().optional(),
+  /** Relative URL minted by POST /api/uploads/product-image; null clears. */
+  imageUrl: z.string().max(500).regex(/^\/api\/uploads\/product-image\/[A-Za-z0-9\-]+\/products\/[A-Za-z0-9\-]+\.(jpg|png|webp)$/).nullable().optional(),
 });
 
 export async function PATCH(
@@ -33,6 +35,13 @@ export async function PATCH(
   const parsed = patchSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+  }
+  if (
+    parsed.data.imageUrl &&
+    !parsed.data.imageUrl.startsWith(`/api/uploads/product-image/${r.ctx.tenantId}/products/`)
+  ) {
+    // Shape is checked by zod; the tenant segment must be the caller's own.
+    return NextResponse.json({ error: "رابط الصورة غير صالح" }, { status: 400 });
   }
   await updateProduct(r.ctx.tenantId, id, parsed.data);
   logActivity({

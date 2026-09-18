@@ -90,6 +90,8 @@ export interface Product {
   /** Linked supplier id; coexists with the legacy free-text `supplier` field. */
   supplierId?: string | null;
   location?: string;
+  /** Relative photo URL (/api/uploads/product-image/…); null = none. */
+  imageUrl?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }

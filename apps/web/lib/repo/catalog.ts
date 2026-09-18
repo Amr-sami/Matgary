@@ -1,6 +1,7 @@
-import { and, eq, asc, desc, inArray, sql } from "drizzle-orm";
+import { and, eq, asc, desc, inArray, sql, type SQLWrapper } from "drizzle-orm";
 import { db, withTenant } from "@/lib/db";
 import {
+  branches,
   categories,
   categoryAttributes,
   categoryAttributeValues,
@@ -10,6 +11,7 @@ import {
   productHistory,
   suppliers,
 } from "@/lib/db/schema";
+import { normalizeSku } from "@/lib/sales/scan-cart";
 import type {
   CategoryDescriptor,
   CategoryAttribute,
@@ -17,6 +19,8 @@ import type {
   Product,
 } from "@/lib/types";
 import { cacheBustPrefix, cacheRemember, tenantKey } from "@/lib/cache";
+import { deleteTenantUpload } from "@/lib/uploads";
+import { logger } from "@/lib/logger";
 
 // 5 min: catalog moves rarely, and every catalog-admin mutation calls
 // bustCatalogCache(tenantId) anyway, so the only stale window is when
@@ -190,6 +194,7 @@ function rowToProduct(
     supplier: p.supplier ?? undefined,
     supplierId: p.supplierId ?? null,
     location: p.location ?? undefined,
+    imageUrl: p.imageUrl ?? null,
     createdAt: p.createdAt,
     updatedAt: p.updatedAt,
   };
@@ -212,52 +217,195 @@ export async function listProducts(
 
     if (ps.length === 0) return [];
 
+    // Every snapshot in the tenant, in one read: a full listing touches most
+    // of them anyway, and one query beats an IN-list of every product id.
     const pavs = await tx
       .select()
       .from(productAttributeValues)
       .where(eq(productAttributeValues.tenantId, tenantId));
 
-    // Map attribute_id -> key for value snapshot
-    const allAttrIds = Array.from(new Set(pavs.map((v) => v.attributeId)));
-    const attrKeysById = new Map<string, string>();
-    if (allAttrIds.length > 0) {
-      const attrs = await tx
-        .select({ id: categoryAttributes.id, key: categoryAttributes.key })
-        .from(categoryAttributes)
-        .where(
-          and(
-            eq(categoryAttributes.tenantId, tenantId),
-            inArray(categoryAttributes.id, allAttrIds),
-          ),
-        );
-      for (const a of attrs) attrKeysById.set(a.id, a.key);
-    }
+    return hydrateProducts(tx, tenantId, ps, pavs);
+  });
+}
 
-    // Resolve linked supplier names so the legacy `supplier` text field stays
-    // populated for clients that filter/group on it.
-    const supplierIds = Array.from(
-      new Set(ps.map((p) => p.supplierId).filter((v): v is string => !!v)),
+type Tx = Parameters<Parameters<typeof withTenant>[1]>[0];
+
+/**
+ * Turn raw product rows into the API's Product shape: attribute snapshots
+ * keyed by attribute key, and the linked supplier's name folded into the
+ * legacy `supplier` text field. Shared by the full listing and the scanner
+ * lookup so the two can never disagree about what a Product looks like.
+ */
+async function hydrateProducts(
+  tx: Tx,
+  tenantId: string,
+  ps: (typeof products.$inferSelect)[],
+  pavs: (typeof productAttributeValues.$inferSelect)[],
+): Promise<Product[]> {
+  // Map attribute_id -> key for value snapshot
+  const allAttrIds = Array.from(new Set(pavs.map((v) => v.attributeId)));
+  const attrKeysById = new Map<string, string>();
+  if (allAttrIds.length > 0) {
+    const attrs = await tx
+      .select({ id: categoryAttributes.id, key: categoryAttributes.key })
+      .from(categoryAttributes)
+      .where(
+        and(
+          eq(categoryAttributes.tenantId, tenantId),
+          inArray(categoryAttributes.id, allAttrIds),
+        ),
+      );
+    for (const a of attrs) attrKeysById.set(a.id, a.key);
+  }
+
+  // Resolve linked supplier names so the legacy `supplier` text field stays
+  // populated for clients that filter/group on it.
+  const supplierIds = Array.from(
+    new Set(ps.map((p) => p.supplierId).filter((v): v is string => !!v)),
+  );
+  const supplierNamesById = new Map<string, string>();
+  if (supplierIds.length > 0) {
+    const rows = await tx
+      .select({ id: suppliers.id, name: suppliers.name })
+      .from(suppliers)
+      .where(
+        and(eq(suppliers.tenantId, tenantId), inArray(suppliers.id, supplierIds)),
+      );
+    for (const r of rows) supplierNamesById.set(r.id, r.name);
+  }
+
+  return ps.map((p) => {
+    const product = rowToProduct(p, pavs, attrKeysById);
+    // Linked supplier name takes precedence over the legacy free-text field.
+    if (p.supplierId) {
+      const linked = supplierNamesById.get(p.supplierId);
+      if (linked) product.supplier = linked;
+    }
+    return product;
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Scanner lookup — one code, the whole tenant
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** A catalogue row that carries a scanned code, and the branch whose shelf
+ *  it is. `product.quantity` is that branch's on-hand count. */
+export interface ProductAtBranch {
+  product: Product;
+  branchId: string;
+  branchName: string;
+}
+
+/**
+ * Mirror of `normalizeSku`'s strip set (lib/sales/scan-cart.ts SKU_STRIP_RE)
+ * as a Postgres ARE bracket expression: whitespace, ASCII control bytes,
+ * DEL, zero-width space/joiners and the BOM. NUL is omitted because a text
+ * column cannot hold one.
+ *
+ * `\s` is NOT the same character class on the two sides: Postgres reads it
+ * as [[:space:]], which (verified live) leaves U+00A0 in place, while JS
+ * `\s` also covers NBSP, U+1680, U+2000–U+200A, U+2028/9, U+202F, U+205F
+ * and U+3000. Those are enumerated here so a SKU pasted with an NBSP — the
+ * write path only trims ASCII space — is still returned by the SQL
+ * pre-filter for the JS confirmation pass to see.
+ *
+ * Kept next to its JS twin on purpose — if the web scanner's rule changes,
+ * this must change with it, and the JS confirmation pass below is what
+ * catches a drift between the two in the meantime.
+ *
+ * Inlined into the query as a LITERAL (not a bind parameter) because
+ * migration 0053 builds products_tenant_norm_sku_idx on exactly this
+ * expression, and the planner only matches an expression index when the
+ * query's expression is textually identical — `$1` would never match.
+ * tests/unit/sku-strip-index.test.ts pins the migration to this constant;
+ * changing it means a new migration that rebuilds the index.
+ */
+export const SKU_STRIP_PG = String.raw`[\s\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\u0001-\u001F\u007F\u200B\u200C\u200D\uFEFF]`;
+
+/** The indexed expression, `sku` substituted. Same text as 0053. */
+export function normalisedSkuExpr(sku: SQLWrapper) {
+  return sql<string>`lower(regexp_replace(${sku}, ${sql.raw(`'${SKU_STRIP_PG}'`)}, '', 'g'))`;
+}
+
+/**
+ * Resolve a scanned code to every product row in the TENANT that carries it,
+ * each with the branch that holds it.
+ *
+ * Replaces "load the branch catalogue and filter in memory" (what
+ * /api/v1/products?barcode= did): one query on the tenant's products,
+ * narrowed by the same normalisation the web scanner applies — case-folded,
+ * decoder junk stripped, UPC-A ↔ EAN-13 collapsed — and only the matching
+ * rows are hydrated. Reads the whole tenant, not one branch, because the
+ * question a scan really asks is "do we have this, and where": the Maadi
+ * till scanning a code that only Nasr City stocks should hear "Nasr City has
+ * 5", not "not found, create it".
+ *
+ * Normalisation happens on BOTH sides. SQL does the bulk of it — lower() and
+ * the strip regex on the stored sku, the leading-zero collapse by asking for
+ * both spellings — and `normalizeSku` re-checks every returned row, so the
+ * result set is exactly what the web's in-memory filter would have produced.
+ *
+ * Ordered so the caller can take the first row as "the" match: rows with
+ * stock first, then by branch name, then by created_at, so the answer is
+ * stable across calls.
+ */
+export async function findProductBySku(
+  tenantId: string,
+  rawCode: string,
+): Promise<ProductAtBranch[]> {
+  const target = normalizeSku(rawCode);
+  if (!target) return [];
+
+  // normalizeSku turns a 13-digit "0"+UPC-A into the 12 digits, so a stored
+  // sku may be either spelling. Asking for both keeps the collapse in SQL.
+  const candidates = /^\d{12}$/.test(target) ? [target, `0${target}`] : [target];
+
+  return withTenant(tenantId, async (tx) => {
+    const rows = await tx
+      .select({ product: products, branchName: branches.name })
+      .from(products)
+      .innerJoin(branches, eq(branches.id, products.branchId))
+      .where(
+        and(
+          eq(products.tenantId, tenantId),
+          inArray(normalisedSkuExpr(products.sku), candidates),
+        ),
+      )
+      .orderBy(
+        desc(sql`${products.quantity} > 0`),
+        asc(branches.name),
+        asc(products.createdAt),
+      );
+
+    // The JS rule is the contract; SQL was the pre-filter.
+    const confirmed = rows.filter(
+      (r) => normalizeSku(r.product.sku ?? "") === target,
     );
-    const supplierNamesById = new Map<string, string>();
-    if (supplierIds.length > 0) {
-      const rows = await tx
-        .select({ id: suppliers.id, name: suppliers.name })
-        .from(suppliers)
-        .where(
-          and(eq(suppliers.tenantId, tenantId), inArray(suppliers.id, supplierIds)),
-        );
-      for (const r of rows) supplierNamesById.set(r.id, r.name);
-    }
+    if (confirmed.length === 0) return [];
 
-    return ps.map((p) => {
-      const product = rowToProduct(p, pavs, attrKeysById);
-      // Linked supplier name takes precedence over the legacy free-text field.
-      if (p.supplierId) {
-        const linked = supplierNamesById.get(p.supplierId);
-        if (linked) product.supplier = linked;
-      }
-      return product;
-    });
+    const ids = confirmed.map((r) => r.product.id);
+    const pavs = await tx
+      .select()
+      .from(productAttributeValues)
+      .where(
+        and(
+          eq(productAttributeValues.tenantId, tenantId),
+          inArray(productAttributeValues.productId, ids),
+        ),
+      );
+    const hydrated = await hydrateProducts(
+      tx,
+      tenantId,
+      confirmed.map((r) => r.product),
+      pavs,
+    );
+
+    return hydrated.map((product, i) => ({
+      product,
+      branchId: confirmed[i]!.product.branchId,
+      branchName: confirmed[i]!.branchName,
+    }));
   });
 }
 
@@ -274,6 +422,8 @@ export interface AddProductInput {
   supplier?: string;
   supplierId?: string | null;
   location?: string;
+  /** Relative upload URL from POST /api/uploads/product-image. */
+  imageUrl?: string | null;
   /** attribute_value_id list — one per category attribute. */
   attributeValueIds?: string[];
 }
@@ -331,6 +481,7 @@ export async function addProduct(
         supplier: input.supplier ?? null,
         supplierId: input.supplierId ?? null,
         location: input.location ?? null,
+        imageUrl: input.imageUrl ?? null,
       })
       .returning({ id: products.id });
 
@@ -361,11 +512,37 @@ export async function addProduct(
 }
 
 export async function deleteProduct(tenantId: string, id: string): Promise<void> {
-  await withTenant(tenantId, async (tx) => {
+  const oldImage = await withTenant(tenantId, async (tx) => {
+    const [row] = await tx
+      .select({ imageUrl: products.imageUrl })
+      .from(products)
+      .where(and(eq(products.tenantId, tenantId), eq(products.id, id)));
     await tx
       .delete(products)
       .where(and(eq(products.tenantId, tenantId), eq(products.id, id)));
+    return row?.imageUrl ?? null;
   });
+  await discardProductImage(tenantId, oldImage);
+}
+
+const IMAGE_URL_PREFIX = "/api/uploads/product-image/";
+
+/**
+ * Best-effort removal of a product photo the row no longer points at, so
+ * replacing or clearing a photo does not leave the old file on the VPS
+ * forever. Runs AFTER the transaction commits; a filesystem failure is logged
+ * and never fails the request that already succeeded.
+ */
+async function discardProductImage(
+  tenantId: string,
+  url: string | null | undefined,
+): Promise<void> {
+  if (!url || !url.startsWith(`${IMAGE_URL_PREFIX}${tenantId}/products/`)) return;
+  try {
+    await deleteTenantUpload(tenantId, url.slice(IMAGE_URL_PREFIX.length));
+  } catch (err) {
+    logger.warn({ event: "product.image.discard_failed", tenantId, url, err: String(err) });
+  }
 }
 
 export interface UpdateProductInput {
@@ -380,6 +557,8 @@ export interface UpdateProductInput {
   supplier?: string | null;
   supplierId?: string | null;
   location?: string | null;
+  /** Null clears the photo. */
+  imageUrl?: string | null;
   /** Re-categorise the product. Caller is trusted to pass a category id
    *  that belongs to the same tenant — RLS would reject otherwise. */
   categoryId?: string;
@@ -390,7 +569,7 @@ export async function updateProduct(
   id: string,
   patch: UpdateProductInput,
 ): Promise<void> {
-  await withTenant(tenantId, async (tx) => {
+  const replacedImage = await withTenant(tenantId, async (tx) => {
     const set: Record<string, unknown> = { updatedAt: new Date() };
     if (patch.name !== undefined) set.name = patch.name;
     if (patch.brand !== undefined) set.brand = patch.brand;
@@ -405,14 +584,15 @@ export async function updateProduct(
     if (patch.supplier !== undefined) set.supplier = patch.supplier;
     if (patch.supplierId !== undefined) set.supplierId = patch.supplierId;
     if (patch.location !== undefined) set.location = patch.location;
+    if (patch.imageUrl !== undefined) set.imageUrl = patch.imageUrl;
     if (patch.categoryId !== undefined) set.categoryId = patch.categoryId;
 
     const [before] = await tx
-      .select({ name: products.name, quantity: products.quantity })
+      .select({ name: products.name, quantity: products.quantity, imageUrl: products.imageUrl })
       .from(products)
       .where(and(eq(products.tenantId, tenantId), eq(products.id, id)));
 
-    if (!before) return;
+    if (!before) return null;
 
     await tx
       .update(products)
@@ -437,7 +617,12 @@ export async function updateProduct(
         type: "updated",
       });
     }
+    // The previous file, once the row no longer references it.
+    return patch.imageUrl !== undefined && before.imageUrl && before.imageUrl !== patch.imageUrl
+      ? before.imageUrl
+      : null;
   });
+  await discardProductImage(tenantId, replacedImage);
 }
 
 export async function bulkUpdateProducts(

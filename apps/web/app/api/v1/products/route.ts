@@ -2,8 +2,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { requireTenantWithBranch } from "@/lib/api/auth-helpers";
-import { listProducts } from "@/lib/repo/catalog";
-import { normalizeSku } from "@/lib/sales/scan-cart";
+import {
+  findProductBySku,
+  listProducts,
+  type ProductAtBranch,
+} from "@/lib/repo/catalog";
 import type { Product } from "@/lib/types";
 
 // Server-side catalogue lookup for the native client.
@@ -14,9 +17,11 @@ import type { Product } from "@/lib/types";
 // lookup that lives on the server. That is what this route is.
 //
 // Lookup modes, in strict precedence order:
-//   ?barcode=  exact, scanner path, at most ONE product back
-//   ?sku=      exact, catalogue-identifier path, every match
-//   ?q=        partial across name / sku / brand
+//   ?barcode=  exact, scanner path, at most ONE product back — resolved
+//              against the WHOLE tenant catalogue by findProductBySku(), with
+//              every branch that carries the code reported in `stock`
+//   ?sku=      exact, catalogue-identifier path, every match (this branch)
+//   ?q=        partial across name / sku / brand (this branch)
 // Precedence matters because the scanner can legitimately fire while a search
 // box still holds text; the physical scan must always win.
 
@@ -92,19 +97,15 @@ export async function GET(req: NextRequest) {
   }
   const { q, barcode, sku, cursor, limit } = parsed.data;
 
-  // Deliberately NOT cached and deliberately the same repo function the web
-  // list route uses: product.quantity decrements on every sale, and the native
-  // POS decides whether a scan is sellable from the quantity in this response.
-  //
-  // Reusing listProducts also keeps one definition of a Product's shape
-  // (attribute snapshots, linked-supplier name resolution). The cost is that a
-  // scan reads the branch's catalogue rather than one indexed row; when a
-  // tenant's catalogue grows past the point where that hurts, the fix is a
-  // findProductBySku() in lib/repo/catalog.ts, not a hand-rolled query here.
-  const all = await listProducts(r.ctx.tenantId, r.ctx.branchId);
-
   if (barcode) {
-    const match = matchBarcode(all, barcode);
+    // The scanner path is a point lookup, not a catalogue read: one query on
+    // the tenant's products narrowed by the normalised code (findProductBySku
+    // applies `normalizeSku` — the web scanner's own rule — on both sides),
+    // and only the handful of matching rows are hydrated. Deliberately NOT
+    // cached: product.quantity decrements on every sale, and the POS decides
+    // whether a scan is sellable from the quantity in this response.
+    const found = await findProductBySku(r.ctx.tenantId, barcode);
+    const match = chooseBarcodeMatch(found, r.ctx.branchId);
     // Zero matches is a 200, not a 404. "No product with this barcode" is the
     // normal first half of the add-product flow — the POS offers to create one.
     // A 404 would make every native HTTP layer treat it as a failure and
@@ -112,12 +113,23 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       data: match.chosen ? [match.chosen] : [],
       nextCursor: null,
-      // The true match count, which can exceed data.length: two branch-local
-      // rows can share a barcode. The POS shows the one we picked and can fall
-      // back to ?sku= to list them all when total > 1.
+      // The true match count IN THIS BRANCH, which can exceed data.length: two
+      // branch-local rows can share a barcode. The POS shows the one we picked
+      // and can fall back to ?sku= to list them all when total > 1.
       total: match.total,
+      // Every branch that carries the code, this branch first, in-stock first.
+      // Empty `data` with a non-empty `stock` is the "it exists, but not on
+      // this shelf" answer: the till can say which branch has it instead of
+      // offering to create a duplicate.
+      stock: match.stock,
     });
   }
+
+  // Deliberately the same repo function the web list route uses, so there is
+  // one definition of a Product's shape (attribute snapshots, linked-supplier
+  // name resolution). The ?sku= and ?q= paths still read the branch
+  // catalogue and filter in memory; they are typed searches, not scans.
+  const all = await listProducts(r.ctx.tenantId, r.ctx.branchId);
 
   let matched: Product[];
   if (sku) {
@@ -176,36 +188,53 @@ export async function GET(req: NextRequest) {
   });
 }
 
+/** One branch's holding of a scanned code. */
+interface BarcodeStock {
+  productId: string;
+  branchId: string;
+  branchName: string;
+  quantity: number;
+  /** The caller's own branch. */
+  current: boolean;
+}
+
 /**
- * Resolve a scanned code to at most one product.
+ * Pick the row a scan resolves to, from every row in the tenant that carries
+ * the code. The normalisation already happened in findProductBySku, which
+ * imports `normalizeSku` verbatim from lib/sales/scan-cart.ts — the same
+ * function the web scanner uses — so the web and the phone cannot drift apart
+ * and produce different scan results.
  *
- * Normalisation is `normalizeSku` imported verbatim from lib/sales/scan-cart.ts
- * — the SAME function the web scanner uses — rather than a re-implementation or
- * a SQL equivalent. It strips invisible decoder junk (NUL, control bytes, BOM,
- * zero-width joiners), case-folds, and collapses UPC-A ↔ EAN-13: a 12-digit
- * UPC-A and the 13-digit EAN-13 that is the same code with a leading "0" both
- * reduce to the same 12 digits. It is applied to BOTH sides — the scanned query
- * AND each stored sku — because either side may be the one holding the leading
- * zero, depending on whether the code was keyed in by hand or captured by a
- * decoder. Sharing the function is the point: if the rule ever changes, the web
- * and the phone cannot drift apart and produce different scan results.
+ * `chosen` is always a row of the CALLER'S branch: it goes straight into a
+ * cart, and a cart line must point at the shelf it will be sold from. Other
+ * branches' rows are reported in `stock` only.
+ *
+ * Within the branch, stock is NOT a filter, only a tiebreak. Returning nothing
+ * for a product that exists at qty 0 is the bug lib/sales/scan-cart.ts calls
+ * out: the cashier is told "not found" and creates a duplicate, when the right
+ * answer is "this exists, top up the stock". So an out-of-stock row still
+ * comes back, with quantity 0 for the client to act on — and `stock` says
+ * whether another branch could cover it.
  */
-function matchBarcode(
-  all: Product[],
-  raw: string,
-): { chosen: Product | null; total: number } {
-  const target = normalizeSku(raw);
-  if (!target) return { chosen: null, total: 0 };
+function chooseBarcodeMatch(
+  found: ProductAtBranch[],
+  branchId: string,
+): { chosen: Product | null; total: number; stock: BarcodeStock[] } {
+  const here = found.filter((f) => f.branchId === branchId);
+  // findProductBySku orders in-stock rows first, so the first local row is
+  // the in-stock one when any is.
+  const chosen = here[0]?.product ?? null;
 
-  const matches = all.filter((p) => normalizeSku(p.sku ?? "") === target);
-  if (matches.length === 0) return { chosen: null, total: 0 };
+  const stock: BarcodeStock[] = found
+    .map((f) => ({
+      productId: f.product.id,
+      branchId: f.branchId,
+      branchName: f.branchName,
+      quantity: f.product.quantity,
+      current: f.branchId === branchId,
+    }))
+    // This branch first; the repo's (in-stock, branch name) order otherwise.
+    .sort((a, b) => Number(b.current) - Number(a.current));
 
-  // Stock is NOT a filter, only a tiebreak. Returning nothing for a product
-  // that exists at qty 0 is the bug lib/sales/scan-cart.ts calls out: the
-  // cashier is told "not found" and creates a duplicate, when the right answer
-  // is "this exists, top up the stock". So an out-of-stock row still comes
-  // back, with quantity 0 for the client to act on.
-  const inStock = matches.filter((p) => p.quantity > 0);
-  const pool = inStock.length > 0 ? inStock : matches;
-  return { chosen: pool[0]!, total: matches.length };
+  return { chosen, total: here.length, stock };
 }
