@@ -14,8 +14,9 @@ import { router, useLocalSearchParams } from "expo-router";
 import { Globe, Lightning } from "phosphor-react-native";
 import { ApiError } from "@matgary/api-client";
 
-import { getLocale, useLocale, t } from "@/i18n";
+import { useLocale, t } from "@/i18n";
 import { api } from "@/api/client";
+import { useSession } from "@/stores/session";
 import { DottedGround } from "@/components/DottedGround";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/Button";
@@ -70,6 +71,32 @@ export default function ResetPasswordScreen() {
   const [tokenState, setTokenState] = useState<TokenState>(token ? "checking" : "invalid");
 
   const canSubmit = password.length >= MIN_PASSWORD && confirm.length > 0;
+
+  const startDemo = useSession((s) => s.startDemo);
+  const signingIn = useSession((s) => s.signingIn);
+  const locale = useLocale((s) => s.locale);
+  const setLocale = useLocale((s) => s.setLocale);
+
+  // Demo pill — the same flow login.tsx runs. startDemo never throws: a
+  // failure lands in session.signInError, which login renders in its own box.
+  // This screen has no box under the pill, so read it back once and show it
+  // here; the value is fresh because startDemo clears it before it starts.
+  //
+  // Unlike the (public) screens, this route is declared OUTSIDE both
+  // Stack.Protected guards in _layout.tsx, so a status flip to "signedIn" does
+  // not drop it from the navigator — we have to leave it ourselves, the way
+  // service-paused and onboarding enter the app home.
+  const [demoError, setDemoError] = useState<string | null>(null);
+  const onDemo = async () => {
+    setDemoError(null);
+    await startDemo();
+    const s = useSession.getState();
+    if (s.status === "signedIn") {
+      router.replace("/");
+      return;
+    }
+    setDemoError(s.signInError);
+  };
 
   const goToLogin = () => router.replace("/login");
   const goToForgot = () => router.replace("/forgot-password");
@@ -212,7 +239,7 @@ export default function ResetPasswordScreen() {
 
         <Button
           label={t("auth.reset.submit")}
-          loading={busy}
+          loading={signingIn || busy}
           disabled={!canSubmit}
           onPress={() => void onSubmit()}
         />
@@ -238,26 +265,36 @@ export default function ResetPasswordScreen() {
           ]}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Same top bar as login/forgot-password; the demo pill is composed
-              but not wired (see the TODO(phase-4) note in forgot-password.tsx). */}
           <View style={styles.topBar}>
-            <Pressable style={styles.demoPill} accessibilityRole="button">
-              <Lightning size={16} color={colors.bg} weight="fill" />
+            <Pressable
+              style={styles.demoPill}
+              accessibilityRole="button"
+              disabled={signingIn || busy}
+              onPress={() => void onDemo()}
+            >
+              <Lightning size={16} color={colors.onAccent} weight="fill" />
               <Text numberOfLines={1} style={styles.demoPillText}>
-                {t("auth.demo.cta")}
+                {t(signingIn ? "auth.demo.busy" : "auth.demo.cta")}
               </Text>
             </Pressable>
             <Pressable
               style={styles.langToggle}
               accessibilityRole="button"
-              onPress={() =>
-                void useLocale.getState().setLocale(getLocale() === "ar" ? "en" : "ar")
+              accessibilityLabel={
+                locale === "ar" ? t("app.shell.language.english") : t("app.shell.language.arabic")
               }
+              onPress={() => void setLocale(locale === "ar" ? "en" : "ar")}
             >
               <Globe size={20} color={colors.textSecondary} />
-              <Text style={styles.langText}>{getLocale() === "ar" ? "ع" : "EN"}</Text>
+              <Text style={styles.langText}>{locale === "ar" ? "ع" : "EN"}</Text>
             </Pressable>
           </View>
+
+          {demoError ? (
+            <View style={[styles.errorBox, styles.demoError]} accessibilityLiveRegion="polite">
+              <Text style={styles.errorText}>{demoError}</Text>
+            </View>
+          ) : null}
 
           <View style={styles.centre}>
             <View style={styles.brand}>
@@ -295,7 +332,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     flexShrink: 1,
   },
-  demoPillText: { fontFamily: fonts.bold, fontSize: 14, color: colors.bg },
+  demoPillText: { fontFamily: fonts.bold, fontSize: 14, color: colors.onAccent },
+  demoError: { marginTop: spacing.md },
   langToggle: {
     flexDirection: "row",
     alignItems: "center",

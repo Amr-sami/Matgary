@@ -52,8 +52,15 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     backgroundColor: colors.bg,
   },
+  // Content-sized cells that share the leftover width (the web's `shrink-0
+  // px-3.5` strip), not equal columns: a long label such as the team tab's
+  // "الفريق والصلاحيات" would otherwise be squeezed into a quarter and
+  // auto-shrunk below its siblings. adjustsFontSizeToFit stays as the last
+  // resort for narrow devices.
   item: {
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: "auto",
     minHeight: 44,
     alignItems: "center",
     justifyContent: "center",

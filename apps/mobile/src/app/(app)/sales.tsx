@@ -9,7 +9,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
-import { CheckCircle, CloudSlash, Minus, Plus, Trash, WarningCircle } from "phosphor-react-native";
+import { CheckCircle, ClockCounterClockwise, CloudSlash, Minus, Plus, Trash, WarningCircle } from "phosphor-react-native";
 import { ApiError, catalog, sales as salesApi } from "@matgary/api-client";
 import { calcLineDiscount } from "@matgary/domain";
 
@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
+import { ChevronForward } from "@/components/ui/Chevron";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
 import { SearchField } from "@/components/ui/SearchField";
@@ -26,6 +27,7 @@ import { ScannerSheet, type ScanTone } from "@/components/scanner/ScannerSheet";
 import { ReceiptActions } from "@/components/receipt/ReceiptActions";
 import { money } from "@/lib/format";
 import { useOffline, useOutbox } from "@/offline";
+import { applyLocalDelta } from "@/offline/local-delta-cache";
 import { enqueueSale, ensureSaleHandler, isQueueableFailure, type SaleOutboxItem } from "@/offline/sales";
 import type { ReceiptSale } from "@/receipt/html";
 import { toReceiptSale } from "@/receipt/share";
@@ -163,6 +165,12 @@ export default function SalesScreen() {
   }, [products.data, recentSales.data]);
 
   const checkout = useMutation({
+    // TanStack pauses an "online"-mode mutation while onlineManager says
+    // offline (app/_layout.tsx feeds it NetInfo) — the spinner would sit
+    // there until the radio came back, which is the one thing an offline
+    // POS must never do. This mutation handles offline itself (it enqueues),
+    // so it must always run.
+    networkMode: "always",
     mutationFn: async (): Promise<LastSale> => {
       // Snapshot before the request: the cart may be edited while it is in
       // flight and is reset on success, and the receipt must show what was
@@ -220,10 +228,22 @@ export default function SalesScreen() {
       // Product names ride along in the outbox row (client-only sidecar) so the
       // sync screen can list the lines and Edit can rebuild the cart offline.
       const names = Object.fromEntries(snapshot.lines.map((l) => [l.productId, l.name]));
+      // So does the catalogue's `updatedAt` per product, as the POS saw it at
+      // ring time (the wire sends it; the api-client Product type does not
+      // declare it yet). localDelta keeps this sale's decrement only while the
+      // server still reports the same stamp (§6.5 server wins) — two server
+      // strings compared, never the device clock against the server's.
+      const catalogUpdatedAt: Record<string, string> = Object.fromEntries(
+        snapshot.lines.flatMap((l) => {
+          const product: unknown = byId.get(l.productId);
+          const at = typeof product === "object" && product !== null ? (product as { updatedAt?: unknown }).updatedAt : undefined;
+          return typeof at === "string" && at ? [[l.productId, at] as const] : [];
+        }),
+      );
       const queued = (reason: "offline" | "network"): LastSale => ({
         result: localResult,
         receipt: toReceiptSale(snapshot, localResult),
-        rowId: enqueueSale(body, cart.invoiceId, names),
+        rowId: enqueueSale(body, cart.invoiceId, names, catalogUpdatedAt),
         queuedReason: reason,
         rungAt,
       });
@@ -247,6 +267,11 @@ export default function SalesScreen() {
       setError(null);
       cart.reset();
       setQuery("");
+      // Queued (not booked): subtract the rung units from the cached catalogue
+      // NOW (localDelta, §6.5) so the next chip tap — and the cart's stock cap —
+      // sees what is really left on the shelf. The server's answer replaces
+      // it once the row lands.
+      if (sale.rowId) applyLocalDelta(qc);
       // Stock moved and the dashboard's numbers are stale — everything that
       // reads either must refetch. (A queued sale invalidates too: cheap, and
       // it means the caches are fresh the moment the drain lands it.)
@@ -323,6 +348,23 @@ export default function SalesScreen() {
       onRefresh={() => void products.refetch()}
       refreshing={products.isRefetching}
     >
+      {/* Doc 02 §1.1 row 2: the ledger is its own screen (sales/history). */}
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => router.push("/sales/history")}
+        style={({ pressed }) => [styles.historyRow, pressed && styles.historyRowPressed]}
+        testID="pos-open-history"
+      >
+        <View style={styles.historyIcon}>
+          <ClockCounterClockwise size={20} color={colors.accent} />
+        </View>
+        <View style={styles.historyText}>
+          <Text style={styles.historyTitle}>{t("mobile.salesHistory.title")}</Text>
+          <Text style={styles.historyHint} numberOfLines={1}>{t("mobile.salesHistory.entryHint")}</Text>
+        </View>
+        <ChevronForward size={16} color={colors.textSecondary} />
+      </Pressable>
+
       {lastSale && shownResult ? (
         <Card>
           <View style={styles.successHead} testID="pos-sale-result">
@@ -353,13 +395,19 @@ export default function SalesScreen() {
           <View style={styles.successMeta}>
             <Text style={styles.successInvoice}>{shownResult.invoiceId}</Text>
             {syncState === "pending" ? (
-              <Badge label={t("mobile.pos.queuedBadge")} variant="lowstock" />
+              <View testID="pos-sync-pending">
+                <Badge label={t("mobile.pos.queuedBadge")} variant="lowstock" />
+              </View>
             ) : syncState === "failed" ? (
-              <Badge label={t("mobile.pos.syncFailedBadge")} variant="outofstock" />
+              <View testID="pos-sync-failed">
+                <Badge label={t("mobile.pos.syncFailedBadge")} variant="outofstock" />
+              </View>
             ) : syncState === "removed" ? (
               <Badge label={t("mobile.pos.removedBadge")} variant="neutral" />
             ) : lastSale.rowId ? (
-              <Badge label={t("mobile.pos.syncedBadge")} variant="success" />
+              <View testID="pos-sync-synced">
+                <Badge label={t("mobile.pos.syncedBadge")} variant="success" />
+              </View>
             ) : null}
           </View>
           {syncState === "pending" ? (
@@ -680,6 +728,30 @@ function messageFor(e: unknown): string {
 }
 
 const styles = StyleSheet.create({
+  historyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    minHeight: 56,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+  },
+  historyRowPressed: { backgroundColor: colors.accentLight },
+  historyIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.full,
+    backgroundColor: colors.accentLight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  historyText: { flex: 1, gap: 1 },
+  historyTitle: { fontFamily: fonts.semibold, fontSize: 15, color: colors.text, ...RTL_TEXT },
+  historyHint: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
   label: { fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary, marginBottom: spacing.sm, ...RTL_TEXT },
   muted: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, marginTop: spacing.sm, ...RTL_TEXT },
   pillRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginBottom: spacing.sm },

@@ -1,5 +1,6 @@
 import {
   ActivityIndicator,
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -7,6 +8,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowCounterClockwise,
@@ -18,19 +20,24 @@ import { ApiError, dashboard as dashboardApi } from "@matgary/api-client";
 
 import { api } from "@/api/client";
 import { HeaderAccessories } from "@/components/shell/HeaderAccessories";
-import { money } from "@/lib/format";
+import { money, shortDate } from "@/lib/format";
 import { useSnapshotAge } from "@/offline/hydrate";
 import { StockAlerts } from "@/components/dashboard/StockAlerts";
+import { Badge } from "@/components/ui/Badge";
+import { ChevronForward } from "@/components/ui/Chevron";
 import { StatCard } from "@/components/ui/StatCard";
 import { useSession } from "@/stores/session";
 import { RTL, RTL_TEXT } from "@/theme/rtl";
-import { colors, fonts, spacing } from "@/theme/tokens";
+import { colors, elevation, fonts, MIN_TOUCH, radius, spacing } from "@/theme/tokens";
 import { t } from "@/i18n";
+
+type RecentSale = dashboardApi.RecentSale;
 
 /**
  * Port of apps/web/app/[lang]/(app)/page.tsx — the dashboard as it actually
  * ships: greeting, a 2×2 KPI grid with the same four metrics, icons and
- * colours, then the stock-alert tile, over the permission-filtered tab bar.
+ * colours, the recent-sales strip, then the stock-alert tile, over the
+ * permission-filtered tab bar.
  *
  * The four cards mirror StatsGrid.tsx one-for-one, including which icon and
  * which semantic colour each carries.
@@ -121,6 +128,8 @@ export default function DashboardScreen() {
               </View>
             </View>
 
+            <RecentSales items={data.recentSales ?? []} />
+
             <StockAlerts items={data.lowStock.items} />
           </>
         ) : null}
@@ -128,6 +137,120 @@ export default function DashboardScreen() {
 
     </View>
   );
+}
+
+/**
+ * Port of apps/web/components/dashboard/RecentSalesListServer.tsx. The web
+ * renders a 5-column table of the last 10 *lines*; a 390pt phone gets a card
+ * list of the last 8 *invoices* (the server folds cart lines), each row a
+ * 44pt tap target into the sale detail. "View all" goes to the full,
+ * paginated history — this strip is deliberately not scrollable on its own.
+ *
+ * `items` may be missing on a snapshot hydrated before the field shipped,
+ * hence the `?? []` at the call site — an older cache must not blank the
+ * whole dashboard.
+ */
+function RecentSales({ items }: { items: RecentSale[] }) {
+  const router = useRouter();
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardTitle}>{t("app.dashboard.recentSales.title")}</Text>
+        {items.length > 0 ? (
+          <Pressable
+            onPress={() => router.push("/sales/history")}
+            hitSlop={8}
+            accessibilityRole="link"
+            style={styles.viewAllHit}
+          >
+            <Text style={styles.viewAll}>{t("app.common.viewAll")}</Text>
+          </Pressable>
+        ) : null}
+      </View>
+
+      {items.length === 0 ? (
+        <Text style={styles.empty}>{t("app.dashboard.recentSales.empty")}</Text>
+      ) : (
+        <View>
+          {items.map((sale, i) => (
+            <Pressable
+              key={sale.id}
+              onPress={() => router.push(`/sales/${sale.id}`)}
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                styles.row,
+                i > 0 && styles.rowDivider,
+                pressed && styles.rowPressed,
+              ]}
+            >
+              <View style={styles.rowText}>
+                <Text
+                  style={[
+                    styles.customer,
+                    !sale.customerName && !sale.customerPhone && styles.customerWalkIn,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {sale.customerName ?? sale.customerPhone ?? t("mobile.dashboard.walkInCustomer")}
+                </Text>
+                <Text style={styles.rowMeta} numberOfLines={1}>
+                  {t("mobile.dashboard.saleMeta", {
+                    n: sale.itemCount,
+                    when: saleWhen(sale.createdAt),
+                  })}
+                </Text>
+              </View>
+              <View style={styles.rowEnd}>
+                <Text style={styles.total}>{money(sale.total)}</Text>
+                <SaleBadge sale={sale} />
+              </View>
+              <ChevronForward />
+            </Pressable>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+/**
+ * One status chip per row, mirroring the web's sold/returned column but
+ * carrying the payment method too, since that is what a cashier glances for:
+ * returned beats everything; an unsettled آجل invoice is a warning; otherwise
+ * the method in neutral.
+ */
+function SaleBadge({ sale }: { sale: RecentSale }) {
+  if (sale.isReturned) {
+    return <Badge label={t("app.dashboard.recentSales.status.returned")} variant="outofstock" />;
+  }
+  if (sale.paymentMethod === "deferred" && !sale.isPaid) {
+    return <Badge label={t("mobile.dashboard.unpaid")} variant="lowstock" />;
+  }
+  if (!sale.paymentMethod) return null;
+  return (
+    <Badge
+      label={t(`app.activityLabels.paymentMethods.${sale.paymentMethod}`)}
+      variant="neutral"
+    />
+  );
+}
+
+/**
+ * Today's sales read as a time ("النهاردة 14:05"), older ones as a date. Both
+ * are built by hand — no Intl on Hermes — and the day comparison is in the
+ * device's local zone, the same zone the clock on the wall shows.
+ */
+function saleWhen(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  const now = new Date();
+  const sameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+  if (!sameDay) return shortDate(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return t("mobile.dashboard.todayAt", { time: `${pad(d.getHours())}:${pad(d.getMinutes())}` });
 }
 
 /** Seconds → "just now" / "{n}m ago" / "{n}h ago" / "{n}d ago", through the dictionary (no Intl on device). */
@@ -155,4 +278,50 @@ const styles = StyleSheet.create({
   gridRow: { flexDirection: "row", gap: spacing.lg },
   error: { fontFamily: fonts.medium, fontSize: 14, color: colors.danger },
   stale: { fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },
+
+  // Recent sales — same surface as StockAlerts / Card so the two tiles read
+  // as siblings.
+  card: {
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    padding: spacing.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...elevation.card,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    // The "view all" hit box below is MIN_TOUCH tall, so the header already
+    // carries its own breathing room — no extra margin under it.
+    minHeight: MIN_TOUCH,
+  },
+  cardTitle: { fontFamily: fonts.semibold, fontSize: 16, color: colors.text, ...RTL_TEXT },
+  // hitSlop alone cannot reach 44pt here: RN clips slop to the parent's
+  // bounds, and the header row is only one line of text tall.
+  viewAllHit: { minHeight: MIN_TOUCH, justifyContent: "center" },
+  viewAll: { fontFamily: fonts.medium, fontSize: 14, color: colors.accent },
+  empty: {
+    fontFamily: fonts.regular,
+    fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: "center",
+    paddingVertical: spacing.xl,
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    minHeight: MIN_TOUCH + spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  rowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  rowPressed: { opacity: 0.6 },
+  rowText: { flex: 1, gap: 2 },
+  customer: { fontFamily: fonts.medium, fontSize: 15, color: colors.text, ...RTL_TEXT },
+  customerWalkIn: { color: colors.textSecondary },
+  rowMeta: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
+  rowEnd: { alignItems: "flex-end", gap: 4 },
+  total: { fontFamily: fonts.bold, fontSize: 15, color: colors.text },
 });

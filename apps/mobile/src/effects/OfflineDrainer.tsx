@@ -1,11 +1,14 @@
 import { useEffect, useRef } from "react";
 import { AppState, Platform } from "react-native";
 import NetInfo from "@react-native-community/netinfo";
+import { useQueryClient } from "@tanstack/react-query";
 import * as BackgroundTask from "expo-background-task";
 import * as TaskManager from "expo-task-manager";
 
 import { api } from "@/api/client";
 import { drainNow, useOffline } from "@/offline";
+import { useDevOffline } from "@/offline/dev-offline";
+import { attachLocalDelta } from "@/offline/local-delta-cache";
 import { useSession } from "@/stores/session";
 
 /**
@@ -24,6 +27,12 @@ import { useSession } from "@/stores/session";
  * Background execution is a bonus, never a guarantee: on iOS the OS picks
  * the cadence, gives ~30s, and stops entirely after a force-quit. The engine
  * must be — and is — correct on foreground drains alone.
+ *
+ * Also mounts two things that belong to the offline engine but need React /
+ * the QueryClient: the localDelta binding (§6.5 — queued sales decrement the
+ * cached catalogue), and, in a dev bundle only, the /sync "simulate offline"
+ * switch, which overrides NetInfo's verdict on `useOffline.online` so the
+ * drainer skips and the POS enqueues exactly as in a real outage.
  */
 
 export const BACKGROUND_TASK = "thestoro-outbox-drain";
@@ -85,13 +94,19 @@ export function OfflineDrainer() {
   const status = useSession((s) => s.status);
   const queued = useOffline((s) => s.queued);
   const online = useOffline((s) => s.online);
+  const queryClient = useQueryClient();
   const prevStatus = useRef(status);
   const prevOnline = useRef<boolean | null>(null);
+  // NetInfo's last verdict, kept so lifting the dev switch restores the truth.
+  const netOnline = useRef(true);
 
   // Connectivity → store, and a drain on every offline→online edge.
   useEffect(() => {
     const unsub = NetInfo.addEventListener((state) => {
-      const isOnline = Boolean(state.isConnected) && state.isInternetReachable !== false;
+      const reachable = Boolean(state.isConnected) && state.isInternetReachable !== false;
+      netOnline.current = reachable;
+      // DEV-ONLY: the simulate-offline switch masks a live "connected" event.
+      const isOnline = reachable && !(__DEV__ && useDevOffline.getState().simulate);
       const set = useOffline.getState().set;
       if (useOffline.getState().online !== isOnline) set({ online: isOnline });
       const wasOnline = prevOnline.current;
@@ -100,6 +115,23 @@ export function OfflineDrainer() {
     });
     return unsub;
   }, []);
+
+  // DEV-ONLY simulate offline (stripped from release: the whole effect is
+  // behind __DEV__). On → the store says offline (drain skips, POS enqueues);
+  // off → NetInfo's last word is restored and a "reconnect" drain runs.
+  useEffect(() => {
+    if (!__DEV__) return;
+    return useDevOffline.subscribe((s, prev) => {
+      if (s.simulate === prev.simulate) return;
+      const isOnline = netOnline.current && !s.simulate;
+      useOffline.getState().set({ online: isOnline });
+      prevOnline.current = isOnline;
+      if (isOnline) void drainNow("reconnect");
+    });
+  }, []);
+
+  // localDelta: queued sales decrement the cached ["products"] until they land (§6.5).
+  useEffect(() => attachLocalDelta(queryClient), [queryClient]);
 
   // Launch + session flips. A signedIn edge also lifts an auth-wait pause.
   useEffect(() => {

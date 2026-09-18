@@ -16,11 +16,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CalendarBlank, Check } from "phosphor-react-native";
 
 import { api } from "@/api/client";
-import { getLocale, t, useLocale } from "@/i18n";
+import { getLocale, t } from "@/i18n";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { groupDigits, shortDate } from "@/lib/format";
+import { HeaderAccessories } from "@/components/shell/HeaderAccessories";
+import { formatActivityDetails } from "@/lib/activity-details";
+import { shortDate } from "@/lib/format";
 import { useSession } from "@/stores/session";
 import { RTL, RTL_TEXT, directionStyle } from "@/theme/rtl";
 import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
@@ -34,8 +36,8 @@ import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
  * "there is more", so this screen is a FlatList over useInfiniteQuery with the
  * exact same rule. The web's date inputs are native <input type="date">; the
  * app has no picker dependency, so they are Field-shaped text inputs with the
- * browser's calendar glyph, accepting dd/mm/yyyy (the placeholder, as the
- * design PNG shows) or YYYY-MM-DD. The web's User / Category <select>s are a
+ * browser's calendar glyph, accepting dd/mm/yyyy (the placeholder — localised,
+ * unlike the browser's, which the design PNG shows in English) or YYYY-MM-DD. The web's User / Category <select>s are a
  * Field-styled Pressable opening a Modal option list, so the filter card keeps
  * the design's compact 2x2 grid.
  */
@@ -102,22 +104,6 @@ const PAGE_SIZE = 50;
 const EMPTY_FILTERS: Filters = { from: "", to: "", actor: "", category: "" };
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const DMY_DATE_RE = /^(\d{2})\/(\d{2})\/(\d{4})$/;
-
-/** Metadata keys whose numeric value is a quantity or amount — group digits like the web's formatNumber. */
-const NUMERIC_FIELDS = new Set([
-  "pricePerUnit",
-  "total",
-  "amount",
-  "price",
-  "costPrice",
-  "baseSalaryMonthly",
-  "hourlyRate",
-  "quantitySold",
-  "totalQuantity",
-  "initialQuantity",
-  "newQuantity",
-  "delta",
-]);
 
 /** `t()` echoes the path when a key is missing; turn that into `undefined`. */
 function tOpt(path: string): string | undefined {
@@ -186,36 +172,8 @@ function formatRelative(iso: string): string {
   return shortDate(iso);
 }
 
-/**
- * Scalar metadata → "label: value" pairs, labelled from the same
- * app.activityLabels.fields / fieldNames dictionaries the web uses. Mirrors
- * the default branch of the web's formatActivityDetails: a key with no label
- * is skipped, never shown raw — metadata carries internal ids (productId,
- * invoiceId's UUID cousins) that must not leak into the row. The web's
- * per-action formatter also flattens sale lines and translates enum values;
- * that is a 400-line switch and is not ported — scalar fields cover the rows
- * the design shows.
- */
-function scalarDetails(metadata: Record<string, unknown> | null): { label: string; value: string }[] {
-  if (!metadata) return [];
-  const out: { label: string; value: string }[] = [];
-  for (const [key, raw] of Object.entries(metadata)) {
-    if (raw == null) continue;
-    const label = tOpt(`app.activityLabels.fields.${key}`) ?? tOpt(`app.activityLabels.fieldNames.${key}`);
-    if (!label) continue;
-    let value: string | null = null;
-    if (typeof raw === "string") value = raw;
-    else if (typeof raw === "number") value = NUMERIC_FIELDS.has(key) ? groupDigits(raw) : String(raw);
-    else if (typeof raw === "boolean") value = raw ? t("mobile.common.yes") : t("mobile.common.no");
-    if (value == null || value === "") continue;
-    out.push({ label, value });
-  }
-  return out.slice(0, 6);
-}
-
 export default function ActivityScreen() {
   const insets = useSafeAreaInsets();
-  const rtl = useLocale((s) => s.locale === "ar");
   const me = useSession((s) => s.me);
   const allowed = Boolean(me?.permissions?.includes("view_activity_log"));
 
@@ -268,17 +226,16 @@ export default function ActivityScreen() {
     ...ACTIVITY_CATEGORIES.map((c) => ({ value: c, label: t(`app.activityLabels.categories.${c}`) })),
   ];
 
-  // Block-level Text keeps its natural alignment on iOS whatever Yoga's
-  // direction says, which left the Arabic title hugging the left edge; pin the
-  // heading to the reading edge from the live locale (render-time, so a
-  // language switch still re-aligns it).
-  const alignStart = { textAlign: rtl ? "right" : "left" } as const;
-
+  // Same frame as components/layout/Screen: the accessories row, then the
+  // title block shrink-wrapped to the reading edge (alignItems flex-start).
+  // A textAlign right/left would be swapped by Fabric under an RTL layout
+  // direction — that is what left the Arabic title hugging the left edge.
   const header = (
     <View style={styles.headerWrap}>
       <View style={styles.titleBlock}>
-        <Text style={[styles.title, alignStart]}>{t("app.activity.heading")}</Text>
-        <Text style={[styles.subtitle, alignStart]}>{t("app.activity.subhead")}</Text>
+        <HeaderAccessories />
+        <Text style={styles.title}>{t("app.activity.heading")}</Text>
+        <Text style={styles.subtitle}>{t("app.activity.subhead")}</Text>
       </View>
 
       {!allowed ? (
@@ -390,8 +347,8 @@ export default function ActivityScreen() {
  * Field-shaped date input with the calendar glyph the web's native
  * <input type="date"> draws at the start edge (see the design PNG). The kit's
  * Field has no adornment slot, so the box is rebuilt here to Field's metrics.
- * textAlign follows the live locale — a digits-only value has no strong
- * character for the natural alignment to pick a side from.
+ * textAlign is left unset, as in Field: RN resolves it from the layout
+ * direction, whereas an explicit right/left gets swapped under RTL.
  */
 function DateField({
   label,
@@ -405,7 +362,6 @@ function DateField({
   error?: string;
 }) {
   const [focused, setFocused] = useState(false);
-  const rtl = useLocale((s) => s.locale === "ar");
 
   return (
     <View style={styles.selectWrap}>
@@ -423,7 +379,7 @@ function DateField({
           accessibilityLabel={label}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          style={[styles.dateInput, { textAlign: rtl ? "right" : "left" }]}
+          style={styles.dateInput}
         />
       </View>
       {error ? <Text style={styles.fieldError}>{error}</Text> : null}
@@ -513,7 +469,9 @@ function Select({
 function ActivityRow({ row, first, last }: { row: LogRow; first: boolean; last: boolean }) {
   const actionLabel = tOpt(`app.activityLabels.actions.${row.action}`) ?? row.action;
   const categoryLabel = tOpt(`app.activityLabels.categories.${row.category}`) ?? row.category;
-  const details = scalarDetails(row.metadata);
+  // Per-action port of the web formatter: sale lines flattened, enums translated,
+  // changed-field lists — `t` passed at render time so a live locale switch re-labels.
+  const details = formatActivityDetails(row.action, row.metadata, t);
 
   return (
     <View style={[styles.row, first && styles.rowFirst, last && styles.rowLast]}>
@@ -535,10 +493,10 @@ function ActivityRow({ row, first, last }: { row: LogRow; first: boolean; last: 
       </View>
       {details.length > 0 ? (
         <View style={styles.details}>
-          {details.map((d) => (
-            <View key={d.label} style={styles.detail}>
+          {details.map((d, i) => (
+            <View key={`${i}-${d.label}`} style={styles.detail}>
               <Text style={styles.detailLabel}>{`${d.label}:`}</Text>
-              <Text style={styles.detailValue} numberOfLines={1}>
+              <Text style={styles.detailValue} numberOfLines={2}>
                 {d.value}
               </Text>
             </View>
@@ -556,7 +514,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxl * 2,
   },
   headerWrap: { gap: spacing.lg, marginBottom: spacing.lg },
-  titleBlock: { gap: 4 },
+  titleBlock: { gap: 4, alignItems: "flex-start" },
   title: { fontFamily: fonts.bold, fontSize: 26, color: colors.text, ...RTL_TEXT },
   subtitle: { fontFamily: fonts.regular, fontSize: 15, color: colors.textSecondary, ...RTL_TEXT },
   notAllowed: {

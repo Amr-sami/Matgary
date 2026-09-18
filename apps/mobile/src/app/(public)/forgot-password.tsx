@@ -12,8 +12,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Globe, Lightning } from "phosphor-react-native";
 
-import { getLocale, useLocale, t } from "@/i18n";
+import { useLocale, t } from "@/i18n";
 import { api } from "@/api/client";
+import { useSession } from "@/stores/session";
 import { DottedGround } from "@/components/DottedGround";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/Button";
@@ -43,7 +44,23 @@ export default function ForgotPasswordScreen() {
   const [submittedEmail, setSubmittedEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
 
+  const startDemo = useSession((s) => s.startDemo);
+  const signingIn = useSession((s) => s.signingIn);
+  const locale = useLocale((s) => s.locale);
+  const setLocale = useLocale((s) => s.setLocale);
+
   const canSubmit = EMAIL_RE.test(email.trim().toLowerCase());
+
+  // Demo pill — the same flow login.tsx runs. startDemo never throws: a
+  // failure lands in session.signInError, which login renders in its own box.
+  // This screen has no box under the pill, so read it back once and show it
+  // here; the value is fresh because startDemo clears it before it starts.
+  const [demoError, setDemoError] = useState<string | null>(null);
+  const onDemo = async () => {
+    setDemoError(null);
+    await startDemo();
+    setDemoError(useSession.getState().signInError);
+  };
 
   const goToLogin = () => {
     if (router.canGoBack()) router.back();
@@ -102,21 +119,36 @@ export default function ForgotPasswordScreen() {
           ]}
           keyboardShouldPersistTaps="handled"
         >
-          {/* TODO(phase-4): same as login.tsx — the demo tenant flow and the
-              locale PATCH are real features on the web; neither target exists
-              natively yet, so these are composed but not wired. */}
           <View style={styles.topBar}>
-            <Pressable style={styles.demoPill} accessibilityRole="button">
-              <Lightning size={16} color="#FFFFFF" weight="fill" />
+            <Pressable
+              style={styles.demoPill}
+              accessibilityRole="button"
+              disabled={signingIn || busy}
+              onPress={() => void onDemo()}
+            >
+              <Lightning size={16} color={colors.onAccent} weight="fill" />
               <Text numberOfLines={1} style={styles.demoPillText}>
-                {t("auth.demo.cta")}
+                {t(signingIn ? "auth.demo.busy" : "auth.demo.cta")}
               </Text>
             </Pressable>
-            <Pressable style={styles.langToggle} accessibilityRole="button" onPress={() => void useLocale.getState().setLocale(getLocale() === "ar" ? "en" : "ar")}>
+            <Pressable
+              style={styles.langToggle}
+              accessibilityRole="button"
+              accessibilityLabel={
+                locale === "ar" ? t("app.shell.language.english") : t("app.shell.language.arabic")
+              }
+              onPress={() => void setLocale(locale === "ar" ? "en" : "ar")}
+            >
               <Globe size={20} color={colors.textSecondary} />
-              <Text style={styles.langText}>{getLocale() === "ar" ? "ع" : "EN"}</Text>
+              <Text style={styles.langText}>{locale === "ar" ? "ع" : "EN"}</Text>
             </Pressable>
           </View>
+
+          {demoError ? (
+            <View style={[styles.errorBox, styles.demoError]} accessibilityLiveRegion="polite">
+              <Text style={styles.errorText}>{demoError}</Text>
+            </View>
+          ) : null}
 
           <View style={styles.centre}>
             <View style={styles.brand}>
@@ -159,7 +191,7 @@ export default function ForgotPasswordScreen() {
 
                 <Button
                   label={t("auth.forgot.submit")}
-                  loading={busy}
+                  loading={signingIn || busy}
                   disabled={!canSubmit}
                   onPress={() => void onSubmit()}
                 />
@@ -200,7 +232,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     flexShrink: 1,
   },
-  demoPillText: { fontFamily: fonts.bold, fontSize: 14, color: "#FFFFFF" },
+  demoPillText: { fontFamily: fonts.bold, fontSize: 14, color: colors.onAccent },
+  demoError: { marginTop: spacing.md },
   langToggle: {
     flexDirection: "row",
     alignItems: "center",

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Linking,
   Pressable,
   StyleSheet,
@@ -8,22 +9,44 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { ShieldCheck } from "phosphor-react-native";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  AndroidLogo,
+  AppleLogo,
+  Desktop,
+  DeviceMobile,
+  ShieldCheck,
+} from "phosphor-react-native";
+import { auth, type DeviceSummary } from "@matgary/api-client";
 
 import { api } from "@/api/client";
 import { Screen } from "@/components/layout/Screen";
 import { ChevronBack } from "@/components/ui/Chevron";
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
+import { shortDate } from "@/lib/format";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
-import { colors, fonts, radius, spacing } from "@/theme/tokens";
+import { colors, fonts, MIN_TOUCH, radius, spacing } from "@/theme/tokens";
 import { t } from "@/i18n";
 
 /**
- * Port of app__account-security.png (/account/security on the web).
+ * Port of app__account-security.png (/account/security on the web), plus the
+ * one native addition doc 02 §1.1 row 24 calls for: the per-device session
+ * list (doc 06 §7.6). Every device that holds a refresh token is a row in
+ * `auth_devices`; GET /api/v1/auth/devices lists the live ones and marks the
+ * caller's own, DELETE ?id= revokes one. "Sign out everywhere" stays as the
+ * blunt instrument.
+ *
+ * Intentional deviation for staff: the web page renders ONLY the staffNotice
+ * for non-owners, while this screen also shows the devices card AND "Sign out
+ * everywhere". Both are the caller's own sessions and nothing else —
+ * /api/v1/auth/devices scopes by user_id and /api/account/sessions/revoke-all
+ * bumps only the caller's own token_version — and a cashier who lost a phone
+ * needs both just as much as an owner does.
  *
  * One capability genuinely does not exist on this client and is NOT faked:
  *
@@ -45,6 +68,33 @@ interface EnrollmentPreview {
   otpauthUri: string;
 }
 
+const DEVICES_KEY = ["auth-devices"] as const;
+
+/** One revoke plus two follow-ups against a successor that rotated in under us. */
+const REVOKE_ATTEMPTS = 3;
+
+/**
+ * Rotation carries device_name, platform and created_at forward onto the
+ * successor row (refresh/route.ts), so the three together identify one
+ * install's lineage across ids. install_id would be the exact key but the
+ * list route does not expose it.
+ */
+function sameLineage(a: DeviceSummary, b: DeviceSummary): boolean {
+  return a.createdAt === b.createdAt && a.deviceName === b.deviceName && a.platform === b.platform;
+}
+
+/**
+ * t() is plain interpolation with no plural rules, and "{n} devices" reads
+ * "1 devices" in the common single-device case (Arabic needs dual and 3-10
+ * forms on top). Branch here instead.
+ */
+function deviceCountLabel(n: number): string {
+  if (n === 1) return t("mobile.security.devices.count_one");
+  if (n === 2) return t("mobile.security.devices.count_two");
+  if (n >= 3 && n <= 10) return t("mobile.security.devices.count_few", { n });
+  return t("mobile.security.devices.count_other", { n });
+}
+
 const ERRORS = (): Record<string, string> => ({
   INVALID_TOTP: t("app.accountSecurity.errors.badCode"),
   BAD_PASSWORD: t("app.accountSecurity.errors.badPassword"),
@@ -58,8 +108,117 @@ function errorText(e: unknown, fallback: string): string {
   return ERRORS()[code] ?? fallback;
 }
 
+/**
+ * The devices route serialises Postgres timestamptz through drizzle's raw
+ * `db.execute`, so the wire form is "2026-09-18 02:34:20.571236+00" — a space
+ * instead of T, six fractional digits, and an hour-only offset. V8 tolerates
+ * all three; Hermes's Date parser does not. Rewrite it to strict ISO before
+ * handing it to shortDate(), which does `new Date(iso)`.
+ */
+function pgToIso(ts: string | null | undefined): string | null {
+  if (!ts) return null;
+  return ts
+    .replace(" ", "T")
+    .replace(/(\.\d{3})\d+/, "$1")
+    .replace(/([+-]\d{2})$/, "$1:00");
+}
+
+function platformLabel(platform: string | null): string {
+  switch (platform) {
+    case "ios":
+      return t("mobile.security.devices.platformIos");
+    case "android":
+      return t("mobile.security.devices.platformAndroid");
+    case "web":
+      return t("mobile.security.devices.platformWeb");
+    default:
+      return "";
+  }
+}
+
+function PlatformIcon({ platform }: { platform: string | null }) {
+  const props = { size: 22, color: colors.textSecondary } as const;
+  switch (platform) {
+    case "ios":
+      return <AppleLogo {...props} />;
+    case "android":
+      return <AndroidLogo {...props} />;
+    case "web":
+      return <Desktop {...props} />;
+    default:
+      return <DeviceMobile {...props} />;
+  }
+}
+
+function deviceTitle(d: DeviceSummary): string {
+  return d.deviceName?.trim() || platformLabel(d.platform) || t("mobile.security.devices.unknownDevice");
+}
+
+function DeviceRow({
+  device,
+  onRevoke,
+  revoking,
+}: {
+  device: DeviceSummary;
+  onRevoke: (d: DeviceSummary) => void;
+  revoking: boolean;
+}) {
+  const platform = platformLabel(device.platform);
+  const meta = [platform, device.appVersion ? `v${device.appVersion}` : ""]
+    .filter(Boolean)
+    .join(" · ");
+  // lastUsedAt is bumped on every refresh (≤15 min); a device that has never
+  // refreshed yet only has its sign-in time, which is still a "last seen".
+  const seen = device.lastUsedAt
+    ? t("mobile.security.devices.lastSeen", { date: shortDate(pgToIso(device.lastUsedAt)) })
+    : t("mobile.security.devices.signedIn", { date: shortDate(pgToIso(device.createdAt)) });
+
+  return (
+    <View style={styles.deviceRow}>
+      <View style={styles.deviceIcon}>
+        <PlatformIcon platform={device.platform} />
+      </View>
+      <View style={styles.deviceBody}>
+        <View style={styles.deviceTitleRow}>
+          <Text numberOfLines={1} style={styles.deviceName}>
+            {deviceTitle(device)}
+          </Text>
+          {device.current ? (
+            <Badge label={t("mobile.security.devices.thisDevice")} variant="accent" />
+          ) : null}
+        </View>
+        {meta && meta !== deviceTitle(device) ? (
+          <Text numberOfLines={1} style={styles.deviceMeta}>
+            {meta}
+          </Text>
+        ) : null}
+        <Text numberOfLines={1} style={styles.deviceMeta}>
+          {seen}
+        </Text>
+      </View>
+      {device.current ? null : (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("mobile.security.devices.revoke")}
+          disabled={revoking}
+          onPress={() => onRevoke(device)}
+          hitSlop={8}
+          style={({ pressed }) => [styles.revoke, (pressed || revoking) && styles.revokePressed]}
+        >
+          {revoking ? (
+            <ActivityIndicator size="small" color={colors.danger} />
+          ) : (
+            <Text style={styles.revokeLabel}>{t("mobile.security.devices.revoke")}</Text>
+          )}
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
 export default function SecurityScreen() {
   const router = useRouter();
+  const qc = useQueryClient();
   const me = useSession((s) => s.me);
   const signOut = useSession((s) => s.signOut);
   const isOwner = me?.isOwner ?? false;
@@ -75,6 +234,7 @@ export default function SecurityScreen() {
   const [error, setError] = useState<string | null>(null);
   const [slug, setSlug] = useState("");
   const [scheduledAt, setScheduledAt] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const statusQuery = useQuery({
     queryKey: ["2fa-status"],
@@ -82,6 +242,7 @@ export default function SecurityScreen() {
       api
         .request<{ enabled: boolean }>("/api/account/2fa-status")
         .catch(() => ({ enabled: false })),
+    enabled: isOwner,
   });
 
   // Seeds ONCE. A cached answer (react-query holds it for 30s) still lands
@@ -91,6 +252,67 @@ export default function SecurityScreen() {
       setStatus(statusQuery.data.enabled ? "on" : "off");
     }
   }, [status, statusQuery.data]);
+
+  // ---- Signed-in devices (doc 06 §7.6) -----------------------------------
+  // Keyed on the user, not the tenant: the route scopes by user_id, and a
+  // branch switch must not serve a stale list from another principal.
+  const devicesQuery = useQuery({
+    queryKey: [...DEVICES_KEY, me?.user?.id ?? null],
+    queryFn: () => auth.listDevices(api),
+    enabled: !!me,
+  });
+
+  // A device row's id is NOT stable: every refresh the other device performs
+  // (<=15 min, and whenever it comes to the foreground) revokes its row with
+  // reason 'rotated' and inserts a successor under a new id. The list here is
+  // served from cache for up to 30s, so the id the user taps can already be
+  // dead — and DELETE ?id=<dead> answers 200 {ok:true} (COALESCE on an
+  // already-revoked row) while the live successor keeps working. Revoking the
+  // tapped id and trusting the 200 was therefore a silent no-op in a real
+  // window. Instead: re-list right before firing, aim at the LIVE row of the
+  // same lineage, then re-list and confirm it is gone — following a successor
+  // that appeared mid-flight — and only report success once the list agrees.
+  const revokeDevice = useMutation({
+    mutationFn: async (picked: DeviceSummary): Promise<DeviceSummary[]> => {
+      let list = await auth.listDevices(api);
+      for (let attempt = 0; attempt < REVOKE_ATTEMPTS; attempt++) {
+        const live =
+          list.find((x) => x.id === picked.id) ??
+          list.find((x) => !x.current && sameLineage(x, picked));
+        if (!live) return list;
+        await auth.revokeDevice(api, live.id);
+        list = await auth.listDevices(api);
+      }
+      throw new Error("DEVICE_STILL_LIVE");
+    },
+    onSuccess: (list) => {
+      setError(null);
+      setNotice(t("mobile.security.devices.revoked"));
+      // The list we just confirmed against IS the truth; no optimistic filter
+      // and no extra invalidate round-trip needed.
+      qc.setQueryData<DeviceSummary[]>([...DEVICES_KEY, me?.user?.id ?? null], list);
+    },
+    onError: () => {
+      setNotice(null);
+      setError(t("mobile.security.devices.revokeFailed"));
+      void qc.invalidateQueries({ queryKey: DEVICES_KEY });
+    },
+  });
+
+  const confirmRevoke = (d: DeviceSummary) => {
+    Alert.alert(
+      t("mobile.security.devices.revokeConfirmTitle"),
+      t("mobile.security.devices.revokeConfirm", { name: deviceTitle(d) }),
+      [
+        { text: t("app.common.cancel"), style: "cancel" },
+        {
+          text: t("mobile.security.devices.revoke"),
+          style: "destructive",
+          onPress: () => revokeDevice.mutate(d),
+        },
+      ],
+    );
+  };
 
   const startEnroll = useMutation({
     mutationFn: () =>
@@ -181,6 +403,26 @@ export default function SecurityScreen() {
     },
   });
 
+  const confirmRevokeAll = () => {
+    Alert.alert(
+      t("app.accountSecurity.revoke.title"),
+      t("mobile.security.signOutEverywhereConfirm"),
+      [
+        { text: t("app.common.cancel"), style: "cancel" },
+        {
+          text: t("app.accountSecurity.revoke.button"),
+          style: "destructive",
+          onPress: () => revokeAll.mutate(),
+        },
+      ],
+    );
+  };
+
+  const refresh = () => {
+    void devicesQuery.refetch();
+    if (isOwner) void statusQuery.refetch();
+  };
+
   const header = (
     <View style={styles.header}>
       <Pressable
@@ -202,28 +444,101 @@ export default function SecurityScreen() {
     </View>
   );
 
-  if (!isOwner) {
-    return (
-      <Screen>
-        {header}
-        <Card>
-          <Text style={styles.body}>
-            {t("app.accountSecurity.staffNotice")}
-          </Text>
-        </Card>
-      </Screen>
-    );
-  }
+  const devices = devicesQuery.data ?? [];
+  const devicesCard = (
+    <Card>
+      <View style={styles.cardTitleRow}>
+        <Text style={styles.bodyStrong}>{t("mobile.security.devices.title")}</Text>
+        {devices.length > 0 ? (
+          <Badge label={deviceCountLabel(devices.length)} />
+        ) : null}
+      </View>
+      <Text style={styles.hint}>{t("mobile.security.devices.intro")}</Text>
+      <View style={styles.deviceList}>
+        {devicesQuery.isLoading ? (
+          <ActivityIndicator color={colors.accent} />
+        ) : devicesQuery.isError ? (
+          <View style={styles.stackTight}>
+            <Text style={styles.errorInline}>{t("mobile.security.devices.loadFailed")}</Text>
+            <Button
+              label={t("app.common.retry")}
+              variant="outline"
+              onPress={() => void devicesQuery.refetch()}
+              loading={devicesQuery.isRefetching}
+            />
+          </View>
+        ) : devices.length === 0 ? (
+          <EmptyState title={t("mobile.security.devices.empty")} />
+        ) : (
+          devices.map((d, i) => (
+            <View key={d.id} style={i > 0 ? styles.deviceDivider : undefined}>
+              <DeviceRow
+                device={d}
+                onRevoke={confirmRevoke}
+                revoking={revokeDevice.isPending && revokeDevice.variables?.id === d.id}
+              />
+            </View>
+          ))
+        )}
+      </View>
+    </Card>
+  );
 
-  return (
-    <Screen>
-      {header}
+  const revokeAllCard = (
+    <Card>
+      <Text style={styles.bodyStrong}>{t("app.accountSecurity.revoke.title")}</Text>
+      <Text style={styles.hint}>
+        {t("app.accountSecurity.revoke.intro")}
+      </Text>
+      <View style={styles.stack}>
+        <Button
+          label={t("app.accountSecurity.revoke.button")}
+          variant="outline"
+          onPress={confirmRevokeAll}
+          loading={revokeAll.isPending}
+        />
+      </View>
+    </Card>
+  );
 
+  const banners = (
+    <>
       {error ? (
         <Pressable onPress={() => setError(null)}>
           <Text style={styles.error}>{error}</Text>
         </Pressable>
       ) : null}
+      {notice ? (
+        <Pressable onPress={() => setNotice(null)}>
+          <Text style={styles.notice}>{notice}</Text>
+        </Pressable>
+      ) : null}
+    </>
+  );
+
+  if (!isOwner) {
+    // Staff cannot touch 2FA or the account itself, but their own devices are
+    // theirs to see and cut — the route scopes by user_id, not by role.
+    return (
+      <Screen onRefresh={refresh} refreshing={devicesQuery.isRefetching}>
+        {header}
+        {banners}
+        <Card>
+          <Text style={styles.body}>
+            {t("app.accountSecurity.staffNotice")}
+          </Text>
+        </Card>
+        {devicesCard}
+        {revokeAllCard}
+      </Screen>
+    );
+  }
+
+  return (
+    <Screen onRefresh={refresh} refreshing={devicesQuery.isRefetching}>
+      {header}
+
+      {banners}
 
       {status === null ? <ActivityIndicator color={colors.accent} /> : null}
 
@@ -361,6 +676,20 @@ export default function SecurityScreen() {
 
       {status === "on" || status === "off" ? (
         <>
+          {devicesCard}
+          {revokeAllCard}
+
+          <Card>
+            <Text style={styles.bodyStrong}>{t("app.accountSecurity.export.title")}</Text>
+            <Text style={styles.hint}>
+              {t("app.accountSecurity.export.intro")}
+            </Text>
+            <View style={styles.stack}>
+              <Button label={t("app.accountSecurity.export.button")} variant="outline" disabled onPress={() => {}} />
+              <Text style={styles.hint}>{t("mobile.common.webOnly")}</Text>
+            </View>
+          </Card>
+
           <Card style={styles.dangerCard}>
             <Text style={styles.dangerTitle}>{t("app.accountSecurity.delete.title")}</Text>
             <Text style={styles.hint}>
@@ -402,32 +731,6 @@ export default function SecurityScreen() {
               </View>
             )}
           </Card>
-
-          <Card>
-            <Text style={styles.bodyStrong}>{t("app.accountSecurity.export.title")}</Text>
-            <Text style={styles.hint}>
-              {t("app.accountSecurity.export.intro")}
-            </Text>
-            <View style={styles.stack}>
-              <Button label={t("app.accountSecurity.export.button")} variant="outline" disabled onPress={() => {}} />
-              <Text style={styles.hint}>{t("mobile.common.webOnly")}</Text>
-            </View>
-          </Card>
-
-          <Card>
-            <Text style={styles.bodyStrong}>{t("app.accountSecurity.revoke.title")}</Text>
-            <Text style={styles.hint}>
-              {t("app.accountSecurity.revoke.intro")}
-            </Text>
-            <View style={styles.stack}>
-              <Button
-                label={t("app.accountSecurity.revoke.button")}
-                variant="outline"
-                onPress={() => revokeAll.mutate()}
-                loading={revokeAll.isPending}
-              />
-            </View>
-          </Card>
         </>
       ) : null}
     </Screen>
@@ -464,6 +767,18 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     ...RTL_TEXT,
   },
+  notice: {
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    backgroundColor: colors.successLight,
+    color: colors.successStrong,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    overflow: "hidden",
+    ...RTL_TEXT,
+  },
+  errorInline: { fontFamily: fonts.medium, fontSize: 13, color: colors.danger, ...RTL_TEXT },
 
   body: { fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary, lineHeight: 24, ...RTL_TEXT },
   bodyStrong: { fontFamily: fonts.semibold, fontSize: 14, color: colors.text, lineHeight: 24, ...RTL_TEXT },
@@ -472,9 +787,49 @@ const styles = StyleSheet.create({
   dangerTitle: { fontFamily: fonts.semibold, fontSize: 14, color: colors.danger, marginBottom: spacing.sm, ...RTL_TEXT },
   dangerCard: { borderColor: colors.dangerLight },
 
+  cardTitleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
+
   stack: { gap: spacing.md, marginTop: spacing.lg },
+  stackTight: { gap: spacing.sm },
   row: { flexDirection: "row", gap: spacing.sm },
   flex1: { flex: 1 },
+
+  // ---- devices ----
+  deviceList: { marginTop: spacing.md },
+  deviceDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  deviceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+    minHeight: MIN_TOUCH,
+  },
+  deviceIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    backgroundColor: colors.neutralTint,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  deviceBody: { flex: 1, minWidth: 0, gap: 2 },
+  deviceTitleRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  deviceName: { flexShrink: 1, fontFamily: fonts.semibold, fontSize: 14, color: colors.text, ...RTL_TEXT },
+  deviceMeta: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
+  revoke: {
+    minHeight: MIN_TOUCH,
+    minWidth: 64,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.dangerLight,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  revokePressed: { backgroundColor: colors.dangerLight },
+  revokeLabel: { fontFamily: fonts.semibold, fontSize: 13, color: colors.danger },
 
   // Latin, machine-readable strings: left-to-right and on the platform's
   // default face, because Cairo has no monospace cut.

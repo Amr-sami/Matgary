@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -10,6 +10,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { useIsFocused } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, catalog } from "@matgary/api-client";
 
@@ -21,6 +22,7 @@ import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
+import { UNREAD_TASKS_KEY, isOpenTask, useBadges } from "@/stores/badges";
 import { useSession } from "@/stores/session";
 import { shortDate } from "@/lib/format";
 import { RTL_TEXT, directionStyle } from "@/theme/rtl";
@@ -92,8 +94,32 @@ export default function TasksScreen() {
   });
 
   const rows = q.data ?? [];
-  const open = rows.filter((task) => task.status !== "done");
+  const open = rows.filter(isOpenTask);
   const done = rows.filter((task) => task.status === "done");
+
+  // Doc 02 §1.1 row 14: this screen drives the bottom-nav badge — by clearing
+  // it. Web parity (components/tasks/TasksTab.tsx): opening the tasks page
+  // marks every task assigned to me as seen, then the unread count re-fetches
+  // to zero. Gated on the badge being lit so an idle visit is not a write per
+  // focus, and keyed on the count so a task assigned while this screen stays
+  // in front is cleared the moment the bar's poll reports it.
+  const focused = useIsFocused();
+  const tasksUnread = useBadges((s) => s.tasksUnread);
+  useEffect(() => {
+    if (!focused || tasksUnread === 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        await api.request<{ ok: true }>("/api/tasks/seen", { method: "POST" });
+        if (!cancelled) await queryClient.invalidateQueries({ queryKey: UNREAD_TASKS_KEY });
+      } catch {
+        // Best-effort, as on the web: the badge simply stays until the next visit.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [focused, tasksUnread, queryClient]);
 
   return (
     <Screen

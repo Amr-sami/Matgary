@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Platform, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import { ArrowCounterClockwise, CloudSlash, PauseCircle, PencilSimple, Trash, WarningCircle } from "phosphor-react-native";
+import { ArrowCounterClockwise, CloudSlash, PauseCircle, PencilSimple, ShoppingCartSimple, Trash, WarningCircle } from "phosphor-react-native";
 import { catalog } from "@matgary/api-client";
 
 import { api } from "@/api/client";
@@ -15,14 +15,18 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { money, shortDate } from "@/lib/format";
 import { drainNow, retry, retryAllFailed, useOffline, useOutbox, type DrainResult, type OutboxItem } from "@/offline";
 import { isBranchMismatchRow } from "@/offline/branch-mismatch";
+import { useDevOffline } from "@/offline/dev-offline";
 import {
   SALE_KIND,
+  canSellAnyway,
   describeSalePayload,
   discardSale,
   ensureSaleHandler,
+  isOversellRefusal,
   loadSaleIntoCart,
   retrySale,
   saleRetryMode,
+  sellAnyway,
   type SaleOutboxItem,
   type SalePayload,
   type SaleRetryMode,
@@ -52,6 +56,18 @@ import { t } from "@/i18n";
  * invoice id (the server never booked the original, so it cannot double-post)
  * and discards the row, keeping its audit copy. For those cached codes Retry
  * is hidden — offering a button that cannot work is worse than none.
+ *
+ * INSUFFICIENT_STOCK gets the §6.5 resolution hint instead: the customer
+ * already left with the goods. The spec'd "Sell anyway" action (re-submit
+ * with allowOversell under a derived key — see offline/sales.ts sellAnyway)
+ * is rendered only when SELL_ANYWAY_ENABLED is on, i.e. once the cart route
+ * accepts the flag (server S7); until then the card offers Edit and Discard
+ * and the hint promises nothing the server would refuse. PRODUCT_NOT_FOUND
+ * offers Edit (re-map the line) and Discard, with a hint saying why.
+ *
+ * DEV BUILDS ONLY: a "Simulate offline" switch at the bottom (offline/
+ * dev-offline.ts) — the e2e offline-sale.yaml drives it. Guarded by __DEV__
+ * so release bundles carry neither the card nor the code behind it.
  */
 export default function SyncScreen() {
   const off = useOffline();
@@ -142,6 +158,31 @@ export default function SyncScreen() {
     [products.data, router],
   );
 
+  const onSellAnyway = useCallback((item: OutboxItem) => {
+    if (item.status === "sending") {
+      Alert.alert(t("mobile.sync.sellAnyway"), t("mobile.sync.discardBusy"));
+      return;
+    }
+    const sale = item as SaleOutboxItem;
+    const { invoiceId } = describeSalePayload(sale.payload);
+    Alert.alert(t("mobile.sync.sellAnywayTitle"), t("mobile.sync.sellAnywayBody", { id: invoiceId ?? item.idempotencyKey }), [
+      { text: t("app.common.cancel"), style: "cancel" },
+      {
+        text: t("mobile.sync.sellAnywayConfirm"),
+        onPress: () => {
+          setBusyId(item.id);
+          const p = sellAnyway(sale);
+          if (!p) {
+            setBusyId(null);
+            Alert.alert(t("mobile.sync.sellAnyway"), t("mobile.sync.discardBusy"));
+            return;
+          }
+          void p.then(setLastResult).finally(() => setBusyId(null));
+        },
+      },
+    ]);
+  }, []);
+
   const onRetryAll = useCallback(async () => {
     setLastResult(await retryAllFailed());
   }, []);
@@ -194,7 +235,7 @@ export default function SyncScreen() {
   return (
     <Screen title={t("mobile.sync.title")} subtitle={t("mobile.sync.subtitle")} onRefresh={() => void onRefresh()} refreshing={refreshing}>
       <View style={styles.stats}>
-        <Stat label={t("mobile.sync.stat.queued")} value={String(off.queued)} tone={off.queued > 0 ? "warning" : "neutral"} />
+        <Stat label={t("mobile.sync.stat.queued")} value={String(off.queued)} tone={off.queued > 0 ? "warning" : "neutral"} testID="sync-stat-queued" />
         <Stat label={t("mobile.sync.stat.failed")} value={String(off.failed)} tone={off.failed > 0 ? "danger" : "neutral"} />
         <Stat
           label={t("mobile.sync.stat.lastSynced")}
@@ -220,13 +261,14 @@ export default function SyncScreen() {
       ) : null}
 
       <View style={styles.actions}>
-        <Button
-          label={t("mobile.sync.syncNow")}
-          onPress={() => void sync()}
-          loading={off.draining}
-          disabled={!off.online || off.draining}
-          style={styles.grow}
-        />
+        <View style={styles.grow} testID="sync-now">
+          <Button
+            label={t("mobile.sync.syncNow")}
+            onPress={() => void sync()}
+            loading={off.draining}
+            disabled={!off.online || off.draining}
+          />
+        </View>
         {failed.length > 0 ? (
           <Button label={t("mobile.sync.retryAll")} variant="outline" onPress={() => void onRetryAll()} disabled={off.draining} style={styles.grow} />
         ) : null}
@@ -251,6 +293,7 @@ export default function SyncScreen() {
               productName={productName}
               onRetry={onRetry}
               onEdit={item.kind === SALE_KIND ? onEdit : undefined}
+              onSellAnyway={canSellAnyway(item) ? onSellAnyway : undefined}
               onDiscard={onDiscard}
             />
           ))}
@@ -284,17 +327,46 @@ export default function SyncScreen() {
           ))}
         </>
       ) : null}
+
+      {__DEV__ ? <DevTools /> : null}
     </Screen>
   );
 }
 
 // ─── pieces ──────────────────────────────────────────────────────────────────
 
-function Stat({ label, value, tone, small }: { label: string; value: string; tone: "neutral" | "warning" | "danger"; small?: boolean }) {
+/**
+ * DEV-ONLY card (never rendered in release: the caller is behind __DEV__, and
+ * so is every line in offline/dev-offline.ts). One switch: simulate offline.
+ */
+function DevTools() {
+  const simulate = useDevOffline((s) => s.simulate);
+  const setSimulate = useDevOffline((s) => s.setSimulate);
+  return (
+    <Card style={styles.devCard}>
+      <Text style={styles.devTitle} testID="sync-dev-tools">{t("mobile.sync.dev.title")}</Text>
+      <View style={styles.devRow}>
+        <View style={styles.devBody}>
+          <Text style={styles.devLabel}>{t("mobile.sync.dev.simulateOffline")}</Text>
+          <Text style={styles.devHint}>{t("mobile.sync.dev.simulateOfflineHint")}</Text>
+        </View>
+        <Switch
+          value={simulate}
+          onValueChange={setSimulate}
+          trackColor={{ true: colors.warningStrong, false: colors.border }}
+          accessibilityLabel={t("mobile.sync.dev.simulateOffline")}
+          testID="sync-simulate-offline"
+        />
+      </View>
+    </Card>
+  );
+}
+
+function Stat({ label, value, tone, small, testID }: { label: string; value: string; tone: "neutral" | "warning" | "danger"; small?: boolean; testID?: string }) {
   const color = tone === "danger" ? colors.danger : tone === "warning" ? colors.warningStrong : colors.text;
   return (
-    <View style={styles.stat}>
-      <Text style={[styles.statValue, small && styles.statValueSmall, { color }]} numberOfLines={1}>
+    <View style={styles.stat} testID={testID}>
+      <Text style={[styles.statValue, small && styles.statValueSmall, { color }]} numberOfLines={1} testID={testID ? `${testID}-value` : undefined}>
         {value}
       </Text>
       <Text style={styles.statLabel} numberOfLines={1}>
@@ -313,6 +385,7 @@ function OutboxCard({
   productName,
   onRetry,
   onEdit,
+  onSellAnyway,
   onDiscard,
 }: {
   item: OutboxItem;
@@ -324,6 +397,8 @@ function OutboxCard({
   productName: (id: string) => string | null;
   onRetry?: (item: OutboxItem) => void;
   onEdit?: (item: OutboxItem) => void;
+  /** §6.5 oversell resolution — only passed for INSUFFICIENT_STOCK rows. */
+  onSellAnyway?: (item: OutboxItem) => void;
   onDiscard?: (item: OutboxItem) => void;
 }) {
   const isSale = item.kind === SALE_KIND;
@@ -336,6 +411,11 @@ function OutboxCard({
   const mode: SaleRetryMode | null = isSale && status === "failed" ? saleRetryMode(item) : null;
   const showRetry = !!onRetry && mode !== "edit";
   const showEdit = !!onEdit && status === "failed";
+  const showSellAnyway = !!onSellAnyway && status === "failed";
+  // The short-stock hint is keyed on the refusal, not on the action: it reads
+  // Edit / Discard while SELL_ANYWAY_ENABLED is off (see offline/sales.ts).
+  const shortStock = isOversellRefusal(item);
+  const productGone = status === "failed" && item.lastErrorCode === "PRODUCT_NOT_FOUND";
   const customer = [sale.customerName, sale.customerPhone].filter(Boolean).join(" · ");
 
   return (
@@ -387,7 +467,11 @@ function OutboxCard({
           )}
           <View style={styles.errorText}>
             <Text style={[styles.errorLine, { color: status === "failed" ? colors.danger : colors.warningStrong }]}>{error}</Text>
-            {mode === "edit" ? (
+            {shortStock ? (
+              <Text style={styles.errorDetail}>{t("mobile.sync.oversellHint")}</Text>
+            ) : productGone ? (
+              <Text style={styles.errorDetail}>{t("mobile.sync.productGoneHint")}</Text>
+            ) : mode === "edit" ? (
               <Text style={styles.errorDetail}>{t("mobile.sync.editHint")}</Text>
             ) : mode === "rekey" ? (
               <Text style={styles.errorDetail}>{t("mobile.sync.rekeyHint")}</Text>
@@ -401,8 +485,21 @@ function OutboxCard({
       ) : null}
       {nextTry ? <Text style={styles.itemHint}>{t("mobile.sync.nextTry", { when: nextTry })}</Text> : null}
 
-      {status !== "done" && status !== "sending" && (showRetry || showEdit || onDiscard) ? (
+      {status !== "done" && status !== "sending" && (showRetry || showEdit || showSellAnyway || onDiscard) ? (
         <View style={styles.itemActions}>
+          {showSellAnyway ? (
+            <Pressable
+              onPress={() => onSellAnyway?.(item)}
+              disabled={busy}
+              style={({ pressed }) => [styles.action, pressed && styles.actionPressed, busy && styles.actionDisabled]}
+              accessibilityRole="button"
+              accessibilityLabel={t("mobile.sync.sellAnyway")}
+              testID="sync-sell-anyway"
+            >
+              <ShoppingCartSimple size={18} color={colors.accent} />
+              <Text style={styles.actionLabel}>{t("mobile.sync.sellAnyway")}</Text>
+            </Pressable>
+          ) : null}
           {showRetry ? (
             <Pressable
               onPress={() => onRetry?.(item)}
@@ -587,8 +684,9 @@ const styles = StyleSheet.create({
   bannerText: { flex: 1, fontFamily: fonts.medium, fontSize: 13, ...RTL_TEXT },
   actions: { flexDirection: "row", gap: spacing.sm, marginBottom: spacing.sm },
   grow: { flex: 1 },
-  resultLine: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, marginBottom: spacing.md, ...RTL_TEXT },
+  resultLine: { alignSelf: "flex-start", fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, marginBottom: spacing.md, ...RTL_TEXT },
   section: {
+    alignSelf: "flex-start",
     fontFamily: fonts.semibold,
     fontSize: 14,
     color: colors.textSecondary,
@@ -598,14 +696,14 @@ const styles = StyleSheet.create({
   },
   item: { marginBottom: spacing.sm },
   itemHead: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: spacing.sm },
-  itemHeadText: { flex: 1, minWidth: 0 },
+  itemHeadText: { flex: 1, minWidth: 0, alignItems: "flex-start" },
   itemHeadEnd: { alignItems: "flex-end", gap: 4 },
   itemKind: { fontFamily: fonts.semibold, fontSize: 15, color: colors.text, ...RTL_TEXT },
   itemInvoice: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },
   itemTotal: { fontFamily: fonts.bold, fontSize: 16, color: colors.text, fontVariant: ["tabular-nums"] },
-  itemMeta: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, marginTop: spacing.xs, ...RTL_TEXT },
-  itemHint: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, marginTop: spacing.xs, ...RTL_TEXT },
-  itemDetail: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, marginTop: 2, ...RTL_TEXT },
+  itemMeta: { alignSelf: "flex-start", fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, marginTop: spacing.xs, ...RTL_TEXT },
+  itemHint: { alignSelf: "flex-start", fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, marginTop: spacing.xs, ...RTL_TEXT },
+  itemDetail: { alignSelf: "flex-start", fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, marginTop: 2, ...RTL_TEXT },
   lines: { marginTop: spacing.sm, gap: 4, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border },
   line: { flexDirection: "row", justifyContent: "space-between", gap: spacing.md },
   lineName: { flexShrink: 1, fontFamily: fonts.regular, fontSize: 13, color: colors.text, ...RTL_TEXT },
@@ -621,7 +719,7 @@ const styles = StyleSheet.create({
   },
   errorBoxFailed: { backgroundColor: colors.dangerLight },
   errorBoxSoft: { backgroundColor: colors.warningLight },
-  errorText: { flex: 1, gap: 2 },
+  errorText: { flex: 1, gap: 2, alignItems: "flex-start" },
   errorLine: { fontFamily: fonts.medium, fontSize: 13, ...RTL_TEXT },
   errorDetail: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
   itemActions: {
@@ -646,4 +744,10 @@ const styles = StyleSheet.create({
   actionPressed: { backgroundColor: colors.neutralTint },
   actionDisabled: { opacity: 0.5 },
   actionLabel: { fontFamily: fonts.medium, fontSize: 14, color: colors.accent },
+  devCard: { marginTop: spacing.lg, borderStyle: "dashed", borderColor: colors.warningStrong },
+  devTitle: { alignSelf: "flex-start", fontFamily: fonts.bold, fontSize: 13, color: colors.warningStrong, marginBottom: spacing.sm, ...RTL_TEXT },
+  devRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  devBody: { flex: 1, alignItems: "flex-start" },
+  devLabel: { fontFamily: fonts.semibold, fontSize: 15, color: colors.text, ...RTL_TEXT },
+  devHint: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, marginTop: 2, ...RTL_TEXT },
 });

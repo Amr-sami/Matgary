@@ -187,9 +187,13 @@ export default function LeaveScreen() {
     ]);
   };
 
-  // The web's team tab strip. Only the team and leaves tabs have native
-  // screens so far; attendance and payroll flash "coming soon" instead of
-  // navigating anywhere.
+  // The web's team tab strip. Team and attendance have native screens;
+  // payroll has none (doc 02 §1.1 row 15 drops the CompensationEditor from
+  // v1) — compensation lives in each employee's detail, so that tab explains
+  // where it went at tap time and offers to open the team list. The hint is
+  // an alert rather than inline state: this screen stays mounted under the
+  // Tabs navigator, so a flag set here would be painted after the push and
+  // linger until the next visit.
   const teamTabs = (): { key: TeamTab; label: string }[] => [
     { key: "team", label: t("app.team.tabs.team") },
     { key: "attendance", label: t("app.team.tabs.attendance") },
@@ -197,12 +201,22 @@ export default function LeaveScreen() {
     { key: "leaves", label: t("app.team.tabs.leaves") },
   ];
   const onTeamTab = (tab: TeamTab) => {
-    if (tab === "leaves") return;
-    if (tab === "team") {
-      router.push("/team");
-      return;
+    switch (tab) {
+      case "leaves":
+        return;
+      case "team":
+        router.push("/team");
+        return;
+      case "attendance":
+        router.push("/team/attendance");
+        return;
+      case "payroll":
+        Alert.alert(t("app.team.tabs.payroll"), t("mobile.leave.payrollHint"), [
+          { text: t("app.leave.form.cancel"), style: "cancel" },
+          { text: t("app.team.tabs.team"), onPress: () => router.push("/team") },
+        ]);
+        return;
     }
-    showFlash(t("mobile.insights.comingSoon", { section: t(`app.team.tabs.${tab}`) }));
   };
 
   return (
@@ -219,7 +233,9 @@ export default function LeaveScreen() {
       {canManageTeam ? <Segmented items={teamTabs()} value="leaves" onChange={onTeamTab} /> : null}
 
       {canRequest ? (
-        // `flex-end` is the left edge in RTL — where the design anchors it.
+        // The web parks this on the end side of a justify-between row whose
+        // start slot is the pending badge; that badge lives in the subtitle
+        // here, so a lone CTA sits on the leading edge (right in RTL) instead.
         <View style={styles.toolbar}>
           <PlusButton label={t("app.leave.tab.request")} onPress={() => setFormOpen(true)} />
         </View>
@@ -250,7 +266,7 @@ export default function LeaveScreen() {
             </Text>
           </View>
           {canRequest ? (
-            <PlusButton label={t("app.leave.tab.newRequest")} onPress={() => setFormOpen(true)} />
+            <PlusButton label={t("app.leave.tab.request")} onPress={() => setFormOpen(true)} />
           ) : null}
         </View>
       ) : (
@@ -370,7 +386,7 @@ function PlusButton({ label, onPress }: { label: string; onPress: () => void }) 
       accessibilityRole="button"
       style={({ pressed }) => [styles.plusBtn, pressed && styles.plusBtnPressed]}
     >
-      <Plus size={18} color="#FFFFFF" weight="bold" />
+      <Plus size={18} color={colors.onAccent} weight="bold" />
       <Text numberOfLines={1} style={styles.plusBtnLabel}>
         {label}
       </Text>
@@ -618,7 +634,7 @@ function DecideSheet({
 }
 
 const styles = StyleSheet.create({
-  toolbar: { flexDirection: "row", justifyContent: "flex-end" },
+  toolbar: { flexDirection: "row", justifyContent: "flex-start" },
   plusBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -630,7 +646,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
   },
   plusBtnPressed: { backgroundColor: colors.accentPressed },
-  plusBtnLabel: { fontFamily: fonts.bold, fontSize: 16, color: "#FFFFFF" },
+  plusBtnLabel: { fontFamily: fonts.bold, fontSize: 16, color: colors.onAccent },
   list: { gap: spacing.md },
   row: {
     backgroundColor: colors.card,

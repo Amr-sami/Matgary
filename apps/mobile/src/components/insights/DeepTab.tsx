@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
+import { branches as branchesApi } from "@matgary/api-client";
 
 import { api } from "@/api/client";
 import { Card } from "@/components/ui/Card";
@@ -18,11 +19,12 @@ import { t } from "@/i18n";
  * tab. Same five reports, same `/api/insights/deep?report=…` endpoint; the
  * charts are plain Views (bars / heat cells) so no new chart dependency.
  *
- * not ported: branch scope selector — web's useDeepFetch sends
- * `branchId=all|<uuid>` from a picker the insights screen does not have yet,
- * so every report here falls back to the API default: the caller's active
- * branch. When the screen grows a picker, thread `branchId` through TabProps
- * into useDeep (both `query` and `queryKey`).
+ * Branch scope (doc 02 §2.9 "owner-only branch-scope toggle survives"): an
+ * owner of a multi-branch tenant gets a chip row "All branches / <branch>…"
+ * above the reports. It sends `branchId=all|<uuid>` on every deep query, the
+ * same param web's useDeepFetch sets, and the scope is part of every query
+ * key. Staff and single-branch tenants see no row and the query carries no
+ * `branchId`, so the server keeps defaulting to the caller's active branch.
  */
 
 export type InsightsRange = "all" | "today" | "yesterday" | "7d" | "30d";
@@ -30,10 +32,25 @@ export type InsightsRange = "all" | "today" | "yesterday" | "7d" | "30d";
 interface TabProps {
   /** `insights?tab=deep&report=heatmap` opens straight on a report. */
   initialReport?: string;
+  /**
+   * `insights?tab=deep&branchId=all|<uuid>` opens on a scope. Only honoured
+   * when the chip row is shown (owner, >1 active branch); otherwise ignored, so a
+   * link cannot make a cashier's request 403.
+   */
+  initialBranchId?: string;
   range: InsightsRange;
   from?: string;
   to?: string;
 }
+
+/**
+ * `"all"` or a branch uuid — the value web's useDeepFetch puts in `branchId`.
+ * `undefined` = omit the param (server falls back to the active branch).
+ */
+type BranchScope = string | undefined;
+
+/** What DeepTab hands each report: the screen's props plus the resolved scope. */
+type ReportProps = TabProps & { branchId: BranchScope };
 
 type ReportKey = "compare" | "heatmap" | "payments" | "branches" | "product";
 const isReportKey = (v: unknown): v is ReportKey =>
@@ -56,21 +73,24 @@ function compact(n: number): string {
 
 function useDeep<T>(
   report: string,
-  { range, from, to }: TabProps,
+  { range, from, to, branchId }: ReportProps,
   extra?: Record<string, string | undefined>,
   enabled = true,
 ) {
   const hasWindow = Boolean(from && to);
   return useQuery({
-    // range is part of the KEY so a chip tap refetches instead of serving
-    // the previous window's figures from cache (same rule as the overview).
-    queryKey: ["insights-deep", report, range, from ?? null, to ?? null, extra ?? null],
+    // range AND branch scope are part of the KEY so a chip tap refetches
+    // instead of serving the previous window's / branch's figures from cache
+    // (same rule as the overview).
+    queryKey: ["insights-deep", report, range, from ?? null, to ?? null, branchId ?? null, extra ?? null],
     queryFn: () =>
       api.request<T>("/api/insights/deep", {
         query: {
           report,
           from: hasWindow ? from : undefined,
           to: hasWindow ? to : undefined,
+          // Same param web's useDeepFetch sets: "all" | <uuid>, or omitted.
+          branchId,
           ...(extra ?? {}),
         },
       }),
@@ -78,8 +98,25 @@ function useDeep<T>(
   });
 }
 
+/**
+ * Owner-only management list (GET /api/branches). Shares the cache entry
+ * settings/branches.tsx already keeps under ["branches"] — same endpoint,
+ * same `data` array — so a rename or a new branch made there shows up here
+ * without a second fetch. Suspended branches stay in: their history is
+ * still worth a report.
+ */
+function useBranchList(enabled: boolean) {
+  return useQuery({
+    queryKey: ["branches"],
+    queryFn: () => branchesApi.list(api).then((r) => r.data ?? []),
+    enabled,
+  });
+}
+
 export function DeepTab(props: TabProps) {
   const isOwner = useSession((s) => s.me?.isOwner ?? false);
+  const activeBranchId = useSession((s) => s.me?.branch.id ?? null);
+  const sessionBranches = useSession((s) => s.me?.branches);
   const [report, setReport] = useState<ReportKey>(
     isReportKey(props.initialReport) ? props.initialReport : "compare",
   );
@@ -88,8 +125,79 @@ export function DeepTab(props: TabProps) {
   }, [props.initialReport]);
   const active = REPORTS().find((r) => r.key === report);
 
+  // ---- branch scope -------------------------------------------------------
+  // `picked` is only what the user (or a deep link) chose; until then the
+  // scope follows the active branch, so a switch elsewhere is reflected here.
+  const branchList = useBranchList(isOwner);
+  // /me already carries the switchable branches, so the row does not wait on
+  // (or vanish with) the extra GET — same fallback settings/branches.tsx uses.
+  // /me lists ACTIVE branches only; the GET adds suspended ones, sorted to the
+  // tail so the active chips keep their slot when it lands.
+  const branchRows = useMemo(() => {
+    const rows = branchList.data
+      ? branchList.data.map((b) => ({ id: b.id, name: b.name, isActive: b.isActive }))
+      : (sessionBranches ?? []).map((b) => ({ id: b.id, name: b.name, isActive: true }));
+    return [...rows.filter((b) => b.isActive), ...rows.filter((b) => !b.isActive)];
+  }, [branchList.data, sessionBranches]);
+  // Gate on the ACTIVE count, which both sources agree on. Counting suspended
+  // rows too would let the row pop in (and re-key every deep query, refetching
+  // identical data) the moment the GET returns for an owner with one live
+  // branch plus suspended ones.
+  const activeBranchCount = branchRows.filter((b) => b.isActive).length;
+  const showScope = isOwner && activeBranchCount > 1;
+  const [picked, setPicked] = useState<string | null>(props.initialBranchId ?? null);
+  useEffect(() => {
+    if (props.initialBranchId) setPicked(props.initialBranchId);
+  }, [props.initialBranchId]);
+  const pickedIsValid =
+    picked === "all" || (picked != null && branchRows.some((b) => b.id === picked));
+  const scope: BranchScope = !showScope
+    ? undefined
+    : pickedIsValid
+      ? (picked as string)
+      : (activeBranchId ?? "all");
+  // Branch comparison is the one report that only makes sense across every
+  // branch — the server ignores `branchId` for it and web forces "all". The
+  // row stays put (no layout jump) but is dimmed with "All branches" lit so
+  // the chips never claim a scope the report is not showing.
+  const scopeLocked = report === "branches";
+  const branchId: BranchScope = scopeLocked && showScope ? "all" : scope;
+  const reportProps: ReportProps = { ...props, branchId };
+
   return (
     <>
+      {showScope ? (
+        <View
+          pointerEvents={scopeLocked ? "none" : "auto"}
+          accessibilityState={scopeLocked ? { disabled: true } : undefined}
+          style={[styles.scope, scopeLocked && styles.chipLocked]}
+        >
+          <Text style={styles.scopeLabel}>{t("app.insights.scope.label")}</Text>
+          <View style={styles.chipRow}>
+            <Chip
+              label={t("app.insights.scope.all")}
+              active={branchId === "all"}
+              onPress={() => setPicked("all")}
+            />
+            {branchRows.map((b) => (
+              <Chip
+                key={b.id}
+                // A suspended branch is still worth a report (its history is
+                // real), but the chip must say so — settings/branches.tsx badges
+                // these rows and a plain name here would read as live.
+                label={
+                  b.isActive
+                    ? b.name
+                    : `${b.name} · ${t("app.branchesPage.labels.suspended")}`
+                }
+                active={branchId === b.id}
+                onPress={() => setPicked(b.id)}
+              />
+            ))}
+          </View>
+        </View>
+      ) : null}
+
       <View style={styles.chipRow}>
         {REPORTS().map((r) => {
           // Web greys out the "Branch comparison" card for non-owners instead
@@ -112,11 +220,11 @@ export function DeepTab(props: TabProps) {
       </View>
       {active ? <Text style={styles.hint}>{active.hint}</Text> : null}
 
-      {report === "compare" ? <CompareReport {...props} /> : null}
-      {report === "heatmap" ? <HeatmapReport {...props} /> : null}
-      {report === "payments" ? <PaymentsReport {...props} /> : null}
-      {report === "branches" ? <BranchesReport {...props} isOwner={isOwner} /> : null}
-      {report === "product" ? <ProductReport {...props} /> : null}
+      {report === "compare" ? <CompareReport {...reportProps} /> : null}
+      {report === "heatmap" ? <HeatmapReport {...reportProps} /> : null}
+      {report === "payments" ? <PaymentsReport {...reportProps} /> : null}
+      {report === "branches" ? <BranchesReport {...reportProps} isOwner={isOwner} /> : null}
+      {report === "product" ? <ProductReport {...reportProps} /> : null}
     </>
   );
 }
@@ -181,7 +289,7 @@ interface CompareData {
   totals: { current: number; previous: number; growth: number };
 }
 
-function CompareReport(props: TabProps) {
+function CompareReport(props: ReportProps) {
   const hasWindow = Boolean(props.from && props.to);
   const q = useDeep<CompareData>("compare", props, undefined, hasWindow);
 
@@ -244,7 +352,7 @@ interface HeatmapData {
 
 const DOW_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
 
-function HeatmapReport(props: TabProps) {
+function HeatmapReport(props: ReportProps) {
   const q = useDeep<HeatmapData>("heatmap", props);
 
   const model = useMemo(() => {
@@ -287,6 +395,18 @@ function HeatmapReport(props: TabProps) {
             </Text>
           ) : null}
           <View style={styles.heat}>
+            {/* Hour axis sits ABOVE the grid: the report opens mid-screen and
+                the footer + legend push anything below the rows under the
+                tab bar, so a trailing axis was never visible on first paint. */}
+            <View style={[styles.heatRow, styles.heatHeader]}>
+              <View style={styles.heatDaySpacer} />
+              <View style={styles.heatHours}>
+                {["00", "06", "12", "18", "23"].map((h) => (
+                  <Text key={h} style={styles.axisText}>{h}</Text>
+                ))}
+              </View>
+              <View style={styles.heatTotalSpacer} />
+            </View>
             {model.grid.map((row, dow) => (
               <View key={dow} style={styles.heatRow}>
                 <Text numberOfLines={1} style={styles.heatDay}>
@@ -317,8 +437,8 @@ function HeatmapReport(props: TabProps) {
                 the grand total in the trailing slot — "which hour is busiest
                 overall" survives, the exact figures do not. */}
             <View style={[styles.heatRow, styles.heatFooter]}>
-              <Text numberOfLines={2} style={styles.heatFooterLabel}>
-                {t("app.insights.deep.heatmap.hourTotal")}
+              <Text numberOfLines={1} style={styles.heatDay}>
+                {t("mobile.insights.heatmap.footerLabel")}
               </Text>
               <View style={styles.heatCells}>
                 {model.hourTotals.map((total, hour) => (
@@ -338,15 +458,6 @@ function HeatmapReport(props: TabProps) {
                   {model.grand ? compact(model.grand) : ""}
                 </Text>
               </View>
-            </View>
-            <View style={styles.heatRow}>
-              <View style={styles.heatDaySpacer} />
-              <View style={styles.heatHours}>
-                {["00", "06", "12", "18", "23"].map((h) => (
-                  <Text key={h} style={styles.axisText}>{h}</Text>
-                ))}
-              </View>
-              <View style={styles.heatTotalSpacer} />
             </View>
           </View>
           <View style={styles.legend}>
@@ -386,7 +497,7 @@ function methodLabel(m: string): string {
   return t(`app.insights.deep.payments.methods.${m in METHOD_COLOR ? m : "unknown"}`);
 }
 
-function PaymentsReport(props: TabProps) {
+function PaymentsReport(props: ReportProps) {
   const q = useDeep<PaymentsData>("payments", props);
 
   const model = useMemo(() => {
@@ -464,7 +575,7 @@ interface BranchesData {
   }[];
 }
 
-function BranchesReport(props: TabProps & { isOwner: boolean }) {
+function BranchesReport(props: ReportProps & { isOwner: boolean }) {
   const q = useDeep<BranchesData>("branches", props, undefined, props.isOwner);
 
   if (!props.isOwner) {
@@ -532,7 +643,7 @@ interface ProductData {
   daily: { date: string; revenue: number; units: number }[];
 }
 
-function ProductReport(props: TabProps) {
+function ProductReport(props: ReportProps) {
   const [q, setQ] = useState("");
   const [debounced, setDebounced] = useState("");
   const [picked, setPicked] = useState<ProductHit | null>(null);
@@ -659,6 +770,8 @@ function ProductDetail({ data }: { data: ProductData }) {
 const styles = StyleSheet.create({
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   chipLocked: { opacity: 0.45 },
+  scope: { gap: spacing.xs },
+  scopeLabel: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
   hint: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, marginTop: -spacing.sm, ...RTL_TEXT },
   muted: { fontFamily: fonts.medium, fontSize: 15, color: colors.textSecondary, ...RTL_TEXT },
   subtitle: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, marginBottom: spacing.lg, ...RTL_TEXT },
@@ -702,8 +815,8 @@ const styles = StyleSheet.create({
   heatTotal: { width: 44, alignItems: "flex-end" },
   heatTotalText: { fontFamily: fonts.regular, fontSize: 10, color: colors.textSecondary, fontVariant: ["tabular-nums"] },
   heatTotalSpacer: { width: 44 },
+  heatHeader: { marginBottom: spacing.xs },
   heatFooter: { marginTop: spacing.xs },
-  heatFooterLabel: { width: 44, fontFamily: fonts.regular, fontSize: 9, lineHeight: 11, color: colors.textSecondary },
 
   list: { gap: spacing.sm },
   methodRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, minHeight: 28 },

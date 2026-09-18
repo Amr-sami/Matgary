@@ -1,102 +1,80 @@
-import { useMemo } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CalendarBlank,
   CheckCircle,
+  Coins,
   Phone,
   Receipt,
   ShoppingCart,
+  Star,
   Wallet,
 } from "phosphor-react-native";
-import { ApiError } from "@matgary/api-client";
+import { ApiError, catalog } from "@matgary/api-client";
 
 import { api } from "@/api/client";
 import { Screen } from "@/components/layout/Screen";
 import { ChevronBack } from "@/components/ui/Chevron";
 import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Field } from "@/components/ui/Field";
+import { Segmented } from "@/components/ui/Segmented";
 import { money, shortDate } from "@/lib/format";
-import { RTL_TEXT } from "@/theme/rtl";
+import { useSession } from "@/stores/session";
+import { RTL_TEXT, directionStyle } from "@/theme/rtl";
 import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
-import { t } from "@/i18n";
+import { getLocale, t } from "@/i18n";
 
 /**
- * Port of app__customer-detail.png (/customers/<urlencoded-phone>).
+ * Doc 02 §1.1 row 6 — RECOMPOSE: ledger + wallet + tap-to-settle per invoice
+ * + mark-all-paid. The three parallel fetches (ledger, wallet, payments) stay
+ * as-is, each its own query so a wallet hiccup never blanks the ledger.
  *
- * The capture only froze the 404 state — "لا توجد فواتير لهذا العميل في الفرع
- * الحالي." under a cart glyph, with the breadcrumb above it and nothing else.
- * That state is matched exactly. Everything below it is ported from the web
- * page the capture came from (apps/web/app/customers/[phone]/page.tsx), in its
- * order: header card → four stats → invoice ledger with a per-invoice payment
- * timeline.
- *
- * Read-only. The web's write actions (تأكيد دفع الكل, the per-invoice settle
- * modal, the WhatsApp reminders) and the loyalty wallet card are NOT here —
- * see the report. Nothing on this screen mutates.
+ * Writes go through the web's own handlers — `POST /api/sales/settle` with
+ * one `invoiceIds` entry (the InvoiceSettleModal contract) and
+ * `POST …/mark-all-paid` (modify_sales). Both invalidate the ledger, the
+ * payment log, the wallet and the customers list, so the receivables ranking
+ * on the previous screen is right the moment the user goes back.
  */
 
-/** apps/web/lib/repo/customers.ts — LedgerInvoice, serialised. */
-interface LedgerLine {
-  saleId: string;
-  productName: string;
-  quantity: number;
-  pricePerUnit: number;
-  lineTotal: number;
-}
-
-interface LedgerInvoice {
-  invoiceId: string;
-  saleIds: string[];
-  date: string;
-  total: number;
-  /** Migration 0037: cash collected against this invoice, 0 ≤ x ≤ total. */
-  amountPaid: number;
-  /** total − amountPaid, pre-computed server-side. */
-  balance: number;
-  isPaid: boolean;
-  paidAt: string | null;
-  paymentMethod: string | null;
-  lines: LedgerLine[];
-}
-
-interface LedgerData {
-  customerName: string | null;
-  customerPhone: string;
-  invoiceCount: number;
-  lifetimeValue: number;
-  outstandingBalance: number;
-  paidBalance: number;
-  firstVisit: string | null;
-  lastVisit: string | null;
-  invoices: LedgerInvoice[];
-}
-
-interface LedgerResponse {
-  data: LedgerData;
-  branchId: string;
-  branchName: string;
-}
-
-/** Migration 0038 — one row per settle action. */
-interface PaymentEvent {
-  id: string;
-  saleId: string;
-  invoiceId: string | null;
-  amount: number;
-  method: string;
-  recordedAt: string;
-  note: string | null;
-  recordedByName: string | null;
-}
+type LedgerInvoice = catalog.CustomerLedgerInvoice;
+type PaymentEvent = catalog.CustomerPaymentEvent;
+type Method = catalog.SettlementMethod;
 
 const METHOD_LABELS = (): Record<string, string> => ({
   cash: t("app.catalog.payment.cash"),
   instapay: t("app.customers.settle.methods.instapay"),
   card: t("app.customers.settle.methods.card"),
 });
+
+const METHODS = (): { key: Method; label: string }[] => [
+  { key: "cash", label: t("app.catalog.payment.cash") },
+  { key: "instapay", label: t("app.customers.settle.methods.instapay") },
+  { key: "card", label: t("app.customers.settle.methods.card") },
+];
+
+/** app.customers.settle.errors.* — the server's error codes, or GENERIC. */
+function settleErrorMessage(error: unknown): string {
+  // http.ts lifts the server's `{ error }` string into ApiError.code.
+  const code = error instanceof ApiError ? (error.code ?? "") : "";
+  const known = ["INVALID_PHONE", "INVALID_AMOUNT", "INVALID_METHOD", "NOTHING_TO_SETTLE"];
+  return t(`app.customers.settle.errors.${known.includes(code) ? code : "GENERIC"}`);
+}
 
 /**
  * expo-router hands params already decoded, but a phone arrives as
@@ -112,21 +90,30 @@ function decodeParam(raw: string): string {
   }
 }
 
+function daysSince(iso: string | null | undefined): number | null {
+  if (!iso) return null;
+  const ms = new Date(iso).getTime();
+  if (Number.isNaN(ms)) return null;
+  return Math.max(0, Math.floor((Date.now() - ms) / 86_400_000));
+}
+
 export default function CustomerDetailScreen() {
   const router = useRouter();
+  const qc = useQueryClient();
   const params = useLocalSearchParams<{ phone: string | string[] }>();
   const raw = Array.isArray(params.phone) ? params.phone[0] : params.phone;
   const phone = decodeParam(raw ?? "");
-  const encoded = encodeURIComponent(phone);
+
+  const isOwner = useSession((s) => s.me?.isOwner ?? false);
+  const permissions = useSession((s) => s.me?.permissions);
+  const canModifySales = isOwner || Boolean(permissions?.includes("modify_sales"));
 
   const ledgerQ = useQuery({
     queryKey: ["customer-ledger", phone],
     enabled: phone.length > 0,
     queryFn: async () => {
       try {
-        return await api.request<LedgerResponse>(
-          `/api/customers/by-phone/${encoded}`,
-        );
+        return await catalog.getCustomerLedger(api, phone);
       } catch (error) {
         // 404 is not a failure here: it is "this customer has no invoices in
         // the active branch", which is its own designed state.
@@ -136,13 +123,16 @@ export default function CustomerDetailScreen() {
     },
   });
 
+  const walletQ = useQuery({
+    queryKey: ["customer-wallet", phone],
+    enabled: phone.length > 0 && Boolean(ledgerQ.data),
+    queryFn: () => catalog.getCustomerWallet(api, phone),
+  });
+
   const paymentsQ = useQuery({
     queryKey: ["customer-payments", phone],
     enabled: phone.length > 0 && Boolean(ledgerQ.data),
-    queryFn: () =>
-      api.request<{ data: PaymentEvent[] }>(
-        `/api/customers/by-phone/${encoded}/payments`,
-      ),
+    queryFn: () => catalog.listCustomerPayments(api, phone),
   });
 
   /**
@@ -151,7 +141,7 @@ export default function CustomerDetailScreen() {
    */
   const paymentsByInvoice = useMemo(() => {
     const map = new Map<string, PaymentEvent[]>();
-    for (const p of paymentsQ.data?.data ?? []) {
+    for (const p of paymentsQ.data ?? []) {
       const key = p.invoiceId ?? p.saleId;
       const bucket = map.get(key);
       if (bucket) bucket.push(p);
@@ -160,14 +150,81 @@ export default function CustomerDetailScreen() {
     return map;
   }, [paymentsQ.data]);
 
+  /** Everything a settlement changes — including the list's ranking. */
+  const invalidateAll = () =>
+    Promise.all([
+      qc.invalidateQueries({ queryKey: ["customer-ledger", phone] }),
+      qc.invalidateQueries({ queryKey: ["customer-payments", phone] }),
+      qc.invalidateQueries({ queryKey: ["customer-wallet", phone] }),
+      qc.invalidateQueries({ queryKey: ["customers"] }),
+    ]);
+
+  const [notice, setNotice] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+  useEffect(() => {
+    if (!notice) return;
+    const id = setTimeout(() => setNotice(null), 4000);
+    return () => clearTimeout(id);
+  }, [notice]);
+
+  const [settleTarget, setSettleTarget] = useState<LedgerInvoice | null>(null);
+
+  const settle = useMutation({
+    mutationFn: (input: { invoice: LedgerInvoice; amount: number; method: Method }) =>
+      catalog.settleCustomer(api, {
+        customerPhone: phone,
+        amount: input.amount,
+        method: input.method,
+        invoiceIds: [input.invoice.invoiceId],
+      }),
+    onSuccess: async (result) => {
+      setSettleTarget(null);
+      setNotice({ kind: "success", text: t("mobile.customers.settleDone", { amount: money(result.appliedAmount) }) });
+      await invalidateAll();
+    },
+  });
+
+  const markAll = useMutation({
+    mutationFn: () => catalog.markCustomerAllPaid(api, phone),
+    onSuccess: async (result) => {
+      setNotice({
+        kind: "success",
+        text: t("mobile.customers.markAllDone", { n: result.markedCount, amount: money(result.markedTotal) }),
+      });
+      await invalidateAll();
+    },
+    onError: () => setNotice({ kind: "error", text: t("mobile.customers.updateFailed") }),
+  });
+
   const refresh = () => {
     void ledgerQ.refetch();
+    void walletQ.refetch();
     void paymentsQ.refetch();
   };
 
   const ledger = ledgerQ.data?.data ?? null;
   const branchName = ledgerQ.data?.branchName ?? "";
   const hasDebt = (ledger?.outstandingBalance ?? 0) > 0;
+  const unpaid = useMemo(() => ledger?.invoices.filter((i) => !i.isPaid) ?? [], [ledger]);
+  const oldestUnpaid = useMemo(() => {
+    let oldest: number | null = null;
+    for (const inv of unpaid) {
+      const d = daysSince(inv.date);
+      if (d !== null && (oldest === null || d > oldest)) oldest = d;
+    }
+    return oldest;
+  }, [unpaid]);
+
+  const confirmMarkAll = () => {
+    if (!ledger || !hasDebt || markAll.isPending) return;
+    Alert.alert(
+      t("mobile.customers.markAllPaid"),
+      t("mobile.customers.markAllConfirm", { amount: money(ledger.outstandingBalance) }),
+      [
+        { text: t("app.common.cancel"), style: "cancel" },
+        { text: t("app.common.confirm"), style: "destructive", onPress: () => markAll.mutate() },
+      ],
+    );
+  };
 
   return (
     <Screen onRefresh={refresh} refreshing={ledgerQ.isRefetching}>
@@ -184,6 +241,14 @@ export default function CustomerDetailScreen() {
         <Text style={styles.crumbText}>{t("app.customers.title")}</Text>
       </Pressable>
 
+      {notice ? (
+        <View style={[styles.notice, notice.kind === "error" ? styles.noticeError : styles.noticeSuccess]}>
+          <Text style={[styles.noticeText, notice.kind === "error" ? styles.noticeTextError : styles.noticeTextSuccess]}>
+            {notice.text}
+          </Text>
+        </View>
+      ) : null}
+
       {ledgerQ.isLoading ? (
         <ActivityIndicator color={colors.accent} />
       ) : !ledger ? (
@@ -196,6 +261,11 @@ export default function CustomerDetailScreen() {
                 : t("mobile.customers.noInvoicesBranch")
             }
           />
+          {/* Pull-to-refresh is the only other way back from a failed load,
+              and nothing on a near-empty screen suggests it exists. */}
+          {ledgerQ.error ? (
+            <Button variant="outline" label={t("app.common.retry")} onPress={refresh} />
+          ) : null}
         </View>
       ) : (
         <>
@@ -208,7 +278,7 @@ export default function CustomerDetailScreen() {
                 {ledger.customerPhone ? (
                   <View style={styles.phoneRow}>
                     <Phone size={14} color={colors.textSecondary} />
-                    <Text numberOfLines={1} style={styles.meta}>
+                    <Text numberOfLines={1} style={[styles.meta, styles.ltr]}>
                       {ledger.customerPhone}
                     </Text>
                   </View>
@@ -232,6 +302,18 @@ export default function CustomerDetailScreen() {
               ) : null}
             </View>
 
+            {hasDebt ? (
+              <View style={styles.debtMeta}>
+                <Badge label={t("mobile.customers.unpaidCount", { n: unpaid.length })} variant="outofstock" />
+                {oldestUnpaid !== null ? (
+                  <Badge
+                    label={t("mobile.customers.oldestUnpaidDays", { n: oldestUnpaid })}
+                    variant={oldestUnpaid >= 30 ? "outofstock" : "lowstock"}
+                  />
+                ) : null}
+              </View>
+            ) : null}
+
             <View style={styles.statGrid}>
               <Stat
                 icon={<Wallet size={14} color={colors.textSecondary} />}
@@ -254,6 +336,56 @@ export default function CustomerDetailScreen() {
                 value={ledger.lastVisit ? shortDate(ledger.lastVisit) : "—"}
               />
             </View>
+
+            {hasDebt && canModifySales ? (
+              <View style={styles.actions}>
+                <Button
+                  label={t("mobile.customers.markAllPaid")}
+                  onPress={confirmMarkAll}
+                  loading={markAll.isPending}
+                />
+              </View>
+            ) : null}
+          </Card>
+
+          {/* Loyalty wallet — points + store credit for this branch. Zero
+              balances are still shown: "0 points" tells the cashier the
+              programme is on but the customer has not earned yet. */}
+          <Card>
+            <View style={styles.sectionHead}>
+              <Coins size={18} color={colors.textSecondary} />
+              <Text style={styles.sectionTitle}>{t("mobile.customers.walletTitle")}</Text>
+            </View>
+            {walletQ.isLoading ? (
+              <ActivityIndicator color={colors.accent} />
+            ) : walletQ.isError ? (
+              <Text style={styles.meta}>{t("app.common.error")}</Text>
+            ) : (
+              <View style={styles.walletRow}>
+                <View style={styles.walletCell}>
+                  <View style={styles.statLabelRow}>
+                    <Star size={14} color={colors.accent} />
+                    <Text numberOfLines={1} style={styles.statLabel}>
+                      {t("mobile.customers.walletPoints")}
+                    </Text>
+                  </View>
+                  <Text numberOfLines={1} style={styles.walletValue}>
+                    {String(walletQ.data?.wallet.points ?? 0)}
+                  </Text>
+                </View>
+                <View style={styles.walletCell}>
+                  <View style={styles.statLabelRow}>
+                    <Wallet size={14} color={colors.successStrong} />
+                    <Text numberOfLines={1} style={styles.statLabel}>
+                      {t("mobile.customers.walletCredit")}
+                    </Text>
+                  </View>
+                  <Text numberOfLines={1} style={styles.walletValue}>
+                    {money(walletQ.data?.wallet.credit ?? 0)}
+                  </Text>
+                </View>
+              </View>
+            )}
           </Card>
 
           <View style={styles.section}>
@@ -266,13 +398,30 @@ export default function CustomerDetailScreen() {
               {ledger.invoices.map((inv, index) => {
                 const events = paymentsByInvoice.get(inv.invoiceId) ?? [];
                 const partial = !inv.isPaid && inv.amountPaid > 0;
+                // A sale recorded before invoices existed has no INV- id; the
+                // ledger falls back to the sale id (repo/customers.ts
+                // `r.invoiceId ?? r.id`), but /api/sales/settle filters on
+                // invoice_id only, so settling it one-by-one always answers
+                // NOTHING_TO_SETTLE. Say so instead of offering a dead tap.
+                const legacy = inv.saleIds.includes(inv.invoiceId);
+                // Gated like "Mark all paid" above: /settle is due to require
+                // modify_sales (doc 02), and a sheet that can only fail is
+                // worse than no sheet.
+                const settleable = canModifySales && !legacy && !inv.isPaid && inv.balance > 0;
                 return (
-                  <View
+                  <Pressable
                     key={inv.invoiceId}
-                    style={[
+                    disabled={!settleable}
+                    accessibilityRole={settleable ? "button" : undefined}
+                    accessibilityLabel={
+                      settleable ? t("mobile.customers.settleFor", { id: inv.invoiceId }) : undefined
+                    }
+                    onPress={() => setSettleTarget(inv)}
+                    style={({ pressed }) => [
                       styles.invoice,
                       index > 0 && styles.invoiceDivided,
                       !inv.isPaid && styles.invoiceUnpaid,
+                      pressed && settleable && styles.invoicePressed,
                     ]}
                   >
                     <View style={styles.invoiceHead}>
@@ -357,14 +506,125 @@ export default function CustomerDetailScreen() {
                         ))}
                       </View>
                     ) : null}
-                  </View>
+
+                    {settleable ? (
+                      <Text style={styles.tapHint}>{t("mobile.customers.tapToSettle")}</Text>
+                    ) : legacy && !inv.isPaid && inv.balance > 0 ? (
+                      <Text style={styles.legacyHint}>{t("mobile.customers.legacyNoSettle")}</Text>
+                    ) : null}
+                  </Pressable>
                 );
               })}
             </View>
           </View>
         </>
       )}
+
+      <SettleSheet
+        invoice={settleTarget}
+        busy={settle.isPending}
+        error={settle.isError ? settleErrorMessage(settle.error) : null}
+        onClose={() => {
+          if (settle.isPending) return;
+          settle.reset();
+          setSettleTarget(null);
+        }}
+        onSubmit={(amount, method) => {
+          if (!settleTarget) return;
+          settle.mutate({ invoice: settleTarget, amount, method });
+        }}
+      />
     </Screen>
+  );
+}
+
+/**
+ * Port of apps/web/components/customers/InvoiceSettleModal.tsx as a bottom
+ * sheet: amount defaults to the remaining balance and is capped at it, method
+ * is a 3-way segment. The invoice's own payment log is already on the card
+ * behind the sheet, so it is not repeated here.
+ */
+function SettleSheet({
+  invoice,
+  busy,
+  error,
+  onClose,
+  onSubmit,
+}: {
+  invoice: LedgerInvoice | null;
+  busy: boolean;
+  error: string | null;
+  onClose: () => void;
+  onSubmit: (amount: number, method: Method) => void;
+}) {
+  const [amountInput, setAmountInput] = useState("");
+  const [method, setMethod] = useState<Method>("cash");
+
+  // Reset per invoice, not per render: reopening for a different invoice must
+  // not carry the previous amount over.
+  useEffect(() => {
+    if (invoice) {
+      setAmountInput(String(invoice.balance));
+      setMethod("cash");
+    }
+  }, [invoice]);
+
+  const balance = invoice?.balance ?? 0;
+  const typed = Number(amountInput.replace(/[^\d.]/g, "")) || 0;
+  const amount = Math.max(0, Math.min(typed, balance));
+  const wouldOverpay = typed > balance;
+
+  return (
+    <Modal visible={Boolean(invoice)} transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={[styles.overlay, directionStyle(getLocale() === "ar")]}
+      >
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel={t("app.common.close")} />
+        <View style={styles.sheet}>
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetBody}>
+            <Text style={styles.sheetTitle}>{t("app.customers.settle.title")}</Text>
+            {invoice ? (
+              <Text style={styles.sheetSub}>
+                {invoice.invoiceId} · {t("mobile.customers.remaining", { amount: money(invoice.balance) })}
+              </Text>
+            ) : null}
+            {invoice && invoice.amountPaid > 0 ? (
+              <Text style={styles.sheetSub}>
+                {t("mobile.customers.paid", { amount: money(invoice.amountPaid) })}
+              </Text>
+            ) : null}
+
+            <Field
+              label={t("app.customers.settle.amountLabel")}
+              value={amountInput}
+              onChangeText={setAmountInput}
+              keyboardType="decimal-pad"
+              ltr
+              editable={!busy}
+            />
+            {wouldOverpay ? (
+              <Text style={styles.hint}>{t("app.customers.settle.overpayHint")}</Text>
+            ) : null}
+
+            <Text style={styles.fieldLabel}>{t("app.customers.settle.methodLabel")}</Text>
+            <Segmented items={METHODS()} value={method} onChange={setMethod} />
+
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+            <View style={styles.sheetActions}>
+              <Button
+                label={`${t("app.customers.settle.submit")} · ${money(amount)}`}
+                onPress={() => onSubmit(amount, method)}
+                loading={busy}
+                disabled={amount <= 0}
+              />
+              <Button variant="ghost" label={t("app.common.cancel")} onPress={onClose} disabled={busy} />
+            </View>
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 }
 
@@ -397,6 +657,13 @@ const styles = StyleSheet.create({
   crumb: { flexDirection: "row", alignItems: "center", gap: spacing.xs, minHeight: 44 },
   crumbText: { fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary, ...RTL_TEXT },
 
+  notice: { borderRadius: radius.lg, borderWidth: 1, padding: spacing.md },
+  noticeSuccess: { backgroundColor: colors.successLight, borderColor: colors.successStrong },
+  noticeError: { backgroundColor: colors.dangerLight, borderColor: colors.danger },
+  noticeText: { fontFamily: fonts.medium, fontSize: 13, ...RTL_TEXT },
+  noticeTextSuccess: { color: colors.successStrong },
+  noticeTextError: { color: colors.danger },
+
   emptyWrap: { alignItems: "center", paddingTop: spacing.xxl * 2, gap: spacing.md },
 
   headRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md },
@@ -404,6 +671,9 @@ const styles = StyleSheet.create({
   name: { fontFamily: fonts.bold, fontSize: 20, color: colors.text, ...RTL_TEXT },
   phoneRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   meta: { flexShrink: 1, fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary },
+  // A phone starts with "+", which an RTL paragraph pushes to the end
+  // ("201…+"). Pin the paragraph direction; the row still flows RTL.
+  ltr: { writingDirection: "ltr" },
   branch: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
 
   debtBlock: { alignItems: "flex-start", flexShrink: 0, gap: 2 },
@@ -414,6 +684,7 @@ const styles = StyleSheet.create({
     color: colors.warningStrong,
     fontVariant: ["tabular-nums"],
   },
+  debtMeta: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.md },
 
   statGrid: {
     flexDirection: "row",
@@ -426,12 +697,25 @@ const styles = StyleSheet.create({
   },
   // 50% columns with an end-side gutter so the left column's value never
   // butts up against the right column's label. Web uses `gap-3`.
-  stat: { width: "50%", paddingEnd: spacing.md, gap: 2 },
+  // flex-start so label row and value both hug the start edge — a stretched
+  // value Text falls back to its own first-strong character and drifts left.
+  stat: { width: "50%", paddingEnd: spacing.md, gap: 2, alignItems: "flex-start" },
   statLabelRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   statLabel: { flexShrink: 1, fontFamily: fonts.regular, fontSize: 11, color: colors.textSecondary, ...RTL_TEXT },
   statValue: {
     fontFamily: fonts.bold,
     fontSize: 14,
+    color: colors.text,
+    fontVariant: ["tabular-nums"],
+    ...RTL_TEXT,
+  },
+  actions: { marginTop: spacing.lg },
+
+  walletRow: { flexDirection: "row", gap: spacing.md, marginTop: spacing.md },
+  walletCell: { flex: 1, minWidth: 0, gap: 2, alignItems: "flex-start" },
+  walletValue: {
+    fontFamily: fonts.bold,
+    fontSize: 18,
     color: colors.text,
     fontVariant: ["tabular-nums"],
     ...RTL_TEXT,
@@ -452,6 +736,7 @@ const styles = StyleSheet.create({
   invoice: { padding: spacing.lg, gap: spacing.sm },
   invoiceDivided: { borderTopWidth: 1, borderTopColor: colors.border },
   invoiceUnpaid: { backgroundColor: colors.warningLight },
+  invoicePressed: { backgroundColor: colors.warningTint },
   invoiceHead: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md },
   invoiceMain: { flex: 1, minWidth: 0, gap: 4 },
   invoiceIdRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" },
@@ -476,6 +761,9 @@ const styles = StyleSheet.create({
     color: colors.warningStrong,
     fontVariant: ["tabular-nums"],
   },
+  tapHint: { fontFamily: fonts.medium, fontSize: 12, color: colors.accent, ...RTL_TEXT },
+  // Muted on purpose: it explains why there is nothing to tap.
+  legacyHint: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
 
   lines: { gap: 2 },
   lineRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
@@ -507,4 +795,24 @@ const styles = StyleSheet.create({
     color: colors.successStrong,
     fontVariant: ["tabular-nums"],
   },
+
+  // Settle sheet
+  overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: colors.scrim },
+  sheet: {
+    backgroundColor: colors.card,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    maxHeight: "85%",
+    paddingBottom: spacing.xxl,
+    ...elevation.modal,
+  },
+  sheetBody: { paddingHorizontal: spacing.xl, paddingTop: spacing.xl, gap: spacing.md },
+  sheetTitle: { fontFamily: fonts.bold, fontSize: 16, color: colors.text, ...RTL_TEXT },
+  sheetSub: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },
+  fieldLabel: { fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },
+  hint: { fontFamily: fonts.regular, fontSize: 12, color: colors.warningStrong, ...RTL_TEXT },
+  errorText: { fontFamily: fonts.medium, fontSize: 13, color: colors.danger, ...RTL_TEXT },
+  sheetActions: { gap: spacing.sm, marginTop: spacing.sm },
 });

@@ -85,6 +85,7 @@ export default function InventoryScreen() {
 
   return (
     <Screen
+      title={t("app.inventory.title")}
       onRefresh={() => void products.refetch()}
       refreshing={products.isRefetching}
     >
@@ -122,11 +123,14 @@ export default function InventoryScreen() {
       {/* Single-shot: one scan fills the search box, the list filters on
           barcode/sku, and the sheet closes itself. No server lookup here —
           the catalogue is already in memory and the filter matches on both
-          fields, which is the lookup a stock check needs. */}
+          fields, which is the lookup a stock check needs.
+          The placeholder is mobile's own, not the web's: the web string names
+          tag and supplier, which this filter does not match, and at 48 chars
+          it overflowed the phone field. */}
       <SearchField
         value={query}
         onChangeText={setQuery}
-        placeholder={t("app.inventory.search.placeholder")}
+        placeholder={t("mobile.inventory.searchPlaceholder")}
         onPressScan={() => setScannerOpen(true)}
       />
       <ScannerSheet

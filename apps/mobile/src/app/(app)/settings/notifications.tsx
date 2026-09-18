@@ -9,7 +9,7 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { notifications } from "@matgary/api-client";
 
@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/Button";
 import { ChevronBack } from "@/components/ui/Chevron";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Segmented } from "@/components/ui/Segmented";
 import { usePush, type PushStatus } from "@/stores/push";
 import { RTL_TEXT } from "@/theme/rtl";
@@ -33,27 +34,30 @@ import { t } from "@/i18n";
  * four-column grid (الحدث · داخل التطبيق · البريد · التسليم). At 360dp that
  * grid gives the event title ~90px, which breaks "تنبيه مخزون منخفض" one word
  * per line — the exact defect the polish pass exists to kill. The same four
- * fields become four labelled rows inside one card per event; every string,
- * every default and every PATCH body is unchanged.
+ * fields become labelled rows inside one card per event; every string,
+ * every default and every PUT body is unchanged.
+ *
+ * ADDITION over the web (doc 06 §8.3): a "Push" switch per event — the phone
+ * column the web page has no use for. The server only pushes when in-app is
+ * on AND delivery is instant (dispatch.ts skips digest-mode events), so the
+ * switch shows the EFFECTIVE state: it dims with in-app off, the way delivery
+ * dims with email off, and dims again — with a hint saying why — while the
+ * event is on the daily digest.
  */
-type EventType =
-  | "sale.created"
-  | "purchase.received"
-  | "inventory.low_stock"
-  | "payment.deferred_settled"
-  | "leave.requested";
+type EventType = notifications.NotificationEventType;
+type Pref = notifications.EventPreference;
+type Prefs = notifications.NotificationPreferences;
 
-interface Pref {
-  eventType: EventType;
-  inApp: boolean;
-  email: boolean;
-  digestMode: "instant" | "digest";
-  isDefault: boolean;
-}
+const PREFS_KEY = ["notification-preferences"] as const;
 
-interface Payload {
-  role: "owner" | "staff";
-  preferences: Pref[];
+/** The GET payload with one event's row replaced by `patch`. */
+function withPatch(cur: Prefs, patch: Pref): Prefs {
+  return {
+    ...cur,
+    preferences: cur.preferences.map((p) =>
+      p.eventType === patch.eventType ? { ...p, ...patch } : p,
+    ),
+  };
 }
 
 /** apps/web/dictionaries/ar.json → app.notificationSettings.events */
@@ -91,31 +95,43 @@ export default function NotificationSettingsScreen() {
     null,
   );
 
+  const qc = useQueryClient();
   const q = useQuery({
-    queryKey: ["notification-preferences"],
-    queryFn: () => api.request<Payload>("/api/notifications/preferences"),
+    queryKey: PREFS_KEY,
+    queryFn: () => notifications.getPreferences(api),
   });
 
   const save = useMutation({
     mutationFn: (patch: Pref) =>
-      api.request("/api/notifications/preferences", {
-        method: "PATCH",
-        body: {
-          eventType: patch.eventType,
-          inApp: patch.inApp,
-          email: patch.email,
-          digestMode: patch.digestMode,
-        },
+      notifications.setPreference(api, {
+        eventType: patch.eventType,
+        inApp: patch.inApp,
+        push: patch.push,
+        email: patch.email,
+        digestMode: patch.digestMode,
       }),
-    onSuccess: () => {
+    // Optimistic: the switch the user just flipped shows its new value during
+    // the PUT instead of snapping back to the stale row until the GET lands.
+    onMutate: (patch) => {
+      qc.setQueryData<Prefs>(PREFS_KEY, (cur) => (cur ? withPatch(cur, patch) : cur));
+    },
+    onSuccess: (res, patch) => {
       setNotice({ tone: "ok", text: t("app.notificationSettings.savedToast") });
-      // Re-read so `isDefault` flips accurately — the server DELETES the row
-      // when a patch happens to match the code default for this role.
-      void q.refetch();
+      // `isDefault` comes from the server — it DELETES the row when a patch
+      // happens to match the code default for this role.
+      qc.setQueryData<Prefs>(PREFS_KEY, (cur) =>
+        cur ? withPatch(cur, { ...patch, isDefault: res.isDefault }) : cur,
+      );
+      // RETURNED, not `void`ed: `isPending` stays true until the re-read
+      // lands, so the card stays locked and a second toggle cannot spread a
+      // stale row into its PUT body and revert this one on the server.
+      return q.refetch();
     },
     onError: () => {
       setNotice({ tone: "err", text: t("app.notificationSettings.errorToast") });
-      void q.refetch();
+      // Drops the optimistic row; the server is the truth. Awaited for the
+      // same lock-until-fresh reason as onSuccess.
+      return q.refetch();
     },
   });
 
@@ -159,10 +175,35 @@ export default function NotificationSettingsScreen() {
 
       {q.isLoading ? (
         <ActivityIndicator color={colors.accent} />
+      ) : q.isError && !q.data ? (
+        // A failed FIRST load used to render nothing at all between the header
+        // and the This-device card — no message, no retry. A refetch that fails
+        // after one good load keeps the rows (`q.data` is still there).
+        <View style={styles.errorBox}>
+          <Text style={styles.err}>{t("mobile.push.prefsLoadFailed")}</Text>
+          <Button
+            label={t("app.common.retry")}
+            variant="ghost"
+            loading={q.isRefetching}
+            onPress={() => void q.refetch()}
+          />
+        </View>
+      ) : rows.length === 0 ? (
+        <EmptyState title={t("mobile.push.prefsEmpty")} />
       ) : (
         rows.map((p) => {
           const meta = EVENTS()[p.eventType];
           const saving = save.isPending && save.variables?.eventType === p.eventType;
+          // Mirror of dispatch.ts: a push goes out only when in-app is on AND
+          // the event is not on the daily digest. The switch shows that
+          // effective state — a stored `push: true` the server will never
+          // act on must not render as ON.
+          const pushBlocked = !p.inApp || p.digestMode === "digest";
+          // In-app off wins the hint (it blocks first); otherwise say digest.
+          const pushHint =
+            p.inApp && pushBlocked
+              ? t("mobile.push.perEventDigestHint")
+              : t("mobile.push.perEventHint");
           return (
             <Card key={p.eventType}>
               <View style={styles.eventHead}>
@@ -183,6 +224,26 @@ export default function NotificationSettingsScreen() {
                   value={p.inApp}
                   disabled={saving}
                   onValueChange={(v) => save.mutate({ ...p, inApp: v })}
+                  trackColor={{ true: colors.accent, false: colors.border }}
+                />
+              </View>
+
+              <View
+                pointerEvents={!pushBlocked && !saving ? "auto" : "none"}
+                style={[styles.toggleRow, pushBlocked ? styles.disabled : undefined]}
+              >
+                <View style={styles.toggleText}>
+                  <Text numberOfLines={1} style={styles.toggleLabel}>
+                    {t("mobile.push.perEvent")}
+                  </Text>
+                  <Text numberOfLines={2} style={styles.toggleHint}>
+                    {pushHint}
+                  </Text>
+                </View>
+                <Switch
+                  value={!pushBlocked && p.push}
+                  disabled={saving || pushBlocked}
+                  onValueChange={(v) => save.mutate({ ...p, push: v })}
                   trackColor={{ true: colors.accent, false: colors.border }}
                 />
               </View>
@@ -428,6 +489,13 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     ...RTL_TEXT,
   },
+  toggleText: { flex: 1, flexShrink: 1, gap: 2 },
+  toggleHint: {
+    fontFamily: fonts.regular,
+    fontSize: 12,
+    color: colors.textSecondary,
+    ...RTL_TEXT,
+  },
   deliveryLabel: {
     fontFamily: fonts.medium,
     fontSize: 14,
@@ -437,6 +505,14 @@ const styles = StyleSheet.create({
     ...RTL_TEXT,
   },
   disabled: { opacity: 0.5 },
+
+  errorBox: { alignItems: "center", gap: spacing.sm, paddingVertical: spacing.lg },
+  err: {
+    fontFamily: fonts.medium,
+    fontSize: 14,
+    color: colors.danger,
+    textAlign: "center",
+  },
 
   deviceValue: {
     fontFamily: fonts.medium,

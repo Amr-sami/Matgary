@@ -138,6 +138,11 @@ export default function SignupScreen() {
   const [handleEdited, setHandleEdited] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const startDemo = useSession((s) => s.startDemo);
+  const signingIn = useSession((s) => s.signingIn);
+  const locale = useLocale((s) => s.locale);
+  const setLocale = useLocale((s) => s.setLocale);
+
   const emailStatus = useAvailability(
     "/api/account/email/check",
     "email",
@@ -177,6 +182,17 @@ export default function SignupScreen() {
   };
 
   const [submitting, setSubmitting] = useState(false);
+
+  // Demo pill — the same flow login.tsx runs. startDemo never throws: a
+  // failure lands in session.signInError, which login renders in its own box.
+  // This screen has no box under the pill, so read it back once and show it
+  // here; the value is fresh because startDemo clears it before it starts.
+  const [demoError, setDemoError] = useState<string | null>(null);
+  const onDemo = async () => {
+    setDemoError(null);
+    await startDemo();
+    setDemoError(useSession.getState().signInError);
+  };
 
   const submit = async () => {
     setError(null);
@@ -226,21 +242,36 @@ export default function SignupScreen() {
           ]}
           keyboardShouldPersistTaps="handled"
         >
-          {/* TODO(phase-4): same as login.tsx — the demo tenant flow and the
-              locale PATCH are real features on the web; neither target exists
-              natively yet, so these are composed but not wired. */}
           <View style={styles.topBar}>
-            <Pressable style={styles.demoPill} accessibilityRole="button">
-              <Lightning size={16} color="#FFFFFF" weight="fill" />
+            <Pressable
+              style={styles.demoPill}
+              accessibilityRole="button"
+              disabled={signingIn || submitting}
+              onPress={() => void onDemo()}
+            >
+              <Lightning size={16} color={colors.onAccent} weight="fill" />
               <Text numberOfLines={1} style={styles.demoPillText}>
-                {t("auth.demo.cta")}
+                {t(signingIn ? "auth.demo.busy" : "auth.demo.cta")}
               </Text>
             </Pressable>
-            <Pressable style={styles.langToggle} accessibilityRole="button" onPress={() => void useLocale.getState().setLocale(getLocale() === "ar" ? "en" : "ar")}>
+            <Pressable
+              style={styles.langToggle}
+              accessibilityRole="button"
+              accessibilityLabel={
+                locale === "ar" ? t("app.shell.language.english") : t("app.shell.language.arabic")
+              }
+              onPress={() => void setLocale(locale === "ar" ? "en" : "ar")}
+            >
               <Globe size={20} color={colors.textSecondary} />
-              <Text style={styles.langText}>{getLocale() === "ar" ? "ع" : "EN"}</Text>
+              <Text style={styles.langText}>{locale === "ar" ? "ع" : "EN"}</Text>
             </Pressable>
           </View>
+
+          {demoError ? (
+            <View style={[styles.errorBox, styles.demoError]} accessibilityLiveRegion="polite">
+              <Text style={styles.errorText}>{demoError}</Text>
+            </View>
+          ) : null}
 
           <View style={styles.brand}>
             <Logo size="md" />
@@ -318,6 +349,7 @@ export default function SignupScreen() {
                 label={T().next}
                 onPress={goToStep2}
                 disabled={
+                  signingIn ||
                   emailStatus === "checking" ||
                   emailStatus === "taken" ||
                   emailStatus === "invalid"
@@ -390,7 +422,7 @@ export default function SignupScreen() {
                   label={T().submit}
                   style={styles.stepButton}
                   onPress={() => void submit()}
-                  loading={submitting}
+                  loading={signingIn || submitting}
                   disabled={
                     handleStatus === "checking" ||
                     handleStatus === "taken" ||
@@ -516,7 +548,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     flexShrink: 1,
   },
-  demoPillText: { fontFamily: fonts.bold, fontSize: 14, color: "#FFFFFF" },
+  demoPillText: { fontFamily: fonts.bold, fontSize: 14, color: colors.onAccent },
+  demoError: { marginTop: spacing.md },
   langToggle: {
     flexDirection: "row",
     alignItems: "center",

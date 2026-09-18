@@ -1,7 +1,8 @@
 import { create } from "zustand";
-import * as Crypto from "expo-crypto";
 import { computeCartTotals, type DiscountType } from "@matgary/domain";
 import type { Product } from "@matgary/api-client";
+
+import { mintInvoiceId } from "@/offline/invoice-id";
 
 /**
  * The POS cart.
@@ -15,7 +16,13 @@ import type { Product } from "@matgary/api-client";
  * lets a receipt be shown (and, later, printed) before the server has
  * confirmed anything, and what makes a retry safe: the id is also the
  * Idempotency-Key, so a replay after a dropped connection returns the original
- * sale instead of booking it twice.
+ * sale instead of booking it twice. The id is device-scoped (doc 06 §6.5,
+ * offline/invoice-id.ts) so two tills of one shop cannot mint the same one.
+ *
+ * `available` is captured from the product list at add time; offline that
+ * list already carries localDelta (offline/local-delta-cache.ts) — the units
+ * rung by still-queued sales are subtracted — so a second offline sale is
+ * capped at what is really left on the shelf.
  */
 
 export interface CartLine {
@@ -48,13 +55,8 @@ interface CartState {
   reset: () => void;
 }
 
-function newInvoiceId(): string {
-  // Short, unique, and within the route's /^[A-Za-z0-9_\-:.]+$/ + 80 chars.
-  return `INV-${Crypto.randomUUID().replace(/-/g, "").slice(0, 16).toUpperCase()}`;
-}
-
 const empty = () => ({
-  invoiceId: newInvoiceId(),
+  invoiceId: mintInvoiceId(),
   lines: [] as CartLine[],
   orderDiscountType: "fixed" as DiscountType,
   orderDiscountValue: 0,

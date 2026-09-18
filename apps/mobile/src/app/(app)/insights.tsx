@@ -110,7 +110,7 @@ function rangeWindow(key: Range): { from: string; to: string } | null {
  */
 export default function InsightsScreen() {
   // `insights?tab=deep|staff` deep-links straight to a tab (notifications, dev probes).
-  const params = useLocalSearchParams<{ tab?: string; range?: string; report?: string }>();
+  const params = useLocalSearchParams<{ tab?: string; range?: string; report?: string; branchId?: string }>();
   const [tab, setTab] = useState<Tab>(isTab(params.tab) ? params.tab : "overview");
   const [range, setRange] = useState<Range>(isRange(params.range) ? params.range : "all");
   // Tab screens stay mounted, so a later deep link only changes the params.
@@ -186,7 +186,13 @@ export default function InsightsScreen() {
       </View>
 
       {tab === "deep" ? (
-        <DeepTab range={range} from={window?.from} to={window?.to} initialReport={params.report} />
+        <DeepTab
+          range={range}
+          from={window?.from}
+          to={window?.to}
+          initialReport={params.report}
+          initialBranchId={params.branchId}
+        />
       ) : tab === "staff" ? (
         <StaffTab range={range} from={window?.from} to={window?.to} />
       ) : overview.isLoading ? (
