@@ -69,7 +69,10 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "ios:sim": "xcodebuild -workspace ios/stwrw.xcworkspace -scheme stwrw -configuration Debug -sdk iphonesimulator -destination \"id=${SIM_UDID:-AB3575BB-3B9D-4D66-85AD-DA2FA5C2F34B}\" -derivedDataPath \"$HOME/Library/Developer/Xcode/DerivedData/stwrw-sim\" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build && xcrun simctl install \"${SIM_UDID:-AB3575BB-3B9D-4D66-85AD-DA2FA5C2F34B}\" \"$HOME/Library/Developer/Xcode/DerivedData/stwrw-sim/Build/Products/Debug-iphonesimulator/stwrw.app\"",
+    "ios:prebuild": "expo prebuild --platform ios --no-install && pod-install",
+    "e2e": "for f in e2e/*.yaml; do ~/.maestro/bin/maestro --device ${SIM_UDID:-AB3575BB-3B9D-4D66-85AD-DA2FA5C2F34B} test \"$f\" || exit 1; done"
   },
   "private": true
 }
