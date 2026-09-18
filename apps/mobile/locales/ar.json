@@ -1,0 +1,13 @@
+{
+  "ios": {
+    "CFBundleDisplayName": "ستورو",
+    "NSCameraUsageDescription": "نحتاج الكاميرا لمسح باركود المنتجات",
+    "NSLocationWhenInUseUsageDescription": "نحتاج موقعك لتسجيل الحضور داخل نطاق المتجر",
+    "NSBluetoothAlwaysUsageDescription": "نحتاج البلوتوث للاتصال بطابعة الفواتير",
+    "NSBluetoothPeripheralUsageDescription": "نحتاج البلوتوث للاتصال بطابعة الفواتير",
+    "NSFaceIDUsageDescription": "نستخدم بصمة الوجه لفتح التطبيق بسرعة وأمان"
+  },
+  "android": {
+    "app_name": "ستورو"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "ios": {
+    "CFBundleDisplayName": "TheStoro",
+    "NSCameraUsageDescription": "TheStoro uses the camera to scan product barcodes.",
+    "NSLocationWhenInUseUsageDescription": "TheStoro uses your location to check you in when you are inside the shop's radius.",
+    "NSBluetoothAlwaysUsageDescription": "TheStoro uses Bluetooth to connect to your receipt printer.",
+    "NSBluetoothPeripheralUsageDescription": "TheStoro uses Bluetooth to connect to your receipt printer.",
+    "NSFaceIDUsageDescription": "TheStoro uses Face ID to unlock the app quickly and securely."
+  },
+  "android": {
+    "app_name": "TheStoro"
+  }
+}

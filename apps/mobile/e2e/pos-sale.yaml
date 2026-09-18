@@ -1,0 +1,116 @@
+# POS — ring up one recent product for cash and get a receipt.
+#
+# Sales tab → tap a recent-product chip → cart totals appear → Cash → Record
+# sale → the receipt card. cart.add() ignores an out-of-stock product, so if
+# the first chip adds nothing the flow falls through to the next ones.
+# Signs in first when the app is on the login screen. Ends on the dashboard.
+appId: com.thestoro.app
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      text: "المزيد|More|تسجيل الدخول|Sign in"
+    timeout: 45000
+- runFlow:
+    when:
+      visible:
+        id: "login-identifier"
+    file: login.yaml
+
+- tapOn:
+    text: "المبيعات|Sales"
+- extendedWaitUntil:
+    visible:
+      id: "pos-recent-chip"
+    timeout: 30000
+- assertVisible:
+    text: "منتجات حديثة:|Recent products:"
+
+- tapOn:
+    id: "pos-recent-chip"
+    index: 0
+- runFlow:
+    when:
+      notVisible:
+        id: "pos-cart-totals"
+    commands:
+      - tapOn:
+          id: "pos-recent-chip"
+          index: 1
+- runFlow:
+    when:
+      notVisible:
+        id: "pos-cart-totals"
+    commands:
+      - tapOn:
+          id: "pos-recent-chip"
+          index: 2
+- runFlow:
+    when:
+      notVisible:
+        id: "pos-cart-totals"
+    commands:
+      - tapOn:
+          id: "pos-recent-chip"
+          index: 4
+
+- scrollUntilVisible:
+    element:
+      id: "pos-cart-totals"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    id: "pos-cart-totals"
+- assertVisible:
+    text: "الإجمالي|Total"
+- assertVisible:
+    text: "المجموع الفرعي|Subtotal"
+
+- scrollUntilVisible:
+    element:
+      text: "كاش|Cash"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    text: "كاش|Cash"
+
+- scrollUntilVisible:
+    element:
+      text: "تسجيل الفاتورة|Record sale"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    text: "تسجيل الفاتورة|Record sale"
+
+# The result card: title, then the receipt lines + total.
+- extendedWaitUntil:
+    visible:
+      id: "pos-sale-result"
+    timeout: 45000
+- scrollUntilVisible:
+    element:
+      id: "pos-sale-result"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    text: "تم تسجيل البيع بنجاح|Sale recorded"
+- assertVisible:
+    id: "pos-receipt"
+- assertVisible:
+    text: "INV-.*"
+
+# Back to a clean state: dismiss the card, return to the dashboard. The dev
+# client may have docked a LogBox toast over the tab bar (the receipt lines
+# render without a key: the server's line summary carries no productId) —
+# clear it first, otherwise the tab tap opens LogBox.
+- tapOn:
+    text: "بيع جديد|New sale"
+- runFlow: helpers/dismiss-logbox.yaml
+- tapOn:
+    text: "لوحة|Home"
+- assertVisible:
+    text: "أهلاً، .+|Welcome back, .+"

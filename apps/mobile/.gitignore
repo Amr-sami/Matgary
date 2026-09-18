@@ -42,3 +42,11 @@ example
 # generated native folders
 /ios
 /android
+
+# release credentials — never in the tree (mobile-dev-docs/12-release-runbook.md §4.2, §7.3)
+secrets/
+credentials.json
+credentials/
+google-services.json
+GoogleService-Info.plist
+*.json.bak

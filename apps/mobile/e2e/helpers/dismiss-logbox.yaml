@@ -1,0 +1,22 @@
+# Dev-client only: a React Native LogBox toast ("!, <warning>") docks over the
+# tab bar, so a tab tap opens the LogBox overlay instead. Open it and dismiss.
+# No-op in a release build (there is no LogBox) or when nothing is docked.
+# (?s) lets "." span the toast's embedded newlines — Maestro regexes must
+# match the whole string.
+appId: com.thestoro.app
+---
+- runFlow:
+    when:
+      visible:
+        text: "(?s)!, .*"
+    commands:
+      - tapOn:
+          text: "(?s)!, .*"
+      - extendedWaitUntil:
+          visible:
+            text: "Dismiss"
+          timeout: 10000
+      - tapOn:
+          text: "Dismiss"
+      - assertNotVisible:
+          text: "(?s)!, .*"
