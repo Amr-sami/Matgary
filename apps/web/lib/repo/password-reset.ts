@@ -22,7 +22,7 @@ import { logger } from "@/lib/logger";
 // via timing — the API layer also returns the same response for known and
 // unknown emails.
 
-const TOKEN_TTL_SEC = 30 * 60;
+const TOKEN_TTL_SEC = 60 * 60; // doc 02 §3.9: an e-mail opened on a phone can take a while; token is single-use
 const TOKEN_BYTES = 32;
 
 const tokenKey = (hash: string) => globalKey("pwreset", hash);

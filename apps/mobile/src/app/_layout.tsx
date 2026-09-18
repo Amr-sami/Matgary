@@ -103,6 +103,8 @@ function RootLayout() {
           {/* Reachable signed in or out: suspended-tenant landing, privacy/terms. */}
           <Stack.Screen name="service-paused" />
           <Stack.Screen name="legal/[doc]" />
+          {/* Outside the auth guard: a signed-in user's reset e-mail link must still land here. */}
+          <Stack.Screen name="reset-password" />
         </Stack>
         </AppLockGate>
       </SafeAreaProvider>
