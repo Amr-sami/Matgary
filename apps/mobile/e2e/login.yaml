@@ -21,13 +21,14 @@ appId: com.thestoro.app
 
 # Dev client only: a cold launch can land on the launcher instead of the last
 # bundle. Tap the Metro entry when it shows; a no-op otherwise.
+# Dev-client launcher: iOS lists the Metro URL as 127.0.0.1, Android (adb reverse) as localhost.
 - runFlow:
     when:
       visible:
-        text: "http://127.0.0.1:8081"
+        text: "http://127.0.0.1:8081|http://localhost:8081"
     commands:
       - tapOn:
-          text: "http://127.0.0.1:8081"
+          text: "http://127.0.0.1:8081|http://localhost:8081"
 
 - extendedWaitUntil:
     visible:

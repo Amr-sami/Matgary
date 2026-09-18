@@ -145,6 +145,9 @@ export default function LoginScreen() {
             <Field
               label={t("auth.login.passwordLabel")}
               testID="login-password"
+              // Dev builds prefill this field; select-all on focus so a retyped
+              // password replaces it instead of appending (Android keyboards).
+              selectTextOnFocus
               value={password}
               onChangeText={setPassword}
               secure
