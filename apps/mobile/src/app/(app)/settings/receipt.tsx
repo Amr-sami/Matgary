@@ -14,6 +14,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, settings } from "@matgary/api-client";
 import {
   ArrowCounterClockwise,
+  Camera,
   CaretDown,
   CaretUp,
   Eye,
@@ -33,6 +34,7 @@ import { Chip } from "@/components/ui/Chip";
 import { Field } from "@/components/ui/Field";
 import { Segmented } from "@/components/ui/Segmented";
 import { money, shortDate } from "@/lib/format";
+import { useLogoPicker } from "@/lib/useLogoPicker";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
@@ -100,6 +102,7 @@ export default function ReceiptSettingsScreen() {
     enabled: isOwner,
   });
   const server = q.data?.data ?? null;
+  const logo = useLogoPicker(() => qc.invalidateQueries({ queryKey: ["shop-settings"] }));
 
   const dirty = useMemo(
     () =>
@@ -297,7 +300,30 @@ export default function ReceiptSettingsScreen() {
                 {t("app.receiptDesigner.logoEmptyTitle")} {t("app.receiptDesigner.logoEmptySubtitle")}
               </Text>
             ) : null}
-            <Text style={styles.hint}>{t("mobile.settings.logoWebOnly")}</Text>
+            <Text style={styles.hint}>{t("mobile.settings.logoHint")}</Text>
+            <Pressable
+                onPress={() => void logo.pick()}
+                disabled={logo.status === "uploading"}
+                accessibilityRole="button"
+                accessibilityLabel={server.receiptLogoUrl ? t("mobile.settings.changeLogo") : t("mobile.settings.addLogo")}
+                style={({ pressed }) => [styles.logoBtn, (pressed || logo.status === "uploading") && styles.logoBtnPressed]}
+              >
+                {logo.status === "uploading" ? (
+                  <ActivityIndicator size="small" color={colors.accent} />
+                ) : (
+                  <Camera size={18} color={colors.accent} />
+                )}
+                <Text style={styles.logoBtnText}>
+                  {logo.status === "uploading"
+                    ? t("mobile.settings.logoUploading")
+                    : server.receiptLogoUrl
+                      ? t("mobile.settings.changeLogo")
+                      : t("mobile.settings.addLogo")}
+                </Text>
+              </Pressable>
+              {logo.message ? (
+                <Text style={[styles.logoMsg, logo.status === "error" && styles.logoMsgError]}>{logo.message}</Text>
+              ) : null}
           </Card>
 
           {/* الخط */}
@@ -780,6 +806,21 @@ const p = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
+  logoBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: spacing.xs,
+    minHeight: MIN_TOUCH,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.full,
+    backgroundColor: colors.accentLight,
+    marginTop: spacing.sm,
+  },
+  logoBtnPressed: { opacity: 0.7 },
+  logoBtnText: { fontFamily: fonts.medium, fontSize: 13, color: colors.accent },
+  logoMsg: { fontFamily: fonts.regular, fontSize: 13, color: colors.success, marginTop: spacing.xs, ...RTL_TEXT },
+  logoMsgError: { color: colors.danger },
   header: { gap: spacing.xs },
   back: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 32 },
   backLabel: { fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },

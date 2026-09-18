@@ -1,0 +1,148 @@
+# CP-06 — Geofenced self check-in, then check-out.
+#
+# Prerequisites: a store location at (30.0444, 31.2357) — the tenant's one
+# attendance location, created through POST /api/attendance/locations with a
+# 100 m fence — and the simulator parked on it:
+#   xcrun simctl location <udid> set 30.0444,31.2357
+#   xcrun simctl privacy <udid> grant location com.thestoro.app
+# The flow re-sets the location itself (setLocation) and answers the iOS
+# permission prompt if it appears, so a fresh simulator also works.
+#
+# More → Check in → the location card resolves a fix and, since the owner can
+# read store locations, says "Inside range (… of 100 m)" → the big button
+# reads Check in → tap → "Checked in" toast + the status card says "You're
+# checked in" → the same button now reads Check out → tap → "Checked out"
+# toast + "Checked out at HH:MM". A run that finds the day already checked in
+# (a previous run stopped half-way) checks out first, so the sequence below
+# always starts from checked-out. Signs in first when the app is on the login
+# screen. Ends on the dashboard.
+#
+# Elements are addressed by testID (attendance-*); Button takes no testID, so
+# the big button sits on a wrapper View.
+appId: com.thestoro.app
+env:
+  LAT: "30.0444"
+  LNG: "31.2357"
+---
+- setLocation:
+    latitude: ${LAT}
+    longitude: ${LNG}
+- launchApp
+- extendedWaitUntil:
+    visible:
+      text: "المزيد|More|تسجيل الدخول|Sign in"
+    timeout: 45000
+- runFlow:
+    when:
+      visible:
+        id: "login-identifier"
+    file: login.yaml
+
+# More → Check in.
+- runFlow: helpers/dismiss-logbox.yaml
+- tapOn:
+    text: "المزيد|More"
+- scrollUntilVisible:
+    element:
+      text: "تسجيل الحضور|Check in"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    text: "تسجيل الحضور|Check in"
+- extendedWaitUntil:
+    visible:
+      id: "attendance-check"
+    timeout: 30000
+- assertVisible:
+    text: "الحضور والانصراف|Attendance"
+
+# Location permission: grant it if the card asks (first run on a fresh
+# simulator), and answer the system prompt.
+- runFlow:
+    when:
+      visible:
+        text: "السماح بالوصول للموقع|Allow location"
+    commands:
+      - tapOn:
+          text: "السماح بالوصول للموقع|Allow location"
+      - extendedWaitUntil:
+          visible:
+            text: "Allow While Using App|Allow Once"
+          timeout: 10000
+      - tapOn:
+          text: "Allow While Using App"
+
+# The fix lands and the fence says inside.
+- extendedWaitUntil:
+    visible:
+      id: "attendance-fence"
+    timeout: 45000
+- assertVisible:
+    id: "attendance-fence"
+    text: "داخل النطاق .*|Inside range .*"
+- assertVisible:
+    text: "أقرب فرع: .*|Nearest location: .*"
+
+# Already checked in from an earlier half-run → check out first.
+- runFlow:
+    when:
+      visible:
+        id: "attendance-status"
+        text: "أنت حاضر الآن|You're checked in"
+    commands:
+      - tapOn:
+          id: "attendance-check"
+      - extendedWaitUntil:
+          visible:
+            id: "attendance-notice"
+            text: "تم تسجيل الانصراف|Checked out"
+          timeout: 45000
+      - extendedWaitUntil:
+          visible:
+            id: "attendance-status"
+            text: "سجّلت انصرافك في .*|Checked out at .*"
+          timeout: 30000
+
+# Check in.
+- assertVisible:
+    text: "حضور|Check in"
+- tapOn:
+    id: "attendance-check"
+- extendedWaitUntil:
+    visible:
+      id: "attendance-notice"
+      text: "تم تسجيل الحضور|Checked in"
+    timeout: 45000
+- extendedWaitUntil:
+    visible:
+      id: "attendance-status"
+      text: "أنت حاضر الآن|You're checked in"
+    timeout: 30000
+- assertVisible:
+    text: "حضور منذ .*|Checked in since .*"
+- assertVisible:
+    text: "انصراف|Check out"
+
+# Check out.
+- tapOn:
+    id: "attendance-check"
+- extendedWaitUntil:
+    visible:
+      id: "attendance-notice"
+      text: "تم تسجيل الانصراف|Checked out"
+    timeout: 45000
+- extendedWaitUntil:
+    visible:
+      id: "attendance-status"
+      text: "سجّلت انصرافك في .*|Checked out at .*"
+    timeout: 30000
+- assertVisible:
+    text: "حضور|Check in"
+
+# Back to the dashboard.
+- runFlow: helpers/dismiss-logbox.yaml
+- tapOn:
+    text: "لوحة|Home"
+- assertVisible:
+    text: "أهلاً، .+|Welcome back, .+"

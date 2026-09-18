@@ -11,7 +11,7 @@ import {
 import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, settings } from "@matgary/api-client";
-import { Storefront, WarningCircle } from "phosphor-react-native";
+import { Camera, Storefront, WarningCircle } from "phosphor-react-native";
 
 import { api } from "@/api/client";
 import { Screen } from "@/components/layout/Screen";
@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Field } from "@/components/ui/Field";
 import { money } from "@/lib/format";
+import { useLogoPicker } from "@/lib/useLogoPicker";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
@@ -89,6 +90,7 @@ export default function StoreSettingsScreen() {
     enabled: isOwner,
   });
   const server = q.data?.data ?? null;
+  const logo = useLogoPicker(() => qc.invalidateQueries({ queryKey: ["shop-settings"] }));
 
   const dirty = useMemo(
     () =>
@@ -243,7 +245,7 @@ export default function StoreSettingsScreen() {
             </View>
           </Card>
 
-          {/* الشعار — للعرض فقط */}
+          {/* الشعار — اختيار + رفع */}
           <Card title={t("mobile.settings.logoTitle")}>
             <View style={styles.logoRow}>
               {server.receiptLogoUrl ? (
@@ -264,9 +266,32 @@ export default function StoreSettingsScreen() {
                     ? t("app.receiptDesigner.logoAlt")
                     : t("app.receiptDesigner.logoEmptyTitle")}
                 </Text>
-                <Text style={styles.sectionHint}>{t("mobile.settings.logoWebOnly")}</Text>
+                <Text style={styles.sectionHint}>{t("mobile.settings.logoHint")}</Text>
               </View>
             </View>
+            <Pressable
+                onPress={() => void logo.pick()}
+                disabled={logo.status === "uploading"}
+                accessibilityRole="button"
+                accessibilityLabel={server.receiptLogoUrl ? t("mobile.settings.changeLogo") : t("mobile.settings.addLogo")}
+                style={({ pressed }) => [styles.logoBtn, (pressed || logo.status === "uploading") && styles.logoBtnPressed]}
+              >
+                {logo.status === "uploading" ? (
+                  <ActivityIndicator size="small" color={colors.accent} />
+                ) : (
+                  <Camera size={18} color={colors.accent} />
+                )}
+                <Text style={styles.logoBtnText}>
+                  {logo.status === "uploading"
+                    ? t("mobile.settings.logoUploading")
+                    : server.receiptLogoUrl
+                      ? t("mobile.settings.changeLogo")
+                      : t("mobile.settings.addLogo")}
+                </Text>
+              </Pressable>
+              {logo.message ? (
+                <Text style={[styles.logoMsg, logo.status === "error" && styles.logoMsgError]}>{logo.message}</Text>
+              ) : null}
           </Card>
 
           {/* برنامج الولاء */}
@@ -429,6 +454,21 @@ const styles = StyleSheet.create({
     ...RTL_TEXT,
   },
 
+  logoBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: spacing.xs,
+    minHeight: MIN_TOUCH,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.full,
+    backgroundColor: colors.accentLight,
+    marginTop: spacing.sm,
+  },
+  logoBtnPressed: { opacity: 0.7 },
+  logoBtnText: { fontFamily: fonts.medium, fontSize: 13, color: colors.accent },
+  logoMsg: { fontFamily: fonts.regular, fontSize: 13, color: colors.success, marginTop: spacing.xs, ...RTL_TEXT },
+  logoMsgError: { color: colors.danger },
   logoRow: { flexDirection: "row", alignItems: "center", gap: spacing.lg },
   logo: { width: 72, height: 72, borderRadius: radius.lg, backgroundColor: colors.neutralTint },
   logoEmpty: { alignItems: "center", justifyContent: "center" },

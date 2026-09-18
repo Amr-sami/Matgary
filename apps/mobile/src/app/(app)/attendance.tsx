@@ -436,7 +436,10 @@ export default function AttendanceScreen() {
           ) : (
             <WarningCircle size={18} color={colors.danger} weight="fill" />
           )}
-          <Text style={[styles.noticeText, notice.tone === "ok" ? styles.okText : styles.errText]}>
+          <Text
+            style={[styles.noticeText, notice.tone === "ok" ? styles.okText : styles.errText]}
+            testID="attendance-notice"
+          >
             {notice.text}
           </Text>
         </View>
@@ -471,7 +474,7 @@ export default function AttendanceScreen() {
           </>
         ) : last ? (
           <>
-            <Text style={styles.statusHeadline}>
+            <Text style={styles.statusHeadline} testID="attendance-status">
               {last.type === "check_in"
                 ? t("app.team.selfCheckIn.checkedIn")
                 : t("mobile.attendance.checkedOutAt", { time: hhmm(last.occurredAt) })}
@@ -486,25 +489,27 @@ export default function AttendanceScreen() {
             </Text>
           </>
         ) : (
-          <Text style={styles.statusHeadline}>{t("app.team.selfCheckIn.notYetToday")}</Text>
+          <Text style={styles.statusHeadline} testID="attendance-status">{t("app.team.selfCheckIn.notYetToday")}</Text>
         )}
       </Card>
 
       {/* ---- the button ---- */}
-      <Button
-        label={t(
-          nextType === "check_in"
-            ? "app.team.selfCheckIn.checkIn"
-            : "app.team.selfCheckIn.checkOut",
-        )}
-        onPress={() => {
-          setNotice(null);
-          submit.mutate("geofence");
-        }}
-        loading={submit.isPending && submit.variables === "geofence"}
-        disabled={geofenceDisabled}
-        style={styles.bigBtn}
-      />
+      <View testID="attendance-check">
+        <Button
+          label={t(
+            nextType === "check_in"
+              ? "app.team.selfCheckIn.checkIn"
+              : "app.team.selfCheckIn.checkOut",
+          )}
+          onPress={() => {
+            setNotice(null);
+            submit.mutate("geofence");
+          }}
+          loading={submit.isPending && submit.variables === "geofence"}
+          disabled={geofenceDisabled}
+          style={styles.bigBtn}
+        />
+      </View>
       {buttonHint ? <Text style={styles.underBtn}>{buttonHint}</Text> : null}
 
       {canManual ? (
@@ -632,6 +637,7 @@ export default function AttendanceScreen() {
                 <View style={styles.flex}>
                   <Text
                     style={[styles.fenceText, fence.inside ? styles.okText : styles.errText]}
+                    testID="attendance-fence"
                   >
                     {fence.inside
                       ? t("mobile.attendance.geofence.inside", {

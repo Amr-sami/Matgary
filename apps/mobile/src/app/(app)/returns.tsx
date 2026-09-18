@@ -11,6 +11,7 @@ import { Screen } from "@/components/layout/Screen";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { DateField } from "@/components/ui/DateField";
 import { Field } from "@/components/ui/Field";
 import { StatCard } from "@/components/ui/StatCard";
 import { money, shortDate } from "@/lib/format";
@@ -128,11 +129,22 @@ function errorMessage(error: unknown, fallback: string): string {
  * piece is a single script that resolves on its own ("1 قطعة" → RTL, the
  * invoice and the date → LTR). No bidi marks, no per-text writingDirection.
  */
-function MetaLine({ invoice, count, date }: { invoice?: string | null; count: number; date?: string | null }) {
+function MetaLine({
+  invoice,
+  count,
+  date,
+  testID,
+}: {
+  invoice?: string | null;
+  count: number;
+  date?: string | null;
+  /** e2e: lands on the invoice Text so a flow can read / match the number. */
+  testID?: string;
+}) {
   return (
     <View style={styles.metaRow}>
       {invoice ? (
-        <Text numberOfLines={1} style={[styles.meta, styles.metaInvoice]}>
+        <Text numberOfLines={1} style={[styles.meta, styles.metaInvoice]} testID={testID}>
           {invoice}
         </Text>
       ) : null}
@@ -336,7 +348,11 @@ export default function ReturnsScreen() {
         subtitle={monthRows.length ? t("mobile.returns.monthTotal", { total: money(monthTotal) }) : undefined}
       />
 
-      {canReturn ? <Button label={t("app.sales.returnModal.title")} onPress={() => setOpen(true)} /> : null}
+      {canReturn ? (
+        <View testID="returns-take">
+          <Button label={t("app.sales.returnModal.title")} onPress={() => setOpen(true)} />
+        </View>
+      ) : null}
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
         {RANGES().map((r) => (
@@ -347,10 +363,10 @@ export default function ReturnsScreen() {
       {range === "custom" ? (
         <View style={styles.custom}>
           <View style={styles.half}>
-            <Field label={t("app.dateRange.from")} value={fromText} onChangeText={setFromText} placeholder={t("mobile.returns.datePlaceholder")} keyboardType="numbers-and-punctuation" ltr />
+            <DateField label={t("app.dateRange.from")} value={fromText} onChange={setFromText} max={toDay(new Date())} />
           </View>
           <View style={styles.half}>
-            <Field label={t("app.dateRange.to")} value={toText} onChangeText={setToText} placeholder={t("mobile.returns.datePlaceholder")} keyboardType="numbers-and-punctuation" ltr />
+            <DateField label={t("app.dateRange.to")} value={toText} onChange={setToText} min={fromText || undefined} max={toDay(new Date())} />
           </View>
         </View>
       ) : null}
@@ -382,12 +398,12 @@ export default function ReturnsScreen() {
             const sale = saleById.get(r.saleId);
             const amount = amountOf(r);
             return (
-              <View key={r.id} style={styles.row}>
+              <View key={r.id} style={styles.row} testID="returns-row">
                 <View style={styles.head}>
-                  <Text numberOfLines={1} style={styles.name}>{r.productName}</Text>
+                  <Text numberOfLines={1} style={styles.name} testID="returns-row-name">{r.productName}</Text>
                   {amount !== null ? <Text style={styles.amount}>{money(amount)}</Text> : null}
                 </View>
-                <MetaLine invoice={sale?.invoiceId} count={r.returnedQuantity} date={r.returnDate} />
+                <MetaLine invoice={sale?.invoiceId} count={r.returnedQuantity} date={r.returnDate} testID="returns-row-invoice" />
                 {r.reason ? <Text numberOfLines={2} style={[styles.meta, styles.reason]}>{r.reason}</Text> : null}
               </View>
             );
@@ -415,9 +431,9 @@ export default function ReturnsScreen() {
                   <Text style={styles.meta}>{t("mobile.returns.noLines")}</Text>
                 ) : (
                   pickable.map((l) => (
-                    <Pressable key={l.id} style={styles.pick} onPress={() => { setLine(l); setQty("1"); setError(null); }}>
+                    <Pressable key={l.id} style={styles.pick} onPress={() => { setLine(l); setQty("1"); setError(null); }} testID="returns-pick-row">
                       <Text numberOfLines={1} style={styles.pickName}>{l.productName}</Text>
-                      <MetaLine invoice={l.invoiceId} count={l.quantitySold} date={l.saleDate} />
+                      <MetaLine invoice={l.invoiceId} count={l.quantitySold} date={l.saleDate} testID="returns-pick-invoice" />
                     </Pressable>
                   ))
                 )}
@@ -427,13 +443,15 @@ export default function ReturnsScreen() {
                 <Pressable style={styles.linkHit} onPress={() => { setLine(null); setError(null); }}>
                   <Text style={styles.link}>{t("mobile.returns.changeLine")}</Text>
                 </Pressable>
-                <Text style={styles.pickName}>{line.productName}</Text>
-                <MetaLine invoice={line.invoiceId} count={line.quantitySold} date={line.saleDate} />
+                <Text style={styles.pickName} testID="returns-line-name">{line.productName}</Text>
+                <MetaLine invoice={line.invoiceId} count={line.quantitySold} date={line.saleDate} testID="returns-line-invoice" />
                 <Text style={styles.meta}>{t("mobile.returns.maxQty", { n: maxQty })}</Text>
-                <Field label={t("app.sales.returnModal.quantity")} value={qty} onChangeText={setQty} keyboardType="number-pad" editable={maxQty > 0} />
-                <Field label={t("mobile.common.reason")} value={reason} onChangeText={setReason} placeholder={t("mobile.returns.reasonExample")} editable={maxQty > 0} />
-                {error ? <Text style={styles.err}>{error}</Text> : null}
-                <Button label={t("mobile.returns.submit")} disabled={!canSubmit} loading={create.isPending} onPress={() => create.mutate()} />
+                <Field label={t("app.sales.returnModal.quantity")} value={qty} onChangeText={setQty} keyboardType="number-pad" editable={maxQty > 0} testID="returns-qty" />
+                <Field label={t("mobile.common.reason")} value={reason} onChangeText={setReason} placeholder={t("mobile.returns.reasonExample")} editable={maxQty > 0} testID="returns-reason" />
+                {error ? <Text style={styles.err} testID="returns-error">{error}</Text> : null}
+                <View testID="returns-submit">
+                  <Button label={t("mobile.returns.submit")} disabled={!canSubmit} loading={create.isPending} onPress={() => create.mutate()} />
+                </View>
               </>
             )}
             <Button label={t("app.common.cancel")} variant="ghost" onPress={closeModal} />

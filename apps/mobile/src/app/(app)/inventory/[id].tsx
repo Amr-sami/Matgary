@@ -11,11 +11,13 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Image } from "expo-image";
 import {
   ArrowCounterClockwise,
   ArrowDown,
   ArrowUp,
   Barcode,
+  Camera,
   Coins,
   Minus,
   Package,
@@ -28,7 +30,8 @@ import {
 } from "phosphor-react-native";
 import { ApiError, catalog, type Product, type Supplier } from "@matgary/api-client";
 
-import { api } from "@/api/client";
+import { API_BASE_URL, api } from "@/api/client";
+import { pickLibraryPhoto, uploadErrorText } from "@/lib/productPhoto";
 import { Screen } from "@/components/layout/Screen";
 import { ChevronBack } from "@/components/ui/Chevron";
 import { Badge } from "@/components/ui/Badge";
@@ -254,6 +257,45 @@ export default function ProductDetailScreen() {
     },
   });
   const canSaveEdit = canManage && editValid && editChanged && !update.isPending;
+
+  // ---- photo: pick → upload → PATCH imageUrl ------------------------------
+  // Same picker as add-product.tsx (src/lib/productPhoto: Android permission,
+  // MIME inference, > 3 MB refused before the network). Upload and PATCH run
+  // in ONE mutation: `update`'s error only renders inside the edit modal,
+  // which is closed here, so a failed PATCH after a good upload would have
+  // been silent and the file orphaned.
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const photoUpload = useMutation({
+    mutationFn: async (v: { id: string; file: { uri: string; name: string; type: string } }) => {
+      const { url } = await catalog.uploadProductImage(api, v.file);
+      await catalog.updateProduct(api, v.id, { imageUrl: url });
+      return { id: v.id, url };
+    },
+    onSuccess: ({ id: pid, url }) => {
+      patchCache(pid, { imageUrl: url });
+      void qc.invalidateQueries({ queryKey: ["products"] });
+      void qc.invalidateQueries({ queryKey: ["productHistory", pid] });
+      if (pid !== idRef.current) return;
+      setNotice(t("app.inventory.toast.productUpdated"));
+    },
+    onError: (e, v) => {
+      if (v.id !== idRef.current) return;
+      setPhotoError(uploadErrorText(e));
+    },
+  });
+  const changePhoto = async () => {
+    if (!product) return;
+    setPhotoError(null);
+    const res = await pickLibraryPhoto();
+    if (res.kind === "cancelled") return;
+    if (res.kind === "tooBig") return setPhotoError(t("mobile.product.photoInvalid"));
+    if (res.kind === "denied") return setPhotoError(t("mobile.product.libraryDenied"));
+    if (res.kind === "pickFailed") return setPhotoError(t("mobile.product.photoPickFailed"));
+    const { uri, name, type } = res.photo;
+    photoUpload.mutate({ id: product.id, file: { uri, name, type } });
+  };
+  const photoBusy = photoUpload.isPending;
+  const imageUri = catalog.resolveUploadUrl(API_BASE_URL, product?.imageUrl);
   const saveEdit = () => {
     if (!product) return;
     // Only the fields that changed: the activity log records `changed` keys,
@@ -345,9 +387,44 @@ export default function ProductDetailScreen() {
       ) : (
         <>
           <Card>
-            <View style={styles.avatar}>
-              <Package size={28} color={colors.accent} />
+            <View style={styles.heroRow}>
+              {imageUri ? (
+                <Image
+                  source={{ uri: imageUri }}
+                  style={styles.heroImage}
+                  contentFit="cover"
+                  transition={150}
+                  accessibilityLabel={t("mobile.product.a11yPhotoPreview")}
+                />
+              ) : (
+                <View style={styles.avatar}>
+                  <Package size={28} color={colors.accent} />
+                </View>
+              )}
+              {canManage ? (
+                <Pressable
+                  onPress={() => void changePhoto()}
+                  disabled={photoBusy}
+                  accessibilityRole="button"
+                  accessibilityLabel={imageUri ? t("mobile.product.changePhoto") : t("mobile.product.addPhoto")}
+                  style={({ pressed }) => [styles.photoBtn, (pressed || photoBusy) && styles.photoBtnPressed]}
+                >
+                  {photoBusy ? (
+                    <ActivityIndicator size="small" color={colors.accent} />
+                  ) : (
+                    <Camera size={18} color={colors.accent} />
+                  )}
+                  <Text style={styles.photoBtnText}>
+                    {photoBusy
+                      ? t("mobile.product.photoUploading")
+                      : imageUri
+                        ? t("mobile.product.changePhoto")
+                        : t("mobile.product.addPhoto")}
+                  </Text>
+                </Pressable>
+              ) : null}
             </View>
+            {photoError ? <Text style={styles.photoError}>{photoError}</Text> : null}
             <Text style={styles.name}>{product.name}</Text>
             {product.brand ? (
               <Text numberOfLines={1} style={styles.brand}>
@@ -752,6 +829,26 @@ const styles = StyleSheet.create({
   backLink: { minHeight: 44, justifyContent: "center" },
   backLinkText: { fontFamily: fonts.medium, fontSize: 15, color: colors.accent, ...RTL_TEXT },
 
+  heroRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+    marginBottom: spacing.md,
+  },
+  heroImage: { width: 96, height: 96, borderRadius: radius.lg, backgroundColor: colors.neutralTint },
+  photoBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    minHeight: MIN_TOUCH,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.full,
+    backgroundColor: colors.accentLight,
+  },
+  photoBtnPressed: { opacity: 0.7 },
+  photoBtnText: { fontFamily: fonts.medium, fontSize: 13, color: colors.accent },
+  photoError: { fontFamily: fonts.regular, fontSize: 13, color: colors.danger, marginBottom: spacing.sm, ...RTL_TEXT },
   avatar: {
     width: 56,
     height: 56,
@@ -760,7 +857,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     alignSelf: "flex-start",
-    marginBottom: spacing.md,
   },
   name: { fontFamily: fonts.bold, fontSize: 24, color: colors.text, ...RTL_TEXT },
   brand: {

@@ -161,6 +161,7 @@ export function BranchSwitcher() {
         accessibilityRole="button"
         accessibilityLabel={t("mobile.branchSwitcher.a11y", { name: activeName })}
         hitSlop={{ top: 6, bottom: 6 }}
+        testID="branch-chip"
         style={({ pressed }) => [styles.chip, confirmed && styles.chipConfirmed, pressed && styles.chipPressed]}
       >
         {confirmed ? (
@@ -173,7 +174,7 @@ export function BranchSwitcher() {
         ) : (
           <View style={styles.chipInner}>
             <Storefront size={14} weight="fill" color={colors.accent} />
-            <Text numberOfLines={1} style={styles.chipText}>
+            <Text numberOfLines={1} style={styles.chipText} testID="branch-chip-label">
               {activeName}
             </Text>
             <CaretDown size={12} weight="bold" color={colors.textSecondary} />
@@ -205,6 +206,7 @@ export function BranchSwitcher() {
                     accessibilityLabel={
                       active ? `${branch.name} — ${t("app.branchesPage.labels.current")}` : branch.name
                     }
+                    testID="branch-option"
                     style={({ pressed }) => [
                       styles.row,
                       active && styles.rowActive,
@@ -219,7 +221,7 @@ export function BranchSwitcher() {
                       />
                     </View>
                     <View style={styles.rowBody}>
-                      <Text numberOfLines={1} style={[styles.rowName, active && styles.rowNameActive]}>
+                      <Text numberOfLines={1} style={[styles.rowName, active && styles.rowNameActive]} testID="branch-option-name">
                         {branch.name}
                       </Text>
                       {(branch.isPrimary || active) && (

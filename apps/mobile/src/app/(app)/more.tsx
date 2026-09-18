@@ -11,6 +11,7 @@ import {
   ListChecks,
   MapPinArea,
   SignOut,
+  Storefront,
   Truck,
   Users,
   UsersThree,
@@ -60,6 +61,13 @@ export default function MoreScreen() {
   const me = useSession((s) => s.me);
   const signOut = useSession((s) => s.signOut);
   const allowed = new Set(me?.permissions ?? []);
+  // The onboarding wizard is a soft gate (web: OnboardingReminder banner,
+  // never a redirect) and /onboarding is otherwise only reached from signup.
+  // Until the tenant's Finish/Skip has run this row is the way back to it —
+  // after a kill, a lost connection, or a step-2 tip that left the wizard.
+  // Strict `=== false`: an older server omits the flag, and then there is
+  // nothing to finish. Same audience as the web banner: any member.
+  const showFinishSetup = me?.onboardingComplete === false;
 
   const visible = ITEMS().filter((i) => {
     if (i.route === "/tasks") return Boolean(me);
@@ -79,6 +87,18 @@ export default function MoreScreen() {
           {me?.tenant.name} · {me?.branch.name}
         </Text>
       </Card>
+
+      {showFinishSetup && (
+        <Pressable
+          style={[styles.row, styles.setup]}
+          accessibilityRole="button"
+          onPress={() => router.push("/onboarding" as never)}
+        >
+          <Storefront size={22} color={colors.accent} weight="fill" />
+          <Text style={styles.rowLabel}>{t("auth.onboarding.reminder.cta")}</Text>
+          <ChevronForward size={16} color={colors.accent} />
+        </Pressable>
+      )}
 
       <View style={styles.list}>
         {visible.map((item) => {
@@ -133,6 +153,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
   },
   rowLabel: { flex: 1, fontFamily: fonts.medium, fontSize: 16, color: colors.text, ...RTL_TEXT },
+  setup: { borderColor: colors.accent, backgroundColor: colors.accentLight },
   signOut: { marginTop: spacing.lg, borderColor: colors.dangerLight },
   signOutLabel: { color: colors.danger, flex: 1 },
 });

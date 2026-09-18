@@ -1,13 +1,21 @@
 import { type ReactNode, useState } from "react";
-import { Image, Linking, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Image, Linking, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Device from "expo-device";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Barcode, Camera, CheckCircle, Trash } from "phosphor-react-native";
+import { ArrowClockwise, Barcode, Camera, CheckCircle, Trash } from "phosphor-react-native";
 import { ApiError, catalog, taxonomy } from "@matgary/api-client";
 
 import { api } from "@/api/client";
+import {
+  MAX_PHOTO_BYTES,
+  PICKER_OPTIONS,
+  acceptPickerResult,
+  pickLibraryPhoto,
+  uploadErrorText,
+  type PickResult,
+} from "@/lib/productPhoto";
 import { Screen } from "@/components/layout/Screen";
 import { ScannerSheet } from "@/components/scanner/ScannerSheet";
 import { Button } from "@/components/ui/Button";
@@ -36,15 +44,15 @@ import { t } from "@/i18n";
  *   review      then POST /api/products
  *
  * Photo: the other half of row 4 — "photo field camera-first". Take photo /
- * Choose go through expo-image-picker (quality 0.7, editing on so the cashier
- * crops on the counter). PREVIEW ONLY for now, and the tile says so: the
- * backend has nowhere to put a product photo — apps/web's products table has
- * no image column, POST /api/products' createSchema strips `imageUrl`, and the
- * only upload route (POST /api/uploads/team) is the team-member photo store,
- * gated on `manage_team`. Nothing is uploaded from here until the web adds the
- * column + field + a product-image route gated on `manage_inventory`; wire it
- * then through an `ApiClient.uploadFile` (shared refresh/dead-session/timeout
- * handling), never a private fetch. The picked file never leaves the phone.
+ * Choose go through expo-image-picker (quality 0.5, editing on so the cashier
+ * crops on the counter). The pick uploads IMMEDIATELY through
+ * catalog.uploadProductImage (POST /api/uploads/product-image, multipart via
+ * the shared client so refresh / dead-session / timeout handling apply) and
+ * the tile shows uploading → ready / failed (+ Retry). The returned relative
+ * url rides on the POST /api/products body as `imageUrl`. There is no image
+ * manipulator in the dev client, so the only size control is the picker's
+ * quality; anything the picker still reports over 3 MB is refused up front
+ * with the same message the server would send.
  *
  * `?sku=` (useLocalSearchParams) is the POS "not found → create" hand-off: the
  * scanned code lands in the barcode field before the cashier types anything.
@@ -56,19 +64,17 @@ type StepKey = "details" | "attributes" | "price" | "review";
 /** Sentinel for the web's "Other (add a new brand)" option. */
 const OTHER_BRAND = "__other__";
 
-/** The picked photo, local to this phone — see the header note. */
+/** The picked photo and where its upload stands — see the header note. */
 interface PhotoFile {
   uri: string;
+  name: string;
+  type: string;
+  status: "uploading" | "ready" | "failed";
+  /** Relative url from the upload route once `status === "ready"`. */
+  url?: string;
+  /** Why it failed — already the user-facing i18n string. */
+  error?: string;
 }
-
-// Editing on → the cashier crops on the counter and the picker re-encodes the
-// crop as JPEG at `quality`, so the preview is small whatever the library holds.
-const PICKER_OPTIONS: ImagePicker.ImagePickerOptions = {
-  mediaTypes: ["images"],
-  allowsEditing: true,
-  quality: 0.7,
-  exif: false,
-};
 
 export default function AddProductScreen() {
   const router = useRouter();
@@ -168,8 +174,8 @@ export default function AddProductScreen() {
       // Review is only reachable through Next, which requires priceOk, so the
       // parsed values are non-null here; the same numbers the Review rows show.
       const ids = Object.values(attrValues);
-      // No photo field: the backend has none yet (header note).
       const body: catalog.CreateProductInput & { attributeValueIds?: string[] } = {
+        ...(photo?.status === "ready" && photo.url ? { imageUrl: photo.url } : {}),
         name: name.trim(),
         categoryId: category!,
         ...(brandName ? { brand: brandName } : {}),
@@ -239,13 +245,45 @@ export default function AddProductScreen() {
     setAttrValues({});
   };
 
-  // ---- photo: camera-first, library second, preview only -------------------
+  // ---- photo: camera-first, library second, uploaded on pick ----------------
 
-  const acceptPicked = (res: ImagePicker.ImagePickerResult) => {
-    const asset = res.canceled ? null : res.assets?.[0];
-    if (!asset) return;
-    setPhoto({ uri: asset.uri });
+  const uploadPhoto = async (file: PhotoFile) => {
+    setPhoto({ ...file, status: "uploading", error: undefined });
+    try {
+      const { url } = await catalog.uploadProductImage(api, {
+        uri: file.uri,
+        name: file.name,
+        type: file.type,
+      });
+      // The cashier may have picked again meanwhile — only the latest wins.
+      setPhoto((cur) => (cur?.uri === file.uri ? { ...cur, status: "ready", url } : cur));
+    } catch (err) {
+      const error = uploadErrorText(err);
+      setPhoto((cur) => (cur?.uri === file.uri ? { ...cur, status: "failed", url: undefined, error } : cur));
+    }
+  };
+
+  const acceptPicked = (res: PickResult) => {
+    if (res.kind === "cancelled") return;
     setPhotoNote(null);
+    if (res.kind === "tooBig") {
+      setPhotoNote({ text: t("mobile.product.photoInvalid") });
+      return;
+    }
+    if (res.kind === "denied") {
+      setPhotoNote({ text: t("mobile.product.libraryDenied"), settings: !res.canAskAgain });
+      return;
+    }
+    if (res.kind === "pickFailed") {
+      setPhotoNote({ text: t("mobile.product.photoPickFailed") });
+      return;
+    }
+    const { uri, name, type } = res.photo;
+    void uploadPhoto({ uri, name, type, status: "uploading" });
+  };
+
+  const retryUpload = () => {
+    if (photo) void uploadPhoto(photo);
   };
 
   const takePhoto = async () => {
@@ -262,7 +300,7 @@ export default function AddProductScreen() {
       return;
     }
     try {
-      acceptPicked(await ImagePicker.launchCameraAsync(PICKER_OPTIONS));
+      acceptPicked(acceptPickerResult(await ImagePicker.launchCameraAsync(PICKER_OPTIONS), MAX_PHOTO_BYTES));
     } catch {
       setPhotoNote({ text: t("mobile.product.cameraUnavailable") });
     }
@@ -270,21 +308,7 @@ export default function AddProductScreen() {
 
   const choosePhoto = async () => {
     setPhotoNote(null);
-    // iOS presents the library picker out of process — no permission needed
-    // (and asking would prompt for full-library access for nothing). Android
-    // below 13 still needs the read permission.
-    if (Platform.OS === "android") {
-      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!perm.granted) {
-        setPhotoNote({ text: t("mobile.product.libraryDenied"), settings: !perm.canAskAgain });
-        return;
-      }
-    }
-    try {
-      acceptPicked(await ImagePicker.launchImageLibraryAsync(PICKER_OPTIONS));
-    } catch {
-      setPhotoNote({ text: t("mobile.product.photoPickFailed") });
-    }
+    acceptPicked(await pickLibraryPhoto());
   };
 
   const removePhoto = () => {
@@ -356,6 +380,7 @@ export default function AddProductScreen() {
               onTake={() => void takePhoto()}
               onChoose={() => void choosePhoto()}
               onRemove={removePhoto}
+              onRetry={retryUpload}
             />
             <Field label={t("app.sales.form.quickAddProduct.name")} value={name} onChangeText={setName} placeholder={t("app.sales.form.quickAddProduct.namePlaceholder")} />
             <View>
@@ -484,7 +509,13 @@ export default function AddProductScreen() {
           {photo ? (
             <View style={styles.reviewPhotoRow}>
               <Image source={{ uri: photo.uri }} style={styles.reviewThumb} accessibilityLabel={t("mobile.product.a11yPhotoPreview")} />
-              <Text style={styles.reviewPhotoNote} numberOfLines={3}>{t("mobile.product.photoHint")}</Text>
+              <Text style={styles.reviewPhotoNote} numberOfLines={3}>
+                {photo.status === "ready"
+                  ? t("mobile.product.photoReady")
+                  : photo.status === "uploading"
+                    ? t("mobile.product.photoUploading")
+                    : t("mobile.product.photoFailedBlocksSave")}
+              </Text>
             </View>
           ) : null}
           <Row label={t("app.common.name")} value={name} />
@@ -521,7 +552,8 @@ export default function AddProductScreen() {
         ) : (
           <Button
             label={t("app.inventory.addProduct.footer.save")}
-            loading={create.isPending}
+            loading={create.isPending || photo?.status === "uploading"}
+            disabled={photo?.status === "failed"}
             onPress={() => create.mutate()}
             style={styles.navBtn}
           />
@@ -549,9 +581,10 @@ const STEP_TITLES = (): Record<StepKey, string> => ({
 
 /**
  * The camera-first photo tile. Empty: a dashed box with Take photo (primary)
- * and Choose. Picked: the preview, the preview-only note, Take photo again and
- * Remove. `note` is why nothing was picked (denied, no camera) — with an Open
- * Settings link once iOS stops asking.
+ * and Choose. Picked: the preview, the upload status (uploading / uploaded /
+ * failed + Retry), Take photo again and Remove. `note` is why nothing was
+ * picked (denied, no camera, too big) — with an Open Settings link once iOS
+ * stops asking.
  */
 function PhotoTile({
   photo,
@@ -559,22 +592,49 @@ function PhotoTile({
   onTake,
   onChoose,
   onRemove,
+  onRetry,
 }: {
   photo: PhotoFile | null;
   note: { text: string; settings?: boolean } | null;
   onTake: () => void;
   onChoose: () => void;
   onRemove: () => void;
+  onRetry: () => void;
 }) {
   return (
     <View>
       <Text style={styles.label}>{t("mobile.product.photo")}</Text>
       {photo ? (
         <View style={styles.photoRow}>
-          <Image source={{ uri: photo.uri }} style={styles.preview} accessibilityLabel={t("mobile.product.a11yPhotoPreview")} />
+          <View>
+            <Image source={{ uri: photo.uri }} style={styles.preview} accessibilityLabel={t("mobile.product.a11yPhotoPreview")} />
+            {photo.status === "uploading" ? (
+              <View style={styles.previewOverlay}>
+                <ActivityIndicator color={colors.onAccent} />
+              </View>
+            ) : null}
+          </View>
           <View style={styles.photoMeta}>
-            <Text style={styles.hintTight}>{t("mobile.product.photoHint")}</Text>
+            <View style={styles.photoStatus}>
+              {photo.status === "ready" ? <CheckCircle size={16} color={colors.success} weight="fill" /> : null}
+              <Text
+                style={[
+                  styles.hintTight,
+                  photo.status === "ready" && styles.photoStatusOk,
+                  photo.status === "failed" && styles.inlineErrorText,
+                ]}
+              >
+                {photo.status === "ready"
+                  ? t("mobile.product.photoReady")
+                  : photo.status === "uploading"
+                    ? t("mobile.product.photoUploading")
+                    : photo.error ?? t("mobile.product.photoUploadFailed")}
+              </Text>
+            </View>
             <View style={styles.photoActions}>
+              {photo.status === "failed" ? (
+                <PhotoAction icon={<ArrowClockwise size={18} color={colors.accent} />} label={t("mobile.product.retryUpload")} onPress={onRetry} />
+              ) : null}
               <PhotoAction icon={<Camera size={18} color={colors.accent} />} label={t("mobile.product.takePhoto")} onPress={onTake} />
               <PhotoAction icon={<Trash size={18} color={colors.danger} />} label={t("mobile.product.removePhoto")} onPress={onRemove} danger />
             </View>
@@ -744,6 +804,15 @@ const styles = StyleSheet.create({
   photoBtn: { flex: 1 },
   photoRow: { flexDirection: "row", gap: spacing.md, alignItems: "flex-start" },
   preview: { width: 96, height: 96, borderRadius: radius.lg, backgroundColor: colors.neutralTint },
+  previewOverlay: {
+    position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+    borderRadius: radius.lg,
+    backgroundColor: colors.scrim,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  photoStatus: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  photoStatusOk: { color: colors.success },
   photoMeta: { flex: 1, gap: spacing.sm, minHeight: 96, justifyContent: "center" },
   photoActions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   photoAction: {

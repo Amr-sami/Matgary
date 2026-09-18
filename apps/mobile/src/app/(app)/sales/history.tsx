@@ -21,7 +21,7 @@ import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
 import { ChevronBack, ChevronForward } from "@/components/ui/Chevron";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { Field } from "@/components/ui/Field";
+import { DateField } from "@/components/ui/DateField";
 import { SearchField } from "@/components/ui/SearchField";
 import { StatCard } from "@/components/ui/StatCard";
 import { groupDigits, money, shortDate } from "@/lib/format";
@@ -103,7 +103,7 @@ function endOfDay(d: Date): Date {
   c.setHours(23, 59, 59, 999);
   return c;
 }
-/** "YYYY-MM-DD" typed by the cashier → local midnight, or null when malformed. */
+/** "YYYY-MM-DD" from the DateField → local midnight, or null when malformed. */
 function parseYmd(s: string): Date | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s.trim());
   if (!m) return null;
@@ -257,28 +257,20 @@ export default function SalesHistoryScreen() {
       {range === "custom" ? (
         <View style={styles.dateRow}>
           <View style={styles.dateCol}>
-            <Field
+            <DateField
               label={t("app.activity.filters.fromLabel")}
-              value={customFrom}
-              onChangeText={setCustomFrom}
-              placeholder={t("mobile.activity.datePlaceholder")}
-              keyboardType="numbers-and-punctuation"
-              autoCapitalize="none"
-              autoCorrect={false}
-              ltr
+              value={customFrom || null}
+              onChange={setCustomFrom}
+              max={customTo || undefined}
             />
             {fromBad ? <Text style={styles.fieldError}>{t("mobile.activity.invalidDate")}</Text> : null}
           </View>
           <View style={styles.dateCol}>
-            <Field
+            <DateField
               label={t("app.activity.filters.toLabel")}
-              value={customTo}
-              onChangeText={setCustomTo}
-              placeholder={t("mobile.activity.datePlaceholder")}
-              keyboardType="numbers-and-punctuation"
-              autoCapitalize="none"
-              autoCorrect={false}
-              ltr
+              value={customTo || null}
+              onChange={setCustomTo}
+              min={customFrom || undefined}
             />
             {toBad ? <Text style={styles.fieldError}>{t("mobile.activity.invalidDate")}</Text> : null}
           </View>

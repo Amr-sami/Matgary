@@ -21,6 +21,7 @@ import { getLocale, t } from "@/i18n";
 import { Screen } from "@/components/layout/Screen";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { DateField } from "@/components/ui/DateField";
 import { Field } from "@/components/ui/Field";
 import { Segmented } from "@/components/ui/Segmented";
 import { useSession } from "@/stores/session";
@@ -107,7 +108,7 @@ function errorMessage(error: unknown, fallback: string): string {
 }
 
 /**
- * `YYYY-MM-DD` typed by hand → a real calendar date (or null). Built at UTC
+ * `YYYY-MM-DD` from the DateField → a real calendar date (or null). Built at UTC
  * midnight so the POST carries the same instant the web sends
  * (`new Date("YYYY-MM-DD").toISOString()`), not a local-midnight offset.
  */
@@ -395,8 +396,8 @@ function PlusButton({ label, onPress }: { label: string; onPress: () => void }) 
 }
 
 /**
- * The web's LeaveFormModal. Dates are typed as YYYY-MM-DD — the app has no
- * date-picker dependency yet, and the server only needs an ISO datetime.
+ * The web's LeaveFormModal. Dates are kept as YYYY-MM-DD (what DateField
+ * emits) and sent as ISO datetimes — the server only needs those.
  *
  * RTL is re-applied on the overlay on purpose: a Modal mounts its own native
  * root outside the root layout's direction.
@@ -462,22 +463,8 @@ function LeaveFormSheet({
             <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetBody}>
               <Text style={styles.sheetTitle}>{t("app.leave.form.title")}</Text>
 
-              <Field
-                label={t("mobile.leave.from")}
-                value={start}
-                onChangeText={setStart}
-                placeholder={t("mobile.leave.datePlaceholder")}
-                keyboardType="numbers-and-punctuation"
-                autoCapitalize="none"
-              />
-              <Field
-                label={t("mobile.leave.to")}
-                value={end}
-                onChangeText={setEnd}
-                placeholder={t("mobile.leave.datePlaceholder")}
-                keyboardType="numbers-and-punctuation"
-                autoCapitalize="none"
-              />
+              <DateField label={t("mobile.leave.from")} value={start} onChange={setStart} />
+              <DateField label={t("mobile.leave.to")} value={end} onChange={setEnd} min={start || undefined} />
               {!datesValid && (start.trim() || end.trim()) ? (
                 <Text style={styles.hint}>{t("mobile.leave.invalidDates")}</Text>
               ) : null}

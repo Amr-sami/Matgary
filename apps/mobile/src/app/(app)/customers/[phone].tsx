@@ -243,7 +243,10 @@ export default function CustomerDetailScreen() {
 
       {notice ? (
         <View style={[styles.notice, notice.kind === "error" ? styles.noticeError : styles.noticeSuccess]}>
-          <Text style={[styles.noticeText, notice.kind === "error" ? styles.noticeTextError : styles.noticeTextSuccess]}>
+          <Text
+            style={[styles.noticeText, notice.kind === "error" ? styles.noticeTextError : styles.noticeTextSuccess]}
+            testID="customer-notice"
+          >
             {notice.text}
           </Text>
         </View>
@@ -295,7 +298,7 @@ export default function CustomerDetailScreen() {
                   <Text numberOfLines={1} style={styles.debtLabel}>
                     {t("mobile.customers.outstandingFromCustomer")}
                   </Text>
-                  <Text numberOfLines={1} style={styles.debtValue}>
+                  <Text numberOfLines={1} style={styles.debtValue} testID="customer-outstanding">
                     {money(ledger.outstandingBalance)}
                   </Text>
                 </View>
@@ -417,6 +420,8 @@ export default function CustomerDetailScreen() {
                       settleable ? t("mobile.customers.settleFor", { id: inv.invoiceId }) : undefined
                     }
                     onPress={() => setSettleTarget(inv)}
+                    // e2e: a flow taps the first settleable card by id.
+                    testID={settleable ? "customer-invoice-settleable" : "customer-invoice"}
                     style={({ pressed }) => [
                       styles.invoice,
                       index > 0 && styles.invoiceDivided,
@@ -602,6 +607,7 @@ function SettleSheet({
               keyboardType="decimal-pad"
               ltr
               editable={!busy}
+              testID="settle-amount"
             />
             {wouldOverpay ? (
               <Text style={styles.hint}>{t("app.customers.settle.overpayHint")}</Text>
@@ -613,12 +619,14 @@ function SettleSheet({
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
             <View style={styles.sheetActions}>
-              <Button
-                label={`${t("app.customers.settle.submit")} · ${money(amount)}`}
-                onPress={() => onSubmit(amount, method)}
-                loading={busy}
-                disabled={amount <= 0}
-              />
+              <View testID="settle-submit">
+                <Button
+                  label={`${t("app.customers.settle.submit")} · ${money(amount)}`}
+                  onPress={() => onSubmit(amount, method)}
+                  loading={busy}
+                  disabled={amount <= 0}
+                />
+              </View>
               <Button variant="ghost" label={t("app.common.cancel")} onPress={onClose} disabled={busy} />
             </View>
           </ScrollView>

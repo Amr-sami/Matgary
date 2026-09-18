@@ -21,6 +21,7 @@ import { HeaderAccessories } from "@/components/shell/HeaderAccessories";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
+import { NativeDatePicker, dateToIsoDay, isoDayToDate } from "@/components/ui/DateField";
 import { ChevronBack, ChevronForward } from "@/components/ui/Chevron";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
@@ -71,14 +72,6 @@ function ymd(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-function startOfDay(d: Date): Date {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
-}
-
-/** First-of-month anchor for the calendar grid; `delta` months away from `d`. */
-function monthAnchor(d: Date, delta = 0): Date {
-  return new Date(d.getFullYear(), d.getMonth() + delta, 1, 0, 0, 0, 0);
-}
 
 function hhmm(iso: string | null | undefined): string {
   if (!iso) return "—";
@@ -286,7 +279,6 @@ export default function TeamAttendanceScreen() {
     ]);
 
   const onPickDay = (d: Date) => {
-    setPickerOpen(false);
     setCustomDay(d);
     setDayKey("custom");
   };
@@ -502,12 +494,17 @@ export default function TeamAttendanceScreen() {
         </View>
       )}
 
-      <DayPickerModal
+      {/* Attendance is never in the future: today is the latest pickable day. */}
+      <NativeDatePicker
         visible={pickerOpen}
-        rtl={rtl}
-        value={customDay ?? day}
+        value={dateToIsoDay(customDay ?? day)}
+        max={dateToIsoDay(new Date())}
+        title={t("mobile.team.attendance.pickDateTitle")}
+        onChange={(iso) => {
+          const d = isoDayToDate(iso);
+          if (d) onPickDay(d);
+        }}
         onClose={() => setPickerOpen(false)}
-        onPick={onPickDay}
       />
 
       {/* Past-day manual entry: needs a time */}
@@ -632,112 +629,6 @@ function IconButton({
   );
 }
 
-/**
- * Pure-JS month calendar (no native picker: adding one means a dev-client
- * rebuild). Days after today are disabled — attendance is never in the future.
- * Cells flow in a wrapping row, so under Arabic the root direction lays the
- * week right-to-left by itself; nothing here reverses an array.
- */
-function DayPickerModal({
-  visible,
-  rtl,
-  value,
-  onClose,
-  onPick,
-}: {
-  visible: boolean;
-  rtl: boolean;
-  value: Date;
-  onClose: () => void;
-  onPick: (d: Date) => void;
-}) {
-  const [cursor, setCursor] = useState(() => monthAnchor(value));
-  useEffect(() => {
-    if (visible) setCursor(monthAnchor(value));
-  }, [visible, value]);
-
-  const today = startOfDay(new Date());
-  const weekStart = rtl ? 6 : 0; // Saturday under Arabic, Sunday otherwise
-  const lead = (cursor.getDay() - weekStart + 7) % 7;
-  const daysInMonth = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate();
-  const canGoNext = monthAnchor(cursor, 1).getTime() <= monthAnchor(today).getTime();
-  const selectedKey = ymd(value);
-  const todayKey = ymd(today);
-
-  const cells: Array<Date | null> = [
-    ...Array.from({ length: lead }, () => null),
-    ...Array.from({ length: daysInMonth }, (_, i) => new Date(cursor.getFullYear(), cursor.getMonth(), i + 1)),
-  ];
-  while (cells.length % 7 !== 0) cells.push(null);
-
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={[styles.pickerScrim, directionStyle(rtl)]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityRole="button" />
-        <View style={styles.pickerCard}>
-          <Text style={styles.pickerTitle}>{t("mobile.team.attendance.pickDateTitle")}</Text>
-          <View style={styles.pickerNav}>
-            <IconButton label={t("app.team.monthly.prevMonth")} onPress={() => setCursor(monthAnchor(cursor, -1))}>
-              <ChevronBack size={20} color={colors.text} />
-            </IconButton>
-            <Text style={styles.pickerMonth}>
-              {t(`mobile.calendar.month.${cursor.getMonth() + 1}`)} {cursor.getFullYear()}
-            </Text>
-            <IconButton
-              label={t("app.team.monthly.nextMonth")}
-              onPress={() => setCursor(monthAnchor(cursor, 1))}
-              disabled={!canGoNext}
-            >
-              <ChevronForward size={20} color={colors.text} />
-            </IconButton>
-          </View>
-          <View style={styles.pickerGrid}>
-            {Array.from({ length: 7 }, (_, i) => (weekStart + i) % 7).map((wd) => (
-              <View key={`h${wd}`} style={styles.pickerCell}>
-                <Text style={styles.pickerWeekday}>{t(`mobile.calendar.weekday.${wd}`)}</Text>
-              </View>
-            ))}
-            {cells.map((d, i) => {
-              if (!d) return <View key={`e${i}`} style={styles.pickerCell} />;
-              const key = ymd(d);
-              const future = d.getTime() > today.getTime();
-              const selected = key === selectedKey;
-              return (
-                <View key={key} style={styles.pickerCell}>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={shortDate(d.toISOString())}
-                    accessibilityState={{ selected, disabled: future }}
-                    disabled={future}
-                    onPress={() => onPick(d)}
-                    style={({ pressed }) => [
-                      styles.pickerDay,
-                      selected && styles.pickerDaySelected,
-                      !selected && key === todayKey && styles.pickerDayToday,
-                      pressed && !selected && styles.pressed,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.pickerDayText,
-                        selected && styles.pickerDayTextSelected,
-                        future && styles.pickerDayTextDisabled,
-                      ]}
-                    >
-                      {d.getDate()}
-                    </Text>
-                  </Pressable>
-                </View>
-              );
-            })}
-          </View>
-          <Button label={t("app.team.editEvent.cancel")} variant="ghost" onPress={onClose} />
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
 const styles = StyleSheet.create({
   stack: { gap: spacing.md },
   // Same shape as the settings sub-pages: back link, then title, then subtitle.
@@ -812,34 +703,4 @@ const styles = StyleSheet.create({
   modalBody: { padding: spacing.xl, paddingTop: spacing.xxl * 1.5, gap: spacing.lg },
   modalTitle: { fontFamily: fonts.bold, fontSize: 20, color: colors.text, ...RTL_TEXT },
   fieldLabel: { fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary, ...RTL_TEXT },
-
-  // Day picker
-  pickerScrim: { flex: 1, backgroundColor: colors.scrim, justifyContent: "center", padding: spacing.xl },
-  pickerCard: {
-    backgroundColor: colors.card,
-    borderRadius: radius.xl,
-    padding: spacing.lg,
-    gap: spacing.md,
-    ...elevation.modal,
-  },
-  pickerTitle: { fontFamily: fonts.bold, fontSize: 18, color: colors.text, ...RTL_TEXT },
-  pickerNav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  pickerMonth: { fontFamily: fonts.semibold, fontSize: 16, color: colors.text, fontVariant: ["tabular-nums"] },
-  pickerGrid: { flexDirection: "row", flexWrap: "wrap" },
-  pickerCell: { width: "14.2857%", alignItems: "center", justifyContent: "center", paddingVertical: 2 },
-  pickerWeekday: { fontFamily: fonts.medium, fontSize: 12, color: colors.textSecondary, paddingVertical: spacing.xs },
-  pickerDay: {
-    width: 38,
-    height: 38,
-    borderRadius: radius.full,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "transparent",
-  },
-  pickerDaySelected: { backgroundColor: colors.accent, borderColor: colors.accent },
-  pickerDayToday: { borderColor: colors.accent },
-  pickerDayText: { fontFamily: fonts.medium, fontSize: 15, color: colors.text, fontVariant: ["tabular-nums"] },
-  pickerDayTextSelected: { color: colors.onAccent },
-  pickerDayTextDisabled: { color: colors.textSecondary, opacity: 0.45 },
 });

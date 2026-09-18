@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import {
+  ActivityIndicator,
   Modal,
   Pressable,
   ScrollView,
@@ -25,7 +26,8 @@ import {
   Wallet,
   type Icon,
 } from "phosphor-react-native";
-import { ApiError } from "@matgary/api-client";
+import { useQueryClient } from "@tanstack/react-query";
+import { ApiError, auth } from "@matgary/api-client";
 import { dictionaries } from "@matgary/i18n";
 
 import { getLocale, t, useLocale } from "@/i18n";
@@ -42,13 +44,11 @@ import { colors, fonts, radius, spacing, MIN_TOUCH } from "@/theme/tokens";
  *
  * Step 1 picks a starting preset, step 2 reviews next steps, then a 13-slide
  * full-screen tour. Skip / Finish on the tour submits and lands on the
- * dashboard. The web completes onboarding through a server action that also
- * seeds the catalog for the "cornerstore" preset; the only bearer-reachable
- * equivalent is PATCH /api/settings (shop name), which cannot seed. Because
- * that PATCH also flips `onboardingComplete` on the web (gated on shopName),
- * a preset picked here would be silently lost — so the cornerstore option is
- * shown disabled ("web only") and the picker defaults to "blank". See
- * `mobile.onboarding.seedNote`.
+ * dashboard. Submit is POST /api/v1/onboarding/complete — the bearer twin of
+ * the web's completeOnboardingAction, sharing lib/onboarding/complete.ts — so
+ * the "cornerstore" preset seeds the starter catalog from the app exactly as
+ * it does from the browser. Error codes are the action's, mapped onto
+ * `auth.onboarding.errors.*`.
  *
  * The whole flow renders inside `Takeover`, a full-window Modal, so the tab
  * bar of the surrounding Tabs navigator never shows under a step flow.
@@ -87,9 +87,11 @@ export default function OnboardingScreen() {
   useLocale();
   const insets = useSafeAreaInsets();
   const me = useSession((s) => s.me);
+  const refreshMe = useSession((s) => s.refreshMe);
+  const qc = useQueryClient();
 
   const [step, setStep] = useState<Step>(1);
-  const [preset, setPreset] = useState<Preset>("blank");
+  const [preset, setPreset] = useState<Preset>("cornerstore");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [tourActive, setTourActive] = useState(false);
@@ -106,17 +108,23 @@ export default function OnboardingScreen() {
     }
     setSubmitting(true);
     try {
-      await api.request("/api/settings", {
-        method: "PATCH",
-        body: { shopName: shopName.trim() },
+      await auth.completeOnboarding(api, {
+        preset,
+        shopName: shopName.trim(),
+        locale: getLocale(),
       });
+      // The seed just wrote categories / brands / attributes / attribute
+      // values and the shop name, so every tenant-scoped read the tabs made
+      // before the wizard finished is stale — products, categories, brands,
+      // ['attributes', categoryId], ['dashboard'] counts, shop settings, /me.
+      // The whole tenant changed; invalidate everything rather than keep a
+      // key list in step with each screen. The session store keeps its own
+      // copy of /me, hence refreshMe as well.
+      void qc.invalidateQueries();
+      void refreshMe().catch(() => {});
       router.replace("/");
     } catch (e) {
-      setError(
-        e instanceof ApiError && e.status === 401
-          ? dict.errors.unauthorized
-          : dict.errors.internal,
-      );
+      setError(errorCopy(e, dict.errors));
     } finally {
       setSubmitting(false);
     }
@@ -189,8 +197,6 @@ export default function OnboardingScreen() {
                   selected={preset === "cornerstore"}
                   title={dict.step1.cornerstoreTitle}
                   body={dict.step1.cornerstoreBody}
-                  badge={t("mobile.onboarding.webOnly")}
-                  disabled
                   onPress={() => setPreset("cornerstore")}
                 />
                 <PresetOption
@@ -199,7 +205,6 @@ export default function OnboardingScreen() {
                   body={dict.step1.blankBody}
                   onPress={() => setPreset("blank")}
                 />
-                <Text style={styles.note}>{t("mobile.onboarding.seedNote")}</Text>
 
                 <Button label={dict.step1.next} onPress={() => setStep(2)} />
               </View>
@@ -255,6 +260,45 @@ export default function OnboardingScreen() {
 }
 
 /**
+ * The route answers with the web action's codes; same copy, same table. But
+ * the transport speaks first: http.ts throws `offline` / `timeout` with no
+ * code at all, and 403 / 429 carry codes the table does not know, so those
+ * kinds get the shared mobile.common copy (same as returns.tsx / tasks.tsx)
+ * instead of collapsing to "something went wrong".
+ */
+function errorCopy(
+  e: unknown,
+  errors: ReturnType<typeof T>["errors"],
+): string {
+  if (!(e instanceof ApiError)) return errors.internal;
+  if (e.status === 401) return errors.unauthorized;
+  switch (e.kind) {
+    case "offline":
+      return t("mobile.common.offline");
+    case "timeout":
+      return t("mobile.common.timeout");
+    case "forbidden":
+      return t("mobile.common.forbidden");
+    case "rateLimited":
+      return t("mobile.common.tooManyAttempts");
+    default:
+      break;
+  }
+  switch (e.code) {
+    case "SHOP_NAME_REQUIRED":
+      return errors.shopNameRequired;
+    case "INVALID_PHONE":
+      return errors.invalidPhone;
+    case "INVALID_INPUT":
+      return errors.invalidInput;
+    case "PRIMARY_BRANCH_MISSING":
+      return errors.primaryBranchMissing;
+    default:
+      return errors.internal;
+  }
+}
+
+/**
  * Full-window host for the wizard.
  *
  * `(app)` is a Tabs navigator whose custom BottomNav draws the same seven tabs
@@ -292,43 +336,29 @@ function PresetOption({
   selected,
   title,
   body,
-  badge,
-  disabled = false,
   onPress,
 }: {
   selected: boolean;
   title: string;
   body: string;
-  /** Short caption rendered next to the title (e.g. "Web only"). */
-  badge?: string;
-  disabled?: boolean;
   onPress: () => void;
 }) {
   return (
     <Pressable
       onPress={onPress}
-      disabled={disabled}
       accessibilityRole="radio"
-      accessibilityState={{ selected, disabled }}
+      accessibilityState={{ selected }}
       style={({ pressed }) => [
         styles.option,
         selected && styles.optionOn,
-        disabled && styles.optionDisabled,
-        pressed && !disabled && styles.optionPressed,
+        pressed && styles.optionPressed,
       ]}
     >
       <View style={[styles.radio, selected && styles.radioOn]}>
         {selected && <View style={styles.radioDot} />}
       </View>
       <View style={styles.flex}>
-        <View style={styles.optionTitleRow}>
-          <Text style={[styles.optionTitle, styles.flex]}>{title}</Text>
-          {badge ? (
-            <View style={styles.optionBadge}>
-              <Text style={styles.optionBadgeText}>{badge}</Text>
-            </View>
-          ) : null}
-        </View>
+        <Text style={styles.optionTitle}>{title}</Text>
         <Text style={styles.optionBody}>{body}</Text>
       </View>
     </Pressable>
@@ -377,14 +407,21 @@ function Tour({
         <Text style={styles.tourCounter}>
           {t("mobile.onboarding.slideCounter", { n: slide + 1, total })}
         </Text>
+        {/* Skip submits from any slide; the Finish button's spinner only
+            exists on the last one, so the request shows its progress here. */}
         <Pressable
           onPress={onDone}
           disabled={submitting}
           hitSlop={8}
           style={styles.tourTextBtn}
           accessibilityRole="button"
+          accessibilityState={{ disabled: submitting, busy: submitting }}
         >
-          <Text style={styles.tourTextBtnLabel}>{tour.skip}</Text>
+          {submitting ? (
+            <ActivityIndicator size="small" color={colors.accent} />
+          ) : (
+            <Text style={styles.tourTextBtnLabel}>{tour.skip}</Text>
+          )}
         </Pressable>
       </View>
 
@@ -444,6 +481,7 @@ function Tour({
             label={last ? tour.finish : tour.next}
             onPress={last ? onDone : () => onSlide(Math.min(total - 1, slide + 1))}
             loading={last && submitting}
+            disabled={submitting}
           />
         </View>
       </View>
@@ -502,20 +540,7 @@ const styles = StyleSheet.create({
     ...RTL,
   },
   optionOn: { borderColor: colors.accent, backgroundColor: colors.accentLight },
-  optionDisabled: { opacity: 0.55 },
   optionPressed: { opacity: 0.85 },
-  optionTitleRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, ...RTL },
-  optionBadge: {
-    backgroundColor: colors.neutralTint,
-    borderRadius: radius.full,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-  },
-  optionBadgeText: {
-    fontFamily: fonts.medium,
-    fontSize: 11,
-    color: colors.textSecondary,
-  },
   radio: {
     width: 20,
     height: 20,
@@ -544,12 +569,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textSecondary,
     marginTop: 2,
-    ...RTL_TEXT,
-  },
-  note: {
-    fontFamily: fonts.regular,
-    fontSize: 12,
-    color: colors.textSecondary,
     ...RTL_TEXT,
   },
   tips: {

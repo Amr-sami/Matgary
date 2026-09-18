@@ -2,10 +2,11 @@ import { useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
+import { Image } from "expo-image";
 import { Package, Plus, WarningOctagon, Wallet, Warning } from "phosphor-react-native";
 import { catalog } from "@matgary/api-client";
 
-import { api } from "@/api/client";
+import { API_BASE_URL, api } from "@/api/client";
 import { Screen } from "@/components/layout/Screen";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
@@ -180,6 +181,7 @@ export default function InventoryScreen() {
           {visible.map((p) => {
             const out = p.quantity === 0;
             const low = p.quantity > 0 && p.quantity <= p.lowStockThreshold;
+            const thumb = catalog.resolveUploadUrl(API_BASE_URL, p.imageUrl);
             return (
               <Pressable
                 key={p.id}
@@ -188,25 +190,37 @@ export default function InventoryScreen() {
                 onPress={() => router.push(`/inventory/${encodeURIComponent(p.id)}`)}
                 style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
               >
-                <View style={styles.rowHead}>
-                  <Text numberOfLines={1} style={styles.name}>
-                    {p.name}
-                  </Text>
-                  {labelFor(p.category) ? (
-                    <Badge label={labelFor(p.category)} variant="accent" />
-                  ) : null}
-                </View>
-                <View style={styles.rowMeta}>
-                  <Text style={styles.price}>{money(p.price)}</Text>
-                  <Badge
-                    label={out ? t("app.inventory.filters.stockStatus.out") : t("mobile.common.pieces", { n: p.quantity })}
-                    variant={out ? "outofstock" : low ? "lowstock" : "success"}
+                {thumb ? (
+                  <Image
+                    source={{ uri: thumb }}
+                    style={styles.thumb}
+                    contentFit="cover"
+                    transition={100}
+                    recyclingKey={p.id}
+                    accessibilityLabel={t("mobile.product.a11yPhotoPreview")}
                   />
-                  {p.brand ? (
-                    <Text numberOfLines={1} style={styles.brand}>
-                      {p.brand}
+                ) : null}
+                <View style={styles.rowBody}>
+                  <View style={styles.rowHead}>
+                    <Text numberOfLines={1} style={styles.name}>
+                      {p.name}
                     </Text>
-                  ) : null}
+                    {labelFor(p.category) ? (
+                      <Badge label={labelFor(p.category)} variant="accent" />
+                    ) : null}
+                  </View>
+                  <View style={styles.rowMeta}>
+                    <Text style={styles.price}>{money(p.price)}</Text>
+                    <Badge
+                      label={out ? t("app.inventory.filters.stockStatus.out") : t("mobile.common.pieces", { n: p.quantity })}
+                      variant={out ? "outofstock" : low ? "lowstock" : "success"}
+                    />
+                    {p.brand ? (
+                      <Text numberOfLines={1} style={styles.brand}>
+                        {p.brand}
+                      </Text>
+                    ) : null}
+                  </View>
                 </View>
               </Pressable>
             );
@@ -253,10 +267,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.lg,
-    gap: spacing.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
     ...elevation.card,
   },
   rowPressed: { backgroundColor: colors.accentLight },
+  thumb: { width: 40, height: 40, borderRadius: radius.md, backgroundColor: colors.neutralTint },
+  rowBody: { flex: 1, minWidth: 0, gap: spacing.sm },
   rowHead: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   name: { flexShrink: 1, fontFamily: fonts.semibold, fontSize: 15, color: colors.text, ...RTL_TEXT },
   rowMeta: { flexDirection: "row", alignItems: "center", gap: spacing.sm },

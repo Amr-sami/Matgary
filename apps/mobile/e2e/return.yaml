@@ -1,0 +1,124 @@
+# CP-03 — Take a return on a recent sale, and see it land in the list.
+#
+# More → Returns → "Record return" → the picker lists recent, not-yet-returned
+# sale lines (newest first — the one pos-sale.yaml just rang) → tap the first
+# → the selected line's invoice number is copied → quantity stays at 1
+# (every POS sale here is a single unit; the field caps at the line's
+# quantity) → a reason (required) → Record → the modal closes, the lists
+# refetch, and a row carrying that invoice number is in the returns list.
+# Signs in first when the app is on the login screen. Ends on the dashboard.
+#
+# Elements are addressed by testID (returns-*); Button takes no testID, so the
+# two buttons sit on a wrapper View. A sale line can be returned ONCE
+# (recordReturn overwrites returnedQuantity), so each run consumes one recent
+# sale — run pos-sale.yaml first to top the list up.
+appId: com.thestoro.app
+env:
+  REASON: "e2e — عيب في المنتج"
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      text: "المزيد|More|تسجيل الدخول|Sign in"
+    timeout: 45000
+- runFlow:
+    when:
+      visible:
+        id: "login-identifier"
+    file: login.yaml
+
+# More → Returns.
+- runFlow: helpers/dismiss-logbox.yaml
+- tapOn:
+    text: "المزيد|More"
+- scrollUntilVisible:
+    element:
+      text: "المرتجعات|Returns"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    text: "المرتجعات|Returns"
+- extendedWaitUntil:
+    visible:
+      id: "returns-take"
+    timeout: 30000
+- assertVisible:
+    text: "مرتجعات الشهر|Returns this month"
+
+# Open the picker and take the newest returnable line.
+- tapOn:
+    id: "returns-take"
+- extendedWaitUntil:
+    visible:
+      id: "returns-pick-row"
+    timeout: 30000
+- assertVisible:
+    text: "اختر البند من آخر المبيعات:|Pick the item from recent sales:"
+- tapOn:
+    id: "returns-pick-row"
+    index: 0
+
+# The selected line: keep its invoice number for the list assertion.
+- extendedWaitUntil:
+    visible:
+      id: "returns-line-invoice"
+    timeout: 15000
+- assertVisible:
+    id: "returns-line-invoice"
+    text: "INV-.*"
+- copyTextFrom:
+    id: "returns-line-invoice"
+- evalScript: ${output.invoice = maestro.copiedText}
+- assertVisible:
+    text: "الحد الأقصى: [1-9][0-9]*|Maximum: [1-9][0-9]*"
+
+# Quantity 1, a reason, submit.
+- tapOn:
+    id: "returns-qty"
+- eraseText: 10
+- inputText: "1"
+- tapOn:
+    id: "returns-reason"
+- inputText: ${REASON}
+# Dismiss the keyboard by tapping static text (the modal's ScrollView has
+# keyboardShouldPersistTaps="handled", so a tap on a plain Text closes it).
+- tapOn:
+    text: "الحد الأقصى: [1-9][0-9]*|Maximum: [1-9][0-9]*"
+- scrollUntilVisible:
+    element:
+      id: "returns-submit"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: "returns-submit"
+
+# The modal closes (the picker is gone) and the list carries the new row.
+- extendedWaitUntil:
+    notVisible:
+      id: "returns-submit"
+    timeout: 45000
+- extendedWaitUntil:
+    visible:
+      id: "returns-take"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "returns-row-invoice"
+      text: ${output.invoice}
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertVisible:
+    id: "returns-row-invoice"
+    text: ${output.invoice}
+- assertVisible:
+    text: ${REASON}
+
+# Back to the dashboard.
+- runFlow: helpers/dismiss-logbox.yaml
+- tapOn:
+    text: "لوحة|Home"
+- assertVisible:
+    text: "أهلاً، .+|Welcome back, .+"

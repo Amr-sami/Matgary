@@ -8,17 +8,17 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { CalendarBlank, Check } from "phosphor-react-native";
+import { Check } from "phosphor-react-native";
 
 import { api } from "@/api/client";
 import { getLocale, t } from "@/i18n";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { DateField } from "@/components/ui/DateField";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { HeaderAccessories } from "@/components/shell/HeaderAccessories";
 import { formatActivityDetails } from "@/lib/activity-details";
@@ -34,12 +34,12 @@ import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
  * (view_activity_log), same four filters. The web paginates with a
  * `before=<createdAt of last row>` keyset cursor and treats a full page as
  * "there is more", so this screen is a FlatList over useInfiniteQuery with the
- * exact same rule. The web's date inputs are native <input type="date">; the
- * app has no picker dependency, so they are Field-shaped text inputs with the
- * browser's calendar glyph, accepting dd/mm/yyyy (the placeholder — localised,
- * unlike the browser's, which the design PNG shows in English) or YYYY-MM-DD. The web's User / Category <select>s are a
- * Field-styled Pressable opening a Modal option list, so the filter card keeps
- * the design's compact 2x2 grid.
+ * exact same rule. The web's date inputs are native <input type="date">; here
+ * they are the kit's DateField (Field-shaped box, calendar glyph, platform
+ * picker) which only ever emits YYYY-MM-DD — the dd/mm/yyyy spelling is still
+ * accepted by the parser for filters restored from an older draft. The web's
+ * User / Category <select>s are a Field-styled Pressable opening a Modal
+ * option list, so the filter card keeps the design's compact 2x2 grid.
  */
 
 type ActivityCategory =
@@ -248,18 +248,20 @@ export default function ActivityScreen() {
             <View style={styles.dateCol}>
               <DateField
                 label={t("app.activity.filters.fromLabel")}
-                value={draft.from}
-                onChangeText={(v) => setDraft((d) => ({ ...d, from: v }))}
-                error={fromBad ? t("mobile.activity.invalidDate") : undefined}
+                value={toIsoDay(draft.from)}
+                onChange={(v) => setDraft((d) => ({ ...d, from: v }))}
+                max={toIsoDay(draft.to) ?? undefined}
               />
+              {fromBad ? <Text style={styles.fieldError}>{t("mobile.activity.invalidDate")}</Text> : null}
             </View>
             <View style={styles.dateCol}>
               <DateField
                 label={t("app.activity.filters.toLabel")}
-                value={draft.to}
-                onChangeText={(v) => setDraft((d) => ({ ...d, to: v }))}
-                error={toBad ? t("mobile.activity.invalidDate") : undefined}
+                value={toIsoDay(draft.to)}
+                onChange={(v) => setDraft((d) => ({ ...d, to: v }))}
+                min={toIsoDay(draft.from) ?? undefined}
               />
+              {toBad ? <Text style={styles.fieldError}>{t("mobile.activity.invalidDate")}</Text> : null}
             </View>
           </View>
 
@@ -339,50 +341,6 @@ export default function ActivityScreen() {
         contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.lg }]}
         keyboardShouldPersistTaps="handled"
       />
-    </View>
-  );
-}
-
-/**
- * Field-shaped date input with the calendar glyph the web's native
- * <input type="date"> draws at the start edge (see the design PNG). The kit's
- * Field has no adornment slot, so the box is rebuilt here to Field's metrics.
- * textAlign is left unset, as in Field: RN resolves it from the layout
- * direction, whereas an explicit right/left gets swapped under RTL.
- */
-function DateField({
-  label,
-  value,
-  onChangeText,
-  error,
-}: {
-  label: string;
-  value: string;
-  onChangeText: (value: string) => void;
-  error?: string;
-}) {
-  const [focused, setFocused] = useState(false);
-
-  return (
-    <View style={styles.selectWrap}>
-      <Text style={styles.filterLabel}>{label}</Text>
-      <View style={[styles.dateBox, focused && styles.dateBoxFocused]}>
-        <CalendarBlank size={18} color={colors.textSecondary} />
-        <TextInput
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={t("mobile.activity.datePlaceholder")}
-          placeholderTextColor={colors.textSecondary}
-          keyboardType="numbers-and-punctuation"
-          autoCapitalize="none"
-          autoCorrect={false}
-          accessibilityLabel={label}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          style={styles.dateInput}
-        />
-      </View>
-      {error ? <Text style={styles.fieldError}>{error}</Text> : null}
     </View>
   );
 }
@@ -536,28 +494,6 @@ const styles = StyleSheet.create({
     ...RTL_TEXT,
   },
   actions: { flexDirection: "row", justifyContent: "flex-end", gap: spacing.sm, marginTop: spacing.lg },
-
-  // DateField — Field's box and input metrics, plus the calendar glyph.
-  dateBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    minHeight: 52,
-    paddingHorizontal: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    backgroundColor: colors.bg,
-  },
-  dateBoxFocused: { borderColor: colors.accent },
-  dateInput: {
-    flex: 1,
-    fontFamily: fonts.regular,
-    fontSize: 16,
-    color: colors.text,
-    includeFontPadding: false,
-    paddingVertical: 12,
-  },
 
   // Select — box matches Field's border/height so the 2x2 grid reads as one.
   selectWrap: { gap: spacing.sm },

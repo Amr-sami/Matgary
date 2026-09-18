@@ -233,6 +233,7 @@ export default function CategoriesSettingsScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t("app.catalog.categoriesAdmin.addCategory")}
+              testID="categories-add"
               onPress={() => setSheet({ mode: "add" })}
               style={({ pressed }) => [styles.addBtn, pressed && { backgroundColor: colors.accentPressed }]}
             >
@@ -250,7 +251,11 @@ export default function CategoriesSettingsScreen() {
         </Pressable>
       ) : null}
 
-      {!canManage && me ? <Text style={styles.readOnly}>{t("mobile.catalog.readOnly")}</Text> : null}
+      {!canManage && me ? (
+        <Text style={styles.readOnly} testID="categories-readonly">
+          {t("mobile.catalog.readOnly")}
+        </Text>
+      ) : null}
 
       {q.isLoading ? (
         <ActivityIndicator color={colors.accent} style={{ marginTop: spacing.xl }} />
