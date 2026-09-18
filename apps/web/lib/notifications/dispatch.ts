@@ -157,6 +157,7 @@ async function doFanout<E extends NotificationEventType>(
       .select({
         userId: notificationPreferences.userId,
         inApp: notificationPreferences.inApp,
+        push: notificationPreferences.push,
         email: notificationPreferences.email,
         digestMode: notificationPreferences.digestMode,
       })
@@ -208,6 +209,10 @@ async function doFanout<E extends NotificationEventType>(
           title,
           body,
           link: payload.link ?? null,
+          // Digest-mode events (an owner's `sale.created`) show in the bell
+          // but do not buzz the phone per event — §8.3. Also honour the
+          // stored per-event push switch when the user has set one.
+          push: pref.digestMode !== "digest" && (storedByUser.get(r.userId)?.push ?? true),
         });
       }
 

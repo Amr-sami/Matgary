@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
-import { sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import { db } from "@/lib/db";
+import { db, withTenant } from "@/lib/db";
+import { pushTokens } from "@/lib/db/schema";
+import { isExpoPushToken } from "@/lib/push/expo-push";
 import { rateLimit } from "@/lib/ratelimit";
 import { hashRefreshToken } from "@/lib/api/native-token";
 
@@ -25,6 +27,14 @@ export const dynamic = "force-dynamic";
 
 const bodySchema = z.object({
   refreshToken: z.string().min(20).max(500),
+  // The device's Expo push token, when the app has one. Signing out must also
+  // stop the pushes — a phone handed to someone else must not keep buzzing
+  // with the previous user's tasks. Optional AND lenient: a simulator, a
+  // device that denied notification permission, or a client that forwards
+  // its stored value verbatim ("" / null) has nothing valid to send, and a
+  // convenience field must never veto the revocation — anything that is not
+  // an Expo token is simply ignored below.
+  pushToken: z.unknown().optional(),
 });
 
 function clientIp(h: Headers): string {
@@ -55,14 +65,49 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "INVALID_BODY" }, { status: 400 });
   }
 
+  const tokenHash = hashRefreshToken(body.refreshToken);
+
   // `revoked_at IS NULL` keeps a retry from overwriting the original reason
-  // and timestamp of an earlier revoke (e.g. a 'token_reuse' sweep).
-  await db.execute(sql`
+  // and timestamp of an earlier revoke (e.g. a 'token_reuse' sweep). RETURNING
+  // the owner lets the push purge below stay scoped to that user without a
+  // second lookup — and stays blind: an unknown token returns no row and the
+  // response is the same 200 either way.
+  const revoked = (await db.execute(sql`
     UPDATE auth_devices
        SET revoked_at = now(), revoked_reason = 'logout'
-     WHERE refresh_token_hash = ${hashRefreshToken(body.refreshToken)}
+     WHERE refresh_token_hash = ${tokenHash}
        AND revoked_at IS NULL
-  `);
+    RETURNING user_id, tenant_id
+  `)) as unknown as Array<{ user_id: string; tenant_id: string }>;
+
+  // Same-device retry after the refresh token was already revoked: the push
+  // token must still be silenced, so fall back to the (now revoked) row's owner.
+  const owner =
+    revoked[0] ??
+    ((await db.execute(sql`
+      SELECT user_id, tenant_id FROM auth_devices
+       WHERE refresh_token_hash = ${tokenHash}
+       LIMIT 1
+    `)) as unknown as Array<{ user_id: string; tenant_id: string }>)[0];
+
+  const pushToken = isExpoPushToken(body.pushToken) ? body.pushToken : null;
+  if (pushToken && owner) {
+    // Only the token's owner can silence it: the refresh token proves who is
+    // asking, and the UPDATE is pinned to that user. Under RLS via withTenant.
+    await withTenant(owner.tenant_id, async (tx) => {
+      await tx
+        .update(pushTokens)
+        .set({ disabledAt: new Date() })
+        .where(
+          and(
+            eq(pushTokens.tenantId, owner.tenant_id),
+            eq(pushTokens.userId, owner.user_id),
+            eq(pushTokens.expoToken, pushToken),
+            isNull(pushTokens.disabledAt),
+          ),
+        );
+    });
+  }
 
   return NextResponse.json({ ok: true });
 }

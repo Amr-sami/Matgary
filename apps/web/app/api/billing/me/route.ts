@@ -7,7 +7,9 @@ import {
 import { isPaymobConfigured } from "@/lib/payments/paymob";
 
 export async function GET() {
-  const r = await requireTenant();
+  // A lapsed subscription is exactly when this screen must render — the
+  // native /billing route is where SUBSCRIPTION_REQUIRED sends the user.
+  const r = await requireTenant({ allowSubscriptionRequired: true });
   if (!r.ok) return r.response;
 
   const sub = await ensureSubscription(r.ctx.tenantId);

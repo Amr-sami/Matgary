@@ -19,6 +19,7 @@ import { renderDigestMessage } from "@/lib/digest/render";
 import { sendTextToMeta } from "@/lib/whatsapp/outbound-sender";
 import { normalizePhone } from "@/lib/settings";
 import { logActivity } from "@/lib/repo/activity";
+import { drainPushReceipts } from "@/lib/push/receipts";
 
 // Hourly (or 30-min) tick. For every tenant where digest_settings.enabled
 // AND it's currently `digest_hour:NN` in their local tz, build + send the
@@ -285,6 +286,10 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Piggyback: check Expo receipts for pushes sent ≥15 min ago and prune the
+  // tokens that turned out dead (lib/push/receipts.ts). Never throws.
+  const pushReceipts = await drainPushReceipts();
+
   return NextResponse.json({
     ok: true,
     tenants: tenantRows.length,
@@ -292,5 +297,6 @@ export async function POST(req: NextRequest) {
     sent,
     skipped,
     failed,
+    pushReceipts,
   });
 }

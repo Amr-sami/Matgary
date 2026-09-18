@@ -2,6 +2,7 @@ import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { withTenant } from "@/lib/db";
 import { notifications } from "@/lib/db/schema";
 import { publishUserNotificationEvent } from "@/lib/notifications/events";
+import { notifyUserDevices, routeForNotification } from "@/lib/push/notify";
 
 export type NotificationKind =
   | "low_stock"
@@ -77,6 +78,10 @@ export interface CreateNotificationInput {
   title: string;
   body?: string | null;
   link?: string | null;
+  /** Also push to the recipient's phones. Default true. The dispatcher passes
+   *  false for digest-mode events (`sale.created` for an owner — §8.3: the
+   *  bell shows it, the phone follows the daily-digest logic instead). */
+  push?: boolean;
 }
 
 /**
@@ -91,18 +96,39 @@ export async function createNotification(
   branchId: string | null,
   input: CreateNotificationInput,
 ): Promise<void> {
-  await tx.insert(notifications).values({
-    tenantId,
-    branchId,
-    userId: input.userId,
-    kind: input.kind,
-    title: input.title,
-    body: input.body ?? null,
-    link: input.link ?? null,
-  });
+  const [row] = await tx
+    .insert(notifications)
+    .values({
+      tenantId,
+      branchId,
+      userId: input.userId,
+      kind: input.kind,
+      title: input.title,
+      body: input.body ?? null,
+      link: input.link ?? null,
+    })
+    .returning({ id: notifications.id });
   // Fire-and-forget pub/sub poke. If the surrounding tx later rolls back,
   // the SSE consumer just refetches and finds nothing new — harmless.
   void publishUserNotificationEvent(input.userId);
+  // Fire-and-forget Expo push to the recipient's phones. NOT harmless on
+  // rollback — a push for a row that never committed lands on a 404 — so
+  // notifyUserDevices waits until this row is visible from another
+  // connection before it sends, and gives up quietly if it never is.
+  if (input.push === false) return;
+  void notifyUserDevices(tenantId, input.userId, {
+    title: input.title,
+    body: input.body ?? null,
+    notificationId: row?.id ?? null,
+    data: {
+      type: input.kind,
+      route: routeForNotification(input.kind, input.link),
+      id: row?.id ?? null,
+      link: input.link ?? null,
+      tenantId,
+      branchId,
+    },
+  });
 }
 
 /**

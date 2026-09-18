@@ -48,9 +48,21 @@ export async function GET() {
   // requireTenantWithBranch also resolves the active branch (X-Branch-Id, then
   // the mg.branch cookie, then the user's primary) and validates it against
   // the user's allow-list, so `ctx.allowedBranchIds` below is already trusted.
-  const r = await requireTenantWithBranch();
+  //
+  // This is the ONE authenticated read that answers behind the
+  // must-change-password and subscription walls. Every other route 403/402s
+  // there; if this one did too, the native app could never seed a session and
+  // the router would have nowhere to send the user — a new staff account or a
+  // lapsed tenant would be stuck on the login screen forever (the web
+  // equivalent: pages still render under those walls, only API calls fail).
+  // The body says which wall applies so the client routes proactively.
+  const r = await requireTenantWithBranch({
+    allowPasswordChangeRequired: true,
+    allowSubscriptionRequired: true,
+  });
   if (!r.ok) return r.response;
   const { ctx } = r;
+  const walls = new Set(ctx.walls ?? []);
 
   const [account, tenantRow, allBranches, userCtx] = await Promise.all([
     // users/tenants are not RLS-protected (they are the tables that establish
@@ -96,13 +108,20 @@ export async function GET() {
       name: account[0].name,
       role: ctx.role,
       locale: userCtx.locale,
+      // Claim OR row: the claim is what gates every other request until the
+      // next refresh, the row is what an admin reset flips first. Either one
+      // means the app must land on /settings/change-password.
+      mustChangePassword:
+        walls.has("PASSWORD_CHANGE_REQUIRED") || userCtx.mustChangePassword,
     },
     tenant: {
       id: ctx.tenantId,
       slug: tenantRow[0]?.slug ?? userCtx.tenantSlug,
       name: tenantRow[0]?.name ?? null,
       subscriptionStatus: userCtx.subscriptionStatus,
-      subscriptionAccessActive: userCtx.subscriptionAccessActive,
+      // Same rule as above: active only when BOTH the claim and the row agree.
+      subscriptionAccessActive:
+        userCtx.subscriptionAccessActive && !walls.has("SUBSCRIPTION_REQUIRED"),
       suspended: Boolean(userCtx.tenantSuspendedAt),
     },
     branch: {

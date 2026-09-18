@@ -172,6 +172,11 @@ const PUBLIC_PREFIXES = [
   // Cron sweeps run from a sidecar with no session — they're guarded by
   // a shared-secret bearer token inside the route handler instead.
   "/api/cron",
+  // OS association files for Universal Links / App Links
+  // (apple-app-site-association, assetlinks.json). Apple's CDN and Android's
+  // verifier fetch these anonymously and follow no redirects, so they must
+  // never hit the session check. Routes live in app/.well-known/.
+  "/.well-known",
   "/_next",
   "/favicon",
   "/fonts",

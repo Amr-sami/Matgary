@@ -337,6 +337,20 @@
       "when": 1781900200000,
       "tag": "0047_normalise_customer_phones",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1781900300000,
+      "tag": "0048_push_tokens",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1781900400000,
+      "tag": "0049_push_receipts",
+      "breakpoints": true
     }
   ]
 }

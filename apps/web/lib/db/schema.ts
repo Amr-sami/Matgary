@@ -9,6 +9,7 @@ import {
   index,
   jsonb,
   uniqueIndex,
+  check,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 
@@ -1350,6 +1351,9 @@ export const notificationPreferences = pgTable(
     /** Matches NotificationEventType in lib/notifications/event-types.ts. */
     eventType: text("event_type").notNull(),
     inApp: boolean("in_app").notNull().default(true),
+    /** Phone push for this event (migration 0048_push_receipts). Independent
+     *  of `inApp` so "show it in the bell, don't buzz me" is expressible. */
+    push: boolean("push").notNull().default(true),
     email: boolean("email").notNull().default(false),
     /** 'instant' | 'digest' — digest buffers to notification_digest_queue. */
     digestMode: text("digest_mode").notNull().default("instant"),
@@ -1368,6 +1372,64 @@ export const notificationPreferences = pgTable(
     ),
     index("notification_preferences_tenant_event_idx").on(t.tenantId, t.eventType),
   ],
+);
+
+// Expo push tokens (migration 0048). One row per (install, user). Rows are
+// disabled, never deleted: Expo's DeviceNotRegistered ticket, an explicit
+// DELETE, and logout all set `disabledAt`. `expoToken` is globally unique so
+// a token that reappears under a different user is re-owned, not duplicated.
+export const pushTokens = pgTable(
+  "push_tokens",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** `ExponentPushToken[...]` / `ExpoPushToken[...]`. */
+    expoToken: text("expo_token").notNull().unique(),
+    /** 'ios' | 'android' */
+    platform: text("platform").notNull(),
+    deviceName: text("device_name"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    /** Non-null means "do not send". */
+    disabledAt: timestamp("disabled_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("push_tokens_tenant_user_live_idx")
+      .on(t.tenantId, t.userId)
+      .where(sql`${t.disabledAt} IS NULL`),
+    check("push_tokens_platform_check", sql`${t.platform} IN ('ios', 'android')`),
+  ],
+);
+
+// Push receipts queue (migration 0048_push_receipts). One row per `ok` Expo
+// ticket; the cron asks Expo for the receipt ~15 min later and disables the
+// token on DeviceNotRegistered. Rows are deleted once checked or once stale.
+export const pushReceipts = pgTable(
+  "push_receipts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    expoToken: text("expo_token").notNull(),
+    ticketId: text("ticket_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [index("push_receipts_tenant_created_idx").on(t.tenantId, t.createdAt)],
 );
 
 // Digest queue (migration 0045). Populated when a user's preference for a
@@ -2165,3 +2227,5 @@ export type AdminSessionRow = typeof adminSessions.$inferSelect;
 export type AdminAuditLogRow = typeof adminAuditLog.$inferSelect;
 export type PlatformPlanRow = typeof platformPlans.$inferSelect;
 export type PlatformBroadcastRow = typeof platformBroadcasts.$inferSelect;
+export type PushTokenRow = typeof pushTokens.$inferSelect;
+export type PushReceiptRow = typeof pushReceipts.$inferSelect;

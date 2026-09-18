@@ -1,4 +1,4 @@
-import { auth } from "@/lib/auth";
+import { auth, resolveTenantContext } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import type { Permission } from "@/lib/permissions";
@@ -45,11 +45,22 @@ async function ensureRequestContext(
   });
 }
 
+/**
+ * A gate that WOULD have blocked this request, had the route not opted out of
+ * it via `ResolveOptions`. Only /api/v1/me (and the routes the walls point at)
+ * opt out, so they can tell the client which wall it is standing behind.
+ */
+export type BypassedWall = "PASSWORD_CHANGE_REQUIRED" | "SUBSCRIPTION_REQUIRED";
+
 export type AuthedContext = {
   userId: string;
   tenantId: string;
   role: string | null;
   permissions: Permission[];
+  /** Gates skipped for this request — see BypassedWall. Empty for a cookie
+   *  session (middleware.ts already enforced them) and for any route that did
+   *  not opt out. Optional so hand-built contexts (tests, jobs) stay valid. */
+  walls?: readonly BypassedWall[];
 };
 
 export type AuthedBranchContext = AuthedContext & {
@@ -79,14 +90,28 @@ type SessionResult =
   /** A valid token whose tenant/account state blocks the request. Mirrors the
    *  bodies middleware returns for cookie sessions, so a client handles one
    *  contract regardless of transport. */
-  | { kind: "blocked"; code: "TENANT_SUSPENDED" | "PASSWORD_CHANGE_REQUIRED" | "SUBSCRIPTION_REQUIRED"; status: 402 | 403 };
+  | {
+      kind: "blocked";
+      code: "TENANT_SUSPENDED" | "PASSWORD_CHANGE_REQUIRED" | "SUBSCRIPTION_REQUIRED";
+      status: 402 | 403;
+      /** Human text for the client to show verbatim. Today only the
+       *  suspension reason the platform admin typed (Spec 03). */
+      detail?: string | null;
+    };
 
-type ResolveOptions = {
-  /** Let a caller with the `mcp` (must-change-password) claim through. Only the
+export type ResolveOptions = {
+  /** Let a caller with the `mcp` (must-change-password) claim through. The
    *  change-password route sets this — it is the one request such a user must
    *  be able to make, exactly as middleware.ts exempts /api/account/password
-   *  for cookie sessions. */
+   *  for cookie sessions — and so does /api/v1/me, which has to answer so the
+   *  native app can seed a session and route to the change-password screen
+   *  instead of stranding the user on login. */
   allowPasswordChangeRequired?: boolean;
+  /** Let a caller whose subscription has lapsed (`sub_ok: false`) through.
+   *  /api/v1/me and /api/billing/me set this: the web still renders the
+   *  billing page under a lapsed subscription (only API writes 402), and the
+   *  native billing screen needs the same two reads to render at all. */
+  allowSubscriptionRequired?: boolean;
 };
 
 async function resolveSession(opts: ResolveOptions = {}): Promise<SessionResult> {
@@ -104,13 +129,31 @@ async function resolveSession(opts: ResolveOptions = {}): Promise<SessionResult>
     // token. They are enforced here instead, in the same order, so the two
     // transports are behaviourally identical.
     if (claims.susp) {
-      return { kind: "blocked", code: "TENANT_SUSPENDED", status: 403 };
+      // The web shows `tenantSuspendedReason` off the NextAuth session; a
+      // bearer has no session, so the reason rides on the 403 body instead.
+      // Cached ~60s in resolveTenantContext and only ever hit on the
+      // suspended path, so it costs nothing on the hot path. Best-effort: a
+      // failed lookup still answers 403 TENANT_SUSPENDED, just without text.
+      let detail: string | null = null;
+      try {
+        detail = (await resolveTenantContext(claims.sub)).tenantSuspendedReason;
+      } catch {
+        detail = null;
+      }
+      return { kind: "blocked", code: "TENANT_SUSPENDED", status: 403, detail };
     }
-    if (claims.mcp && !opts.allowPasswordChangeRequired) {
-      return { kind: "blocked", code: "PASSWORD_CHANGE_REQUIRED", status: 403 };
+    const walls: BypassedWall[] = [];
+    if (claims.mcp) {
+      if (!opts.allowPasswordChangeRequired) {
+        return { kind: "blocked", code: "PASSWORD_CHANGE_REQUIRED", status: 403 };
+      }
+      walls.push("PASSWORD_CHANGE_REQUIRED");
     }
     if (!claims.sub_ok) {
-      return { kind: "blocked", code: "SUBSCRIPTION_REQUIRED", status: 402 };
+      if (!opts.allowSubscriptionRequired) {
+        return { kind: "blocked", code: "SUBSCRIPTION_REQUIRED", status: 402 };
+      }
+      walls.push("SUBSCRIPTION_REQUIRED");
     }
 
     return {
@@ -120,6 +163,7 @@ async function resolveSession(opts: ResolveOptions = {}): Promise<SessionResult>
         tenantId: claims.tenantId,
         role: claims.role,
         permissions: claims.permissions,
+        walls,
       },
     };
   }
@@ -133,6 +177,7 @@ async function resolveSession(opts: ResolveOptions = {}): Promise<SessionResult>
       tenantId: session.user.tenantId,
       role: session.user.role,
       permissions: (session.user.permissions ?? []) as Permission[],
+      walls: [],
     },
   };
 }
@@ -151,7 +196,10 @@ export async function requireTenant(opts: ResolveOptions = {}): Promise<
   if (r.kind === "blocked") {
     return {
       ok: false,
-      response: NextResponse.json({ error: r.code }, { status: r.status }),
+      response: NextResponse.json(
+        r.detail ? { error: r.code, detail: r.detail } : { error: r.code },
+        { status: r.status },
+      ),
     };
   }
   setRequestContext({ tenantId: r.ctx.tenantId, userId: r.ctx.userId });
@@ -187,11 +235,11 @@ export async function requirePermission(perm: Permission): Promise<
  * accessible branches (a misconfigured staff row); the migration guarantees
  * every tenant has a primary branch, so owners never hit this.
  */
-export async function requireTenantWithBranch(): Promise<
+export async function requireTenantWithBranch(opts: ResolveOptions = {}): Promise<
   | { ok: true; ctx: AuthedBranchContext }
   | { ok: false; response: NextResponse }
 > {
-  const r = await requireTenant();
+  const r = await requireTenant(opts);
   if (!r.ok) return r;
   const branch = await resolveActiveBranch(r.ctx);
   if (!branch) {
