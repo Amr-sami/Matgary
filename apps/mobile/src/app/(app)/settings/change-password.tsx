@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
 import { useMutation } from "@tanstack/react-query";
 
 import { api } from "@/api/client";
@@ -9,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Field } from "@/components/ui/Field";
 import { SettingsHeader } from "@/components/ui/SettingsHeader";
+import { useGoBack } from "@/lib/nav";
 import { useSession } from "@/stores/session";
 import { colors, fonts, radius, spacing } from "@/theme/tokens";
 import { RTL_TEXT } from "@/theme/rtl";
@@ -56,7 +56,7 @@ function serverError(e: unknown, fallback: string): string {
  * mobile wins over pixel parity with the browser.
  */
 export default function ChangePasswordScreen() {
-  const router = useRouter();
+  const goBack = useGoBack("/settings");
   const insets = useSafeAreaInsets();
 
   const [current, setCurrent] = useState("");
@@ -93,7 +93,7 @@ export default function ChangePasswordScreen() {
         return;
       }
       // Let the success line register before the screen pops.
-      setTimeout(() => router.back(), 900);
+      setTimeout(goBack, 900);
     },
     onError: (e) => {
       setSuccess(false);
@@ -135,6 +135,7 @@ export default function ChangePasswordScreen() {
         <SettingsHeader
           parentLabel={t("app.settingsPage.title")}
           title={t("app.changePassword.title")}
+          fallback="/settings"
         />
 
         <Card style={styles.card}>

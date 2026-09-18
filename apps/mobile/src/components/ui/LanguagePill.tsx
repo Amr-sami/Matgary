@@ -27,7 +27,14 @@ import { colors, fonts, MIN_TOUCH, radius, spacing } from "@/theme/tokens";
  * Accessibility: VoiceOver/TalkBack read "Language: العربية, button, Switch to
  * English" — what it is now, then what the tap does.
  */
-export function LanguagePill({ style }: { style?: StyleProp<ViewStyle> }) {
+export function LanguagePill({
+  style,
+  // Shared e2e contract: every public screen's pill answers to this one id.
+  testID = "language-pill",
+}: {
+  style?: StyleProp<ViewStyle>;
+  testID?: string;
+}) {
   const locale = useLocale((s) => s.locale);
   const setLocale = useLocale((s) => s.setLocale);
 
@@ -41,6 +48,7 @@ export function LanguagePill({ style }: { style?: StyleProp<ViewStyle> }) {
 
   return (
     <Pressable
+      testID={testID}
       accessibilityRole="button"
       accessibilityLabel={`${t("app.shell.language.label")}: ${currentName}`}
       accessibilityHint={t("mobile.languagePill.switchTo", { lang: targetName })}

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
-import { Redirect, useRouter } from "expo-router";
+import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { ProhibitIcon as Prohibit } from "phosphor-react-native/src/icons/Prohibit";
 
 import { ApiError } from "@matgary/api-client";
@@ -42,6 +42,13 @@ export default function ServicePausedScreen() {
   const refreshMe = useSession((s) => s.refreshMe);
   const last = useBlocked((s) => s.last);
   const paused = last?.code === "TENANT_SUSPENDED";
+  // Dev-only audit hook: `matgary://service-paused?preview=1` renders the wall
+  // without suspending a tenant, so its layout/RTL can be checked in both
+  // locales. `__DEV__` is false in release builds, so Metro strips the whole
+  // branch and the deep-link redirect below stays intact for real users.
+  const params = useLocalSearchParams<{ preview?: string | string[] }>();
+  const rawPreview = Array.isArray(params.preview) ? params.preview[0] : params.preview;
+  const preview = __DEV__ && rawPreview === "1";
   const reason = paused ? serverDetail(last.message) : null;
   const [signingOut, setSigningOut] = useState(false);
   const [checking, setChecking] = useState(false);
@@ -111,7 +118,8 @@ export default function ServicePausedScreen() {
 
   // Reached by link, not by a wall: the tenant is active as far as this run
   // knows, so there is nothing to say and no reason to trap the user here.
-  if (!paused) return <Redirect href="/" />;
+  // (Skipped in dev when `?preview=1` is set — see `preview` above.)
+  if (!paused && !preview) return <Redirect href="/" />;
 
   return (
     <Screen>

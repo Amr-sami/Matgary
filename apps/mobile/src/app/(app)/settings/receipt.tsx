@@ -7,7 +7,6 @@ import {
   Text,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, settings } from "@matgary/api-client";
 import { ArrowCounterClockwiseIcon as ArrowCounterClockwise } from "phosphor-react-native/src/icons/ArrowCounterClockwise";
@@ -83,7 +82,6 @@ const customId = (k: ReceiptBlockKey) => k.slice("custom:".length);
 const LOGO_PX = { small: 40, medium: 64, large: 96 } as const;
 
 export default function ReceiptSettingsScreen() {
-  const router = useRouter();
   const qc = useQueryClient();
   const me = useSession((s) => s.me);
   const branchId = me?.branch.id ?? null;
@@ -213,7 +211,7 @@ export default function ReceiptSettingsScreen() {
         parentLabel={t("app.settingsPage.title")}
         title={t("app.settingsPage.receiptCard.heading")}
         subtitle={t("app.settingsPage.receiptCard.subhead")}
-        onBack={() => router.back()}
+        fallback="/settings"
       />
 
       {notice ? (

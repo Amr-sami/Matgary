@@ -15,6 +15,7 @@ import { Logo } from "@/components/Logo";
 import { Screen } from "@/components/layout/Screen";
 import { ChevronBack, ChevronForward } from "@/components/ui/Chevron";
 import { t, useLocale } from "@/i18n";
+import { useGoBack } from "@/lib/nav";
 import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
 
@@ -57,6 +58,7 @@ interface Row {
 
 export default function AboutSettingsScreen() {
   const router = useRouter();
+  const goBack = useGoBack("/settings");
   const locale = useLocale((s) => s.locale);
   const [error, setError] = useState<string | null>(null);
 
@@ -163,8 +165,9 @@ export default function AboutSettingsScreen() {
       <View style={styles.header}>
         <Pressable
           accessibilityRole="button"
-          onPress={() => router.back()}
+          onPress={goBack}
           hitSlop={12}
+          testID="back-link"
           style={styles.back}
         >
           <ChevronBack size={16} color={colors.textSecondary} />

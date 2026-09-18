@@ -503,6 +503,7 @@ export default function SalesScreen() {
       <Card title={t("app.sales.form.title")}>
         <Text style={styles.label}>{t("app.sales.form.productSearch.label")}</Text>
         <SearchField
+          testID="pos-search"
           value={query}
           onChangeText={(v) => {
             setQuery(v);

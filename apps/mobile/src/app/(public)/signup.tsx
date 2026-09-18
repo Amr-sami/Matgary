@@ -18,6 +18,7 @@ import { dictionaries } from "@matgary/i18n";
 import { getLocale, t } from "@/i18n";
 import { api, deviceMeta } from "@/api/client";
 import { getInstallId } from "@/auth/installId";
+import { useGoBack } from "@/lib/nav";
 import { useSession } from "@/stores/session";
 import { DottedGround } from "@/components/DottedGround";
 import { Logo } from "@/components/Logo";
@@ -222,10 +223,7 @@ export default function SignupScreen() {
     }
   };
 
-  const goToLogin = () => {
-    if (router.canGoBack()) router.back();
-    else router.replace("/login");
-  };
+  const goToLogin = useGoBack("/login");
 
   return (
     <View style={styles.root}>
@@ -288,9 +286,12 @@ export default function SignupScreen() {
               <View style={styles.fieldGroup}>
                 <Field
                   label={T().emailLabel}
+                  testID="signup-email"
                   placeholder={T().emailPlaceholder}
                   value={email}
                   onChangeText={setEmail}
+                  // Always Latin: keep the caret at the end in Arabic (see login.tsx).
+                  ltr
                   autoCapitalize="none"
                   autoCorrect={false}
                   keyboardType="email-address"
@@ -307,6 +308,7 @@ export default function SignupScreen() {
 
               <Field
                 label={T().passwordLabel}
+                testID="signup-password"
                 placeholder={T().passwordPlaceholder}
                 value={password}
                 onChangeText={setPassword}
@@ -318,6 +320,7 @@ export default function SignupScreen() {
 
               <Field
                 label={T().passwordConfirmLabel}
+                testID="signup-password-confirm"
                 placeholder={T().passwordConfirmPlaceholder}
                 value={passwordConfirm}
                 onChangeText={setPasswordConfirm}
@@ -352,6 +355,7 @@ export default function SignupScreen() {
             <View style={styles.form}>
               <Field
                 label={T().storeNameLabel}
+                testID="signup-store-name"
                 placeholder={T().storeNamePlaceholder}
                 value={storeName}
                 onChangeText={setStoreName}
@@ -362,12 +366,16 @@ export default function SignupScreen() {
               <View style={styles.fieldGroup}>
                 <Field
                   label={T().handleLabel}
+                  testID="signup-store-handle"
                   placeholder={T().handlePlaceholder}
                   value={storeHandle}
                   onChangeText={(value) => {
                     setStoreHandle(value.toLowerCase().replace(/[^a-z0-9-]/g, ""));
                     setHandleEdited(true);
                   }}
+                  // Filtered to [a-z0-9-] above, so it is a Latin code by
+                  // construction — same caret rule as the e-mail.
+                  ltr
                   autoCapitalize="none"
                   autoCorrect={false}
                   maxLength={40}
@@ -450,7 +458,7 @@ export default function SignupScreen() {
             <Pressable
               accessibilityRole="link"
               accessibilityLabel={t("mobile.legal.termsLabel")}
-              onPress={() => router.push("/legal/terms")}
+              onPress={() => router.push({ pathname: "/legal/terms", params: { from: "signup" } })}
               style={({ pressed }) => [styles.consentLink, pressed && styles.consentLinkPressed]}
             >
               <Text style={styles.consentLinkLabel}>{t("mobile.legal.termsLabel")}</Text>
@@ -458,7 +466,7 @@ export default function SignupScreen() {
             <Pressable
               accessibilityRole="link"
               accessibilityLabel={t("mobile.legal.privacyLabel")}
-              onPress={() => router.push("/legal/privacy")}
+              onPress={() => router.push({ pathname: "/legal/privacy", params: { from: "signup" } })}
               style={({ pressed }) => [styles.consentLink, pressed && styles.consentLinkPressed]}
             >
               <Text style={styles.consentLinkLabel}>{t("mobile.legal.privacyLabel")}</Text>

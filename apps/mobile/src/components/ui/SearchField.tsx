@@ -32,6 +32,10 @@ import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
  * left and `...RTL_TEXT` would pin Arabic to the wrong edge. The side is picked
  * from the locale on every render — never in StyleSheet.create(), which runs
  * once and would freeze the direction across a live language switch.
+ *
+ * Maestro: `testID` lands on the TextInput itself (so `tapOn` + `inputText`
+ * address one id), the clear button is `${testID}-clear` and the scan button
+ * `${testID}-scan`. POS passes "pos-search", inventory "inventory-search".
  */
 export function SearchField({
   value,
@@ -40,6 +44,7 @@ export function SearchField({
   onPressScan,
   onSubmitEditing,
   leadingIcon = true,
+  testID,
 }: {
   value: string;
   onChangeText: (v: string) => void;
@@ -48,6 +53,8 @@ export function SearchField({
   onSubmitEditing?: (value: string) => void;
   /** Passive magnifying glass before the input (default). */
   leadingIcon?: boolean;
+  /** Input id; the trailing actions derive `${testID}-clear` / `${testID}-scan`. */
+  testID?: string;
 }) {
   const rtl = isRTL();
   return (
@@ -66,6 +73,7 @@ export function SearchField({
         style={[styles.input, rtl ? styles.inputRtl : styles.inputLtr]}
         autoCapitalize="none"
         autoCorrect={false}
+        testID={testID}
       />
       {value.length > 0 ? (
         <Pressable
@@ -74,6 +82,7 @@ export function SearchField({
           style={styles.slot}
           accessibilityRole="button"
           accessibilityLabel={t("mobile.a11y.clearSearch")}
+          testID={testID ? `${testID}-clear` : undefined}
         >
           <XCircle size={18} color={colors.textSecondary} weight="fill" />
         </Pressable>
@@ -85,6 +94,7 @@ export function SearchField({
           style={styles.slot}
           accessibilityRole="button"
           accessibilityLabel={t("mobile.a11y.scanBarcode")}
+          testID={testID ? `${testID}-scan` : undefined}
         >
           <Barcode size={22} color={colors.accent} />
         </Pressable>

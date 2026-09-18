@@ -1,8 +1,9 @@
-import { useRouter } from "expo-router";
+import type { Href } from "expo-router";
 import { Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from "react-native";
 
 import { ChevronBack } from "@/components/ui/Chevron";
 import { t } from "@/i18n";
+import { useGoBack } from "@/lib/nav";
 import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
 
@@ -13,8 +14,16 @@ export interface BackLinkProps {
    * app-wide names where the tap goes.
    */
   label: string;
-  /** Defaults to `router.back()`. Pass a step-back for wizards. */
+  /** Replaces the default guarded back. Pass a step-back for wizards. */
   onPress?: () => void;
+  /**
+   * Where the tap lands when there is no history to pop — a cold-start deep
+   * link, a push-notification tap, the locale re-key. Defaults to the current
+   * pathname's parent; pass the real parent whenever the label names a screen
+   * the URL does not ("‹ Sales history" from /sales/[id]).
+   */
+  fallback?: Href;
+  /** Defaults to "back-link" — the e2e contract for every back affordance. */
   testID?: string;
   style?: StyleProp<ViewStyle>;
 }
@@ -29,16 +38,19 @@ export interface BackLinkProps {
  * chevron's visual edge flush with the content column while the pressed tint
  * still gets a little bleed into the gutter. `ChevronBack` picks the caret from
  * the live locale, so nothing here reads the locale itself.
+ *
+ * The tap is `useGoBack(fallback)`, never a bare `router.back()`: with no
+ * history (deep link, push tap, locale switch) a bare back is a silent no-op.
  */
-export function BackLink({ label, onPress, testID, style }: BackLinkProps) {
-  const router = useRouter();
+export function BackLink({ label, onPress, fallback, testID = "back-link", style }: BackLinkProps) {
+  const goBack = useGoBack(fallback);
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={t("app.common.back")}
       accessibilityHint={label}
-      onPress={onPress ?? (() => router.back())}
-      hitSlop={{ top: 4, bottom: 4, left: 8, right: 8 }}
+      onPress={onPress ?? goBack}
+      hitSlop={{ top: 10, bottom: 10, left: 12, right: 12 }}
       testID={testID}
       style={({ pressed }) => [styles.link, pressed && styles.pressed, style]}
     >

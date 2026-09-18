@@ -9,7 +9,6 @@ import {
   Text,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, taxonomy } from "@matgary/api-client";
 import { CaretDownIcon as CaretDown } from "phosphor-react-native/src/icons/CaretDown";
@@ -30,6 +29,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
 import { Sheet } from "@/components/ui/Sheet";
 import { countLabel } from "@/lib/format";
+import { useGoBack } from "@/lib/nav";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
@@ -76,7 +76,7 @@ const byPosition = <T extends { position: number; label: string }>(rows: T[]) =>
   [...rows].sort((a, b) => a.position - b.position || a.label.localeCompare(b.label));
 
 export default function AttributesSettingsScreen() {
-  const router = useRouter();
+  const goBack = useGoBack("/settings");
   const qc = useQueryClient();
   const me = useSession((s) => s.me);
   const canManage = !!me && (me.isOwner || me.permissions.includes("manage_catalog"));
@@ -233,7 +233,7 @@ export default function AttributesSettingsScreen() {
   return (
     <Screen onRefresh={refetch} refreshing={attrsQ.isRefetching}>
       <View style={styles.header}>
-        <Pressable accessibilityRole="button" onPress={() => router.back()} hitSlop={12} style={styles.back}>
+        <Pressable accessibilityRole="button" onPress={goBack} hitSlop={12} style={styles.back} testID="back-link">
           <ChevronBack size={16} color={colors.textSecondary} />
           <Text style={styles.backLabel}>{t("app.settingsPage.title")}</Text>
         </Pressable>

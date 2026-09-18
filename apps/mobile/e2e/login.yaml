@@ -3,16 +3,32 @@
 # Runs against the dev client (com.thestoro.app) on the simulator, backend on
 # :3003. The app persists both the session and the locale, so this flow first
 # signs out if a session is live, then normalises the locale to Arabic (the
-# product default) via the login screen's language toggle, then signs in with
+# product default) via the login screen's language pill, then signs in with
 # the seeded owner and asserts the dashboard greeting.
 #
-# Text selectors are regexes matched against the whole string; "x|y" accepts
-# either locale so a flow still runs when the app was last left in English.
-# Dev builds prefill the credentials (EXPO_PUBLIC_DEV_IDENTIFIER in .env), so
-# both fields are erased before typing to make the login real.
+# Selectors: testIDs first (login-identifier / login-password / language-pill
+# come from app/(public)/login.tsx and components/ui/LanguagePill.tsx); text
+# only for the tab label and the sign-out row, as "x|y" regexes matched against
+# the whole string so the flow runs whichever locale the app was left in.
+#
+# Dev builds prefill the credentials (EXPO_PUBLIC_DEV_IDENTIFIER in .env) and
+# a previous run may have left a partial value, so each field is tapped and
+# erased twice (eraseText is capped per call) before typing — the login is
+# real, not a prefilled submit.
 appId: com.thestoro.app
 ---
 - launchApp
+
+# Dev client only: a cold launch can land on the launcher instead of the last
+# bundle. Tap the Metro entry when it shows; a no-op otherwise.
+- runFlow:
+    when:
+      visible:
+        text: "http://127.0.0.1:8081"
+    commands:
+      - tapOn:
+          text: "http://127.0.0.1:8081"
+
 - extendedWaitUntil:
     visible:
       text: "المزيد|More|تسجيل الدخول|Sign in"
@@ -40,30 +56,30 @@ appId: com.thestoro.app
       id: "login-identifier"
     timeout: 30000
 
-# Locale left in English by a previous run → the toggle reads "العربية". Tap it.
+# Locale left in English by a previous run → the login form is in English.
+# The pill toggles to the other language; wait for the Arabic screen title.
 - runFlow:
     when:
       visible:
-        text: "العربية"
+        text: "Sign in"
     commands:
       - tapOn:
-          text: "العربية"
+          id: "language-pill"
       - extendedWaitUntil:
           visible:
-            text: "تصفح المتجر التجريبي"
+            text: "تسجيل الدخول"
           timeout: 15000
-
-- assertVisible:
-    text: "البريد أو اسم المستخدم"
 
 - tapOn:
     id: "login-identifier"
-- eraseText: 80
+- eraseText: 120
+- eraseText: 120
 - inputText: "amr@matgary.local"
 
 - tapOn:
     id: "login-password"
-- eraseText: 80
+- eraseText: 120
+- eraseText: 120
 - inputText: "Test1234!"
 
 # Submit from the keyboard: the password field's return key is "go" and is

@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { type LayoutChangeEvent, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { router, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { ArrowSquareOutIcon as ArrowSquareOut } from "phosphor-react-native/src/icons/ArrowSquareOut";
 import { dictionaries } from "@matgary/i18n";
@@ -10,6 +10,8 @@ import { BackLink } from "@/components/ui/BackLink";
 import { ChevronForward } from "@/components/ui/Chevron";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { t, useLocale } from "@/i18n";
+import { legalParent } from "@/lib/nav";
+import { useSession } from "@/stores/session";
 import { RTL, RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
 
@@ -99,10 +101,10 @@ export default function LegalScreen() {
     scrollRef.current?.scrollTo({ y: Math.max(0, y - spacing.md), animated: true });
   }, []);
 
-  const goBack = useCallback(() => {
-    if (router.canGoBack()) router.back();
-    else router.replace("/");
-  }, []);
+  // With nothing to pop (cold-start deep link, the locale re-key) the link
+  // lands on the screen that links here: About signed in, Login signed out.
+  const signedIn = useSession((s) => s.status) === "signedIn";
+  const fallback = legalParent(from, signedIn);
 
   const doc = isLegalDoc(raw) ? raw : null;
 
@@ -124,7 +126,7 @@ export default function LegalScreen() {
     return (
       <View style={styles.root}>
         <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
-          <BackLink label={parentLabel} onPress={goBack} />
+          <BackLink label={parentLabel} fallback={fallback} />
         </View>
         <View style={styles.notFound}>
           <EmptyState
@@ -152,7 +154,7 @@ export default function LegalScreen() {
         ]}
       >
         <View style={styles.header}>
-          <BackLink label={parentLabel} onPress={goBack} />
+          <BackLink label={parentLabel} fallback={fallback} />
           {/* Tracking + uppercase only in English: letterSpacing pulls Arabic's joins apart. */}
           <Text style={[styles.eyebrow, !rtl && styles.tracked]}>{dict.eyebrow}</Text>
           <Text style={styles.title} accessibilityRole="header">

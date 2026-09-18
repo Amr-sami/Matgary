@@ -161,9 +161,12 @@ export default function ForgotPasswordScreen() {
               <View style={styles.form}>
                 <Field
                   label={t("auth.forgot.emailLabel")}
+                  testID="forgot-email"
                   placeholder={t("auth.forgot.emailPlaceholder")}
                   value={email}
                   onChangeText={setEmail}
+                  // Always Latin: keep the caret at the end in Arabic (see login.tsx).
+                  ltr
                   autoCapitalize="none"
                   autoCorrect={false}
                   keyboardType="email-address"

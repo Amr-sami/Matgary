@@ -21,6 +21,7 @@ import { StatusBar } from "expo-status-bar";
 import { XIcon as X } from "phosphor-react-native/src/icons/X";
 
 import { Button } from "@/components/ui/Button";
+import { useSheetPresence } from "@/components/ui/Sheet";
 import { isRTL, t } from "@/i18n";
 import { clearMark, mark, measure } from "@/observability/perf";
 import { RTL_TEXT, directionStyle } from "@/theme/rtl";
@@ -75,6 +76,12 @@ export interface ScannerSheetProps {
  * The manual-entry row at the bottom is not a nicety — it is what a cashier
  * with a cracked lens or a refused permission uses, and on a simulator (no
  * camera at all) it is the only path that works.
+ *
+ * Presence follows `useSheetPresence` (see ui/Sheet.tsx): the sheet closes
+ * when the screen that opened it loses focus, and hides — camera off — while
+ * the app lock is armed. Maestro ids: `scanner-sheet` (root), `scanner-close`
+ * (header X), `scanner-manual` (typed code), `scanner-manual-submit`,
+ * `scanner-done` (Done / Cancel).
  */
 export function ScannerSheet({
   visible,
@@ -90,6 +97,11 @@ export function ScannerSheet({
   const [manual, setManual] = useState("");
   const last = useRef<{ code: string; at: number } | null>(null);
   const finished = useRef(false);
+  // Effective visibility: the owner's `visible` minus route blur (closes it)
+  // and app lock (hides it). Everything below that used to read `visible` for
+  // "is the sheet on screen" reads `shown`, so the camera is not kept hot
+  // behind the lock cover.
+  const shown = useSheetPresence(visible, onClose);
 
   useEffect(() => {
     if (!visible) return;
@@ -170,7 +182,7 @@ export function ScannerSheet({
   };
 
   const granted = permission?.granted === true;
-  const cameraOn = visible && granted && available === true;
+  const cameraOn = shown && granted && available === true;
   // One filled button per state. While the camera works, "Done" is the way
   // out and manual entry is the outline fallback; the moment the cashier
   // starts typing — or the device has no camera at all, where typing is the
@@ -188,12 +200,12 @@ export function ScannerSheet({
 
   return (
     <Modal
-      visible={visible}
+      visible={shown}
       animationType="slide"
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      <View style={[styles.root, directionStyle(isRTL())]}>
+      <View style={[styles.root, directionStyle(isRTL())]} testID="scanner-sheet">
         {/* The sheet is near-black; the root layout's dark bar would leave the
             clock and battery unreadable on it. Last-mounted StatusBar wins, and
             the Modal drops its children on close, so the root's style returns. */}
@@ -207,6 +219,7 @@ export function ScannerSheet({
             style={styles.closeBtn}
             accessibilityRole="button"
             accessibilityLabel={t("app.common.close")}
+            testID="scanner-close"
           >
             <X size={22} color={colors.bg} weight="bold" />
           </Pressable>
@@ -218,7 +231,7 @@ export function ScannerSheet({
             <CameraView
               style={StyleSheet.absoluteFill}
               facing="back"
-              active={visible}
+              active={shown}
               barcodeScannerSettings={{ barcodeTypes: BARCODE_TYPES }}
               onBarcodeScanned={onBarcode}
             />
@@ -298,24 +311,31 @@ export function ScannerSheet({
               autoCapitalize="none"
               autoCorrect={false}
               returnKeyType="done"
+              testID="scanner-manual"
               // TextInput alignment is physical (no start/end swap), so the
               // locale picks the edge; inline because the locale can change
               // while the module-scope StyleSheet cannot.
               style={[styles.manualInput, { textAlign: isRTL() ? "right" : "left" }]}
             />
-            <Button
-              label={t("app.ui.scanner.manualSubmit")}
-              variant={manualPrimary ? "primary" : "outline"}
-              disabled={!manual.trim()}
-              onPress={submitManual}
-            />
+            {/* Button takes no testID; the app's convention is a wrapping
+                View, which Maestro taps at its centre. */}
+            <View testID="scanner-manual-submit">
+              <Button
+                label={t("app.ui.scanner.manualSubmit")}
+                variant={manualPrimary ? "primary" : "outline"}
+                disabled={!manual.trim()}
+                onPress={submitManual}
+              />
+            </View>
           </View>
           {/* "Cancel" (single mode) discards a typed code; "Done" uses it. */}
-          <Button
-            label={mode === "single" ? t("app.ui.scanner.cancel") : t("app.receiptDesigner.editor.done")}
-            variant={manualPrimary ? "outline" : "primary"}
-            onPress={mode === "single" ? onClose : onDone}
-          />
+          <View testID="scanner-done">
+            <Button
+              label={mode === "single" ? t("app.ui.scanner.cancel") : t("app.receiptDesigner.editor.done")}
+              variant={manualPrimary ? "outline" : "primary"}
+              onPress={mode === "single" ? onClose : onDone}
+            />
+          </View>
         </View>
       </View>
     </Modal>

@@ -126,6 +126,7 @@ export default function InventoryScreen() {
         onChangeText={setQuery}
         placeholder={t("mobile.inventory.searchPlaceholder")}
         onPressScan={() => setScannerOpen(true)}
+        testID="inventory-search"
       />
 
       {/* The KPI block collapses while a query is typed: with the keyboard up

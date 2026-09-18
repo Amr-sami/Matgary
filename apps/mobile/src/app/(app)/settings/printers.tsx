@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, Text, View } from "react-native";
-import { useRouter } from "expo-router";
 import { BluetoothIcon as Bluetooth } from "phosphor-react-native/src/icons/Bluetooth";
 import { BluetoothSlashIcon as BluetoothSlash } from "phosphor-react-native/src/icons/BluetoothSlash";
 import { BluetoothXIcon as BluetoothX } from "phosphor-react-native/src/icons/BluetoothX";
@@ -38,7 +37,6 @@ const SCAN_MS = 10_000;
  * width, print mode, default flag and a test ticket.
  */
 export default function PrintersSettingsScreen() {
-  const router = useRouter();
   const printers = usePrinters();
   const [ble, setBle] = useState<BleState>("unknown");
   const [scanning, setScanning] = useState(false);
@@ -110,7 +108,7 @@ export default function PrintersSettingsScreen() {
         parentLabel={t("app.settingsPage.title")}
         title={t("mobile.printing.title")}
         subtitle={t("mobile.printing.subtitle")}
-        onBack={() => router.back()}
+        fallback="/settings"
       />
 
       <Card title={t("mobile.printing.bluetooth")}>

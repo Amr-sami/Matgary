@@ -186,8 +186,8 @@ export default function SettingsScreen() {
           value={locale}
           onChange={(v) => void setLocale(v)}
           items={[
-            { key: "ar", label: t("app.shell.language.arabic") },
-            { key: "en", label: t("app.shell.language.english") },
+            { key: "ar", label: t("app.shell.language.arabic"), testID: "language-ar" },
+            { key: "en", label: t("app.shell.language.english"), testID: "language-en" },
           ]}
         />
       </Card>

@@ -35,6 +35,7 @@ import { ChevronBack } from "@/components/ui/Chevron";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { t, useLocale } from "@/i18n";
 import { shortDate } from "@/lib/format";
+import { useGoBack } from "@/lib/nav";
 import { useSession } from "@/stores/session";
 import { RTL, RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
@@ -157,10 +158,7 @@ export default function NotificationsScreen() {
 
   // A hidden tab route: the bar highlights nothing, so the screen carries its
   // own way out. A cold-start push tap lands here with no history — go home.
-  const goBack = useCallback(() => {
-    if (router.canGoBack()) router.back();
-    else router.replace("/");
-  }, [router]);
+  const goBack = useGoBack("/");
 
   const header = (
     <View style={styles.header}>
@@ -170,6 +168,7 @@ export default function NotificationsScreen() {
           accessibilityLabel={t("app.common.back")}
           onPress={goBack}
           hitSlop={12}
+          testID="back-link"
           style={({ pressed }) => [styles.back, pressed && styles.backPressed]}
         >
           <ChevronBack size={18} color={colors.textSecondary} />

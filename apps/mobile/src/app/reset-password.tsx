@@ -211,6 +211,7 @@ export default function ResetPasswordScreen() {
       <View style={styles.form}>
         <Field
           label={t("auth.reset.newPasswordLabel")}
+          testID="reset-password"
           value={password}
           onChangeText={setPassword}
           secure
@@ -221,6 +222,7 @@ export default function ResetPasswordScreen() {
         />
         <Field
           label={t("auth.reset.confirmLabel")}
+          testID="reset-confirm"
           value={confirm}
           onChangeText={setConfirm}
           secure

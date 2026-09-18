@@ -346,7 +346,7 @@ export default function ProductDetailScreen() {
       header={
         <BackLink
           label={t("app.inventory.title")}
-          onPress={() => (router.canGoBack() ? router.back() : router.navigate("/inventory"))}
+          fallback="/inventory"
         />
       }
     >

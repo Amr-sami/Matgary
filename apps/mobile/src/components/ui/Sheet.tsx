@@ -1,4 +1,4 @@
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
   KeyboardAvoidingView,
   Modal,
@@ -11,11 +11,13 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
+import { useIsFocused } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { XIcon as X } from "phosphor-react-native/src/icons/X";
 
 import { Button } from "@/components/ui/Button";
 import { t, useLocale } from "@/i18n";
+import { useAppLock } from "@/stores/appLock";
 import { RTL_TEXT, directionStyle } from "@/theme/rtl";
 import { MIN_TOUCH, colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
 
@@ -92,6 +94,10 @@ export interface SheetProps {
  * not wander into the dimmed screen behind; the title is a header; the close
  * X is a labelled 44pt button. The panel, close and backdrop carry
  * `${testID}`, `${testID}-close` and `${testID}-backdrop` for Maestro.
+ *
+ * Presence is decided by `useSheetPresence` below, not by `visible` alone:
+ * a Modal is its own native window, so it neither leaves with the screen
+ * that opened it nor stays under the app-lock cover on its own.
  */
 export function Sheet({
   visible,
@@ -111,12 +117,13 @@ export function Sheet({
 }: SheetProps) {
   const insets = useSafeAreaInsets();
   const rtl = useLocale((s) => s.locale) === "ar";
+  const shown = useSheetPresence(visible, onClose);
 
   const hasFooter = footer !== undefined || primaryAction !== undefined || secondaryAction !== undefined;
 
   return (
     <Modal
-      visible={visible}
+      visible={shown}
       transparent
       animationType="slide"
       statusBarTranslucent
@@ -219,6 +226,55 @@ export function Sheet({
       </View>
     </Modal>
   );
+}
+
+/**
+ * Whether the screen hosting this component is the focused route.
+ *
+ * `useIsFocused` throws outside a navigator ("Couldn't find a navigation
+ * object"); a sheet mounted above the Stack — a shell component, the lock
+ * gate — has no route to lose, so it counts as focused. The try/catch is
+ * hook-safe: whether the hook throws is fixed by the component's place in
+ * the tree, so the hook sequence is the same on every render of one instance.
+ */
+function useHostFocused(): boolean {
+  try {
+    return useIsFocused();
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * The two reasons a sheet must NOT be on screen although its owner still says
+ * `visible` — shared by Sheet and ScannerSheet (both are RN <Modal>s, and an
+ * RN Modal is a separate native window that knows nothing about routes or
+ * covers):
+ *
+ *  1. The screen that opened it lost focus. A deep link, a notification tap
+ *     or a tab switch navigates the Stack UNDERNEATH the modal window, so the
+ *     sheet would stay open over a screen it does not belong to (observed: the
+ *     settle-invoice sheet floating over Suppliers). Losing focus closes it
+ *     for good through `onClose` — the owner's state follows, so nothing
+ *     re-opens when the route comes back.
+ *
+ *  2. The app lock is armed. AppLockGate's cover is itself a Modal presented
+ *     from the root view controller; while a sheet's modal window is up, iOS
+ *     refuses a second presentation from the same presenter, so the sheet
+ *     would sit where the cover should be. The sheet is hidden — not closed —
+ *     while `locked`, and comes back with its content once the user unlocks.
+ *
+ * Returns the effective `visible` to hand to the Modal.
+ */
+export function useSheetPresence(visible: boolean, onClose: () => void): boolean {
+  const focused = useHostFocused();
+  const locked = useAppLock((s) => s.locked);
+
+  useEffect(() => {
+    if (visible && !focused) onClose();
+  }, [visible, focused, onClose]);
+
+  return visible && !locked;
 }
 
 /** `const sheet = useSheet(); <Button onPress={sheet.open} /> <Sheet visible={sheet.visible} onClose={sheet.close} …/>` */

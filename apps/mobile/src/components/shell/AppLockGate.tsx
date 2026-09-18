@@ -1,11 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type PropsWithChildren,
-  type RefObject,
-} from "react";
+import { type PropsWithChildren, type RefObject, useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   AppState,
@@ -128,6 +121,22 @@ export function AppLockGate({ children }: PropsWithChildren) {
 
   const visible = status === "signedIn" && enabled && locked;
 
+  // The cover is a Modal, and so is every Sheet. They present from the same
+  // root view controller, and UIKit refuses a presentation while another one
+  // is still dismissing. Sheets hide the instant `locked` flips (Sheet.tsx),
+  // so the cover waits one dismiss-animation (~400 ms) before presenting;
+  // hiding is immediate. Children stay covered by `pointerEvents`/a11y flags
+  // driven by `visible`, so nothing is interactive during the gap.
+  const [coverVisible, setCoverVisible] = useState(visible);
+  useEffect(() => {
+    if (!visible) {
+      setCoverVisible(false);
+      return;
+    }
+    const id = setTimeout(() => setCoverVisible(true), 400);
+    return () => clearTimeout(id);
+  }, [visible]);
+
   // Background bookkeeping. `hiddenAt` is when we last left the foreground;
   // `authenticating` suppresses that while a prompt is up, because Android's
   // device-credential fallback is a separate activity that backgrounds us.
@@ -178,7 +187,7 @@ export function AppLockGate({ children }: PropsWithChildren) {
         {children}
       </View>
       <Modal
-        visible={visible}
+        visible={coverVisible}
         animationType="none"
         presentationStyle="fullScreen"
         statusBarTranslucent

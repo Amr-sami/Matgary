@@ -7,7 +7,6 @@ import {
   Text,
   View, ScrollView
 } from "react-native";
-import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import * as LocalAuthentication from "expo-local-authentication";
 import { AuthenticationType, SecurityLevel } from "expo-local-authentication";
@@ -87,7 +86,6 @@ function requireLabel(seconds: RequireAfterSeconds): string {
 }
 
 export default function AppLockSettingsScreen() {
-  const router = useRouter();
   const enabled = useAppLock((s) => s.enabled);
   const requireAfterSeconds = useAppLock((s) => s.requireAfterSeconds);
   const setEnabled = useAppLock((s) => s.setEnabled);
@@ -169,7 +167,7 @@ export default function AppLockSettingsScreen() {
         parentLabel={t("app.settingsPage.title")}
         title={t("mobile.appLock.title")}
         subtitle={t("mobile.appLock.intro")}
-        onBack={() => router.back()}
+        fallback="/settings"
       />
 
       {notice ? (

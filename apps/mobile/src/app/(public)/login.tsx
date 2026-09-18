@@ -125,6 +125,14 @@ export default function LoginScreen() {
               placeholder={t("auth.login.identifierPlaceholder")}
               value={identifier}
               onChangeText={setIdentifier}
+              // The identifier is always Latin (e-mail or "cashier@store"). In
+              // Arabic the box is right-aligned, so an LTR run puts the caret
+              // mid-string on tap; clearing and retyping then interleaves the
+              // old and new value ("amr@matgary.localamr@matgary.local", e2e).
+              // `ltr` fixes the caret; select-all on focus makes a retype
+              // replace the prefilled value instead of appending to it.
+              ltr
+              selectTextOnFocus
               autoCapitalize="none"
               autoCorrect={false}
               // NOT keyboardType="email-address": staff sign in with a

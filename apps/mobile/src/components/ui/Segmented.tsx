@@ -19,7 +19,8 @@ export function Segmented<T extends string>({
   value,
   onChange,
 }: {
-  items: { key: T; label: string }[];
+  /** `testID` is optional and per item (e.g. settings' "language-ar"/"language-en"). */
+  items: { key: T; label: string; testID?: string }[];
   value: T;
   onChange: (v: T) => void;
 }) {
@@ -30,6 +31,7 @@ export function Segmented<T extends string>({
         return (
           <Pressable
             key={it.key}
+            testID={it.testID}
             onPress={() => onChange(it.key)}
             accessible
             accessibilityRole="tab"

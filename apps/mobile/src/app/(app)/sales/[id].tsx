@@ -16,6 +16,7 @@ import { Card } from "@/components/ui/Card";
 import { ChevronBack, ChevronForward } from "@/components/ui/Chevron";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { groupDigits, money, shortDate } from "@/lib/format";
+import { useGoBack } from "@/lib/nav";
 import type { ReceiptSale } from "@/receipt/html";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
@@ -89,6 +90,7 @@ function toReceipt(inv: salesApi.Invoice): ReceiptSale {
 
 export default function SaleDetailScreen() {
   const router = useRouter();
+  const goBack = useGoBack("/sales/history");
   const { id } = useLocalSearchParams<{ id: string }>();
   const lineId = typeof id === "string" ? id : "";
   // POST /api/returns is gated on manage_returns (owners bypass) — same rule
@@ -140,7 +142,8 @@ export default function SaleDetailScreen() {
         accessibilityLabel={t("app.common.back")}
         hitSlop={8}
         style={styles.crumb}
-        onPress={() => (router.canGoBack() ? router.back() : router.navigate("/sales/history"))}
+        onPress={goBack}
+        testID="back-link"
       >
         <ChevronBack size={16} color={colors.textSecondary} />
         <Text style={styles.crumbText}>{t("mobile.salesHistory.title")}</Text>

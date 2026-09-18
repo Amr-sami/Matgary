@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { Href } from "expo-router";
 import { StyleSheet, Text, View } from "react-native";
 
 import { BackLink } from "@/components/ui/BackLink";
@@ -16,8 +17,14 @@ export interface SettingsHeaderProps {
    * pushing the accessory off-screen.
    */
   accessories?: ReactNode;
-  /** Forwarded to BackLink; defaults to `router.back()`. */
+  /** Forwarded to BackLink; replaces the default guarded back. */
   onBack?: () => void;
+  /**
+   * Forwarded to BackLink: where the back tap lands with no history to pop.
+   * Settings sub-screens pass "/settings" so a deep link or a locale switch
+   * never strands the user. Defaults to the pathname's parent.
+   */
+  fallback?: Href;
   testID?: string;
 }
 
@@ -37,11 +44,12 @@ export function SettingsHeader({
   subtitle,
   accessories,
   onBack,
+  fallback,
   testID,
 }: SettingsHeaderProps) {
   return (
     <View style={styles.root} testID={testID}>
-      <BackLink label={parentLabel} onPress={onBack} />
+      <BackLink label={parentLabel} onPress={onBack} fallback={fallback} />
       <View style={styles.titleRow}>
         <View style={styles.titleText}>
           <Text accessibilityRole="header" style={styles.title}>

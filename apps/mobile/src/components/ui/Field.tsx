@@ -61,6 +61,13 @@ const INPUT_HEIGHT = 52;
 const INPUT_PADDING_H = 16;
 const EYE_ICON = 20;
 
+/**
+ * `props.testID` reaches the TextInput through the spread, and the eye toggle
+ * derives its own from it as `<testID>-eye` (shared e2e contract). Likewise
+ * `selectTextOnFocus` is NOT destructured here on purpose: it must reach the
+ * TextInput untouched so the login identifier can select-all on focus (see
+ * login.tsx).
+ */
 export function Field({ label, secure = false, ltr = false, adornment, ...props }: FieldProps) {
   const [focused, setFocused] = useState(false);
   const [revealed, setRevealed] = useState(false);
@@ -100,6 +107,7 @@ export function Field({ label, secure = false, ltr = false, adornment, ...props 
           <Pressable
             onPress={() => setRevealed((v) => !v)}
             style={styles.eye}
+            testID={props.testID ? `${props.testID}-eye` : undefined}
             accessibilityRole="button"
             accessibilityLabel={revealed ? t("mobile.a11y.hidePassword") : t("mobile.a11y.showPassword")}
           >
