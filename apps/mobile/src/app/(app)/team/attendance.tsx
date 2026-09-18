@@ -27,7 +27,10 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { NativeDatePicker, dateToIsoDay, isoDayToDate } from "@/components/ui/DateField";
-import { ChevronBack, ChevronForward } from "@/components/ui/Chevron";
+import { CaretDownIcon as CaretDown } from "phosphor-react-native/src/icons/CaretDown";
+import { CaretUpIcon as CaretUp } from "phosphor-react-native/src/icons/CaretUp";
+
+import { ChevronBack } from "@/components/ui/Chevron";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
 import { Segmented } from "@/components/ui/Segmented";
@@ -312,7 +315,7 @@ export default function TeamAttendanceScreen() {
           style={styles.back}
         >
           <ChevronBack size={16} color={colors.textSecondary} />
-          <Text style={styles.backLabel}>{t("app.team.tabs.team")}</Text>
+          <Text style={styles.backLabel}>{t("mobile.team.back")}</Text>
         </Pressable>
         <Text style={styles.title}>
           {isToday ? t("app.team.roster.todayHeading") : t("mobile.team.attendance.dayHeading")}
@@ -416,7 +419,9 @@ export default function TeamAttendanceScreen() {
                           </Text>
                         </View>
                         <Badge label={st.label} variant={st.variant} />
-                        {open ? <ChevronBack /> : <ChevronForward />}
+                        {/* Expand/collapse is vertical; the sideways caret means "opens a
+                            detail" on the roster one screen back. */}
+                        {open ? <CaretUp size={16} color={colors.textSecondary} /> : <CaretDown size={16} color={colors.textSecondary} />}
                       </Pressable>
 
                       <View style={styles.actions}>

@@ -1,6 +1,14 @@
 import { Tabs } from "expo-router";
 
 import { BottomNav } from "@/components/layout/BottomNav";
+import { RouteErrorFallback } from "@/observability/sentry";
+
+/**
+ * Wraps every CHILD screen (not this layout) in the bilingual fallback, so a
+ * render throw shows "something went wrong" + retry with the tab bar still
+ * alive — instead of a dead white screen after the red box is dismissed.
+ */
+export const unstable_settings = { screenErrorBoundary: RouteErrorFallback };
 
 /**
  * The tab bar is the web's MobileBottomNav, not a stock one: seven items with

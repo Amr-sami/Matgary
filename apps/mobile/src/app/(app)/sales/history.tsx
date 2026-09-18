@@ -5,6 +5,7 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
+  ScrollView,
   View,
 } from "react-native";
 import { FlashList } from "@shopify/flash-list";
@@ -62,13 +63,18 @@ const RANGES = (): { key: RangeKey; label: string }[] => [
   { key: "custom", label: t("mobile.salesHistory.customRange") },
 ];
 
-/** Same labels the POS payment chips use (sales.tsx). */
+/** One namespace for payment names across POS, dashboard, history and detail. */
 const PAYMENT_LABELS = (): Record<Payment, string> => ({
-  cash: t("app.catalog.payment.cash"),
-  instapay: t("app.customers.settle.methods.instapay"),
-  card: t("app.catalog.payment.card"),
-  deferred: t("app.admin.sales.tenantDetail.paymentMethods.deferred"),
+  cash: t("app.activityLabels.paymentMethods.cash"),
+  instapay: t("app.activityLabels.paymentMethods.instapay"),
+  card: t("app.activityLabels.paymentMethods.card"),
+  deferred: t("app.activityLabels.paymentMethods.deferred"),
 });
+
+/** Arabic counts 1 / 2 / 3–10 / 11+ differently; the dictionary carries One/Two/Few beside the default. */
+function countForm(n: number): string {
+  return n === 1 ? "One" : n === 2 ? "Two" : n >= 3 && n <= 10 ? "Few" : "";
+}
 const PAYMENT_ORDER: Payment[] = ["cash", "instapay", "card", "deferred"];
 
 function paymentLabel(p: Payment | null | undefined): string {
@@ -250,11 +256,11 @@ export default function SalesHistoryScreen() {
         placeholder={t("mobile.salesHistory.searchPlaceholder")}
       />
 
-      <View style={styles.chips}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsWrap} contentContainerStyle={styles.chips} keyboardShouldPersistTaps="handled">
         {RANGES().map((r) => (
           <Chip key={r.key} label={r.label} active={range === r.key} onPress={() => setRange(r.key)} />
         ))}
-      </View>
+      </ScrollView>
       {range === "custom" ? (
         <View style={styles.dateRow}>
           <View style={styles.dateCol}>
@@ -278,7 +284,7 @@ export default function SalesHistoryScreen() {
         </View>
       ) : null}
 
-      <View style={styles.chips}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsWrap} contentContainerStyle={styles.chips} keyboardShouldPersistTaps="handled">
         <Chip label={t("mobile.salesHistory.paymentAll")} active={payment === null} onPress={() => setPayment(null)} />
         {PAYMENT_ORDER.map((p) => (
           <Chip
@@ -288,7 +294,7 @@ export default function SalesHistoryScreen() {
             onPress={() => setPayment(payment === p ? null : p)}
           />
         ))}
-      </View>
+      </ScrollView>
 
       <View style={styles.stats}>
         <StatCard title={t("mobile.salesHistory.invoices")} value={groupDigits(totalCount)} icon={Receipt} />
@@ -374,11 +380,15 @@ function InvoiceRow({ inv, onPress }: { inv: salesApi.Invoice; onPress: () => vo
           <Text style={styles.invoice} numberOfLines={1}>
             {inv.invoiceId ?? inv.lines[0]?.productName ?? "—"}
           </Text>
-          <Text style={[styles.total, inv.fullyReturned && styles.totalReturned]}>{money(inv.netTotal)}</Text>
+          {/* A fully returned invoice strikes what the receipt SAID (total),
+              not the 0 the shop kept — a struck-through 0 conveys nothing. */}
+          <Text style={[styles.total, inv.fullyReturned && styles.totalReturned]}>
+            {money(inv.fullyReturned ? inv.total : inv.netTotal)}
+          </Text>
         </View>
         <Text style={styles.meta} numberOfLines={1}>
           {ltr(`${shortDate(inv.saleDate)} ${timeOf(inv.saleDate)}`)} · {customer} ·{" "}
-          {t("mobile.salesHistory.lineCount", { n: inv.lines.length })}
+          {t(`mobile.salesHistory.lineCount${countForm(inv.lines.length)}`, { n: inv.lines.length })}
         </Text>
         <View style={styles.badges}>
           <Badge label={paymentLabel(inv.paymentMethod)} variant={inv.paymentMethod === "deferred" ? "lowstock" : "accent"} />
@@ -412,7 +422,10 @@ const styles = StyleSheet.create({
   titleBlock: { gap: 2, alignItems: "flex-start" },
   title: { fontFamily: fonts.bold, fontSize: 26, color: colors.text, ...RTL_TEXT },
   subtitle: { fontFamily: fonts.regular, fontSize: 15, color: colors.textSecondary, ...RTL_TEXT },
-  chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  // One scrolling row per filter group — wrapping orphaned "آجل" on its own
+  // third line and pushed the first invoice below the fold.
+  chipsWrap: { marginHorizontal: -spacing.lg },
+  chips: { flexDirection: "row", gap: spacing.sm, paddingHorizontal: spacing.lg },
   dateRow: { flexDirection: "row", gap: spacing.md },
   dateCol: { flex: 1 },
   fieldError: {

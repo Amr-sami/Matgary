@@ -1,6 +1,8 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
+import { BellIcon as Bell } from "phosphor-react-native/src/icons/Bell";
 import { ChatCircleIcon as ChatCircle } from "phosphor-react-native/src/icons/ChatCircle";
+import { IdentificationCardIcon as IdentificationCard } from "phosphor-react-native/src/icons/IdentificationCard";
 import { InfoIcon as Info } from "phosphor-react-native/src/icons/Info";
 import { KeyIcon as Key } from "phosphor-react-native/src/icons/Key";
 import { LockKeyIcon as LockKey } from "phosphor-react-native/src/icons/LockKey";
@@ -77,7 +79,7 @@ export default function SettingsScreen() {
     {
       key: "notifications",
       route: "/settings/notifications",
-      icon: ChatCircle,
+      icon: Bell,
       title: t("app.notificationSettings.title"),
       hint: t("app.settingsPage.notificationsTile.subtitle"),
       ownerOnly: false,
@@ -101,7 +103,7 @@ export default function SettingsScreen() {
     {
       key: "store",
       route: "/settings/store",
-      icon: Storefront,
+      icon: IdentificationCard,
       title: t("app.settingsPage.shopInfo.section"),
       hint: t("mobile.settings.storeSub"),
       ownerOnly: true,
@@ -251,7 +253,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
     ...RTL_TEXT,
   },
-  list: { gap: spacing.md },
+  list: { gap: spacing.lg },
   tile: {
     flexDirection: "row",
     alignItems: "center",

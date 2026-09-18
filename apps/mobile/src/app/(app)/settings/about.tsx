@@ -181,7 +181,7 @@ export default function AboutSettingsScreen() {
         </Text>
       </View>
 
-      <Group heading={t("footer.columns.legal.heading")} rows={legalRows} />
+      <Group heading={t("mobile.about.legalHeading")} rows={legalRows} />
       <Group heading={t("footer.columns.support.heading")} rows={supportRows} />
 
       {error ? (
@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.semibold,
     fontSize: 13,
     color: colors.textSecondary,
-    marginStart: spacing.xs,
+    marginStart: spacing.lg,
     ...RTL_TEXT,
   },
   card: {

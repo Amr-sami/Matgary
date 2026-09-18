@@ -43,6 +43,8 @@ import { Field } from "@/components/ui/Field";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT, directionStyle } from "@/theme/rtl";
 import { MIN_TOUCH, colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
 import { getLocale, t } from "@/i18n";
 
 /**
@@ -395,12 +397,16 @@ function SheetBody({
   const [label, setLabel] = useState(initialLabel);
   const [icon, setIcon] = useState(initialIcon);
   const valid = label.trim().length > 0 && label.trim().length <= 80;
+  const insets = useSafeAreaInsets();
   return (
     <View style={[styles.overlay, directionStyle(getLocale() === "ar")]}>
-      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel={t("app.common.close")} />
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      {/* The KAV is the full-height flex-end container and the scrim sits INSIDE
+          it: with an auto-height KAV the sheet's maxHeight resolved against its
+          own content, clipping the Save/Cancel row at the bottom edge. */}
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.kav}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel={t("app.common.close")} />
         <View style={styles.sheet}>
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetBody}>
+          <ScrollView keyboardShouldPersistTaps="handled" style={styles.sheetScroll} contentContainerStyle={styles.sheetBody}>
             <Text style={styles.sheetTitle}>{title}</Text>
             <Field
               label={t("app.catalog.categoriesAdmin.labelLabel")}
@@ -432,17 +438,18 @@ function SheetBody({
                 })}
               </View>
             </View>
-            <View style={styles.sheetActions}>
-              <Button label={t("app.common.cancel")} variant="ghost" onPress={onClose} style={{ flex: 1 }} />
-              <Button
-                label={t("app.catalog.categoriesAdmin.save")}
-                onPress={() => onSubmit(label.trim(), icon)}
-                disabled={!valid}
-                loading={pending}
-                style={{ flex: 1 }}
-              />
-            </View>
           </ScrollView>
+          {/* Pinned footer: Save is always visible, whatever the keyboard does. */}
+          <View style={[styles.sheetActions, styles.sheetFooter, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
+            <Button label={t("app.common.cancel")} variant="ghost" onPress={onClose} style={{ flex: 1 }} />
+            <Button
+              label={t("app.catalog.categoriesAdmin.save")}
+              onPress={() => onSubmit(label.trim(), icon)}
+              disabled={!valid}
+              loading={pending}
+              style={{ flex: 1 }}
+            />
+          </View>
         </View>
       </KeyboardAvoidingView>
     </View>
@@ -506,7 +513,10 @@ const styles = StyleSheet.create({
     maxHeight: "90%",
     ...elevation.modal,
   },
+  kav: { flex: 1, justifyContent: "flex-end" },
+  sheetScroll: { flexShrink: 1 },
   sheetBody: { padding: spacing.xl, gap: spacing.lg },
+  sheetFooter: { paddingHorizontal: spacing.xl, paddingTop: spacing.md },
   sheetTitle: { fontFamily: fonts.bold, fontSize: 18, color: colors.text, ...RTL_TEXT },
   label: { fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary, marginBottom: spacing.sm, ...RTL_TEXT },
   iconGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },

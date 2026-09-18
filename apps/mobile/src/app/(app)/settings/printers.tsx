@@ -123,7 +123,7 @@ export default function PrintersSettingsScreen() {
         <Text style={styles.hint}>{t("mobile.printing.classicNote")}</Text>
       </Card>
 
-      <Card title={t("mobile.printing.scan")}>
+      <Card title={t("mobile.printing.scanTitle")}>
         <Text style={styles.hint}>{t("mobile.printing.scanHint")}</Text>
         <Button
           label={scanning ? t("mobile.printing.scanning") : t("mobile.printing.scan")}
@@ -139,13 +139,13 @@ export default function PrintersSettingsScreen() {
             ))}
           </View>
         ) : scanned && !scanning ? (
-          <EmptyState title={t("mobile.printing.noneFound")} hint={t("mobile.printing.noneFoundHint")} />
+          <EmptyState compact title={t("mobile.printing.noneFound")} hint={t("mobile.printing.noneFoundHint")} />
         ) : null}
       </Card>
 
       <Card title={t("mobile.printing.savedTitle")}>
         {printers.length === 0 ? (
-          <EmptyState title={t("mobile.printing.noSaved")} hint={t("mobile.printing.noSavedHint")} />
+          <EmptyState compact title={t("mobile.printing.noSaved")} hint={t("mobile.printing.noSavedHint")} />
         ) : (
           <View style={styles.list}>
             {printers.map((p) => (
@@ -302,14 +302,14 @@ function SavedRow({
 }
 
 const styles = StyleSheet.create({
-  header: { gap: 4, alignItems: "flex-start", marginBottom: spacing.md },
+  header: { gap: 4, alignItems: "flex-start" },
   back: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 32 },
   backLabel: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
   title: { fontFamily: fonts.bold, fontSize: 26, color: colors.text, ...RTL_TEXT },
-  subtitle: { fontFamily: fonts.regular, fontSize: 15, color: colors.textSecondary, ...RTL_TEXT },
-  hint: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT, marginBottom: spacing.sm },
+  subtitle: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, color: colors.textSecondary, ...RTL_TEXT },
+  hint: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 20, color: colors.textSecondary, ...RTL_TEXT, marginBottom: spacing.sm },
   stateRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, minHeight: MIN_TOUCH, marginBottom: spacing.xs },
-  stateText: { fontFamily: fonts.medium, fontSize: 15, flexShrink: 1, ...RTL_TEXT },
+  stateText: { fontFamily: fonts.medium, fontSize: 15, lineHeight: 22, flexShrink: 1, ...RTL_TEXT },
   list: { gap: spacing.sm, marginTop: spacing.md },
   sectionLabel: { fontFamily: fonts.semibold, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },
   foundRow: {

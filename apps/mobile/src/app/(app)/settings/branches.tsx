@@ -477,7 +477,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textSecondary,
     writingDirection: "ltr",
-    textAlign: "right",
+    // Hug the start ("right" meant END under the swap → the phone sat at the
+    // opposite edge from the address line above it).
+    alignSelf: "flex-start",
     fontVariant: ["tabular-nums"],
   },
   actions: {

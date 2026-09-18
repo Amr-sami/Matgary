@@ -160,18 +160,19 @@ const styles = StyleSheet.create({
   subtitle: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, marginBottom: spacing.lg, ...RTL_TEXT },
   sectionTitle: { fontFamily: fonts.semibold, fontSize: 14, color: colors.text, marginBottom: spacing.sm, ...RTL_TEXT },
 
-  // Web is grid-cols-2 on phones (sm:grid-cols-3 never fires under 640px):
-  // three stats forced into one row ellipsize a 7-digit revenue total.
+  // Same 3-up row as DeepTab's compare card and the Customers KPIs — three
+  // stats never wrap, so nothing is orphaned under the divider. A ~100px
+  // column (390px phone) holds a 7-digit money total at 15px; the labels are
+  // kept short enough in both locales to stay on one line so the values align.
   statRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
     gap: spacing.md,
     paddingBottom: spacing.lg,
     marginBottom: spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  stat: { flexBasis: "45%", flexGrow: 1, gap: 2 },
+  stat: { flex: 1, gap: 2 },
   statLabel: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
   statValue: { fontFamily: fonts.bold, fontSize: 15, color: colors.text, fontVariant: ["tabular-nums"], ...RTL_TEXT },
 

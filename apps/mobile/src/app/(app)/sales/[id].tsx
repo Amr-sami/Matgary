@@ -7,7 +7,7 @@ import { UserIcon as User } from "phosphor-react-native/src/icons/User";
 import { ApiError, sales as salesApi } from "@matgary/api-client";
 
 import { api } from "@/api/client";
-import { t } from "@/i18n";
+import { isRTL, t } from "@/i18n";
 import { Screen } from "@/components/layout/Screen";
 import { ReceiptActions } from "@/components/receipt/ReceiptActions";
 import { Badge } from "@/components/ui/Badge";
@@ -33,11 +33,21 @@ import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
 type Payment = salesApi.PaymentMethod;
 
 const PAYMENT_LABELS = (): Record<Payment, string> => ({
-  cash: t("app.catalog.payment.cash"),
-  instapay: t("app.customers.settle.methods.instapay"),
-  card: t("app.catalog.payment.card"),
-  deferred: t("app.admin.sales.tenantDetail.paymentMethods.deferred"),
+  cash: t("app.activityLabels.paymentMethods.cash"),
+  instapay: t("app.activityLabels.paymentMethods.instapay"),
+  card: t("app.activityLabels.paymentMethods.card"),
+  deferred: t("app.activityLabels.paymentMethods.deferred"),
 });
+
+/**
+ * "−3,400 ج.م" with the sign at the READING start. A bare "−" + digits has no
+ * strong character, so the paragraph fell back to the device direction and
+ * in Arabic the sign landed at the visual left, detached from the digits
+ * ("3,400 ج.م−" to the reader). A leading RLM/LRM pins the paragraph.
+ */
+function negative(value: number): string {
+  return `${isRTL() ? "\u200F" : "\u200E"}−${money(value)}`;
+}
 
 function paymentLabel(p: Payment | null | undefined): string {
   return p ? PAYMENT_LABELS()[p] ?? p : "—";
@@ -179,7 +189,7 @@ export default function SaleDetailScreen() {
               <View style={styles.colName}>
                 <Text style={styles.th}>{t("app.sales.table.col.product")}</Text>
               </View>
-              <Text style={[styles.colAmt, styles.th]}>{t("app.sales.table.col.total")}</Text>
+              <Text style={[styles.th, styles.colAmt]}>{t("app.sales.table.col.total")}</Text>
             </View>
             {inv.lines.map((l) => (
               <View key={l.id} style={styles.lineRow} testID={`sale-line-${l.id}`}>
@@ -196,7 +206,7 @@ export default function SaleDetailScreen() {
                   </Text>
                   {(l.discountAmount ?? 0) > 0 ? (
                     <Text style={styles.lineSub}>
-                      {t("app.common.discount")} −{money(l.discountAmount ?? 0)}
+                      {t("app.common.discount")} {negative(l.discountAmount ?? 0)}
                     </Text>
                   ) : null}
                   {l.isReturned || (l.returnedQuantity ?? 0) > 0 ? (
@@ -205,7 +215,7 @@ export default function SaleDetailScreen() {
                     </Text>
                   ) : null}
                 </View>
-                <Text style={[styles.colAmt, styles.lineNum, styles.lineTotal, l.isReturned && styles.struck]}>
+                <Text style={[styles.lineNum, styles.lineTotal, styles.colAmt, l.isReturned && styles.struck]}>
                   {money(l.totalPrice)}
                 </Text>
               </View>
@@ -217,11 +227,11 @@ export default function SaleDetailScreen() {
             <View style={styles.totals}>
               <TotalRow label={t("mobile.saleDetail.subtotal")} value={money(inv.subtotal)} />
               {inv.discount > 0 ? (
-                <TotalRow label={t("app.common.discount")} value={`−${money(inv.discount)}`} />
+                <TotalRow label={t("app.common.discount")} value={negative(inv.discount)} />
               ) : null}
               <TotalRow label={t("app.common.total")} value={money(inv.total)} strong />
               {returnedAmount > 0 ? (
-                <TotalRow label={t("app.sales.status.returned")} value={`−${money(returnedAmount)}`} danger />
+                <TotalRow label={t("app.sales.status.returned")} value={negative(returnedAmount)} danger />
               ) : null}
               {returnedAmount > 0 ? (
                 <TotalRow label={t("app.sales.kpi.netSales")} value={money(inv.netTotal)} strong />
@@ -230,7 +240,7 @@ export default function SaleDetailScreen() {
           </Card>
 
           {/* Payment */}
-          <Card title={t("app.activityLabels.fields.paymentMethod")}>
+          <Card title={t("mobile.saleDetail.payment")}>
             <TotalRow label={t("app.activityLabels.fields.paymentMethod")} value={paymentLabel(inv.paymentMethod)} />
             {inv.paymentMethod === "deferred" ? (
               <>
@@ -353,7 +363,9 @@ const styles = StyleSheet.create({
   lineHead: { paddingTop: 0 },
   th: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 12, color: colors.textSecondary },
   colName: { flex: 1, gap: 2, alignItems: "flex-start" },
-  colAmt: { width: 92, fontVariant: ["tabular-nums"] },
+  // End-aligned ("right" = END under the Fabric swap) so the line totals share
+  // the TotalRow values' edge below them — one amount column, one edge.
+  colAmt: { width: 92, fontVariant: ["tabular-nums"], textAlign: "right" },
   lineName: { fontFamily: fonts.medium, fontSize: 14, color: colors.text, ...RTL_TEXT },
   lineSub: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
   lineReturned: { fontFamily: fonts.medium, fontSize: 12, color: colors.danger, ...RTL_TEXT },

@@ -19,6 +19,7 @@ import { ApiError } from "@matgary/api-client";
 import { api } from "@/api/client";
 import { t } from "@/i18n";
 import { Screen } from "@/components/layout/Screen";
+import { HeaderAccessories } from "@/components/shell/HeaderAccessories";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { ChevronBack } from "@/components/ui/Chevron";
@@ -278,6 +279,8 @@ function InboxView({ onSelect }: { onSelect: (id: string) => void }) {
 
   const header = (
     <View style={styles.headerWrap}>
+      {/* Same branch pill + bell row every sibling tab gets from <Screen>. */}
+      <HeaderAccessories />
       <View style={styles.titleRow}>
         <Text style={styles.title}>{t("app.whatsappInbox.title")}</Text>
       </View>

@@ -29,7 +29,7 @@ import { Field } from "@/components/ui/Field";
 import { money } from "@/lib/format";
 import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
-import { t } from "@/i18n";
+import { isRTL, t } from "@/i18n";
 
 /**
  * Port of app__add-product.png + states/add-product-step2.png, step3.png.
@@ -400,7 +400,7 @@ export default function AddProductScreen() {
               ) : null}
             </View>
             <View>
-              <Text style={styles.label}>{t("app.sales.form.quickAddProduct.category")}</Text>
+              <Text style={styles.label}>{t("app.common.category")}</Text>
               {categories.isPending ? <Text style={styles.hint}>{t("app.common.loading")}</Text> : null}
               {categories.isError ? (
                 <View style={styles.inlineError}>
@@ -523,7 +523,7 @@ export default function AddProductScreen() {
             </View>
           ) : null}
           <Row label={t("app.common.name")} value={name} />
-          <Row label={t("app.sales.form.quickAddProduct.category")} value={categoryLabel ?? "—"} />
+          <Row label={t("app.common.category")} value={categoryLabel ?? "—"} />
           <Row label={t("app.sales.table.col.brand")} value={brandName ?? "—"} />
           {barcode.trim() ? <Row label={t("mobile.common.barcode")} value={barcode} /> : null}
           {chosenAttrs.map((r) => (
@@ -719,7 +719,7 @@ function BarcodeField({
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="done"
-          style={styles.fieldInput}
+          style={[styles.fieldInput, { textAlign: isRTL() ? "right" : "left" }]}
         />
         <Pressable
           onPress={onPressScan}
@@ -859,7 +859,6 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
     paddingVertical: 12,
     writingDirection: "ltr",
-    textAlign: "left",
   },
   scanBtn: { minWidth: MIN_TOUCH, minHeight: MIN_TOUCH, alignItems: "center", justifyContent: "center" },
   row: { flexDirection: "row", justifyContent: "space-between", gap: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },

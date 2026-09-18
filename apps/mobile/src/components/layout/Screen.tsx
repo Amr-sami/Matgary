@@ -10,6 +10,12 @@ import { colors, fonts, spacing } from "@/theme/tokens";
  * Every tab screen's frame: safe-area top padding, RTL direction, a title, and
  * pull-to-refresh. Bottom padding clears the tab bar — the bar is absolute over
  * the content, so without it the last row sits under the glyphs.
+ *
+ * The top inset lives on the ROOT, not inside the scroll content: the
+ * ScrollView's frame therefore starts under the status bar and clips scrolled
+ * rows there, with the root's background painted behind the clock. Padding
+ * the content instead scrolls away with it, and the first row ends up drawn
+ * straight through the time/battery glyphs.
  */
 export function Screen({
   title,
@@ -26,10 +32,10 @@ export function Screen({
 }) {
   const insets = useSafeAreaInsets();
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { paddingTop: insets.top }]}>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.lg }]}
+        contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         refreshControl={
           onRefresh ? (
@@ -54,6 +60,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg, ...RTL },
   scroll: { flex: 1 },
   content: {
+    paddingTop: spacing.lg,
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xxl * 2,
     gap: spacing.lg,

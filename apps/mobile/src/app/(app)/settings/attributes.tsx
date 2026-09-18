@@ -591,7 +591,7 @@ const styles = StyleSheet.create({
   },
   rowTitle: { fontFamily: fonts.semibold, fontSize: 16, color: colors.text, ...RTL_TEXT },
   metaRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" },
-  key: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, writingDirection: "ltr" },
+  key: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, writingDirection: "ltr", flexShrink: 1 },
   body: { marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border, gap: spacing.md },
   attrActions: { flexDirection: "row", alignItems: "center", gap: 0 },
   actions: { flexDirection: "row", alignItems: "center", gap: 0 },

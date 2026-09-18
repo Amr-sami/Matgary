@@ -432,9 +432,10 @@ export default function SecurityScreen() {
         <ChevronBack size={16} color={colors.textSecondary} />
         <Text style={styles.backLabel}>{t("app.settingsPage.title")}</Text>
       </Pressable>
+      {/* Leading icon at the reading start, like Shop info — not parked at the far edge. */}
       <View style={styles.titleRow}>
+        <ShieldCheck size={24} color={colors.accent} />
         <Text style={styles.title}>{t("app.accountSecurity.heading")}</Text>
-        <ShieldCheck size={26} color={colors.accent} />
       </View>
       <Text style={styles.subtitle}>
         {t("app.accountSecurity.subhead")}
@@ -739,9 +740,9 @@ const styles = StyleSheet.create({
   header: { gap: spacing.xs },
   back: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 32 },
   backLabel: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
-  titleRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   title: {
-    flex: 1,
+    flexShrink: 1,
     fontFamily: fonts.bold,
     fontSize: 26,
     color: colors.text,

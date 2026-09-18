@@ -18,7 +18,11 @@
  * module scope, so a live locale switch re-labels on the next render).
  *
  * No Intl anywhere (Hermes ships a trimmed ICU): numbers are grouped with a
- * regex and dates are dd/mm/yyyy, the same shapes as "@/lib/format".
+ * regex and dates are dd/mm/yyyy, the same shapes as "@/lib/format". Money
+ * fields (total, price, amount, salary) take the app's currency shape through
+ * the same `mobile.format.money` key `money()` reads — "3,400 ج.م" here must
+ * look like "3,400 ج.م" on the notification for the same sale — while
+ * quantities and the per-line "qty × price" stay bare, as on the web.
  */
 
 export interface ActivityDetail {
@@ -54,6 +58,23 @@ export function formatNumber(v: unknown): string {
   const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   const sign = rounded < 0 ? "-" : "";
   return frac ? `${sign}${grouped}.${frac}` : `${sign}${grouped}`;
+}
+
+/** The key `money()` in "@/lib/format" reads: "{amount} ج.م" in Arabic, "EGP {amount}" in English. */
+const MONEY_KEY = "mobile.format.money";
+
+/**
+ * A money amount in the app's currency shape — "3,400 ج.م" / "EGP 3,400", the
+ * same `mobile.format.money` string every other screen prints — resolved
+ * through the injected `t` so this file stays import-free. Unlike `money()`
+ * the fraction is kept (a 1,264.5 sale total must not round to 1,265). Falls
+ * back to the bare grouped number when the dictionary lacks the key.
+ */
+function formatMoney(t: Translate, v: unknown): string {
+  const amount = formatNumber(v);
+  if (typeof v !== "number" || !Number.isFinite(v)) return amount;
+  const shaped = t(MONEY_KEY, { amount });
+  return shaped === MONEY_KEY ? amount : shaped;
 }
 
 /** ISO / date-only string → "18/09/2026" (mirrors shortDate in "@/lib/format"); the input when unparsable. */
@@ -120,11 +141,11 @@ export function formatActivityDetails(
         out.push({ label: f("lines"), value: summariseSaleLines(m.lines as SaleLine[], t) });
       if (typeof m.totalQuantity === "number")
         out.push({ label: f("totalQuantity"), value: formatNumber(m.totalQuantity) });
-      if (typeof m.total === "number") out.push({ label: f("total"), value: formatNumber(m.total) });
+      if (typeof m.total === "number") out.push({ label: f("total"), value: formatMoney(t, m.total) });
       if (typeof m.quantitySold === "number")
         out.push({ label: f("quantitySold"), value: formatNumber(m.quantitySold) });
       if (typeof m.pricePerUnit === "number")
-        out.push({ label: f("pricePerUnit"), value: formatNumber(m.pricePerUnit) });
+        out.push({ label: f("pricePerUnit"), value: formatMoney(t, m.pricePerUnit) });
       if (m.paymentMethod)
         out.push({ label: f("paymentMethod"), value: enumLabel(t, "paymentMethods", m.paymentMethod) });
       if (m.customerName) out.push({ label: f("customerName"), value: String(m.customerName) });
@@ -168,14 +189,14 @@ export function formatActivityDetails(
     case "team.compensation_set": {
       if (m.payType) out.push({ label: f("payType"), value: enumLabel(t, "payTypes", m.payType) });
       if (m.baseSalaryMonthly != null)
-        out.push({ label: f("baseSalaryMonthly"), value: formatNumber(m.baseSalaryMonthly) });
-      if (m.hourlyRate != null) out.push({ label: f("hourlyRate"), value: formatNumber(m.hourlyRate) });
+        out.push({ label: f("baseSalaryMonthly"), value: formatMoney(t, m.baseSalaryMonthly) });
+      if (m.hourlyRate != null) out.push({ label: f("hourlyRate"), value: formatMoney(t, m.hourlyRate) });
       return out;
     }
     case "product.create": {
       if (typeof m.quantity === "number")
         out.push({ label: f("initialQuantity"), value: formatNumber(m.quantity) });
-      if (typeof m.price === "number") out.push({ label: f("price"), value: formatNumber(m.price) });
+      if (typeof m.price === "number") out.push({ label: f("price"), value: formatMoney(t, m.price) });
       return out;
     }
     case "product.adjust": {
@@ -188,7 +209,7 @@ export function formatActivityDetails(
       return out;
     }
     case "expense.create": {
-      if (typeof m.amount === "number") out.push({ label: f("amount"), value: formatNumber(m.amount) });
+      if (typeof m.amount === "number") out.push({ label: f("amount"), value: formatMoney(t, m.amount) });
       if (m.category) out.push({ label: f("type"), value: enumLabel(t, "expenseCategories", m.category) });
       return out;
     }

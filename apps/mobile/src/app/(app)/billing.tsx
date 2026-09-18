@@ -251,7 +251,7 @@ export default function BillingScreen() {
 
       {billing.isError && !b ? (
         <>
-          <EmptyState title={t("app.common.errorRetry")} />
+          <EmptyState compact title={t("app.common.errorRetry")} />
           <Button
             label={t("app.common.retry")}
             variant="outline"

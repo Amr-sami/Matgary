@@ -49,6 +49,11 @@ type Action = "receive" | "cancel" | "delete";
  * Everything that writes is gated on `manage_purchases`, the way the web's
  * `can(principal, "manage_purchases")` hides its buttons.
  */
+/** Arabic counts 1 / 2 / 3–10 / 11+ differently; the dictionary carries One/Two/Few beside the default. */
+function countForm(n: number): string {
+  return n === 1 ? "One" : n === 2 ? "Two" : n >= 3 && n <= 10 ? "Few" : "";
+}
+
 export default function PurchasesScreen() {
   const qc = useQueryClient();
   const me = useSession((s) => s.me);
@@ -211,7 +216,7 @@ export default function PurchasesScreen() {
                 <View style={styles.rowMeta}>
                   <Text style={styles.total} testID="po-row-total">{money(o.total)}</Text>
                   <Text style={styles.meta} testID="po-row-meta">
-                    {t("mobile.purchases.orderMeta", { n: o.itemCount, date: shortDate(o.orderDate) })}
+                    {t(`mobile.purchases.orderMeta${countForm(o.itemCount)}`, { n: o.itemCount, date: shortDate(o.orderDate) })}
                   </Text>
                 </View>
                 {o.status === "received" && o.receivedDate ? (
@@ -261,7 +266,9 @@ export default function PurchasesScreen() {
 
 const styles = StyleSheet.create({
   gridRow: { flexDirection: "row", gap: spacing.lg },
-  spacer: { flex: 1 },
+  // Same box as a StatCard (padding + border) so Yoga's flex basis matches and
+  // the orphan tile is exactly as wide as the two above it.
+  spacer: { flex: 1, padding: spacing.lg, borderWidth: 1, borderColor: "transparent" },
   list: { gap: spacing.md },
   row: {
     backgroundColor: colors.card,

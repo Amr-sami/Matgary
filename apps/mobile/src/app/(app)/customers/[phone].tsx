@@ -55,17 +55,20 @@ type LedgerInvoice = catalog.CustomerLedgerInvoice;
 type PaymentEvent = catalog.CustomerPaymentEvent;
 type Method = catalog.SettlementMethod;
 
+// One namespace for payment names across POS, dashboard, history and detail.
 const METHOD_LABELS = (): Record<string, string> => ({
-  cash: t("app.catalog.payment.cash"),
-  instapay: t("app.customers.settle.methods.instapay"),
-  card: t("app.customers.settle.methods.card"),
+  cash: t("app.activityLabels.paymentMethods.cash"),
+  instapay: t("app.activityLabels.paymentMethods.instapay"),
+  card: t("app.activityLabels.paymentMethods.card"),
 });
 
-const METHODS = (): { key: Method; label: string }[] => [
-  { key: "cash", label: t("app.catalog.payment.cash") },
-  { key: "instapay", label: t("app.customers.settle.methods.instapay") },
-  { key: "card", label: t("app.customers.settle.methods.card") },
-];
+const METHODS = (): { key: Method; label: string }[] =>
+  (["cash", "instapay", "card"] as const).map((key) => ({ key, label: METHOD_LABELS()[key] ?? key }));
+
+/** Arabic counts 1 / 2 / 3–10 / 11+ differently; the dictionary carries One/Two/Few beside the default. */
+function countForm(n: number): string {
+  return n === 1 ? "One" : n === 2 ? "Two" : n >= 3 && n <= 10 ? "Few" : "";
+}
 
 /** app.customers.settle.errors.* — the server's error codes, or GENERIC. */
 function settleErrorMessage(error: unknown): string {
@@ -294,7 +297,7 @@ export default function CustomerDetailScreen() {
 
             {hasDebt ? (
               <View style={styles.debtMeta}>
-                <Badge label={t("mobile.customers.unpaidCount", { n: unpaid.length })} variant="outofstock" />
+                <Badge label={t(`mobile.customers.unpaidCount${countForm(unpaid.length)}`, { n: unpaid.length })} variant="outofstock" />
                 {oldestUnpaid !== null ? (
                   <Badge
                     label={t("mobile.customers.oldestUnpaidDays", { n: oldestUnpaid })}
@@ -427,11 +430,11 @@ export default function CustomerDetailScreen() {
                           ) : partial ? (
                             <Badge label={t("app.purchases.paymentBadge.partial")} variant="lowstock" />
                           ) : (
-                            <Badge label={t("app.catalog.payment.deferred")} variant="outofstock" />
+                            <Badge label={t("app.activityLabels.paymentMethods.deferred")} variant="outofstock" />
                           )}
                         </View>
                         <Text style={styles.invoiceMeta}>
-                          {t("mobile.customers.invoiceMeta", { date: shortDate(inv.date), n: inv.lines.length })}
+                          {t(`mobile.customers.invoiceMeta${countForm(inv.lines.length)}`, { date: shortDate(inv.date), n: inv.lines.length })}
                           {inv.paidAt ? ` ${t("mobile.customers.paidOn", { date: shortDate(inv.paidAt) })}` : ""}
                         </Text>
                       </View>
@@ -578,7 +581,9 @@ function SettleSheet({
             <Text style={styles.sheetTitle}>{t("app.customers.settle.title")}</Text>
             {invoice ? (
               <Text style={styles.sheetSub}>
-                {invoice.invoiceId} · {t("mobile.customers.remaining", { amount: money(invoice.balance) })}
+                {/* LRI…PDI: the Latin id must not be the paragraph's first strong
+                    character, or TextKit lays the whole Arabic line out LTR. */}
+                {`\u2066${invoice.invoiceId}\u2069`} · {t("mobile.customers.remaining", { amount: money(invoice.balance) })}
               </Text>
             ) : null}
             {invoice && invoice.amountPaid > 0 ? (
@@ -592,7 +597,6 @@ function SettleSheet({
               value={amountInput}
               onChangeText={setAmountInput}
               keyboardType="decimal-pad"
-              ltr
               editable={!busy}
               testID="settle-amount"
             />
@@ -671,10 +675,12 @@ const styles = StyleSheet.create({
   ltr: { writingDirection: "ltr" },
   branch: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
 
-  debtBlock: { alignItems: "flex-start", flexShrink: 0, gap: 2 },
-  debtLabel: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 11, color: colors.textSecondary },
+  // The trailing block is end-aligned as a unit ("right" = END under the
+  // Fabric swap) so label and amount share the card's far edge.
+  debtBlock: { alignItems: "flex-end", flexShrink: 0, gap: 2 },
+  debtLabel: { textAlign: "right", fontFamily: fonts.regular, fontSize: 11, color: colors.textSecondary },
   debtValue: {
-    ...RTL_TEXT,
+    textAlign: "right",
     fontFamily: fonts.bold,
     fontSize: 22,
     color: colors.warningStrong,

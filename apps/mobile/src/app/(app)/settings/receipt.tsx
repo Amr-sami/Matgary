@@ -31,7 +31,8 @@ import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
 import { Field } from "@/components/ui/Field";
 import { Segmented } from "@/components/ui/Segmented";
-import { money, shortDate } from "@/lib/format";
+import { shortDate } from "@/lib/format";
+import { receiptMoney } from "@/receipt/html";
 import { useLogoPicker } from "@/lib/useLogoPicker";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
@@ -637,6 +638,7 @@ function ReceiptPreview({
   order: ReceiptBlockKey[];
 }) {
   const lang = draft.receiptLanguage;
+  const tracked = lang === "en" ? p.trackedEn : null;
   const T = (en: string, ar: string) =>
     lang === "en" ? en : lang === "ar" ? ar : `${en} · ${ar}`;
   const shopName = (server.shopName || "STORE").toUpperCase();
@@ -682,9 +684,11 @@ function ReceiptPreview({
       case "shopInfo":
         return (
           <>
-            <Text style={[p.center, p.bold]}>{shopName}</Text>
+            {/* p.center LAST: p.bold/p.black spread RTL_TEXT (textAlign left) and
+                were overriding the centring — the paper centres these. */}
+            <Text style={[p.bold, tracked, p.center]}>{shopName}</Text>
             {server.shopPhone ? (
-              <Text style={[p.center, p.ltr]}>TEL: {server.shopPhone}</Text>
+              <Text style={[p.center, p.ltr]}>{T("TEL", "هاتف")}: {server.shopPhone}</Text>
             ) : null}
           </>
         );
@@ -698,10 +702,10 @@ function ReceiptPreview({
       case "items":
         return (
           <>
-            <Text style={[p.center, p.black]}>{T("*** RECEIPT ***", "*** فاتورة ***")}</Text>
+            <Text style={[p.black, tracked, p.center]}>{T("*** RECEIPT ***", "*** فاتورة ***")}</Text>
             <View style={p.row}>
-              <Text style={p.body}>SAMPLE ITEM</Text>
-              <Text style={[p.body, p.ltr]}>{money(100)}</Text>
+              <Text style={p.body}>{T("SAMPLE ITEM", "صنف تجريبي")}</Text>
+              <Text style={[p.body, p.ltr]}>{receiptMoney(100)}</Text>
             </View>
           </>
         );
@@ -710,18 +714,18 @@ function ReceiptPreview({
           <>
             <View style={p.row}>
               <Text style={p.body}>{T("SUBTOTAL", "المجموع")}</Text>
-              <Text style={[p.body, p.ltr]}>{money(100)}</Text>
+              <Text style={[p.body, p.ltr]}>{receiptMoney(100)}</Text>
             </View>
             {showLoyaltyRows ? (
               <View style={p.row}>
                 <Text style={p.body}>{T("CREDIT APPLIED", "رصيد مستخدم")}</Text>
-                <Text style={[p.body, p.ltr]}>- {money(10)}</Text>
+                <Text style={[p.body, p.ltr]}>{receiptMoney(-10)}</Text>
               </View>
             ) : null}
             <View style={p.hr} />
             <View style={p.row}>
               <Text style={[p.body, p.black]}>{T("TOTAL AMOUNT", "الإجمالي")}</Text>
-              <Text style={[p.body, p.black, p.ltr]}>{money(showLoyaltyRows ? 90 : 100)}</Text>
+              <Text style={[p.body, p.black, tracked, p.ltr]}>{receiptMoney(showLoyaltyRows ? 90 : 100)}</Text>
             </View>
           </>
         );
@@ -737,7 +741,7 @@ function ReceiptPreview({
       case "footer":
         return (
           <>
-            <Text style={[p.center, p.bold]}>
+            <Text style={[p.bold, tracked, p.center]}>
               {T("THANK YOU FOR SHOPPING!", "شكراً لتسوقكم معنا")}
             </Text>
             {draft.receiptFooterText ? (
@@ -797,7 +801,10 @@ const p = StyleSheet.create({
   body: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 12, color: PAPER_INK, lineHeight: 18 },
   small: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 11, color: PAPER_INK, lineHeight: 16 },
   bold: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 13, color: PAPER_INK, lineHeight: 20 },
-  black: { ...RTL_TEXT, fontFamily: fonts.bold, letterSpacing: 1 },
+  // No letterSpacing here: tracking pulls Arabic's cursive joins apart. It is
+  // applied per render (`tracked`) only when the labels are English.
+  black: { ...RTL_TEXT, fontFamily: fonts.bold },
+  trackedEn: { letterSpacing: 1 },
   center: { textAlign: "center", alignItems: "center", alignSelf: "stretch" },
   ltr: { writingDirection: "ltr", fontVariant: ["tabular-nums"] },
   muted: { fontFamily: fonts.regular, fontSize: 10, color: colors.textSecondary, textAlign: "center" },

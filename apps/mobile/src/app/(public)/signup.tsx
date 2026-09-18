@@ -264,7 +264,7 @@ export default function SignupScreen() {
               onPress={() => void setLocale(locale === "ar" ? "en" : "ar")}
             >
               <Globe size={20} color={colors.textSecondary} />
-              <Text style={styles.langText}>{locale === "ar" ? "ع" : "EN"}</Text>
+              <Text style={styles.langText}>{locale === "ar" ? "EN" : "ع"}</Text>
             </Pressable>
           </View>
 
@@ -351,6 +351,9 @@ export default function SignupScreen() {
                 onPress={goToStep2}
                 disabled={
                   signingIn ||
+                  !email.trim() ||
+                  password.length < 8 ||
+                  password !== passwordConfirm ||
                   emailStatus === "checking" ||
                   emailStatus === "taken" ||
                   emailStatus === "invalid"
@@ -425,6 +428,8 @@ export default function SignupScreen() {
                   onPress={() => void submit()}
                   loading={signingIn || submitting}
                   disabled={
+                    !storeName.trim() ||
+                    !storeHandle.trim() ||
                     handleStatus === "checking" ||
                     handleStatus === "taken" ||
                     handleStatus === "invalid"
@@ -607,11 +612,13 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     padding: spacing.md,
   },
+  // Start-aligned like the labels and inline hints above it — the one centred
+  // line broke the form's edge.
   errorText: {
     fontFamily: fonts.medium,
     fontSize: 14,
     color: colors.danger,
-    textAlign: "center",
+    ...RTL_TEXT,
   },
   consent: {
     fontFamily: fonts.regular,
@@ -622,9 +629,10 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     paddingHorizontal: spacing.sm,
   },
+  // Plain weight: bold names read as links but were not tappable; the pill
+  // links beneath are the one affordance.
   consentEmphasis: {
     ...RTL_TEXT,
-    fontFamily: fonts.semibold,
     color: colors.text,
   },
   consentLinks: {

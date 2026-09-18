@@ -306,7 +306,9 @@ const styles = StyleSheet.create({
   sheetTitle: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 18, color: colors.accent },
   sheetHint: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, lineHeight: 20 },
 
-  list: { paddingHorizontal: spacing.md, gap: spacing.xs },
+  // sm + row md = 20 = sheetHeader xl, so the icon/name column lines up with
+  // the title and the active card bleeds a clean 12pt past the text column.
+  list: { paddingHorizontal: spacing.sm, gap: spacing.xs },
   row: {
     minHeight: MIN_TOUCH + 12,
     flexDirection: "row",

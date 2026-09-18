@@ -432,7 +432,7 @@ const styles = StyleSheet.create({
 
   enableRow: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     justifyContent: "space-between",
     gap: spacing.md,
   },

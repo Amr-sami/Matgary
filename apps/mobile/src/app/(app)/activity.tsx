@@ -437,12 +437,12 @@ function ActivityRow({ row, first, last }: { row: LogRow; first: boolean; last: 
         <View style={styles.pill}>
           <Text style={styles.pillText}>{categoryLabel}</Text>
         </View>
-        <Text style={styles.action}>{actionLabel}</Text>
-        {row.entityLabel ? (
-          <Text style={styles.entity} numberOfLines={1}>
-            {`— ${row.entityLabel}`}
-          </Text>
-        ) : null}
+        {/* One Text: nested so the dash stays glued to the action word when the
+            id wraps, and the Latin id is bidi-isolated (LRI…PDI). */}
+        <Text style={styles.action}>
+          {actionLabel}
+          {row.entityLabel ? <Text style={styles.entity}>{` — \u2066${row.entityLabel}\u2069`}</Text> : null}
+        </Text>
       </View>
       <View style={styles.rowMeta}>
         <Text style={styles.meta}>{row.actorName ?? "—"}</Text>
@@ -570,7 +570,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: radius.xl,
     borderBottomRightRadius: radius.xl,
   },
-  rowTop: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" },
+  rowTop: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   pill: {
     backgroundColor: colors.neutralTint,
     borderRadius: radius.full,
@@ -578,8 +578,8 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   pillText: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary },
-  action: { fontFamily: fonts.semibold, fontSize: 15, color: colors.text, ...RTL_TEXT },
-  entity: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary, flexShrink: 1 },
+  action: { fontFamily: fonts.semibold, fontSize: 15, color: colors.text, flex: 1, minWidth: 0, ...RTL_TEXT },
+  entity: { fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary },
   rowMeta: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" },
   meta: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary },
   details: { marginTop: spacing.xs, gap: 2 },

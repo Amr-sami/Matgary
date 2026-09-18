@@ -26,6 +26,12 @@ interface ButtonProps {
  * shipped buttons that broke a two-word Arabic label one word per line, which
  * is the defect this whole polish pass started from — a native button must not
  * reintroduce it.
+ *
+ * Disabled is a real variant, not an opacity fade: a half-transparent accent
+ * fill is a lavender pill with white text that still reads as the primary CTA
+ * (settings/printers with Bluetooth off). Disabled buttons drop to the neutral
+ * tint with secondary-grey text; outline loses its accent border for the card
+ * border. `loading` keeps the accent fill so the white spinner stays visible.
  */
 export function Button({
   label,
@@ -36,6 +42,7 @@ export function Button({
   style,
 }: ButtonProps) {
   const isDisabled = disabled || loading;
+  const showDisabled = disabled && !loading;
 
   return (
     <Pressable
@@ -50,7 +57,9 @@ export function Button({
         variant === "ghost" && styles.ghost,
         pressed && variant === "primary" && styles.primaryPressed,
         pressed && variant !== "primary" && styles.nonPrimaryPressed,
-        isDisabled && styles.disabled,
+        loading && styles.loading,
+        showDisabled && variant === "primary" && styles.primaryDisabled,
+        showDisabled && variant === "outline" && styles.outlineDisabled,
         style,
       ]}
     >
@@ -64,6 +73,7 @@ export function Button({
           style={[
             styles.label,
             variant === "primary" ? styles.labelOnAccent : styles.labelAccent,
+            showDisabled && styles.labelDisabled,
           ]}
         >
           {label}
@@ -88,8 +98,11 @@ const styles = StyleSheet.create({
   outline: { backgroundColor: colors.bg, borderColor: colors.accent },
   ghost: { backgroundColor: "transparent", minHeight: MIN_TOUCH },
   nonPrimaryPressed: { backgroundColor: colors.accentLight },
-  disabled: { opacity: 0.5 },
+  loading: { opacity: 0.5 },
+  primaryDisabled: { backgroundColor: colors.neutralTint },
+  outlineDisabled: { backgroundColor: colors.bg, borderColor: colors.border },
   label: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 16 },
   labelOnAccent: { color: "#FFFFFF" },
   labelAccent: { color: colors.accent },
+  labelDisabled: { color: colors.textSecondary },
 });

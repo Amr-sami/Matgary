@@ -275,13 +275,15 @@ export default function SyncScreen() {
             disabled={!off.online || off.draining}
           />
         </View>
-        {/* Dev-only, sits first so a QA run never has to scroll past synced items. */}
-        {__DEV__ ? <DevTools /> : null}
         {failed.length > 0 ? (
           <Button label={t("mobile.sync.retryAll")} variant="outline" onPress={() => void onRetryAll()} disabled={off.draining} style={styles.grow} />
         ) : null}
       </View>
       {lastResult ? <Text style={styles.resultLine}>{drainSummary(lastResult)}</Text> : null}
+      {/* Dev-only, sits before the lists so a QA run never scrolls past synced
+          items — and OUTSIDE the actions row, where it squeezed the Sync CTA
+          to half width and broke every Arabic word mid-glyph. */}
+      {__DEV__ ? <DevTools /> : null}
 
       {nothingPending ? (
         <EmptyState title={t("mobile.sync.emptyTitle")} hint={t("mobile.sync.emptyHint")} />
@@ -674,8 +676,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 2,
   },
-  statValue: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 24, fontVariant: ["tabular-nums"] },
-  statValueSmall: { ...RTL_TEXT, fontSize: 15, paddingVertical: 5 },
+  // One fixed line box for every tile's value so the three labels share a baseline.
+  statValue: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 24, lineHeight: 30, fontVariant: ["tabular-nums"] },
+  statValueSmall: { ...RTL_TEXT, fontSize: 15, lineHeight: 30, paddingVertical: 0 },
   statLabel: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary },
   banner: {
     flexDirection: "row",
@@ -751,7 +754,7 @@ const styles = StyleSheet.create({
   actionPressed: { backgroundColor: colors.neutralTint },
   actionDisabled: { opacity: 0.5 },
   actionLabel: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.accent },
-  devCard: { marginTop: spacing.lg, borderStyle: "dashed", borderColor: colors.warningStrong },
+  devCard: { borderStyle: "dashed", borderColor: colors.warningStrong },
   devTitle: { alignSelf: "flex-start", fontFamily: fonts.bold, fontSize: 13, color: colors.warningStrong, marginBottom: spacing.sm, ...RTL_TEXT },
   devRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   devBody: { flex: 1, alignItems: "flex-start" },

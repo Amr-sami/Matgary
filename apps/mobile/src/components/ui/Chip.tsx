@@ -1,6 +1,5 @@
 import { Pressable, StyleSheet, Text } from "react-native";
 
-import { RTL_TEXT } from "@/theme/rtl";
 import { colors, fonts, radius, spacing } from "@/theme/tokens";
 
 /**
@@ -12,6 +11,14 @@ import { colors, fonts, radius, spacing } from "@/theme/tokens";
  * started the polish pass: a flex child defaults to shrinking, and for text
  * min-content means breaking at every space, so "آخر 7 أيام" rendered one word
  * per line in a 70px chip.
+ *
+ * The label is centred in BOTH axes, on purpose (no RTL_TEXT here): a chip
+ * usually hugs its label, but a caller may stretch it to fill a cell (the
+ * expenses category grid puts each chip in a 48% column, and a column's default
+ * align is stretch). With start alignment the stretched chip read as an empty
+ * text input with a value at the start edge — only the active one looked like a
+ * choice. Centring matches Segmented, and is direction-neutral, so it renders
+ * the same in Arabic and English.
  */
 export function Chip({
   label,
@@ -46,6 +53,7 @@ export function Chip({
 const styles = StyleSheet.create({
   chip: {
     minHeight: 44,
+    alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: spacing.lg,
     borderRadius: radius.md,
@@ -55,7 +63,7 @@ const styles = StyleSheet.create({
   active: { backgroundColor: colors.accent, borderColor: colors.accent },
   inactive: { backgroundColor: colors.bg, borderColor: colors.border },
   pressed: { backgroundColor: colors.accentLight },
-  text: { fontFamily: fonts.medium, fontSize: 14, ...RTL_TEXT },
+  text: { fontFamily: fonts.medium, fontSize: 14, textAlign: "center" },
   textActive: { color: "#FFFFFF" },
   textInactive: { color: colors.text },
 });

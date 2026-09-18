@@ -18,6 +18,8 @@ import { PlusIcon as Plus } from "phosphor-react-native/src/icons/Plus";
 import { ApiError } from "@matgary/api-client";
 
 import { api } from "@/api/client";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
 import { getLocale, t } from "@/i18n";
 import { Screen } from "@/components/layout/Screen";
 import { Badge } from "@/components/ui/Badge";
@@ -134,7 +136,11 @@ export default function LeaveScreen() {
 
   const queryClient = useQueryClient();
   const q = useQuery({
-    queryKey: ["leave-requests"],
+    // "with-branch": team/[userId].tsx caches the bare array under
+    // ["leave-requests"]; sharing the key made whichever screen loaded first
+    // fix the cached shape for the other (a crash one way, an empty list the
+    // other). Prefix-matched invalidations still refresh both.
+    queryKey: ["leave-requests", "with-branch"],
     queryFn: () =>
       api.request<{ data: LeaveRequestDto[]; branchId: string | null }>("/api/leave-requests"),
   });
@@ -268,7 +274,9 @@ export default function LeaveScreen() {
             </Text>
           </View>
           {canRequest ? (
-            <PlusButton label={t("app.leave.tab.request")} onPress={() => setFormOpen(true)} />
+            // The header already carries "طلب إجازة"; this one is "طلب جديد" as in
+            // the web's empty state, so the screen does not show one CTA twice.
+            <PlusButton label={t("app.leave.tab.newRequest")} onPress={() => setFormOpen(true)} />
           ) : null}
         </View>
       ) : (
@@ -412,6 +420,7 @@ function LeaveFormSheet({
   onClose: () => void;
   onCreated: () => void;
 }) {
+  const insets = useSafeAreaInsets();
   const today = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
   const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
@@ -461,7 +470,7 @@ function LeaveFormSheet({
         <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel={t("app.common.close")} />
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
           <View style={styles.sheet}>
-            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetBody}>
+            <ScrollView keyboardShouldPersistTaps="handled" style={styles.sheetScroll} contentContainerStyle={styles.sheetBody}>
               <Text style={styles.sheetTitle}>{t("app.leave.form.title")}</Text>
 
               <DateField label={t("mobile.leave.from")} value={start} onChange={setStart} />
@@ -485,22 +494,24 @@ function LeaveFormSheet({
                 </Text>
               ) : null}
 
-              <View style={styles.actions}>
-                <Button
-                  label={t("app.leave.form.submit")}
-                  onPress={() => create.mutate()}
-                  disabled={!datesValid}
-                  loading={create.isPending}
-                  style={styles.actionGrow}
-                />
-                <Button
-                  label={t("app.leave.form.cancel")}
-                  variant="outline"
-                  onPress={close}
-                  style={styles.actionGrow}
-                />
-              </View>
             </ScrollView>
+            {/* Pinned footer: inside the ScrollView the CTAs fell below the fold
+                once the keyboard lifted the sheet. Cancel leads, primary trails. */}
+            <View style={[styles.actions, styles.sheetFooter, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
+              <Button
+                label={t("app.leave.form.cancel")}
+                variant="outline"
+                onPress={close}
+                style={styles.actionGrow}
+              />
+              <Button
+                label={t("app.leave.form.submit")}
+                onPress={() => create.mutate()}
+                disabled={!datesValid}
+                loading={create.isPending}
+                style={styles.actionGrow}
+              />
+            </View>
           </View>
         </KeyboardAvoidingView>
       </View>
@@ -518,6 +529,7 @@ function DecideSheet({
   onClose: () => void;
   onDecided: (status: "approved" | "rejected") => void;
 }) {
+  const insets = useSafeAreaInsets();
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -553,7 +565,7 @@ function DecideSheet({
         <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel={t("app.common.close")} />
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
           <View style={styles.sheet}>
-            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetBody}>
+            <ScrollView keyboardShouldPersistTaps="handled" style={styles.sheetScroll} contentContainerStyle={styles.sheetBody}>
               <Text style={styles.sheetTitle}>
                 {approving ? t("app.leave.tab.decision.approveTitle") : t("app.leave.tab.decision.rejectTitle")}
               </Text>
@@ -596,24 +608,24 @@ function DecideSheet({
                 </Text>
               ) : null}
 
-              <View style={styles.actions}>
-                <Button
-                  label={
-                    approving ? t("app.leave.tab.decision.approveButton") : t("app.leave.tab.decision.rejectButton")
-                  }
-                  variant={approving ? "primary" : "outline"}
-                  onPress={() => decide.mutate()}
-                  loading={decide.isPending}
-                  style={styles.actionGrow}
-                />
-                <Button
-                  label={t("app.leave.tab.decision.cancel")}
-                  variant="ghost"
-                  onPress={close}
-                  style={styles.actionGrow}
-                />
-              </View>
             </ScrollView>
+            <View style={[styles.actions, styles.sheetFooter, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
+              <Button
+                label={t("app.leave.tab.decision.cancel")}
+                variant="ghost"
+                onPress={close}
+                style={styles.actionGrow}
+              />
+              <Button
+                label={
+                  approving ? t("app.leave.tab.decision.approveButton") : t("app.leave.tab.decision.rejectButton")
+                }
+                variant={approving ? "primary" : "outline"}
+                onPress={() => decide.mutate()}
+                loading={decide.isPending}
+                style={styles.actionGrow}
+              />
+            </View>
           </View>
         </KeyboardAvoidingView>
       </View>
@@ -673,7 +685,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   emptyText: { alignItems: "center", gap: spacing.xs },
-  emptyTitle: { fontFamily: fonts.semibold, fontSize: 16, color: colors.text, textAlign: "center", ...RTL_TEXT },
+  emptyTitle: { fontFamily: fonts.semibold, fontSize: 16, color: colors.text, textAlign: "center" },
   emptyHint: { fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary, textAlign: "center" },
   flash: {
     fontFamily: fonts.medium,
@@ -698,6 +710,8 @@ const styles = StyleSheet.create({
     maxHeight: "90%",
     ...elevation.modal,
   },
+  sheetScroll: { flexShrink: 1 },
   sheetBody: { padding: spacing.xl, gap: spacing.lg },
+  sheetFooter: { paddingHorizontal: spacing.xl, paddingTop: spacing.md },
   sheetTitle: { fontFamily: fonts.bold, fontSize: 18, color: colors.text, ...RTL_TEXT },
 });

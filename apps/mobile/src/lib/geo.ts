@@ -83,15 +83,38 @@ export function accuracyExceedsRadius(
 }
 
 /**
- * "120 m" / "1.4 km" — Latin digits, no Intl (Hermes ICU is trimmed; see
- * src/lib/format.ts). Under 1 km rounds to the metre; above it, one decimal.
+ * The app's `t()` shape. Taken as a parameter (the `activity-details.ts`
+ * pattern) because this module must import nothing — `@/i18n` pulls in
+ * expo-secure-store, which plain Node cannot load for the tests above.
  */
-export function formatDistance(meters: number): string {
+export type Translate = (path: string, vars?: Record<string, string | number>) => string;
+
+/** 11990 -> "11,990" — same regex as format.ts's groupDigits, inlined to keep this module import-free. */
+function group(n: number): string {
+  return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+/**
+ * "120 m" / "1.4 km" — Latin digits, no Intl (Hermes ICU is trimmed; see
+ * src/lib/format.ts). Under 1 km rounds to the metre (999.6 is "1 km", not
+ * "1000 m"); above it, one decimal; from 100 km whole and digit-grouped like
+ * every other amount in the app ("11,990 km", never "11990 km").
+ *
+ * Pass the app's `t` and the dictionary owns the unit — "120 م" / "1.4 كم" in
+ * Arabic via `mobile.units.meters` / `mobile.units.km` — so a status such as
+ * "داخل النطاق (0 م من 100 م)" is one Arabic run with no Latin "m" leaking in.
+ * The units are Arabic letters and the digits are bidi-weak, so inside an RTL
+ * paragraph no isolate is needed; one would only split "±" from the digits it
+ * belongs to in `mobile.attendance.location.accuracy`. Without `t` the Latin
+ * fallback keeps the function usable from Node.
+ */
+export function formatDistance(meters: number, t?: Translate): string {
   if (!Number.isFinite(meters) || meters < 0) return "—";
-  if (meters < 1000) return `${Math.round(meters)} m`;
+  const m = Math.round(meters);
+  if (m < 1000) return t ? t("mobile.units.meters", { n: m }) : `${m} m`;
   const km = meters / 1000;
-  const s = km >= 100 ? String(Math.round(km)) : km.toFixed(1).replace(/\.0$/, "");
-  return `${s} km`;
+  const s = km >= 100 ? group(Math.round(km)) : km.toFixed(1).replace(/\.0$/, "");
+  return t ? t("mobile.units.km", { n: s }) : `${s} km`;
 }
 
 /** Server zod wants `accuracyM` as a non-negative integer or null. */

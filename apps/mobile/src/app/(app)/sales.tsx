@@ -41,7 +41,7 @@ import { toReceiptSale } from "@/receipt/share";
 import { selectItemCount, selectTotals, useCart } from "@/stores/cart";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
-import { colors, fonts, radius, spacing } from "@/theme/tokens";
+import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
 import { t } from "@/i18n";
 
 type Payment = salesApi.PaymentMethod;
@@ -60,13 +60,22 @@ interface LastSale {
   rungAt: Date;
 }
 
-/** dictionaries/ar.json — the four methods the cart route accepts. */
-const PAYMENTS = (): { key: Payment; label: string }[] => ([
-  { key: "cash", label: t("app.catalog.payment.cash") },
-  { key: "instapay", label: t("app.customers.settle.methods.instapay") },
-  { key: "card", label: t("app.catalog.payment.card") },
-  { key: "deferred", label: t("app.admin.sales.tenantDetail.paymentMethods.deferred") },
-]);
+/**
+ * The four methods the cart route accepts. Labels come from ONE namespace —
+ * app.activityLabels.paymentMethods — the same one the dashboard badge,
+ * sales history and the invoice detail read, so a sale is never "كاش" on the
+ * POS and "نقدي" on the home screen a minute later.
+ */
+const PAYMENTS = (): { key: Payment; label: string }[] =>
+  (["cash", "instapay", "card", "deferred"] as const).map((key) => ({
+    key,
+    label: t(`app.activityLabels.paymentMethods.${key}`),
+  }));
+
+/** Arabic counts 1 / 2 / 3–10 / 11+ differently; the dictionary carries One/Two/Few beside the default. */
+function countForm(n: number): string {
+  return n === 1 ? "One" : n === 2 ? "Two" : n >= 3 && n <= 10 ? "Few" : "";
+}
 
 /**
  * The POS — app__sales-pos.png, recomposed per doc 04: the sale comes first,
@@ -564,7 +573,7 @@ export default function SalesScreen() {
           )
         ) : recent.length ? (
           <>
-            <Text style={styles.label}>{t("app.sales.form.recentLabel")}</Text>
+            <Text style={[styles.label, styles.recentLabel]}>{t("app.sales.form.recentLabel")}</Text>
             <View style={styles.pillRow}>
               {recent.map((p) => (
                 <Pressable
@@ -592,47 +601,56 @@ export default function SalesScreen() {
       ) : null}
 
       {canRecord && cart.lines.length > 0 ? (
-        <Card title={t("mobile.pos.itemsInCart", { n: itemCount })}>
+        <Card title={t(`mobile.pos.itemsInCart${countForm(itemCount)}`, { n: itemCount })}>
           <View style={styles.cartList}>
             {cart.lines.map((l) => (
               <View key={l.productId} style={styles.cartRow}>
-                <View style={styles.cartText}>
-                  <Text numberOfLines={1} style={styles.cartName}>
-                    {l.name}
-                  </Text>
-                  <Text style={styles.cartUnit}>
-                    {money(l.pricePerUnit)} × {l.quantity}
-                  </Text>
-                </View>
-                <View style={styles.qty}>
+                {/* Two rows per line: the name gets the full width (a cashier
+                    must be able to read "Casio Edifice EFR-…" in full), the
+                    stepper and the line total share the row beneath. */}
+                <View style={styles.cartHead}>
+                  <View style={styles.cartText}>
+                    <Text numberOfLines={2} style={styles.cartName}>
+                      {l.name}
+                    </Text>
+                    <Text style={styles.cartUnit}>
+                      {money(l.pricePerUnit)} × {l.quantity}
+                    </Text>
+                  </View>
                   <Pressable
-                    style={styles.qtyBtn}
-                    onPress={() => cart.setQuantity(l.productId, l.quantity - 1)}
+                    onPress={() => cart.remove(l.productId)}
+                    style={styles.trashBtn}
                     accessibilityRole="button"
-                    accessibilityLabel={t("mobile.common.decrease")}
+                    accessibilityLabel={t("app.sales.void.confirm")}
                   >
-                    <Minus size={16} color={colors.accent} weight="bold" />
-                  </Pressable>
-                  <Text style={styles.qtyValue}>{l.quantity}</Text>
-                  <Pressable
-                    style={[styles.qtyBtn, l.quantity >= l.available && styles.qtyBtnDisabled]}
-                    disabled={l.quantity >= l.available}
-                    onPress={() => cart.setQuantity(l.productId, l.quantity + 1)}
-                    accessibilityRole="button"
-                    accessibilityLabel={t("mobile.common.increase")}
-                  >
-                    <Plus size={16} color={colors.accent} weight="bold" />
+                    <Trash size={18} color={colors.textSecondary} />
                   </Pressable>
                 </View>
-                <Text style={styles.cartTotal}>{money(l.quantity * l.pricePerUnit)}</Text>
-                <Pressable
-                  onPress={() => cart.remove(l.productId)}
-                  hitSlop={10}
-                  accessibilityRole="button"
-                  accessibilityLabel={t("app.sales.void.confirm")}
-                >
-                  <Trash size={18} color={colors.textSecondary} />
-                </Pressable>
+                <View style={styles.cartControls}>
+                  <View style={styles.qty}>
+                    <Pressable
+                      style={styles.qtyBtn}
+                      hitSlop={4}
+                      onPress={() => cart.setQuantity(l.productId, l.quantity - 1)}
+                      accessibilityRole="button"
+                      accessibilityLabel={t("mobile.common.decrease")}
+                    >
+                      <Minus size={16} color={colors.accent} weight="bold" />
+                    </Pressable>
+                    <Text style={styles.qtyValue}>{l.quantity}</Text>
+                    <Pressable
+                      style={[styles.qtyBtn, l.quantity >= l.available && styles.qtyBtnDisabled]}
+                      hitSlop={4}
+                      disabled={l.quantity >= l.available}
+                      onPress={() => cart.setQuantity(l.productId, l.quantity + 1)}
+                      accessibilityRole="button"
+                      accessibilityLabel={t("mobile.common.increase")}
+                    >
+                      <Plus size={16} color={colors.accent} weight="bold" />
+                    </Pressable>
+                  </View>
+                  <Text style={styles.cartTotal}>{money(l.quantity * l.pricePerUnit)}</Text>
+                </View>
               </View>
             ))}
           </View>
@@ -676,7 +694,7 @@ export default function SalesScreen() {
               value={cart.customerPhone}
               onChangeText={(v) => cart.setCustomer(cart.customerName, v)}
               keyboardType="phone-pad"
-              placeholder="01xxxxxxxxx"
+              placeholder={t("app.sales.form.customer.phonePlaceholder")}
             />
           </View>
 
@@ -787,7 +805,10 @@ const styles = StyleSheet.create({
   historyText: { flex: 1, gap: 1 },
   historyTitle: { fontFamily: fonts.semibold, fontSize: 15, color: colors.text, ...RTL_TEXT },
   historyHint: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
-  label: { fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary, marginBottom: spacing.sm, ...RTL_TEXT },
+  // fonts.medium matches Field's own label, so the free-standing labels on
+  // this card do not read lighter than the ones the inputs draw themselves.
+  label: { fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary, marginBottom: spacing.sm, ...RTL_TEXT },
+  recentLabel: { marginTop: spacing.md },
   muted: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, marginTop: spacing.sm, ...RTL_TEXT },
   pillRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginBottom: spacing.sm },
   // Recent-product chips. flexShrink 0 + numberOfLines 1 is the Chip lesson
@@ -796,7 +817,7 @@ const styles = StyleSheet.create({
   // Coco Mademoiselle 50ml") each measured wider than half the card, so Yoga
   // wrapped every one onto its own line and the row read as a vertical list.
   // The cap ellipsises a long name instead; the full name shows in the cart.
-  pill: { backgroundColor: colors.accentLight, borderRadius: radius.full, paddingHorizontal: spacing.md, minHeight: 36, justifyContent: "center", flexShrink: 0, maxWidth: "48%" },
+  pill: { backgroundColor: colors.accentLight, borderRadius: radius.full, paddingHorizontal: spacing.md, minHeight: 40, justifyContent: "center", flexShrink: 0, maxWidth: "100%" },
   pillText: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 13, color: colors.accent },
   results: { marginTop: spacing.md, gap: spacing.sm },
   result: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md, minHeight: 56, paddingHorizontal: spacing.lg, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border },
@@ -806,15 +827,20 @@ const styles = StyleSheet.create({
   resultStock: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
   resultPrice: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 15, color: colors.text, fontVariant: ["tabular-nums"], flexShrink: 0 },
   cartList: { gap: spacing.sm },
-  cartRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
+  cartRow: { gap: spacing.xs, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
+  cartHead: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
+  cartControls: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
   cartText: { flex: 1, minWidth: 0 },
+  trashBtn: { width: MIN_TOUCH, height: MIN_TOUCH, alignItems: "center", justifyContent: "center", marginTop: -spacing.sm, marginEnd: -spacing.sm },
   cartName: { fontFamily: fonts.medium, fontSize: 14, color: colors.text, ...RTL_TEXT },
   cartUnit: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
   qty: { flexDirection: "row", alignItems: "center", gap: 4 },
-  qtyBtn: { width: 36, height: 36, borderRadius: radius.md, borderWidth: 1, borderColor: colors.accent, alignItems: "center", justifyContent: "center" },
+  qtyBtn: { width: 40, height: 40, borderRadius: radius.md, borderWidth: 1, borderColor: colors.accent, alignItems: "center", justifyContent: "center" },
   qtyBtnDisabled: { opacity: 0.35 },
   qtyValue: { minWidth: 28, textAlign: "center", fontFamily: fonts.bold, fontSize: 15, color: colors.text, fontVariant: ["tabular-nums"] },
-  cartTotal: { minWidth: 80, fontFamily: fonts.bold, fontSize: 14, color: colors.text, fontVariant: ["tabular-nums"], ...RTL_TEXT },
+  // End-aligned (textAlign "right" = END under the Fabric swap) so a column of
+  // line totals rags against the same edge whatever their digit count.
+  cartTotal: { fontFamily: fonts.bold, fontSize: 15, color: colors.text, fontVariant: ["tabular-nums"], flexShrink: 0, textAlign: "right" },
   totals: { marginTop: spacing.lg, marginBottom: spacing.lg, gap: 6 },
   totalRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: spacing.md },
   totalLabel: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary },

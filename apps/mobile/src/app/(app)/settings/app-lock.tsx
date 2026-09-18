@@ -7,7 +7,7 @@ import {
   StyleSheet,
   Switch,
   Text,
-  View,
+  View, ScrollView
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
@@ -218,7 +218,7 @@ export default function AppLockSettingsScreen() {
       {/* اطلب التحقق بعد */}
       <Card title={t("mobile.appLock.requireTitle")}>
         <Text style={styles.sectionHint}>{t("mobile.appLock.requireHint")}</Text>
-        <View style={styles.chips}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsWrap} contentContainerStyle={styles.chips}>
           {REQUIRE_AFTER_OPTIONS.map((seconds) => (
             <Chip
               key={seconds}
@@ -227,7 +227,7 @@ export default function AppLockSettingsScreen() {
               onPress={() => setRequireAfterSeconds(seconds)}
             />
           ))}
-        </View>
+        </ScrollView>
       </Card>
 
       {/* الجهاز ده */}
@@ -318,21 +318,25 @@ const styles = StyleSheet.create({
   switchSlot: { flexShrink: 0, minWidth: 51, minHeight: 31 },
   lockNow: { marginTop: spacing.lg, minHeight: MIN_TOUCH },
 
-  sectionTitle: { fontFamily: fonts.semibold, fontSize: 16, color: colors.text, ...RTL_TEXT },
+  sectionTitle: { fontFamily: fonts.semibold, fontSize: 16, lineHeight: 22, color: colors.text, ...RTL_TEXT },
+  // No flex:1 — as a COLUMN child it collapsed the body's height, so the
+  // Switch centred on the title line instead of title + hint.
   sectionHint: {
     fontFamily: fonts.regular,
     fontSize: 12,
     color: colors.textSecondary,
-    lineHeight: 20,
-    flex: 1,
+    lineHeight: 18,
+    flexShrink: 1,
     ...RTL_TEXT,
   },
 
+  // One scrolling row: the three chips overflowed the card by ~5pt and wrapped
+  // 2 + 1 with the selected option orphaned on its own line.
+  chipsWrap: { marginTop: spacing.md, marginHorizontal: -spacing.lg },
   chips: {
     flexDirection: "row",
-    flexWrap: "wrap",
     gap: spacing.sm,
-    marginTop: spacing.md,
+    paddingHorizontal: spacing.lg,
   },
 
   deviceStack: { gap: spacing.md },

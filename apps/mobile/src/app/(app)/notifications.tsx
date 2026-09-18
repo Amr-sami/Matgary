@@ -52,14 +52,20 @@ type Me = MeResponse;
  */
 
 /** Web formatRelative, via t() so the English path exists (Hermes: no Intl). */
+function relativeUnit(unit: "minutes" | "hours" | "days", n: number): string {
+  const form = n === 1 ? "One" : n === 2 ? "Two" : n >= 3 && n <= 10 ? "Few" : "";
+  return t(`app.activity.relative.${unit}${form}`, { n });
+}
+
 function relative(iso: string): string {
   const ms = Date.parse(iso);
   if (Number.isNaN(ms)) return "";
   const sec = Math.max(0, (Date.now() - ms) / 1000);
-  if (sec < 60) return t("mobile.notifications.time.now");
-  if (sec < 3600) return t("mobile.notifications.time.minutes", { n: Math.floor(sec / 60) });
-  if (sec < 86400) return t("mobile.notifications.time.hours", { n: Math.floor(sec / 3600) });
-  if (sec < 86400 * 7) return t("mobile.notifications.time.days", { n: Math.floor(sec / 86400) });
+  // Shared with Activity: same wording and the Arabic 1 / 2 / 3–10 forms.
+  if (sec < 60) return t("app.activity.relative.now");
+  if (sec < 3600) return relativeUnit("minutes", Math.floor(sec / 60));
+  if (sec < 86400) return relativeUnit("hours", Math.floor(sec / 3600));
+  if (sec < 86400 * 7) return relativeUnit("days", Math.floor(sec / 86400));
   return shortDate(iso);
 }
 

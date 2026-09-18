@@ -27,6 +27,8 @@ import { money } from "@/lib/format";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT, directionStyle } from "@/theme/rtl";
 import { MIN_TOUCH, colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
 import { isRTL, t } from "@/i18n";
 
 /**
@@ -61,6 +63,11 @@ function errorMessage(error: unknown, fallback: string): string {
 }
 
 /** Port of app__suppliers.png. Balance > 0 means the shop owes the supplier. */
+/** Arabic counts 1 / 2 / 3–10 / 11+ differently; the dictionary carries One/Two/Few beside the default. */
+function countForm(n: number): string {
+  return n === 1 ? "One" : n === 2 ? "Two" : n >= 3 && n <= 10 ? "Few" : "";
+}
+
 export default function SuppliersScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -115,8 +122,8 @@ export default function SuppliersScreen() {
 
   return (
     <Screen
-      title={t("app.activityLabels.categories.supplier")}
-      subtitle={rows.length ? t("mobile.suppliers.summary", { n: rows.length, owed: money(owed) }) : undefined}
+      title={t("app.suppliers.list.heading")}
+      subtitle={rows.length ? t(`mobile.suppliers.summary${countForm(rows.length)}`, { n: rows.length, owed: money(owed) }) : undefined}
       onRefresh={() => void q.refetch()}
       refreshing={q.isRefetching}
     >
@@ -203,7 +210,8 @@ export default function SuppliersScreen() {
                   </>
                 ) : null}
               </View>
-              {s.phone ? <Text style={styles.meta}>{s.phone}</Text> : null}
+              {/* LRI…PDI: an all-neutral "+2010…" in an RTL paragraph trails its plus. */}
+              {s.phone ? <Text style={[styles.meta, styles.metaLtr]}>{`\u2066${s.phone}\u2069`}</Text> : null}
               {s.address ? (
                 <Text numberOfLines={1} style={styles.meta}>
                   {s.address}
@@ -258,6 +266,7 @@ function SupplierFormSheet({
   onClose: () => void;
   onSaved: (id: string, created: boolean) => void;
 }) {
+  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -337,10 +346,13 @@ function SupplierFormSheet({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
       <View style={[styles.overlay, directionStyle(isRTL())]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel={t("app.common.close")} />
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        {/* The KAV is the full-height flex-end container and the scrim sits
+            INSIDE it: with an auto-height KAV the sheet's maxHeight resolved
+            against its own content, clipping the CTAs at the bottom edge. */}
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.kav}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel={t("app.common.close")} />
           <View style={styles.sheet}>
-            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetBody}>
+            <ScrollView keyboardShouldPersistTaps="handled" style={styles.sheetScroll} contentContainerStyle={styles.sheetBody}>
               <Text style={styles.sheetTitle}>
                 {initial ? t("app.suppliers.form.editTitle") : t("app.suppliers.form.createTitle")}
               </Text>
@@ -393,22 +405,23 @@ function SupplierFormSheet({
                 </Text>
               ) : null}
 
-              <View style={styles.actions}>
-                <Button
-                  label={initial ? t("app.suppliers.form.save") : t("app.suppliers.form.add")}
-                  onPress={submit}
-                  disabled={!name.trim()}
-                  loading={save.isPending}
-                  style={styles.actionGrow}
-                />
-                <Button
-                  label={t("app.suppliers.form.cancel")}
-                  variant="outline"
-                  onPress={close}
-                  style={styles.actionGrow}
-                />
-              </View>
             </ScrollView>
+            {/* Pinned footer with the home-indicator inset: inside the ScrollView the CTAs were clipped. Cancel leads. */}
+            <View style={[styles.actions, styles.sheetFooter, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
+              <Button
+                label={t("app.suppliers.form.cancel")}
+                variant="outline"
+                onPress={close}
+                style={styles.actionGrow}
+              />
+              <Button
+                label={initial ? t("app.suppliers.form.save") : t("app.suppliers.form.add")}
+                onPress={submit}
+                disabled={!name.trim()}
+                loading={save.isPending}
+                style={styles.actionGrow}
+              />
+            </View>
           </View>
         </KeyboardAvoidingView>
       </View>
@@ -459,6 +472,7 @@ const styles = StyleSheet.create({
   refreshFailedText: { alignSelf: "flex-start", fontFamily: fonts.medium, fontSize: 13, color: colors.danger, ...RTL_TEXT },
 
   overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: colors.scrim },
+  kav: { flex: 1, justifyContent: "flex-end" },
   sheet: {
     backgroundColor: colors.card,
     borderTopLeftRadius: radius.xl,
@@ -472,5 +486,8 @@ const styles = StyleSheet.create({
   sheetTitle: { alignSelf: "flex-start", fontFamily: fonts.bold, fontSize: 18, color: colors.text, ...RTL_TEXT },
   error: { alignSelf: "flex-start", fontFamily: fonts.medium, fontSize: 14, color: colors.danger, ...RTL_TEXT },
   actions: { flexDirection: "row", gap: spacing.sm },
+  sheetScroll: { flexShrink: 1 },
+  sheetFooter: { paddingHorizontal: spacing.xl, paddingTop: spacing.md },
+  metaLtr: { writingDirection: "ltr", alignSelf: "flex-start", fontVariant: ["tabular-nums"] },
   actionGrow: { flex: 1 },
 });

@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowCounterClockwiseIcon as ArrowCounterClockwise } from "phosphor-react-native/src/icons/ArrowCounterClockwise";
-import { CurrencyDollarIcon as CurrencyDollar } from "phosphor-react-native/src/icons/CurrencyDollar";
+import { CoinsIcon as Coins } from "phosphor-react-native/src/icons/Coins";
 import { PackageIcon as Package } from "phosphor-react-native/src/icons/Package";
 import { ShoppingCartIcon as ShoppingCart } from "phosphor-react-native/src/icons/ShoppingCart";
 import { ApiError, dashboard as dashboardApi } from "@matgary/api-client";
@@ -100,7 +100,7 @@ export default function DashboardScreen() {
                 <StatCard
                   title={t("app.dashboard.stats.todaySales")}
                   value={money(data.stats.todayRevenue)}
-                  icon={CurrencyDollar}
+                  icon={Coins}
                   color="success"
                 />
                 <StatCard
@@ -192,7 +192,7 @@ function RecentSales({ items }: { items: RecentSale[] }) {
                   {sale.customerName ?? sale.customerPhone ?? t("mobile.dashboard.walkInCustomer")}
                 </Text>
                 <Text style={styles.rowMeta} numberOfLines={1}>
-                  {t("mobile.dashboard.saleMeta", {
+                  {t(`mobile.dashboard.saleMeta${countForm(sale.itemCount)}`, {
                     n: sale.itemCount,
                     when: saleWhen(sale.createdAt),
                   })}
@@ -238,6 +238,11 @@ function SaleBadge({ sale }: { sale: RecentSale }) {
  * are built by hand — no Intl on Hermes — and the day comparison is in the
  * device's local zone, the same zone the clock on the wall shows.
  */
+/** Arabic counts 1 / 2 / 3–10 / 11+ differently; the dictionary carries One/Two/Few beside the default. */
+function countForm(n: number): string {
+  return n === 1 ? "One" : n === 2 ? "Two" : n >= 3 && n <= 10 ? "Few" : "";
+}
+
 function saleWhen(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";

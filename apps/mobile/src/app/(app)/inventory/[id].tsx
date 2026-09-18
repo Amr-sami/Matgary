@@ -15,7 +15,6 @@ import { Image } from "expo-image";
 import { ArrowCounterClockwiseIcon as ArrowCounterClockwise } from "phosphor-react-native/src/icons/ArrowCounterClockwise";
 import { ArrowDownIcon as ArrowDown } from "phosphor-react-native/src/icons/ArrowDown";
 import { ArrowUpIcon as ArrowUp } from "phosphor-react-native/src/icons/ArrowUp";
-import { BarcodeIcon as Barcode } from "phosphor-react-native/src/icons/Barcode";
 import { CameraIcon as Camera } from "phosphor-react-native/src/icons/Camera";
 import { CoinsIcon as Coins } from "phosphor-react-native/src/icons/Coins";
 import { MinusIcon as Minus } from "phosphor-react-native/src/icons/Minus";
@@ -31,7 +30,7 @@ import { ApiError, catalog, type Product, type Supplier } from "@matgary/api-cli
 import { API_BASE_URL, api } from "@/api/client";
 import { pickLibraryPhoto, uploadErrorText } from "@/lib/productPhoto";
 import { Screen } from "@/components/layout/Screen";
-import { ChevronBack } from "@/components/ui/Chevron";
+import { ChevronForward } from "@/components/ui/Chevron";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -353,7 +352,8 @@ export default function ProductDetailScreen() {
         >
           <Text style={styles.crumbText}>{t("app.inventory.title")}</Text>
         </Pressable>
-        <ChevronBack size={14} color={colors.textSecondary} />
+        {/* A breadcrumb SEPARATOR points in the reading direction, into the child. */}
+        <ChevronForward size={16} color={colors.textSecondary} />
         <Text numberOfLines={1} style={styles.crumbCurrent}>
           {product?.name ?? ""}
         </Text>
@@ -558,7 +558,6 @@ export default function ProductDetailScreen() {
               <Detail
                 label={t("app.inventory.editForm.fields.sku")}
                 value={product.sku || product.barcode || "—"}
-                icon={<Barcode size={14} color={colors.textSecondary} />}
               />
               <Detail label={t("mobile.common.addedOn")} value={shortDate(product.createdAt)} />
               {attributes.map(([key, value]) => (
@@ -703,8 +702,9 @@ function parseCount(s: string): number | null {
   return Number(v);
 }
 
+/** U+2212 minus, matching the totals and the stepper glyph — not an ASCII hyphen. */
 function signed(n: number): string {
-  return n > 0 ? `+${n}` : String(n);
+  return n > 0 ? `+${n}` : n < 0 ? `−${Math.abs(n)}` : String(n);
 }
 
 /** ISO → "14/09/2026 · 14:05", locale-neutral like shortDate. */

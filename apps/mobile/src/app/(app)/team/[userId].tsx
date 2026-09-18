@@ -19,7 +19,7 @@ import { UserMinusIcon as UserMinus } from "phosphor-react-native/src/icons/User
 import { ApiError, team } from "@matgary/api-client";
 
 import { api } from "@/api/client";
-import { getLocale, t } from "@/i18n";
+import { getLocale, isRTL, t } from "@/i18n";
 import { Screen } from "@/components/layout/Screen";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -171,6 +171,11 @@ function hhmm(iso: string | null | undefined): string {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
+/** Arabic counts 1 / 2 / 3–10 / 11+ differently; the dictionary carries One/Two/Few beside the default. */
+function countForm(n: number): string {
+  return n === 1 ? "One" : n === 2 ? "Two" : n >= 3 && n <= 10 ? "Few" : "";
+}
+
 export default function TeamMemberScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ userId: string | string[] }>();
@@ -230,7 +235,7 @@ export default function TeamMemberScreen() {
   });
   const memberLeave = useMemo(
     () =>
-      (leaveQ.data ?? [])
+      (Array.isArray(leaveQ.data) ? leaveQ.data : [])
         .filter((l) => l.userId === userId)
         .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)),
     [leaveQ.data, userId],
@@ -381,7 +386,7 @@ export default function TeamMemberScreen() {
         style={styles.breadcrumb}
       >
         <ChevronBack size={14} color={colors.textSecondary} />
-        <Text style={styles.breadcrumbText}>{t("app.team.tabs.team")}</Text>
+        <Text style={styles.breadcrumbText}>{t("mobile.team.back")}</Text>
       </Pressable>
 
       {banner ? (
@@ -446,7 +451,7 @@ export default function TeamMemberScreen() {
             ) : (
               <>
                 <Text style={styles.hint}>
-                  {t("mobile.team.permissionsCount", { n: effectivePerms.size })}
+                  {t(`mobile.team.permissionsCount${countForm(effectivePerms.size)}`, { n: effectivePerms.size })}
                 </Text>
                 {!meIsOwner ? (
                   <Text style={styles.hint}>{t("mobile.team.permissionsOwnerOnly")}</Text>
@@ -572,7 +577,10 @@ export default function TeamMemberScreen() {
                       <Text style={styles.shiftDate}>{shortDate(s.date)}</Text>
                       <Clock size={16} color={colors.textSecondary} />
                       <Text style={styles.shiftTime}>
-                        {hhmm(s.checkInAt)} → {s.checkOutAt ? hhmm(s.checkOutAt) : t("app.team.monthly.table.open")}
+                        {/* Direction-aware arrow inside an LTR isolate: U+2192 is not
+                            bidi-mirrored, so bare it pointed the wrong way in Arabic and
+                            the digit-only run reordered to "17:00 → 09:00". */}
+                        {`\u2066${hhmm(s.checkInAt)} ${isRTL() ? "←" : "→"} ${s.checkOutAt ? hhmm(s.checkOutAt) : t("app.team.monthly.table.open")}\u2069`}
                       </Text>
                       <Text style={styles.shiftHours}>
                         {t("mobile.team.hoursShort", { h: s.hours.toFixed(1) })}
@@ -845,7 +853,14 @@ const styles = StyleSheet.create({
   infoValue: { fontFamily: fonts.medium, fontSize: 14, color: colors.text, flexShrink: 1, ...RTL_TEXT },
   ltr: { writingDirection: "ltr" },
   group: { marginTop: spacing.md, gap: spacing.xs },
-  groupTitle: { fontFamily: fonts.semibold, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },
+  groupTitle: {
+    fontFamily: fonts.semibold,
+    fontSize: 12,
+    lineHeight: 16,
+    color: colors.text,
+    alignSelf: "flex-start",
+    ...RTL_TEXT,
+  },
   toggleRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -853,7 +868,10 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     minHeight: MIN_TOUCH,
   },
-  toggleLabel: { fontFamily: fonts.regular, fontSize: 15, color: colors.text, flex: 1, ...RTL_TEXT },
+  // Shrink-wrapped, not flex:1 — a stretched Text leans on Fabric's alignment
+  // swap, and in Arabic the label ended up glued to the Switch on the left.
+  // An explicit lineHeight keeps Cairo's tall line box centred on the switch.
+  toggleLabel: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 20, color: colors.text, flexShrink: 1, ...RTL_TEXT },
   actionRow: {
     flexDirection: "row",
     alignItems: "center",

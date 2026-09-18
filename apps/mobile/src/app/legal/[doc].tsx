@@ -54,6 +54,7 @@ export default function LegalScreen() {
   const params = useLocalSearchParams<{ doc?: string | string[] }>();
   const raw = Array.isArray(params.doc) ? params.doc[0] : params.doc;
   const locale = useLocale((s) => s.locale);
+  const rtl = locale === "ar";
   const [openError, setOpenError] = useState<string | null>(null);
 
   // Table of contents → clause. Each section reports its y inside the scroll
@@ -128,7 +129,8 @@ export default function LegalScreen() {
       >
         <View style={styles.header}>
           <BackRow onPress={goBack} />
-          <Text style={styles.eyebrow}>{dict.eyebrow}</Text>
+          {/* Tracking + uppercase only in English: letterSpacing pulls Arabic's joins apart. */}
+          <Text style={[styles.eyebrow, !rtl && styles.tracked]}>{dict.eyebrow}</Text>
           <Text style={styles.title} accessibilityRole="header">
             {dict.title}
           </Text>
@@ -141,7 +143,7 @@ export default function LegalScreen() {
             merchant checking one clause should not have to scroll blind, so
             every row is a full-height button that jumps to its clause. */}
         <View style={styles.toc} accessibilityRole="list">
-          <Text style={styles.tocHeading} accessibilityRole="header">
+          <Text style={[styles.tocHeading, !rtl && styles.tracked]} accessibilityRole="header">
             {t("mobile.legal.contents")}
           </Text>
           {sections.map((s, i) => (
@@ -233,8 +235,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.semibold,
     fontSize: 12,
     color: colors.accent,
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
     marginTop: spacing.sm,
     ...RTL_TEXT,
   },
@@ -248,12 +248,12 @@ const styles = StyleSheet.create({
     fontFamily: fonts.semibold,
     fontSize: 12,
     color: colors.textSecondary,
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
     marginBottom: spacing.xs,
     ...RTL_TEXT,
   },
+  tracked: { textTransform: "uppercase", letterSpacing: 0.6 },
   tocRow: {
+    marginHorizontal: -spacing.sm,
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,

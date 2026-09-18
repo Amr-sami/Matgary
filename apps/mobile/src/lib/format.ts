@@ -34,10 +34,32 @@ export function shortDate(iso: string | null | undefined): string {
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
 }
 
-/** "YYYY-MM-DD" (or ISO) -> "14/09" — axis ticks, locale-neutral like shortDate. */
+/**
+ * Month names come from the dictionary (`mobile.insights.month.*`) so the chart
+ * axes and the Overview peak caption speak the same language — "18 Sep" in
+ * English, "18 سبتمبر" in Arabic. The numeric "18/09" was dropped: one tap away
+ * from a "Sep 14" caption it looked like a second format, and on an en-US
+ * phone "12/09" reads as December 9. Intl stays out (see the header note).
+ */
+const MONTH_KEYS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+
+/** 0-based month index -> localized short name ("Sep" / "سبتمبر"); "" when out of range. */
+export function monthName(index: number): string {
+  const key = MONTH_KEYS[index];
+  return key ? t(`mobile.insights.month.${key}`) : "";
+}
+
+/**
+ * "YYYY-MM-DD" (or ISO) -> "18 Sep" / "18 سبتمبر" — chart axis ends, in the
+ * same shape as the Overview peak caption (`mobile.insights.peakDate`, which
+ * owns the day/month order per locale). Plain string ops, no Date: an ISO with
+ * a "Z" must not drift a day on a UTC+2 phone.
+ */
 export function dayMonth(day: string | null | undefined): string {
   if (!day) return "";
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(day);
   if (!m) return "";
-  return `${m[3]}/${m[2]}`;
+  const month = monthName(Number(m[2]) - 1);
+  if (!month) return "";
+  return t("mobile.insights.peakDate", { day: String(Number(m[3])), month });
 }

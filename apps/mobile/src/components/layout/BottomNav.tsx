@@ -97,8 +97,22 @@ export function BottomNav({ state, navigation }: TabBarProps) {
   useEffect(() => () => useBadges.getState().reset(), []);
   const tasksUnread = useBadges((s) => s.tasksUnread);
 
-  const visible = ITEMS().filter((i) => !i.requires || allowed.has(i.requires));
-  const activeRoute = state.routes[state.index]?.name;
+  const items = ITEMS();
+  const visible = items.filter((i) => !i.requires || allowed.has(i.requires));
+
+  // The Tabs navigator also holds the More-sheet destinations (settings,
+  // customers, team, …) as hidden screens with no bar item, and the detail
+  // routes without their own _layout (inventory/[id], sales/history,
+  // team/[userId]) sit beside them as siblings. Matching the raw name against
+  // the seven bar routes therefore lit no tab at all on any of those screens.
+  // Resolve the route to its section instead: the first path segment when it
+  // is a bar tab, otherwise More — the web MobileBottomNav marks More active
+  // for every More-sheet path the same way, and the design ref shows المزيد
+  // lit on Settings.
+  const currentRoute = state.routes[state.index]?.name;
+  const barRoutes = new Set(items.map((i) => i.route));
+  const section = currentRoute?.split("/")[0] ?? "";
+  const activeRoute = barRoutes.has(section) ? section : "more";
 
   return (
     <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
@@ -115,7 +129,10 @@ export function BottomNav({ state, navigation }: TabBarProps) {
             accessibilityState={{ selected: isActive }}
             accessibilityLabel={count > 0 ? `${item.label}, ${count} ${t("app.shell.newItems")}` : item.label}
             onPress={() => {
-              if (!isActive) navigation.navigate(item.route);
+              // Guard on the exact route, not on `isActive`: More is lit while
+              // the user is on Settings, and the tab must still take them
+              // back to the sheet (likewise المخزن from inventory/[id]).
+              if (item.route !== currentRoute) navigation.navigate(item.route);
             }}
           >
             <View style={styles.iconWrap}>

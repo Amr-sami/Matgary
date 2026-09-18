@@ -73,6 +73,11 @@ function ltr(s: string): string {
   return `\u2066${s}\u2069`;
 }
 
+/** Arabic counts 1 / 2 / 3–10 / 11+ differently; the dictionary carries One/Two/Few beside the default. */
+function countForm(n: number): string {
+  return n === 1 ? "One" : n === 2 ? "Two" : n >= 3 && n <= 10 ? "Few" : "";
+}
+
 function sinceLabel(days: number): string {
   return days === 0 ? t("mobile.customers.sinceToday") : t("mobile.customers.sinceDays", { n: days });
 }
@@ -181,7 +186,7 @@ export default function CustomersScreen() {
       title={t("app.customers.title")}
       subtitle={
         all.length
-          ? t("mobile.customers.summary", { n: total, owed: money(summary.owed) })
+          ? t(`mobile.customers.summary${countForm(total)}`, { n: total, owed: money(summary.owed) })
           : undefined
       }
       onRefresh={() => void list.refetch()}
@@ -240,7 +245,8 @@ export default function CustomersScreen() {
             <Star size={14} color={colors.accent} />
             <Text style={styles.topTitle}>{t("mobile.customers.topCustomers")}</Text>
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.topChips}>
+          {/* Bleeds to the screen edge: a card sliced at the page gutter read as a bug. */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -spacing.lg }} contentContainerStyle={[styles.topChips, { paddingHorizontal: spacing.lg }]}>
             {topCustomers.map((c) => (
               <Pressable
                 key={c.phone}
@@ -320,7 +326,7 @@ export default function CustomersScreen() {
                 ) : null}
 
                 <Text style={styles.meta}>
-                  {t("mobile.customers.rowMeta", { phone: ltr(c.phone), n: c.invoiceCount, spend: money(c.totalSpend) })}
+                  {t(`mobile.customers.rowMeta${countForm(c.invoiceCount)}`, { phone: ltr(c.phone), n: c.invoiceCount, spend: money(c.totalSpend) })}
                 </Text>
                 <Text style={styles.meta}>
                   {t("mobile.customers.lastPurchase", { date: shortDate(c.lastPurchaseAt) })}

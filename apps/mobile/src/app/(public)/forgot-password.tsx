@@ -141,7 +141,7 @@ export default function ForgotPasswordScreen() {
               onPress={() => void setLocale(locale === "ar" ? "en" : "ar")}
             >
               <Globe size={20} color={colors.textSecondary} />
-              <Text style={styles.langText}>{locale === "ar" ? "ع" : "EN"}</Text>
+              <Text style={styles.langText}>{locale === "ar" ? "EN" : "ع"}</Text>
             </Pressable>
           </View>
 
@@ -246,7 +246,9 @@ const styles = StyleSheet.create({
   langText: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
   // The capture's whole reason for differing from login.tsx: one field is not
   // enough content to fill the fold, and the web centres what there is.
-  centre: { flex: 1, justifyContent: "center" },
+  // No vertical centring: login/signup anchor the brand at the top, and the
+  // logo jumped ~100pt on Login → Forgot → Back.
+  centre: { flex: 1 },
   brand: { alignItems: "center", marginBottom: spacing.xxl },
   heading: {
     fontFamily: fonts.bold,

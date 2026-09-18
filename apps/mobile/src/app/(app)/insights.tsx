@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocalSearchParams } from "expo-router";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CurrencyDollarIcon as CurrencyDollar } from "phosphor-react-native/src/icons/CurrencyDollar";
+import { CoinsIcon as Coins } from "phosphor-react-native/src/icons/Coins";
 import { PercentIcon as Percent } from "phosphor-react-native/src/icons/Percent";
 import { ShoppingCartIcon as ShoppingCart } from "phosphor-react-native/src/icons/ShoppingCart";
 import { TrendUpIcon as TrendUp } from "phosphor-react-native/src/icons/TrendUp";
@@ -164,6 +164,7 @@ export default function InsightsScreen() {
 
   return (
     <Screen
+      title={t("app.insights.title")}
       onRefresh={() => void onRefresh()}
       refreshing={refreshing}
     >
@@ -211,7 +212,7 @@ export default function InsightsScreen() {
               <StatCard
                 title={t("app.insights.headline.monthCurrent")}
                 value={money(m.currentRevenue)}
-                icon={CurrencyDollar}
+                icon={Coins}
                 color="accent"
                 trendPercent={m.revenueGrowth}
                 subtitle={t("app.insights.comparison.all")}

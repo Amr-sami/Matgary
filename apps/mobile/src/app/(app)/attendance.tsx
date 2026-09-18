@@ -451,9 +451,10 @@ export default function AttendanceScreen() {
           {last ? (
             <Badge
               label={t(
+                // Past-tense STATE, not the event verb — "Check out" read as a button.
                 last.type === "check_in"
-                  ? "app.activityLabels.attendanceTypes.check_in"
-                  : "app.activityLabels.attendanceTypes.check_out",
+                  ? "app.team.selfCheckIn.toast.checkedIn"
+                  : "app.team.selfCheckIn.toast.checkedOut",
               )}
               variant={last.type === "check_in" ? "success" : "neutral"}
             />
@@ -640,13 +641,13 @@ export default function AttendanceScreen() {
                   >
                     {fence.inside
                       ? t("mobile.attendance.geofence.inside", {
-                          distance: formatDistance(fence.distanceM),
-                          radius: formatDistance(fence.nearest.geofenceRadiusM),
+                          distance: formatDistance(fence.distanceM, t),
+                          radius: formatDistance(fence.nearest.geofenceRadiusM, t),
                         })
                       : t("mobile.attendance.geofence.outside", {
-                          distance: formatDistance(fence.distanceM),
+                          distance: formatDistance(fence.distanceM, t),
                           name: fence.nearest.name,
-                          radius: formatDistance(fence.nearest.geofenceRadiusM),
+                          radius: formatDistance(fence.nearest.geofenceRadiusM, t),
                         })}
                   </Text>
                   {fence.inside ? (
@@ -669,8 +670,8 @@ export default function AttendanceScreen() {
                 <WarningCircle size={16} color={colors.warningStrong} weight="fill" />
                 <Text style={[styles.warnText, styles.flex]}>
                   {t("mobile.attendance.geofence.lowAccuracy", {
-                    accuracy: formatDistance(loc.accuracy ?? 0),
-                    radius: formatDistance(fence.nearest.geofenceRadiusM),
+                    accuracy: formatDistance(loc.accuracy ?? 0, t),
+                    radius: formatDistance(fence.nearest.geofenceRadiusM, t),
                   })}
                 </Text>
               </View>
@@ -708,7 +709,7 @@ export default function AttendanceScreen() {
                 <Text style={styles.mutedSmall}>
                   {loc.accuracy != null
                     ? t("mobile.attendance.location.accuracy", {
-                        m: formatDistance(loc.accuracy),
+                        m: formatDistance(loc.accuracy, t),
                       })
                     : "—"}
                 </Text>

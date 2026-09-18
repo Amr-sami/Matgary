@@ -242,7 +242,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
-    minHeight: 52,
+    // Fixed, like Field's INPUT_HEIGHT — a minHeight let Cairo's line box plus
+    // the value's old paddingVertical grow this to ~56, so the 2x2 filter grid
+    // on activity had two box heights next to its 52pt Selects.
+    height: 52,
     paddingHorizontal: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border,
@@ -256,10 +259,9 @@ const styles = StyleSheet.create({
     ...RTL_TEXT,
     flex: 1,
     fontFamily: fonts.regular,
-    fontSize: 16,
+    fontSize: 15,
     color: colors.text,
     includeFontPadding: false,
-    paddingVertical: 12,
   },
   placeholder: { color: colors.textSecondary },
 

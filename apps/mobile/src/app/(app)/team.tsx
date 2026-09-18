@@ -31,6 +31,11 @@ const ROLE = (): Record<string, string> => ({
  * GET /api/team 403s for anyone else, so a non-manager sees the forbidden
  * empty state rather than a spinner that never resolves.
  */
+/** Arabic counts 1 / 2 / 3–10 / 11+ differently; the dictionary carries One/Two/Few beside the default. */
+function countForm(n: number): string {
+  return n === 1 ? "One" : n === 2 ? "Two" : n >= 3 && n <= 10 ? "Few" : "";
+}
+
 export default function TeamScreen() {
   const router = useRouter();
   const permissions = useSession((s) => s.me?.permissions);
@@ -53,7 +58,7 @@ export default function TeamScreen() {
   return (
     <Screen
       title={canManage ? t("app.team.heading.manager") : t("app.team.heading.staff")}
-      subtitle={rows.length ? t("mobile.team.summary", { n: rows.length }) : undefined}
+      subtitle={rows.length ? t(`mobile.team.summary${countForm(rows.length)}`, { n: rows.length }) : undefined}
       onRefresh={canManage ? () => void q.refetch() : undefined}
       refreshing={q.isRefetching}
     >
@@ -114,7 +119,7 @@ export default function TeamScreen() {
                     <Text numberOfLines={1} style={styles.meta}>
                       {isOwner
                         ? t("mobile.team.memberMetaOwner", { email: m.loginEmail })
-                        : t("mobile.team.memberMeta", {
+                        : t(`mobile.team.memberMeta${countForm(m.permissions.length)}`, {
                             email: m.loginEmail,
                             n: m.permissions.length,
                           })}

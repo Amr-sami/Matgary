@@ -15,6 +15,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, catalog } from "@matgary/api-client";
 
 import { api } from "@/api/client";
+import { CheckIcon as Check } from "phosphor-react-native/src/icons/Check";
+import { XIcon as X } from "phosphor-react-native/src/icons/X";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
 import { isRTL, t } from "@/i18n";
 import { Screen } from "@/components/layout/Screen";
 import { Badge } from "@/components/ui/Badge";
@@ -26,7 +30,7 @@ import { UNREAD_TASKS_KEY, isOpenTask, useBadges } from "@/stores/badges";
 import { useSession } from "@/stores/session";
 import { shortDate } from "@/lib/format";
 import { RTL_TEXT, directionStyle } from "@/theme/rtl";
-import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
+import { MIN_TOUCH, colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
 
 /** Measured pairs from doc 03 §2: عاجلة on danger-light, عادية on accent-light. */
 const PRIORITY = (): Record<string, { label: string; variant: "outofstock" | "accent" | "neutral" }> => ({
@@ -69,6 +73,13 @@ function errorMessage(error: unknown, fallback: string): string {
 }
 
 /** Port of app__tasks.png. */
+/** Local midnight — a task due yesterday is overdue, one due later today is not. */
+function startOfToday(): number {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
 export default function TasksScreen() {
   const queryClient = useQueryClient();
   const q = useQuery({ queryKey: ["tasks"], queryFn: () => catalog.listTasks(api) });
@@ -148,10 +159,10 @@ export default function TasksScreen() {
       refreshing={q.isRefetching}
     >
       {canManageTasks ? (
-        // "+ مهمة جديدة" in the capture draws the plus to the LEFT of the
-        // words, which in an RTL paragraph is the END of the string — hence
-        // the trailing sign here rather than a leading one.
-        <Button label={t("mobile.tasks.newTask")} onPress={() => setFormOpen(true)} />
+        // Verb + noun like every other list screen's CTA ("إضافة مصروف"); the
+        // plus glyph that used to live in the string is gone — Button has no
+        // icon slot, and a text "+" lands on the wrong side per direction.
+        <Button label={t("app.tasks.toolbar.newTask")} onPress={() => setFormOpen(true)} />
       ) : null}
 
       {statusError ? (
@@ -176,6 +187,7 @@ export default function TasksScreen() {
           {[...open, ...done].map((task) => {
             const p = PRIORITY()[task.priority] ?? { label: task.priority, variant: "neutral" as const };
             const isDone = task.status === "done";
+            const overdue = !isDone && !!task.dueDate && new Date(task.dueDate).getTime() < startOfToday();
             const pending = toggle.isPending && toggle.variables?.id === task.id;
             return (
               <Pressable
@@ -199,9 +211,13 @@ export default function TasksScreen() {
                 </View>
                 <View style={styles.meta}>
                   {isDone ? (
-                    <Badge label={t("app.tasks.card.doneAction")} variant="success" />
+                    <Badge label={t("mobile.tasks.doneState")} variant="success" />
                   ) : task.dueDate ? (
-                    <Text style={styles.date}>{t("mobile.tasks.due", { date: shortDate(task.dueDate) })}</Text>
+                    <Text style={[styles.date, overdue && styles.dateOverdue]}>
+                      {overdue
+                        ? t("mobile.tasks.overdue", { date: shortDate(task.dueDate) })
+                        : t("mobile.tasks.due", { date: shortDate(task.dueDate) })}
+                    </Text>
                   ) : null}
                 </View>
                 {/* What a tap does, spelled out. The web says it with two
@@ -211,9 +227,12 @@ export default function TasksScreen() {
                   {pending ? (
                     <ActivityIndicator color={colors.accent} />
                   ) : (
-                    <Text numberOfLines={1} style={styles.action}>
-                      {isDone ? t("app.tasks.card.reopenAction") : t("mobile.tasks.doneCheck")}
-                    </Text>
+                    <View style={styles.actionRow}>
+                      {isDone ? null : <Check size={14} color={colors.successStrong} weight="bold" />}
+                      <Text numberOfLines={1} style={styles.action}>
+                        {isDone ? t("app.tasks.card.reopenAction") : t("mobile.tasks.markDone")}
+                      </Text>
+                    </View>
                   )}
                 </View>
               </Pressable>
@@ -253,6 +272,7 @@ function TaskFormSheet({
   onClose: () => void;
   onCreated: () => void;
 }) {
+  const insets = useSafeAreaInsets();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [assignee, setAssignee] = useState<string | null>(null);
@@ -299,11 +319,19 @@ function TaskFormSheet({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
       <View style={[styles.overlay, directionStyle(isRTL())]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel={t("app.common.close")} />
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        {/* The KAV is the full-height flex-end container and the scrim sits
+            INSIDE it: with an auto-height KAV the sheet's maxHeight resolved
+            against its own content, clipping the CTAs at the bottom edge. */}
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.kav}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel={t("app.common.close")} />
           <View style={styles.sheet}>
-            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetBody}>
-              <Text style={styles.sheetTitle}>{t("app.tasks.toolbar.newTask")}</Text>
+            <ScrollView keyboardShouldPersistTaps="handled" style={styles.sheetScroll} contentContainerStyle={styles.sheetBody}>
+              <View style={styles.sheetHeader}>
+                <Text style={styles.sheetTitle}>{t("app.tasks.toolbar.newTask")}</Text>
+                <Pressable onPress={close} style={styles.closeBtn} accessibilityRole="button" accessibilityLabel={t("app.common.close")}>
+                  <X size={22} color={colors.text} />
+                </Pressable>
+              </View>
 
               <Field
                 label={t("app.tasks.form.titleLabel")}
@@ -363,22 +391,24 @@ function TaskFormSheet({
                 </Text>
               ) : null}
 
-              <View style={styles.actions}>
-                <Button
-                  label={t("app.tasks.form.create")}
-                  onPress={() => create.mutate()}
-                  disabled={!canSubmit}
-                  loading={create.isPending}
-                  style={styles.actionGrow}
-                />
-                <Button
-                  label={t("app.tasks.form.cancel")}
-                  variant="outline"
-                  onPress={close}
-                  style={styles.actionGrow}
-                />
-              </View>
             </ScrollView>
+            {/* Pinned footer with the home-indicator inset: inside the ScrollView
+                the CTAs were clipped at the sheet's bottom edge. Cancel leads. */}
+            <View style={[styles.actions, styles.sheetFooter, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
+              <Button
+                label={t("app.tasks.form.cancel")}
+                variant="outline"
+                onPress={close}
+                style={styles.actionGrow}
+              />
+              <Button
+                label={t("app.tasks.form.create")}
+                onPress={() => create.mutate()}
+                disabled={!canSubmit}
+                loading={create.isPending}
+                style={styles.actionGrow}
+              />
+            </View>
           </View>
         </KeyboardAvoidingView>
       </View>
@@ -404,6 +434,8 @@ const styles = StyleSheet.create({
   titleDone: { textDecorationLine: "line-through" },
   meta: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   date: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },
+  dateOverdue: { color: colors.danger, fontFamily: fonts.medium },
+  actionRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   footer: {
     borderTopWidth: 1,
     borderTopColor: colors.border,
@@ -420,6 +452,7 @@ const styles = StyleSheet.create({
   },
 
   overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.45)" },
+  kav: { flex: 1, justifyContent: "flex-end" },
   sheet: {
     backgroundColor: colors.card,
     borderTopLeftRadius: radius.xl,
@@ -429,7 +462,11 @@ const styles = StyleSheet.create({
     maxHeight: "90%",
     ...elevation.modal,
   },
+  sheetScroll: { flexShrink: 1 },
   sheetBody: { padding: spacing.xl, gap: spacing.lg },
+  sheetHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
+  closeBtn: { width: MIN_TOUCH, height: MIN_TOUCH, alignItems: "center", justifyContent: "center", marginEnd: -spacing.sm, marginVertical: -spacing.sm },
+  sheetFooter: { paddingHorizontal: spacing.xl, paddingTop: spacing.md },
   sheetTitle: { fontFamily: fonts.bold, fontSize: 18, color: colors.text, ...RTL_TEXT },
   label: {
     fontFamily: fonts.medium,

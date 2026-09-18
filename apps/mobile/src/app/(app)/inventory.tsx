@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { FlashList } from "@shopify/flash-list";
@@ -15,6 +15,7 @@ import { catalog, type Product } from "@matgary/api-client";
 import { API_BASE_URL, api } from "@/api/client";
 import { HeaderAccessories } from "@/components/shell/HeaderAccessories";
 import { Badge } from "@/components/ui/Badge";
+import { ChevronForward } from "@/components/ui/Chevron";
 import { Chip } from "@/components/ui/Chip";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SearchField } from "@/components/ui/SearchField";
@@ -154,7 +155,7 @@ export default function InventoryScreen() {
         onPressScan={() => setScannerOpen(true)}
       />
 
-      <Pressable style={styles.cta} accessibilityRole="button">
+      <Pressable style={styles.cta} accessibilityRole="button" onPress={() => router.push("/add-product")}>
         <Plus size={18} color="#FFFFFF" weight="bold" />
         <Text numberOfLines={1} style={styles.ctaText}>
           {t("app.inventory.tools.addProduct")}
@@ -180,7 +181,13 @@ export default function InventoryScreen() {
         <Chip label={t("app.inventory.filters.stockStatus.out")} active={status === "out"} onPress={() => setStatus("out")} />
       </ChipRow>
 
-      <Text style={styles.count}>{t("app.inventory.count", { n: visible.length })}</Text>
+      {/* With a filter applied the number is the MATCH count, not the size of
+          the inventory — the stat card above still says 24 while this says 3. */}
+      <Text style={styles.count}>
+        {query.trim() || category !== "all" || status !== "all"
+          ? t("mobile.inventory.matchCount", { n: visible.length })
+          : t("app.inventory.count", { n: visible.length })}
+      </Text>
     </View>
   );
 
@@ -195,6 +202,8 @@ export default function InventoryScreen() {
 
   return (
     <View style={styles.root}>
+      {/* Opaque status-bar band: the list scrolls under the clock otherwise. */}
+      <View style={{ height: insets.top, backgroundColor: colors.bg }} />
       <FlashList
         data={visible}
         keyExtractor={(p) => p.id}
@@ -211,7 +220,7 @@ export default function InventoryScreen() {
         refreshControl={
           <RefreshControl refreshing={products.isRefetching} onRefresh={() => void products.refetch()} />
         }
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.lg }]}
+        contentContainerStyle={[styles.content, { paddingTop: spacing.lg }]}
         keyboardShouldPersistTaps="handled"
       />
 
@@ -267,7 +276,7 @@ function ProductRow({
         <View style={styles.rowMeta}>
           <Text style={styles.price}>{money(p.price)}</Text>
           <Badge
-            label={out ? t("app.inventory.filters.stockStatus.out") : t("mobile.common.pieces", { n: p.quantity })}
+            label={out ? t("app.inventory.filters.stockStatus.out") : t(`mobile.common.pieces${countForm(p.quantity)}`, { n: p.quantity })}
             variant={out ? "outofstock" : low ? "lowstock" : "success"}
           />
           {p.brand ? (
@@ -277,8 +286,16 @@ function ProductRow({
           ) : null}
         </View>
       </View>
+      {/* Same disclosure the sales-history rows carry: one affordance for
+          "this row opens a detail screen". */}
+      <ChevronForward size={16} color={colors.textSecondary} />
     </Pressable>
   );
+}
+
+/** Arabic counts 1 / 2 / 3–10 / 11+ differently; the dictionary carries One/Two/Few beside the default. */
+function countForm(n: number): string {
+  return n === 1 ? "One" : n === 2 ? "Two" : n >= 3 && n <= 10 ? "Few" : "";
 }
 
 /** The `gap` the old `<View style={styles.list}>` had between cards. */
@@ -293,9 +310,15 @@ function Separator() {
  */
 function ChipRow({ children }: { children: React.ReactNode }) {
   return (
-    <View style={styles.chipRowWrap}>
-      <View style={styles.chipRow}>{children}</View>
-    </View>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.chipRowWrap}
+      contentContainerStyle={styles.chipRow}
+      keyboardShouldPersistTaps="handled"
+    >
+      {children}
+    </ScrollView>
   );
 }
 
@@ -320,8 +343,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
   },
   ctaText: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 16, color: "#FFFFFF" },
-  chipRowWrap: { overflow: "hidden" },
-  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  // Bleeds to the screen edge so a half-visible chip signals "more"; the
+  // first chip still lines up with the page gutter via the content padding.
+  chipRowWrap: { marginHorizontal: -spacing.lg },
+  chipRow: { flexDirection: "row", gap: spacing.sm, paddingHorizontal: spacing.lg },
   count: { fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary, ...RTL_TEXT },
   separator: { height: spacing.md },
   row: {

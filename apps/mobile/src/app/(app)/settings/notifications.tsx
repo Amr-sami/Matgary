@@ -482,9 +482,12 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     minHeight: MIN_TOUCH,
   },
+  // Explicit lineHeights: Cairo's natural line box is tall and carries the
+  // glyphs low, so a centred box was not a centred label next to the Switch.
   toggleLabel: {
     fontFamily: fonts.medium,
     fontSize: 14,
+    lineHeight: 20,
     color: colors.text,
     flexShrink: 1,
     ...RTL_TEXT,
@@ -493,6 +496,7 @@ const styles = StyleSheet.create({
   toggleHint: {
     fontFamily: fonts.regular,
     fontSize: 12,
+    lineHeight: 18,
     color: colors.textSecondary,
     ...RTL_TEXT,
   },

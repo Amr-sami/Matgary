@@ -14,6 +14,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, catalog } from "@matgary/api-client";
 
 import { api } from "@/api/client";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
 import { isRTL, t } from "@/i18n";
 import { Screen } from "@/components/layout/Screen";
 import { Badge } from "@/components/ui/Badge";
@@ -84,6 +86,11 @@ function errorMessage(error: unknown, fallback: string): string {
 }
 
 /** Port of app__expenses.png. */
+/** Arabic counts 1 / 2 / 3–10 / 11+ differently; the dictionary carries One/Two/Few beside the default. */
+function countForm(n: number): string {
+  return n === 1 ? "One" : n === 2 ? "Two" : n >= 3 && n <= 10 ? "Few" : "";
+}
+
 export default function ExpensesScreen() {
   const queryClient = useQueryClient();
   const q = useQuery({
@@ -99,7 +106,7 @@ export default function ExpensesScreen() {
   return (
     <Screen
       title={t("app.expenses.title")}
-      subtitle={rows.length ? t("mobile.expenses.summary", { n: rows.length, total: money(total) }) : undefined}
+      subtitle={rows.length ? t(`mobile.expenses.summary${countForm(rows.length)}`, { n: rows.length, total: money(total) }) : undefined}
       onRefresh={() => void q.refetch()}
       refreshing={q.isRefetching}
     >
@@ -162,6 +169,7 @@ function ExpenseFormSheet({
   onClose: () => void;
   onCreated: () => void;
 }) {
+  const insets = useSafeAreaInsets();
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState<catalog.ExpenseCategory>("other");
@@ -204,13 +212,14 @@ function ExpenseFormSheet({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
       <View style={[styles.overlay, directionStyle(isRTL())]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel={t("app.common.close")} />
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        {/* The KAV is the full-height flex-end container and the scrim sits
+            INSIDE it: with an auto-height KAV the sheet's maxHeight resolved
+            against its own content, clipping the CTAs at the bottom edge. */}
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.kav}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel={t("app.common.close")} />
           <View style={styles.sheet}>
-            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetBody}>
-              {/* The heading is accent-coloured on the web, next to a wallet
-                  glyph. The colour is the part that carries the identity. */}
-              <Text style={styles.sheetTitleAccent}>{t("app.expenses.form.heading")}</Text>
+            <ScrollView keyboardShouldPersistTaps="handled" style={styles.sheetScroll} contentContainerStyle={styles.sheetBody}>
+              <Text style={styles.sheetTitle}>{t("app.expenses.form.heading")}</Text>
 
               <Field
                 label={t("app.expenses.form.titleLabel")}
@@ -248,7 +257,7 @@ function ExpenseFormSheet({
                 label={t("app.expenses.form.noteLabel")}
                 value={note}
                 onChangeText={setNote}
-                placeholder="…"
+                placeholder={t("app.expenses.form.notePlaceholder")}
               />
 
               {error ? (
@@ -257,22 +266,23 @@ function ExpenseFormSheet({
                 </Text>
               ) : null}
 
-              <View style={styles.actions}>
-                <Button
-                  label={t("app.expenses.form.submit")}
-                  onPress={() => create.mutate()}
-                  disabled={!canSubmit}
-                  loading={create.isPending}
-                  style={styles.actionGrow}
-                />
-                <Button
-                  label={t("app.common.cancel")}
-                  variant="outline"
-                  onPress={close}
-                  style={styles.actionGrow}
-                />
-              </View>
             </ScrollView>
+            {/* Pinned footer with the home-indicator inset: inside the ScrollView the CTAs were clipped. Cancel leads. */}
+            <View style={[styles.actions, styles.sheetFooter, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
+              <Button
+                label={t("app.common.cancel")}
+                variant="outline"
+                onPress={close}
+                style={styles.actionGrow}
+              />
+              <Button
+                label={t("app.expenses.form.submit")}
+                onPress={() => create.mutate()}
+                disabled={!canSubmit}
+                loading={create.isPending}
+                style={styles.actionGrow}
+              />
+            </View>
           </View>
         </KeyboardAvoidingView>
       </View>
@@ -305,6 +315,7 @@ const styles = StyleSheet.create({
   date: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary },
 
   overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.45)" },
+  kav: { flex: 1, justifyContent: "flex-end" },
   sheet: {
     backgroundColor: colors.card,
     borderTopLeftRadius: radius.xl,
@@ -315,7 +326,10 @@ const styles = StyleSheet.create({
     ...elevation.modal,
   },
   sheetBody: { padding: spacing.xl, gap: spacing.lg },
-  sheetTitleAccent: { fontFamily: fonts.bold, fontSize: 18, color: colors.accent, ...RTL_TEXT },
+  // Same sheet-title token as the settle and supplier sheets.
+  sheetTitle: { fontFamily: fonts.bold, fontSize: 16, color: colors.text, ...RTL_TEXT },
+  sheetScroll: { flexShrink: 1 },
+  sheetFooter: { paddingHorizontal: spacing.xl, paddingTop: spacing.md },
   label: {
     fontFamily: fonts.medium,
     fontSize: 14,
@@ -323,8 +337,10 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     ...RTL_TEXT,
   },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  gridCell: { width: "48%" },
+  // Two columns that fill the row exactly (48% + 48% + gap left the trailing
+  // column short of the inputs' edge).
+  grid: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -spacing.xs, rowGap: spacing.sm },
+  gridCell: { width: "50%", paddingHorizontal: spacing.xs },
   error: { fontFamily: fonts.medium, fontSize: 14, color: colors.danger, ...RTL_TEXT },
   actions: { flexDirection: "row", gap: spacing.sm },
   actionGrow: { flex: 1 },

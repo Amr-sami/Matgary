@@ -112,7 +112,7 @@
       "trend": {
         "titleDefault": "Sales trend (last 30 days)",
         "titleWithRange": "Sales trend ({label})",
-        "subtitle": "Daily average · peak · total",
+        "subtitle": "Total · daily average · period peak",
         "stat": {
           "total": "Total",
           "avg": "Average",
@@ -173,7 +173,8 @@
           "product": {
             "label": "Product drill-down",
             "hint": "Pick a product and inspect its trend and margin."
-          }
+          },
+          "label": "Report"
         },
         "compare": {
           "title": "Period-over-period",
@@ -260,21 +261,21 @@
         "loading": "Loading…",
         "empty": {
           "title": "No data for this period",
-          "subtitle": "Numbers show up once a staff member records the first sale."
+          "subtitle": "Numbers show up once a team member records the first sale."
         },
         "summary": {
-          "active": "Active staff",
+          "active": "Active members",
           "totalRevenue": "Total sales",
           "ops": "Transactions"
         },
-        "leaderboard": "Staff leaderboard",
+        "leaderboard": "Team leaderboard",
         "metric": {
           "ops": "{n} transactions",
           "returns": "{n} returns"
         },
         "unattributed": {
-          "title": "Sales with no assigned staff",
-          "body": "{count} transactions worth {amount} had no recording staff member (legacy sales from before this feature was enabled)."
+          "title": "Sales with no assigned team member",
+          "body": "{count} transactions worth {amount} were recorded without a team member (legacy sales from before this feature was enabled)."
         }
       }
     },
@@ -556,7 +557,7 @@
           "useExisting": "Use existing",
           "saveAsNewAnyway": "Save as new anyway"
         },
-        "recentLabel": "Recent products:",
+        "recentLabel": "Recent products",
         "available": "Available: {n} pcs",
         "fields": {
           "quantity": "Quantity",
@@ -2800,7 +2801,8 @@
         "pay": "Pay",
         "receive": "Receive",
         "cancel": "Cancel",
-        "deleteTitle": "Delete"
+        "deleteTitle": "Delete",
+        "itemCountOne": "1 item"
       },
       "paymentBadge": {
         "paid": "Paid",
@@ -2922,7 +2924,7 @@
           "weekly": "Weekly"
         },
         "noteLabel": "Note (optional)",
-        "notePlaceholder": "…",
+        "notePlaceholder": "e.g. September rent",
         "submit": "Record expense"
       },
       "table": {
@@ -3840,7 +3842,7 @@
       "title": "Create a new account",
       "step1Sub": "Start by creating your account",
       "step2Sub": "Tell us about your store",
-      "emailLabel": "Your email",
+      "emailLabel": "Email",
       "emailPlaceholder": "you@example.com",
       "passwordLabel": "Password",
       "passwordPlaceholder": "At least 8 characters",
@@ -3915,7 +3917,9 @@
         "short": "Password must be at least 8 characters",
         "mismatch": "Passwords do not match",
         "generic": "Couldn't reset"
-      }
+      },
+      "requestNewLink": "Request a new link",
+      "invalidTitle": "Link expired"
     },
     "onboarding": {
       "meta": {
@@ -4366,7 +4370,10 @@
       "no": "No",
       "conflict": "The change was not accepted. Refresh and try again.",
       "tenantSuspended": "Your store’s service has been paused by support. Contact us to reactivate.",
-      "passwordChangeRequired": "You must change your password before continuing."
+      "passwordChangeRequired": "You must change your password before continuing.",
+      "piecesOne": "1 pc",
+      "piecesTwo": "{n} pcs",
+      "piecesFew": "{n} pcs"
     },
     "pos": {
       "itemsInCart": "{n} items in the invoice",
@@ -4391,7 +4398,10 @@
       "removedHint": "This invoice was removed from the sync queue on this device. If it was edited, the new invoice replaces it; if it was discarded, it was never recorded.",
       "rungAt": "Rung at {when} — the time it will be booked under when it syncs.",
       "noPermissionHint": "Ask the store owner to grant this account the record-sales permission.",
-      "emptyCartHint": "Search, scan a barcode, or tap a recent product to start a sale."
+      "emptyCartHint": "Search, scan a barcode, or tap a recent product to start a sale.",
+      "itemsInCartOne": "1 item in the invoice",
+      "itemsInCartTwo": "{n} items in the invoice",
+      "itemsInCartFew": "{n} items in the invoice"
     },
     "product": {
       "details": "Product details",
@@ -4407,7 +4417,7 @@
       "noPermission": "You don't have permission to add products",
       "notFound": "Product not found.",
       "detailsOf": "{name} details",
-      "margin": "{amount} · {pct}% margin",
+      "margin": "{amount} · {pct}%",
       "attributesLoadFailed": "Couldn't load the category's attributes",
       "attributesHint": "Pick a value for each attribute — starred ones are required",
       "attributesNone": "This category has no attributes — straight on to pricing",
@@ -4465,7 +4475,10 @@
       "remaining": "{n} of {sold} left",
       "loadFailed": "Couldn't load returns",
       "salesLoadFailed": "Couldn't load recent sales",
-      "saleLoadFailed": "Couldn't load the sale"
+      "saleLoadFailed": "Couldn't load the sale",
+      "summaryOne": "1 return · {total}",
+      "summaryTwo": "{n} returns · {total}",
+      "summaryFew": "{n} returns · {total}"
     },
     "purchases": {
       "empty": "No purchase orders",
@@ -4507,16 +4520,24 @@
         "receiveNow": "Receive now",
         "close": "Close",
         "lineTotal": "{qty} × {cost} = {total}",
-        "remove": "Remove item"
+        "remove": "Remove item",
+        "noLinesHint": "Search by name above or scan a barcode to add the first item",
+        "linesSummaryOne": "1 item · {amount}"
       },
       "actionFailed": "The action failed, try again",
-      "filterAll": "All"
+      "filterAll": "All",
+      "orderMetaOne": "1 item · {date}",
+      "orderMetaTwo": "{n} items · {date}",
+      "orderMetaFew": "{n} items · {date}"
     },
     "expenses": {
       "empty": "No expenses yet",
       "summary": "{n} expenses · {total}",
       "add": "Add expense",
-      "saveFailed": "Couldn't record the expense"
+      "saveFailed": "Couldn't record the expense",
+      "summaryOne": "1 expense · {total}",
+      "summaryTwo": "{n} expenses · {total}",
+      "summaryFew": "{n} expenses · {total}"
     },
     "customers": {
       "emptyHint": "Customers appear here after the first sale recorded with a name.",
@@ -4540,7 +4561,7 @@
       "invoiceMeta": "{date} · {n} items",
       "paid": "Paid: {amount}",
       "remaining": "Remaining: {amount}",
-      "sinceDays": "since {n} d",
+      "sinceDays": "since {n}d",
       "sinceToday": "since today",
       "filterDebtors": "Owing",
       "debtors": "Debtors",
@@ -4557,11 +4578,23 @@
       "markAllDone": "Marked {n} invoices paid ({amount})",
       "settleDone": "Recorded {amount}",
       "updateFailed": "Couldn't update. Try again.",
-      "oldestUnpaidDays": "Oldest unpaid: {n} d",
+      "oldestUnpaidDays": "Oldest unpaid: {n}d",
       "unpaidCount": "{n} unpaid invoices",
       "kpiPartial": "Totals cover the {n} customers loaded so far — show more to complete them",
       "topCustomers": "Top customers",
-      "legacyNoSettle": "Older sale with no invoice number — can't be settled on its own"
+      "legacyNoSettle": "Older sale with no invoice number — can't be settled on its own",
+      "unpaidCountOne": "1 unpaid invoice",
+      "unpaidCountTwo": "{n} unpaid invoices",
+      "unpaidCountFew": "{n} unpaid invoices",
+      "invoiceMetaOne": "{date} · 1 item",
+      "invoiceMetaTwo": "{date} · {n} items",
+      "invoiceMetaFew": "{date} · {n} items",
+      "rowMetaOne": "{phone} · 1 invoice · {spend}",
+      "rowMetaTwo": "{phone} · {n} invoices · {spend}",
+      "rowMetaFew": "{phone} · {n} invoices · {spend}",
+      "summaryOne": "1 customer · {owed} outstanding",
+      "summaryTwo": "{n} customers · {owed} outstanding",
+      "summaryFew": "{n} customers · {owed} outstanding"
     },
     "suppliers": {
       "profileOf": "Supplier: {name}",
@@ -4572,7 +4605,10 @@
       "saveFailed": "Couldn't save changes",
       "edit": "Edit supplier",
       "refreshFailed": "Couldn't refresh — showing the last loaded list",
-      "maybeSaved": "The connection dropped before the server answered. Check the list before adding again — the supplier may already be saved."
+      "maybeSaved": "The connection dropped before the server answered. Check the list before adding again — the supplier may already be saved.",
+      "summaryOne": "1 supplier · {owed} owed",
+      "summaryTwo": "{n} suppliers · {owed} owed",
+      "summaryFew": "{n} suppliers · {owed} owed"
     },
     "team": {
       "summary": "{n} members",
@@ -4619,7 +4655,17 @@
         "pickDateTitle": "Pick a day"
       },
       "permissionsOwnerOnly": "Only the store owner can change permissions or account settings.",
-      "memberMetaOwner": "{email} · all permissions"
+      "memberMetaOwner": "{email} · all permissions",
+      "summaryOne": "1 member",
+      "summaryTwo": "{n} members",
+      "summaryFew": "{n} members",
+      "permissionsCountOne": "1 permission",
+      "permissionsCountTwo": "{n} permissions",
+      "permissionsCountFew": "{n} permissions",
+      "memberMetaOne": "{email} · 1 permission",
+      "memberMetaTwo": "{email} · {n} permissions",
+      "memberMetaFew": "{email} · {n} permissions",
+      "back": "Team"
     },
     "tasks": {
       "summary": "{open} open · {done} done",
@@ -4627,7 +4673,10 @@
       "doneCheck": "✓ Done",
       "completeTitle": "Complete {title}",
       "reopenTitle": "Reopen {title}",
-      "due": "Due {date}"
+      "due": "Due {date}",
+      "markDone": "Mark done",
+      "doneState": "Done",
+      "overdue": "Overdue · {date}"
     },
     "insights": {
       "loadFailed": "Couldn't load insights",
@@ -4667,7 +4716,8 @@
       "searchHint": "Try another search or clear the filters.",
       "empty": "No products",
       "backToList": "Back to inventory",
-      "searchPlaceholder": "Search by name, barcode, or brand…"
+      "searchPlaceholder": "Search by name, barcode, or brand",
+      "matchCount": "{n} matching products"
     },
     "billing": {
       "trialDaysLeft": "{days} days left in your free trial.",
@@ -4707,7 +4757,7 @@
       "about": "About",
       "aboutSub": "Version, privacy policy and terms",
       "storeIntro": "The name and WhatsApp number shown on receipts and in customer messages — each branch has its own.",
-      "logoTitle": "Store logo",
+      "logoTitle": "Shop logo",
       "logoWebOnly": "Changing the logo is done from the web version for now.",
       "loyaltyExample": "A 100 EGP invoice earns {earned} points worth {value} off a future invoice.",
       "loyaltyWarning": "Points won't be earned or redeemed until at least one rate is set.",
@@ -4742,7 +4792,8 @@
     "a11y": {
       "showPassword": "Show password",
       "hidePassword": "Hide password",
-      "scanBarcode": "Scan barcode"
+      "scanBarcode": "Scan barcode",
+      "clearSearch": "Clear search"
     },
     "auth": {
       "unexpected": "Something went wrong",
@@ -4752,7 +4803,9 @@
       "signInFailed": "Couldn't sign in"
     },
     "format": {
-      "money": "EGP {amount}"
+      "money": "EGP {amount}",
+      "thousand": "{n}K",
+      "million": "{n}M"
     },
     "onboarding": {
       "seedNote": "Ready-made categories can only be set up from the web version for now. To start with them, finish onboarding on the web instead of here.",
@@ -4761,8 +4814,8 @@
     },
     "leave": {
       "title": "Leave requests",
-      "from": "From (YYYY-MM-DD)",
-      "to": "To (YYYY-MM-DD)",
+      "from": "From",
+      "to": "To",
       "datePlaceholder": "2026-01-31",
       "invalidDates": "Enter valid dates — the end date must not precede the start.",
       "filterPending": "Pending",
@@ -4995,7 +5048,8 @@
       "privacySub": "How we protect your data, under Law 151/2020",
       "termsSub": "The rules for using the platform and your subscription",
       "website": "Website",
-      "websiteSub": "thestoro.com"
+      "websiteSub": "thestoro.com",
+      "legalHeading": "Legal"
     },
     "receipt": {
       "sharePdf": "Share PDF",
@@ -5064,7 +5118,13 @@
       "attributeCountFew": "{n} attributes",
       "valuesCountOne": "1 value",
       "valuesCountTwo": "2 values",
-      "valuesCountFew": "{n} values"
+      "valuesCountFew": "{n} values",
+      "categoryCountOne": "1 category",
+      "categoryCountTwo": "{n} categories",
+      "categoryCountFew": "{n} categories",
+      "productsCountOne": "1 product",
+      "productsCountTwo": "{n} products",
+      "productsCountFew": "{n} products"
     },
     "appLock": {
       "title": "App lock",
@@ -5173,7 +5233,7 @@
       "title": "Receipt printer",
       "subtitle": "Pair a Bluetooth thermal printer and print receipts straight from the app",
       "bluetooth": "Bluetooth",
-      "stateUnsupported": "Bluetooth is not available on this device (the simulator has no radio)",
+      "stateUnsupported": "Bluetooth is not available on this device.",
       "statePoweredOff": "Bluetooth is off — turn it on in the device settings",
       "stateUnauthorized": "The app is not allowed to use Bluetooth — allow it in the device settings",
       "statePoweredOn": "Bluetooth is on",
@@ -5220,7 +5280,8 @@
       "codeTable": "Arabic code table",
       "codeTableEpson": "Epson numbering (37)",
       "codeTableXprinter": "Xprinter numbering (22)",
-      "codeTableHint": "Cheap printers number their code tables differently. If Arabic comes out as garbage in printer-font mode, pick the other numbering and send a test print."
+      "codeTableHint": "Cheap printers number their code tables differently. If Arabic comes out as garbage in printer-font mode, pick the other numbering and send a test print.",
+      "scanTitle": "Add a printer"
     },
     "calendar": {
       "month": {
@@ -5265,7 +5326,10 @@
       "walkInCustomer": "Walk-in customer",
       "saleMeta": "{n} items · {when}",
       "todayAt": "Today {time}",
-      "unpaid": "Unpaid"
+      "unpaid": "Unpaid",
+      "saleMetaOne": "1 item · {when}",
+      "saleMetaTwo": "{n} items · {when}",
+      "saleMetaFew": "{n} items · {when}"
     },
     "salesHistory": {
       "title": "Sales history",
@@ -5281,7 +5345,10 @@
       "endOfList": "End of history",
       "lineCount": "{n} items",
       "customRange": "Custom",
-      "totalsPartial": "Still loading invoices — figures above are so far only"
+      "totalsPartial": "Still loading invoices — totals above are partial",
+      "lineCountOne": "1 item",
+      "lineCountTwo": "{n} items",
+      "lineCountFew": "{n} items"
     },
     "saleDetail": {
       "title": "Invoice details",
@@ -5291,13 +5358,14 @@
       "customer": "Customer",
       "openCustomer": "Open customer",
       "walkIn": "Walk-in customer",
-      "returnedQty": "Returned {n}",
+      "returnedQty": "{n} returned",
       "receipt": "Receipt",
       "paidInFull": "Paid in full",
       "linesIncomplete": "Some lines of this invoice are missing — pull to refresh",
       "paid": "Paid",
       "remaining": "Remaining",
-      "qtyAtPrice": "{qty} × {price}"
+      "qtyAtPrice": "{qty} × {price}",
+      "payment": "Payment"
     },
     "security": {
       "devices": {
@@ -5328,6 +5396,14 @@
     "dateField": {
       "placeholder": "Pick a date",
       "done": "Done"
+    },
+    "scanner": {
+      "notSupported": "The camera isn’t available on this device — type the code below.",
+      "permissionDenied": "Camera access was denied. Allow it in the device Settings, or type the code below."
+    },
+    "units": {
+      "meters": "{n} m",
+      "km": "{n} km"
     }
   }
 }

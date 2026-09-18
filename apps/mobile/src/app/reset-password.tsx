@@ -189,7 +189,8 @@ export default function ResetPasswordScreen() {
           <View style={styles.errorBox}>
             <Text style={styles.errorText}>{t("auth.reset.invalidLink")}</Text>
           </View>
-          <Button label={t("auth.reset.invalidLinkAction")} onPress={goToForgot} />
+          {/* The button names the ACTION the sentence above asks for. */}
+          <Button label={t("auth.reset.requestNewLink")} onPress={goToForgot} />
           <Pressable accessibilityRole="button" style={styles.back} onPress={goToLogin}>
             <Text style={styles.backText}>{t("auth.forgot.backToLogin")}</Text>
           </Pressable>
@@ -287,7 +288,7 @@ export default function ResetPasswordScreen() {
               onPress={() => void setLocale(locale === "ar" ? "en" : "ar")}
             >
               <Globe size={20} color={colors.textSecondary} />
-              <Text style={styles.langText}>{locale === "ar" ? "ع" : "EN"}</Text>
+              <Text style={styles.langText}>{locale === "ar" ? "EN" : "ع"}</Text>
             </Pressable>
           </View>
 
@@ -302,8 +303,12 @@ export default function ResetPasswordScreen() {
               <Logo size="md" />
             </View>
 
-            <Text style={styles.heading}>{t("auth.reset.title")}</Text>
-            <Text style={styles.subheading}>{t("auth.reset.subhead")}</Text>
+            {/* A dead link gets its own heading; "choose a new password" above an
+                "invalid link" error contradicted itself. */}
+            <Text style={styles.heading}>
+              {tokenState === "invalid" ? t("auth.reset.invalidTitle") : t("auth.reset.title")}
+            </Text>
+            {tokenState === "invalid" ? null : <Text style={styles.subheading}>{t("auth.reset.subhead")}</Text>}
 
             {renderBody()}
           </View>
@@ -344,7 +349,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   langText: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
-  centre: { flex: 1, justifyContent: "center" },
+  centre: { flex: 1 },
   brand: { alignItems: "center", marginBottom: spacing.xxl },
   heading: {
     fontFamily: fonts.bold,

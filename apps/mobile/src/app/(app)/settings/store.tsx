@@ -222,8 +222,8 @@ export default function StoreSettingsScreen() {
         <ActivityIndicator color={colors.accent} />
       ) : (
         <>
-          {/* معلومات المتجر */}
-          <Card title={t("app.settingsPage.shopInfo.section")}>
+          {/* معلومات المتجر — no card title: the page H1 60pt above already says it. */}
+          <Card>
             <View style={styles.stack}>
               <Field
                 label={t("app.settingsPage.shopInfo.shopNameLabel")}

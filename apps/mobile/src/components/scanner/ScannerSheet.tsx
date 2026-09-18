@@ -17,6 +17,7 @@ import {
   type BarcodeType,
 } from "expo-camera";
 import * as Haptics from "expo-haptics";
+import { StatusBar } from "expo-status-bar";
 import { XIcon as X } from "phosphor-react-native/src/icons/X";
 
 import { Button } from "@/components/ui/Button";
@@ -154,6 +155,11 @@ export function ScannerSheet({
 
   const granted = permission?.granted === true;
   const cameraOn = visible && granted && available === true;
+  // One filled button per state. While the camera works, "Done" is the way
+  // out and manual entry is the outline fallback; the moment the cashier
+  // starts typing — or the device has no camera at all, where typing is the
+  // only path — the submit becomes the filled action and Done steps back.
+  const manualPrimary = manual.trim().length > 0 || (granted && available === false);
 
   // The camera is mounted in this commit: the decode budget starts here.
   // Closing the sheet before any decode drops the mark, so the next opening
@@ -171,6 +177,10 @@ export function ScannerSheet({
       statusBarTranslucent
     >
       <View style={[styles.root, directionStyle(isRTL())]}>
+        {/* The sheet is near-black; the root layout's dark bar would leave the
+            clock and battery unreadable on it. Last-mounted StatusBar wins, and
+            the Modal drops its children on close, so the root's style returns. */}
+        <StatusBar style="light" />
         {/* Header */}
         <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
           <Text style={styles.title}>{t("app.ui.scanner.title")}</Text>
@@ -217,7 +227,7 @@ export function ScannerSheet({
                   </>
                 ) : (
                   <>
-                    <Text style={styles.stateText}>{t("app.ui.scanner.permissionDenied")}</Text>
+                    <Text style={styles.stateText}>{t("mobile.scanner.permissionDenied")}</Text>
                     <Button
                       label={t("app.shell.secondary.settings")}
                       onPress={() => void Linking.openSettings()}
@@ -225,7 +235,7 @@ export function ScannerSheet({
                   </>
                 )
               ) : (
-                <Text style={styles.stateText}>{t("app.ui.scanner.notSupported")}</Text>
+                <Text style={styles.stateText}>{t("mobile.scanner.notSupported")}</Text>
               )}
             </View>
           )}
@@ -267,17 +277,21 @@ export function ScannerSheet({
               autoCapitalize="none"
               autoCorrect={false}
               returnKeyType="done"
-              style={styles.manualInput}
+              // TextInput alignment is physical (no start/end swap), so the
+              // locale picks the edge; inline because the locale can change
+              // while the module-scope StyleSheet cannot.
+              style={[styles.manualInput, { textAlign: isRTL() ? "right" : "left" }]}
             />
             <Button
               label={t("app.ui.scanner.manualSubmit")}
-              variant="outline"
+              variant={manualPrimary ? "primary" : "outline"}
               disabled={!manual.trim()}
               onPress={submitManual}
             />
           </View>
           <Button
             label={mode === "single" ? t("app.ui.scanner.cancel") : t("app.receiptDesigner.editor.done")}
+            variant={manualPrimary ? "outline" : "primary"}
             onPress={onClose}
           />
         </View>
@@ -339,7 +353,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.bg,
     textAlign: "center",
-    ...RTL_TEXT,
   },
   dim: { flex: 1, backgroundColor: DIM },
   dimBottom: { alignItems: "center", paddingTop: spacing.lg },
@@ -357,7 +370,6 @@ const styles = StyleSheet.create({
     color: colors.bg,
     textAlign: "center",
     paddingHorizontal: spacing.xxl,
-    ...RTL_TEXT,
   },
   toast: {
     position: "absolute",
@@ -378,7 +390,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.text,
     textAlign: "center",
-    ...RTL_TEXT,
   },
   toastTextSuccess: { color: colors.successStrong },
   toastTextError: { color: colors.danger },
@@ -405,6 +416,5 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.md,
     backgroundColor: colors.bg,
-    ...RTL_TEXT,
   },
 });

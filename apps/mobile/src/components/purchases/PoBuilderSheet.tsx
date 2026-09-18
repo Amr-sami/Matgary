@@ -15,6 +15,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CheckIcon as Check } from "phosphor-react-native/src/icons/Check";
 import { CheckCircleIcon as CheckCircle } from "phosphor-react-native/src/icons/CheckCircle";
+import { MagnifyingGlassIcon as MagnifyingGlass } from "phosphor-react-native/src/icons/MagnifyingGlass";
 import { MinusIcon as Minus } from "phosphor-react-native/src/icons/Minus";
 import { PlusIcon as Plus } from "phosphor-react-native/src/icons/Plus";
 import { TrashIcon as Trash } from "phosphor-react-native/src/icons/Trash";
@@ -54,6 +55,8 @@ import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
 
 type Step = 1 | 2 | 3 | 4;
 const STEP_COUNT = 4;
+const HEADER_BTN = 36;
+const HEADER_ICON = 22;
 
 export interface BuilderLine {
   uid: string;
@@ -173,13 +176,13 @@ export function PoBuilderSheet({
             accessibilityLabel={step === 1 || step === 4 ? t("mobile.purchases.builder.close") : t("mobile.purchases.builder.back")}
             style={styles.headerBtn}
           >
-            {step === 1 || step === 4 ? <X size={22} color={colors.text} /> : <ChevronBack size={22} color={colors.text} />}
+            {step === 1 || step === 4 ? <X size={HEADER_ICON} color={colors.text} /> : <ChevronBack size={HEADER_ICON} color={colors.text} />}
           </Pressable>
           <View style={styles.headerText}>
-            <Text style={styles.stepLabel}>
-              {t("mobile.purchases.builder.step", { n: step, total: STEP_COUNT })}
+            <Text style={styles.title} numberOfLines={1}>{t("app.purchases.builder.title")}</Text>
+            <Text style={styles.stepLabel} numberOfLines={1}>
+              {t("mobile.common.step", { step, total: STEP_COUNT, title: stepTitle })}
             </Text>
-            <Text style={styles.title} numberOfLines={1}>{stepTitle}</Text>
           </View>
         </View>
         <View style={styles.progress}>
@@ -263,6 +266,28 @@ export function describeError(e: unknown, fallback: string): string {
   }
 }
 
+/**
+ * t() has no plural rules, so "{n} items" prints "1 items" for a one-line
+ * order. The footer on steps 2 and 3 and the done-step summary all go through
+ * here so the caption keeps one shape across the wizard.
+ */
+function linesSummary(n: number, total: number): string {
+  return t(n === 1 ? "mobile.purchases.builder.linesSummaryOne" : "mobile.purchases.builder.linesSummary", {
+    n,
+    amount: money(total),
+  });
+}
+
+/**
+ * TextInput alignment is PHYSICAL — Fabric swaps textAlign left/right for
+ * Text under an RTL layout but not for a native input, so `...RTL_TEXT`
+ * would pin Arabic to the left edge. Resolved at render time (not in the
+ * StyleSheet) so a live locale switch re-aligns the field.
+ */
+function inputAlign() {
+  return isRTL() ? styles.inputRtl : styles.inputLtr;
+}
+
 // ---------------------------------------------------------------------------
 // Step 1 — supplier
 // ---------------------------------------------------------------------------
@@ -320,8 +345,18 @@ function SupplierStep({
   return (
     <>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <View testID="po-supplier-search">
-          <SearchField value={q} onChangeText={setQ} placeholder={t("mobile.purchases.builder.searchSupplier")} />
+        <View testID="po-supplier-search" style={styles.searchBox}>
+          <MagnifyingGlass size={20} color={colors.textSecondary} />
+          <TextInput
+            value={q}
+            onChangeText={setQ}
+            placeholder={t("mobile.purchases.builder.searchSupplier")}
+            placeholderTextColor={colors.textSecondary}
+            returnKeyType="search"
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={[styles.searchInput, inputAlign()]}
+          />
         </View>
 
         {canCreate ? (
@@ -540,7 +575,7 @@ function LinesStep({
         </Pressable>
 
         {lines.length === 0 ? (
-          <EmptyState title={t("mobile.purchases.builder.noLines")} />
+          <EmptyState title={t("mobile.purchases.builder.noLines")} hint={t("mobile.purchases.builder.noLinesHint")} />
         ) : (
           <View style={styles.list}>
             {lines.map((l) => (
@@ -555,7 +590,7 @@ function LinesStep({
                       placeholder={t("mobile.purchases.builder.lineNamePlaceholder")}
                       placeholderTextColor={colors.textSecondary}
                       maxLength={200}
-                      style={[styles.input, styles.grow]}
+                      style={[styles.input, inputAlign(), styles.grow]}
                     />
                   )}
                   <Pressable
@@ -603,9 +638,7 @@ function LinesStep({
         )}
       </ScrollView>
       <View style={styles.footer}>
-        <Text style={styles.footerMeta}>
-          {t("mobile.purchases.builder.linesSummary", { n: count, amount: money(total) })}
-        </Text>
+        <Text style={styles.footerMeta}>{linesSummary(count, total)}</Text>
         <View testID="po-lines-next">
           <Button label={t("mobile.purchases.builder.next")} disabled={count === 0} onPress={onNext} />
         </View>
@@ -629,7 +662,7 @@ function CostInput({ value, onChange }: { value: number; onChange: (v: number) =
       onBlur={() => { setFocused(false); setText(String(Math.max(0, parseNum(text)))); }}
       keyboardType="decimal-pad"
       selectTextOnFocus
-      style={styles.input}
+      style={[styles.input, inputAlign()]}
     />
   );
 }
@@ -668,7 +701,7 @@ function ReviewStep({
 
         <View style={styles.reviewCard}>
           <Text style={styles.editorLabel}>
-            {t("app.purchases.row.itemCount", { n: lines.length })}
+            {t(lines.length === 1 ? "app.purchases.row.itemCountOne" : "app.purchases.row.itemCount", { n: lines.length })}
           </Text>
           {lines.map((l) => (
             <View key={l.uid} style={styles.reviewLine}>
@@ -700,7 +733,7 @@ function ReviewStep({
         {error ? <Text style={styles.err}>{error}</Text> : null}
       </ScrollView>
       <View style={styles.footer}>
-        <Text style={styles.footerMeta}>{t("mobile.purchases.total", { amount: money(total) })}</Text>
+        <Text style={styles.footerMeta}>{linesSummary(lines.length, total)}</Text>
         <View testID="po-submit">
           <Button
             label={t("app.purchases.builder.save")}
@@ -744,9 +777,7 @@ function DoneStep({
           {t("mobile.purchases.builder.orderRef", { ref: id.slice(0, 8).toUpperCase() })}
         </Text>
         <Text style={styles.pickName} testID="po-done-supplier">{supplierName}</Text>
-        <Text style={styles.meta} testID="po-done-summary">
-          {t("mobile.purchases.builder.linesSummary", { n: lineCount, amount: money(total) })}
-        </Text>
+        <Text style={styles.meta} testID="po-done-summary">{linesSummary(lineCount, total)}</Text>
         <Text style={[styles.hint, styles.doneHint]}>{t("mobile.purchases.builder.createdHint")}</Text>
       </ScrollView>
       <View style={styles.footer}>
@@ -768,19 +799,33 @@ function DoneStep({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
+  // Title first, step caption under it (the Screen/add-product header order);
+  // the row is top-aligned so the X / chevron centres on the TITLE line, not
+  // on the two-line block. Cairo at 20pt lays out a ~34pt line, so a 36pt
+  // button sits on it; hitSlop={12} keeps the touch area above MIN_TOUCH.
   header: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: spacing.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
   },
-  headerBtn: { width: MIN_TOUCH, height: MIN_TOUCH, alignItems: "center", justifyContent: "center" },
+  headerBtn: {
+    width: HEADER_BTN,
+    height: HEADER_BTN,
+    // The 22pt glyph is centred in a 36pt box; pull it back so the glyph's
+    // edge sits on the 16pt content edge the rail and body use, not 7pt in.
+    marginStart: -(HEADER_BTN - HEADER_ICON) / 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   headerText: { flex: 1, gap: 2 },
-  stepLabel: { fontFamily: fonts.medium, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
   title: { fontFamily: fonts.bold, fontSize: 20, color: colors.text, ...RTL_TEXT },
-  progress: { flexDirection: "row", gap: spacing.xs, paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
-  progressSeg: { flex: 1, height: 4, borderRadius: radius.md, backgroundColor: colors.border },
+  stepLabel: { fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },
+  // Same rail as add-product.tsx (6pt, gap sm, accentLight -> accent) so the
+  // two wizards read as one pattern.
+  progress: { flexDirection: "row", gap: spacing.sm, paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
+  progressSeg: { flex: 1, height: 6, borderRadius: 3, backgroundColor: colors.accentLight },
   progressSegActive: { backgroundColor: colors.accent },
   body: { flex: 1 },
   content: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xl },
@@ -876,7 +921,28 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     fontSize: 15,
     color: colors.text,
-    ...RTL_TEXT,
+  },
+  inputLtr: { textAlign: "left", writingDirection: "ltr" },
+  inputRtl: { textAlign: "right", writingDirection: "rtl" },
+  // SearchField's box without its barcode button: a supplier is not scanned.
+  searchBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    minHeight: 52,
+    paddingHorizontal: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    backgroundColor: colors.bg,
+  },
+  searchInput: {
+    flex: 1,
+    fontFamily: fonts.regular,
+    fontSize: 15,
+    color: colors.text,
+    includeFontPadding: false,
+    paddingVertical: 12,
   },
   lineTotal: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 15, color: colors.text, fontVariant: ["tabular-nums"] },
   reviewCard: {

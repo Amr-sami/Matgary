@@ -21,7 +21,7 @@ import { ApiError, catalog, type Expense, type PurchaseOrder, type Supplier } fr
 import { api } from "@/api/client";
 import { isRTL, t } from "@/i18n";
 import { Screen } from "@/components/layout/Screen";
-import { ChevronBack } from "@/components/ui/Chevron";
+import { ChevronForward } from "@/components/ui/Chevron";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -165,7 +165,8 @@ export default function SupplierDetailScreen() {
         >
           <Text style={styles.crumbText}>{t("app.suppliers.title")}</Text>
         </Pressable>
-        <ChevronBack size={14} color={colors.textSecondary} />
+        {/* A breadcrumb SEPARATOR points in the reading direction, into the child. */}
+        <ChevronForward size={16} color={colors.textSecondary} />
         <Text numberOfLines={1} style={styles.crumbCurrent}>
           {supplier?.name ?? ""}
         </Text>

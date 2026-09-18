@@ -145,8 +145,21 @@ test("formatDistance", () => {
   assert.equal(formatDistance(1000), "1 km");
   assert.equal(formatDistance(1440), "1.4 km");
   assert.equal(formatDistance(123_456), "123 km");
+  assert.equal(formatDistance(999.6), "1 km", "rounds up into the km branch, never '1000 m'");
+  assert.equal(formatDistance(11_990_000), "11,990 km", "grouped like every amount in the app");
   assert.equal(formatDistance(-5), "—");
   assert.equal(formatDistance(NaN), "—");
+});
+
+test("formatDistance: the unit comes from the dictionary when t is passed", () => {
+  const ar: Record<string, string> = { "mobile.units.meters": "{n} م", "mobile.units.km": "{n} كم" };
+  const t = (path: string, vars?: Record<string, string | number>) =>
+    (ar[path] ?? path).replace(/\{(\w+)\}/g, (_, k: string) => String(vars?.[k]));
+  assert.equal(formatDistance(0, t), "0 م");
+  assert.equal(formatDistance(119.6, t), "120 م");
+  assert.equal(formatDistance(1440, t), "1.4 كم");
+  assert.equal(formatDistance(11_990_000, t), "11,990 كم");
+  assert.equal(formatDistance(NaN, t), "—");
 });
 
 test("toAccuracyM: integer or null, as the zod schema wants", () => {
