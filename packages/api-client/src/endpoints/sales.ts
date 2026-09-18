@@ -27,6 +27,12 @@ export interface CartOptions {
   /** Client-minted, so a receipt printed offline matches the server record. */
   invoiceId?: string;
   amountPaidNow?: number;
+  /**
+   * ISO datetime of the moment the sale was rung. The route books
+   * `customDate ?? now`, so a sale rung offline at 22:00 and drained at 09:00
+   * lands on the day the customer's receipt shows, not the day it synced.
+   */
+  customDate?: string;
 }
 
 /** apps/web/lib/repo/operations.ts — CartSaleResult */
@@ -39,6 +45,41 @@ export interface CartSaleResult {
   customerName: string | null;
   customerPhone: string | null;
   note: string | null;
+}
+
+/**
+ * The exact JSON the cart route receives. Both the live POS write and the
+ * offline outbox go through `sendCartSale`, so the two paths send
+ * byte-identical bodies — the outbox stores this object with JSON.stringify
+ * and parses it back before sending; key order survives that round trip.
+ */
+export interface CartSaleBody {
+  lines: CartLineInput[];
+  options: CartOptions;
+}
+
+export function buildCartSaleBody(lines: CartLineInput[], options: CartOptions): CartSaleBody {
+  return { lines, options };
+}
+
+/**
+ * POST a prepared body. `extraHeaders` is for the outbox's `X-Outbox-Branch`
+ * (apps/web/app/api/sales/cart/route.ts refuses, with a 409, a row rung at a
+ * branch the cashier has since switched away from — better than booking it
+ * at the wrong branch). Never pass Idempotency-Key here; it is a parameter so
+ * it cannot be forgotten.
+ */
+export async function sendCartSale(
+  client: ApiClient,
+  body: CartSaleBody,
+  idempotencyKey: string,
+  extraHeaders: Record<string, string> = {},
+): Promise<CartSaleResult> {
+  return client.request<CartSaleResult>("/api/sales/cart", {
+    method: "POST",
+    body,
+    headers: { ...extraHeaders, "Idempotency-Key": idempotencyKey },
+  });
 }
 
 /**
@@ -59,9 +100,5 @@ export async function recordCartSale(
   options: CartOptions,
   idempotencyKey: string,
 ): Promise<CartSaleResult> {
-  return client.request<CartSaleResult>("/api/sales/cart", {
-    method: "POST",
-    body: { lines, options },
-    headers: { "Idempotency-Key": idempotencyKey },
-  });
+  return sendCartSale(client, buildCartSaleBody(lines, options), idempotencyKey);
 }

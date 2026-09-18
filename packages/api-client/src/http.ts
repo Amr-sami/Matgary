@@ -5,7 +5,7 @@
  * device-specific (where tokens are stored, which branch is active) is injected,
  * so this same file runs in a Node test with an in-memory store.
  */
-import { ApiError, classify } from "./errors";
+import { ApiError, type BlockedCode, blockedCodeOf, classify } from "./errors";
 
 export interface AuthTokens {
   accessToken: string;
@@ -29,6 +29,13 @@ export interface ApiClientOptions {
   getBranchId?: () => string | null;
   /** Called once when the session is unrecoverable. The app signs out here. */
   onSessionLost?: (error: ApiError) => void;
+  /**
+   * Called, in addition to the throw, whenever a response is one of the four
+   * walls (see `BlockedCode`). The app routes here — to the paused screen,
+   * billing, or change-password — instead of every screen re-deriving it from
+   * the error it caught. The error still propagates to the caller.
+   */
+  onBlocked?: (code: BlockedCode, error: ApiError) => void;
   timeoutMs?: number;
 }
 
@@ -54,6 +61,7 @@ export class ApiClient {
   private readonly store: TokenStore;
   private readonly getBranchId: () => string | null;
   private readonly onSessionLost?: (error: ApiError) => void;
+  private readonly onBlocked?: (code: BlockedCode, error: ApiError) => void;
   private readonly timeoutMs: number;
 
   /**
@@ -71,6 +79,7 @@ export class ApiClient {
     this.store = opts.tokens;
     this.getBranchId = opts.getBranchId ?? (() => null);
     this.onSessionLost = opts.onSessionLost;
+    this.onBlocked = opts.onBlocked;
     this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   }
 
@@ -123,6 +132,21 @@ export class ApiClient {
   }
 
   // ---------------------------------------------------------------- internals
+
+  /**
+   * Side channel for the walls. Never lets a handler bug mask the real error:
+   * the caller still gets the ApiError whether or not the app's hook throws.
+   */
+  private notifyBlocked(error: ApiError): void {
+    if (!this.onBlocked) return;
+    const blocked = blockedCodeOf(error.status, error.code);
+    if (!blocked) return;
+    try {
+      this.onBlocked(blocked, error);
+    } catch {
+      // The app's handler is not our problem to surface here.
+    }
+  }
 
   private async refresh(current: AuthTokens): Promise<AuthTokens> {
     if (this.refreshInFlight) return this.refreshInFlight;
@@ -272,13 +296,15 @@ export class ApiClient {
     if (!response.ok) {
       const code = readErrorCode(payload);
       const retryAfter = Number(response.headers.get("retry-after"));
-      throw new ApiError({
+      const error = new ApiError({
         kind: classify(response.status, code),
         code,
         status: response.status,
         message: readErrorMessage(payload) ?? code ?? `HTTP ${response.status}`,
         retryAfterSec: Number.isFinite(retryAfter) ? retryAfter : null,
       });
+      this.notifyBlocked(error);
+      throw error;
     }
 
     return payload as T;

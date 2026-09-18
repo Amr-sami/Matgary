@@ -53,12 +53,20 @@ export interface MeResponse {
     name: string | null;
     role: string;
     locale: string;
+    /**
+     * The account is behind the PASSWORD_CHANGE_REQUIRED wall: every request
+     * but /me and the change-password call 403s until it is changed. /me is
+     * the one read the server answers under the wall precisely so the app
+     * can seed a session and route here. Optional: older servers omit it.
+     */
+    mustChangePassword?: boolean;
   };
   tenant: {
     id: string;
     slug: string | null;
     name: string | null;
     subscriptionStatus: string | null;
+    /** False = SUBSCRIPTION_REQUIRED wall: only /me and /api/billing/me answer. */
     subscriptionAccessActive: boolean;
     suspended: boolean;
   };

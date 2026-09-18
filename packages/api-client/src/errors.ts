@@ -56,13 +56,33 @@ export class ApiError extends Error {
     this.retryAfterSec = opts.retryAfterSec ?? null;
   }
 
-  /** True when a blind retry is reasonable. Drives the outbox backoff later. */
+  /**
+   * One of the three routed walls — TENANT_SUSPENDED, SUBSCRIPTION_REQUIRED,
+   * PASSWORD_CHANGE_REQUIRED. Not PERMISSION_DENIED: that is a verdict on the
+   * request itself and re-sending it changes nothing.
+   */
+  get wall(): boolean {
+    const blocked = blockedCodeOf(this.status, this.code);
+    return blocked !== null && blocked !== "PERMISSION_DENIED";
+  }
+
+  /**
+   * True when a blind retry is reasonable. Drives the outbox backoff later.
+   *
+   * A wall counts as retryable (doc 06 §5.3): a sale queued offline must
+   * survive the subscription lapsing or an admin forcing a password change —
+   * the request was valid, the account is temporarily gated, and the moment
+   * the gate lifts the same request is correct to send. Dropping it would
+   * lose the sale. The outbox must still stop draining while `wall` is true
+   * (the router has sent the user to fix it) rather than hammer the server.
+   */
   get retryable(): boolean {
     return (
       this.kind === "offline" ||
       this.kind === "timeout" ||
       this.kind === "server" ||
-      this.kind === "rateLimited"
+      this.kind === "rateLimited" ||
+      this.wall
     );
   }
 
@@ -110,4 +130,42 @@ export function classify(status: number, code: string | null): ApiErrorKind {
       if (status >= 500) return "server";
       return "unknown";
   }
+}
+
+/**
+ * The four responses that mean "stop what you are doing and go somewhere
+ * else" — a wall the app must route to, not an error a screen should render
+ * inline. Codes are the server's own machine strings (middleware.ts and
+ * lib/api/auth-helpers.ts), except PERMISSION_DENIED, which normalises the
+ * `{ error: "Forbidden" }` body that every `requirePermission*` helper sends.
+ *
+ *   TENANT_SUSPENDED         403 → /service-paused
+ *   SUBSCRIPTION_REQUIRED    402 → /billing
+ *   PASSWORD_CHANGE_REQUIRED 403 → /settings/change-password
+ *   PERMISSION_DENIED        403 → non-blocking banner, stay on screen
+ */
+export type BlockedCode =
+  | "TENANT_SUSPENDED"
+  | "SUBSCRIPTION_REQUIRED"
+  | "PASSWORD_CHANGE_REQUIRED"
+  | "PERMISSION_DENIED";
+
+/**
+ * Bodies the permission helpers answer 403 with. "Forbidden" is what ships
+ * today (auth-helpers.ts requirePermission / requirePermissionWithBranch /
+ * requirePermissionAudited); the other two are accepted so a future rename to
+ * a machine code does not silently turn banners back into raw errors.
+ */
+const PERMISSION_DENIED_CODES = new Set(["Forbidden", "FORBIDDEN", "PERMISSION_DENIED"]);
+
+/** Null for every response that is not one of the four walls. */
+export function blockedCodeOf(status: number | null, code: string | null): BlockedCode | null {
+  if (status === 402) return "SUBSCRIPTION_REQUIRED";
+  if (status !== 403) return null;
+  if (code === "TENANT_SUSPENDED") return "TENANT_SUSPENDED";
+  if (code === "PASSWORD_CHANGE_REQUIRED") return "PASSWORD_CHANGE_REQUIRED";
+  // NO_BRANCH_ACCESS / FORBIDDEN_BRANCH are branch-selection problems, not
+  // permission denials — they fall through to null on purpose.
+  if (code && PERMISSION_DENIED_CODES.has(code)) return "PERMISSION_DENIED";
+  return null;
 }

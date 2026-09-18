@@ -33,16 +33,65 @@ export async function login(
   return data;
 }
 
+export interface LogoutOptions {
+  /**
+   * This device's Expo push token. When present it is unregistered
+   * (DELETE /api/v1/devices/push-token) BEFORE the session is revoked — the
+   * server needs the still-valid bearer to know whose token to drop. Omitted,
+   * the token registered through `setPushTokenProvider` is used instead.
+   */
+  pushToken?: string | null;
+}
+
+let pushTokenProvider: (() => string | null | undefined) | null = null;
+
+/**
+ * Let the push layer hand its current token to `logout` without every caller
+ * of `logout` having to know about push. The app's session store calls
+ * `logout(client)` with no options; the registrar installs this provider once
+ * at mount so sign-out still unregisters the device.
+ */
+export function setPushTokenProvider(
+  provider: (() => string | null | undefined) | null,
+): void {
+  pushTokenProvider = provider;
+}
+
+/** Hard cap on the best-effort push unregister so sign-out never hangs on it. */
+const PUSH_UNREGISTER_TIMEOUT_MS = 4_000;
+
 /**
  * Revoke this device's session server-side, then drop it locally.
  *
  * Local state is cleared even when the call fails: a user who taps "sign out"
  * on a plane must end up signed out. The server row expires on its own.
  */
-export async function logout(client: ApiClient): Promise<void> {
+export async function logout(
+  client: ApiClient,
+  opts: LogoutOptions = {},
+): Promise<void> {
   const tokens = await client.currentTokens();
   try {
     if (tokens) {
+      const pushToken = opts.pushToken ?? pushTokenProvider?.() ?? null;
+      if (pushToken) {
+        // Best-effort and time-boxed: a failed unregister must not keep the
+        // user signed in, and the server prunes dead tokens from receipts.
+        const ctl = new AbortController();
+        const timer = setTimeout(() => ctl.abort(), PUSH_UNREGISTER_TIMEOUT_MS);
+        try {
+          await client.request("/api/v1/devices/push-token", {
+            method: "DELETE",
+            body: { token: pushToken },
+            noBranch: true,
+            signal: ctl.signal,
+          });
+        } catch {
+          // ignore — see above
+        } finally {
+          clearTimeout(timer);
+        }
+      }
       await client.request("/api/v1/auth/logout", {
         method: "POST",
         body: { refreshToken: tokens.refreshToken },
