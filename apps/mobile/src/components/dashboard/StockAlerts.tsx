@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from "react-native";
-import { CheckCircle, Warning } from "phosphor-react-native";
+import { CheckCircleIcon as CheckCircle } from "phosphor-react-native/src/icons/CheckCircle";
+import { WarningIcon as Warning } from "phosphor-react-native/src/icons/Warning";
 
 import { Badge } from "@/components/ui/Badge";
 import { RTL_TEXT } from "@/theme/rtl";

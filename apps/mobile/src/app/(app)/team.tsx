@@ -1,7 +1,7 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
-import { ClockCounterClockwise } from "phosphor-react-native";
+import { ClockCounterClockwiseIcon as ClockCounterClockwise } from "phosphor-react-native/src/icons/ClockCounterClockwise";
 import { ApiError, team } from "@matgary/api-client";
 
 import { api } from "@/api/client";
@@ -66,6 +66,7 @@ export default function TeamScreen() {
       ) : (
         <View style={styles.list}>
           <Pressable
+            testID="team-attendance"
             accessibilityRole="button"
             onPress={() => router.push("/team/attendance")}
             style={({ pressed }) => [styles.attendanceRow, pressed && styles.pressed]}
@@ -96,6 +97,7 @@ export default function TeamScreen() {
               return (
                 <Pressable
                   key={m.userId}
+                  testID="team-member-row"
                   accessibilityRole="button"
                   onPress={() => router.push(`/team/${encodeURIComponent(m.userId)}`)}
                   style={({ pressed }) => [styles.row, pressed && styles.pressed]}

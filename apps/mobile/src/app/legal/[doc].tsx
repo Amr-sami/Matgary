@@ -3,7 +3,7 @@ import { type LayoutChangeEvent, Pressable, ScrollView, StyleSheet, Text, View }
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
-import { ArrowSquareOut } from "phosphor-react-native";
+import { ArrowSquareOutIcon as ArrowSquareOut } from "phosphor-react-native/src/icons/ArrowSquareOut";
 import { dictionaries } from "@matgary/i18n";
 
 import { ChevronBack, ChevronForward } from "@/components/ui/Chevron";

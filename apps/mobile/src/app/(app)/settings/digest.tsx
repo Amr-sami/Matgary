@@ -10,7 +10,9 @@ import {
 import { useRouter } from "expo-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ApiError } from "@matgary/api-client";
-import { CaretDown, CheckCircle, MinusCircle } from "phosphor-react-native";
+import { CaretDownIcon as CaretDown } from "phosphor-react-native/src/icons/CaretDown";
+import { CheckCircleIcon as CheckCircle } from "phosphor-react-native/src/icons/CheckCircle";
+import { MinusCircleIcon as MinusCircle } from "phosphor-react-native/src/icons/MinusCircle";
 
 import { api } from "@/api/client";
 import { Screen } from "@/components/layout/Screen";

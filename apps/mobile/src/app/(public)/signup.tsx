@@ -10,7 +10,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
-import { Globe, Lightning } from "phosphor-react-native";
+import { GlobeIcon as Globe } from "phosphor-react-native/src/icons/Globe";
+import { LightningIcon as Lightning } from "phosphor-react-native/src/icons/Lightning";
 
 import { ApiError, auth } from "@matgary/api-client";
 import { dictionaries } from "@matgary/i18n";

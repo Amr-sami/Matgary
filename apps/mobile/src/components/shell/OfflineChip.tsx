@@ -1,7 +1,10 @@
 import type { ReactNode } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text } from "react-native";
 import { useRouter } from "expo-router";
-import { CloudArrowUp, PauseCircle, WarningCircle, WifiSlash } from "phosphor-react-native";
+import { CloudArrowUpIcon as CloudArrowUp } from "phosphor-react-native/src/icons/CloudArrowUp";
+import { PauseCircleIcon as PauseCircle } from "phosphor-react-native/src/icons/PauseCircle";
+import { WarningCircleIcon as WarningCircle } from "phosphor-react-native/src/icons/WarningCircle";
+import { WifiSlashIcon as WifiSlash } from "phosphor-react-native/src/icons/WifiSlash";
 
 import { t } from "@/i18n";
 import { useOffline } from "@/stores/offline";

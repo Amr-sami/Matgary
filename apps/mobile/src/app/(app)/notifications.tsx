@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo } from "react";
 import {
   ActivityIndicator,
-  FlatList,
   Pressable,
   RefreshControl,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { FlashList } from "@shopify/flash-list";
 import { useRouter } from "expo-router";
 import {
   useInfiniteQuery,
@@ -16,7 +16,8 @@ import {
 } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Notifications from "expo-notifications";
-import { Checks, Info } from "phosphor-react-native";
+import { ChecksIcon as Checks } from "phosphor-react-native/src/icons/Checks";
+import { InfoIcon as Info } from "phosphor-react-native/src/icons/Info";
 import { notifications, type MeResponse } from "@matgary/api-client";
 
 import { api } from "@/api/client";
@@ -44,7 +45,7 @@ type Me = MeResponse;
  * The notification centre — the screen the web's dropdown never became
  * (doc 02 §1.4, §2.12). First real consumer of the fanout rows.
  *
- * A FlatList over useInfiniteQuery: the web route returns the newest 30 rows
+ * A FlashList over useInfiniteQuery: the web route returns the newest 30 rows
  * with no cursor today, and `nextCursor` (when the server grows it) drives
  * onEndReached. Tap = mark read + route by link/kind; unread rows are tinted
  * and dotted; the tray badge clears on open (doc 06 §8.5 "clear on inbox open").
@@ -180,6 +181,7 @@ export default function NotificationsScreen() {
         </View>
         {unread > 0 ? (
           <Pressable
+            testID="notifications-mark-all"
             accessibilityRole="button"
             onPress={() => markAll.mutate()}
             disabled={markAll.isPending}
@@ -228,7 +230,7 @@ export default function NotificationsScreen() {
 
   return (
     <View style={styles.root}>
-      <FlatList
+      <FlashList
         data={rows}
         keyExtractor={(n) => n.id}
         renderItem={({ item, index }) => (

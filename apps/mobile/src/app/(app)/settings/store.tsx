@@ -11,7 +11,9 @@ import {
 import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, settings } from "@matgary/api-client";
-import { Camera, Storefront, WarningCircle } from "phosphor-react-native";
+import { CameraIcon as Camera } from "phosphor-react-native/src/icons/Camera";
+import { StorefrontIcon as Storefront } from "phosphor-react-native/src/icons/Storefront";
+import { WarningCircleIcon as WarningCircle } from "phosphor-react-native/src/icons/WarningCircle";
 
 import { api } from "@/api/client";
 import { Screen } from "@/components/layout/Screen";

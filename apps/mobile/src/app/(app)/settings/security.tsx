@@ -10,13 +10,11 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  AndroidLogo,
-  AppleLogo,
-  Desktop,
-  DeviceMobile,
-  ShieldCheck,
-} from "phosphor-react-native";
+import { AndroidLogoIcon as AndroidLogo } from "phosphor-react-native/src/icons/AndroidLogo";
+import { AppleLogoIcon as AppleLogo } from "phosphor-react-native/src/icons/AppleLogo";
+import { DesktopIcon as Desktop } from "phosphor-react-native/src/icons/Desktop";
+import { DeviceMobileIcon as DeviceMobile } from "phosphor-react-native/src/icons/DeviceMobile";
+import { ShieldCheckIcon as ShieldCheck } from "phosphor-react-native/src/icons/ShieldCheck";
 import { auth, type DeviceSummary } from "@matgary/api-client";
 
 import { api } from "@/api/client";

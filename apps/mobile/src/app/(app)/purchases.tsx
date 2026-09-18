@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Package, Receipt, Trash, Wallet } from "phosphor-react-native";
+import { PackageIcon as Package } from "phosphor-react-native/src/icons/Package";
+import { ReceiptIcon as Receipt } from "phosphor-react-native/src/icons/Receipt";
+import { TrashIcon as Trash } from "phosphor-react-native/src/icons/Trash";
+import { WalletIcon as Wallet } from "phosphor-react-native/src/icons/Wallet";
 import { catalog } from "@matgary/api-client";
 
 import { api } from "@/api/client";

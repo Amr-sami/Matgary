@@ -1,4 +1,5 @@
-import { CaretLeft, CaretRight } from "phosphor-react-native";
+import { CaretLeftIcon as CaretLeft } from "phosphor-react-native/src/icons/CaretLeft";
+import { CaretRightIcon as CaretRight } from "phosphor-react-native/src/icons/CaretRight";
 
 import { useLocale } from "@/i18n";
 import { colors } from "@/theme/tokens";

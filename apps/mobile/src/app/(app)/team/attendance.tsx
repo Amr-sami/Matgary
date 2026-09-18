@@ -11,7 +11,12 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarBlank, CheckCircle, Clock, PencilSimple, Trash, WarningCircle } from "phosphor-react-native";
+import { CalendarBlankIcon as CalendarBlank } from "phosphor-react-native/src/icons/CalendarBlank";
+import { CheckCircleIcon as CheckCircle } from "phosphor-react-native/src/icons/CheckCircle";
+import { ClockIcon as Clock } from "phosphor-react-native/src/icons/Clock";
+import { PencilSimpleIcon as PencilSimple } from "phosphor-react-native/src/icons/PencilSimple";
+import { TrashIcon as Trash } from "phosphor-react-native/src/icons/Trash";
+import { WarningCircleIcon as WarningCircle } from "phosphor-react-native/src/icons/WarningCircle";
 import { ApiError, team } from "@matgary/api-client";
 
 import { api } from "@/api/client";
@@ -385,7 +390,7 @@ export default function TeamAttendanceScreen() {
                   const open = expanded === line.userId;
                   const st = STATUS()[line.needsReview ? "review" : line.status];
                   return (
-                    <View key={line.userId} style={styles.card}>
+                    <View key={line.userId} style={styles.card} testID="roster-row">
                       <Pressable
                         accessibilityRole="button"
                         onPress={() => setExpanded(open ? null : line.userId)}

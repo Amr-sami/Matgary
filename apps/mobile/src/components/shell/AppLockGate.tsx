@@ -21,7 +21,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as LocalAuthentication from "expo-local-authentication";
 import { SecurityLevel, type LocalAuthenticationError } from "expo-local-authentication";
-import { LockKey } from "phosphor-react-native";
+import { LockKeyIcon as LockKey } from "phosphor-react-native/src/icons/LockKey";
 
 import { setActiveBranchId } from "@/api/client";
 import { Logo } from "@/components/Logo";

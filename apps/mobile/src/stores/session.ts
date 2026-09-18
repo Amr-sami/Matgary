@@ -6,6 +6,7 @@ import { ApiError, auth, me as meApi, type MeResponse } from "@matgary/api-clien
 import { api, deviceMeta, onSessionLost, setActiveBranchId } from "@/api/client";
 import { getLocale, t } from "@/i18n";
 import { getInstallId } from "@/auth/installId";
+import { markBoot } from "@/observability/perf";
 import { useCart } from "@/stores/cart";
 
 type Status = "loading" | "signedOut" | "signedIn";
@@ -133,6 +134,49 @@ export function messageFor(error: unknown): string {
   }
 }
 
+/**
+ * The background half of bootstrap: this launch's /me, applied only while the
+ * session still holds the copy it set out to confirm. If anything replaced
+ * `me` meanwhile (signIn, switchBranch, refreshMe, a sign-out) the answer is
+ * for a session that no longer exists on this device and is dropped.
+ *
+ *   ok      → adopt (branch header + disk + `offline: false`), as refreshMe does.
+ *   fatal   → the session is dead server-side: sign out, exactly as the
+ *             awaited path always did. The client already cleared the tokens.
+ *   other   → offline / timeout / 5xx: the cache stays, flagged `offline`
+ *             so SnapshotRefresher re-reads /me the moment connectivity is
+ *             back (doc 06 §6.6) — the same state an offline cold start
+ *             produced before.
+ */
+async function revalidateMe(cached: MeResponse): Promise<void> {
+  const stillOurs = () => {
+    const s = useSession.getState();
+    return s.status === "signedIn" && s.me === cached;
+  };
+  try {
+    const me = await meApi.getMe(api);
+    if (!stillOurs()) return;
+    adoptMe(me);
+    useSession.setState({ me, offline: false });
+    // The server resolved a DIFFERENT branch than the cached one (deactivated
+    // or dropped from the allow-list since the last launch). Anything the
+    // cashier put in the cart during the revalidation window was priced and
+    // stock-checked against the cached branch; under the new header it would
+    // drain A's stock while booking the revenue to B (recordSale has no
+    // cross-branch guard) — the same reason switchBranch resets it.
+    if (me.branch.id !== cached.branch.id) useCart.getState().reset();
+  } catch (error) {
+    if (!stillOurs()) return;
+    const fatal = error instanceof ApiError && error.fatalToSession;
+    if (fatal) {
+      applyBranch(null);
+      useSession.setState({ status: "signedOut", me: null, offline: false, signInError: null });
+      return;
+    }
+    useSession.setState({ offline: true });
+  }
+}
+
 export const useSession = create<SessionState>((set, get) => ({
   status: "loading",
   me: null,
@@ -142,11 +186,17 @@ export const useSession = create<SessionState>((set, get) => ({
 
   /**
    * Called once at launch. A stored refresh token is worth 90 days, so the
-   * common path is: tokens exist → /me succeeds → straight to the app.
+   * common path is: tokens exist → the last good /me is adopted at once →
+   * straight to the app, while this launch's /me revalidates in the
+   * background (perf.md §5: the splash used to wait on that round trip, the
+   * one boot phase a shop's connection can stretch to seconds).
    *
-   * /me is what proves the session, not the presence of tokens: the access
-   * token may be expired (the client refreshes transparently) or the session
-   * may have been revoked from another device, and only the server knows.
+   * /me is still what proves the session, not the presence of tokens: the
+   * access token may be expired (the client refreshes transparently) or the
+   * session may have been revoked from another device, and only the server
+   * knows. Adopting the cache first grants nothing the tokens do not — every
+   * permission and plan flag in it is re-checked by the server on the first
+   * request — and a fatal answer signs the device out exactly as before.
    */
   async bootstrap() {
     // A keychain that refuses to answer (missing entitlement on a mis-signed
@@ -155,12 +205,29 @@ export const useSession = create<SessionState>((set, get) => ({
     const tokens = await api.currentTokens().catch(() => null);
     if (!tokens) {
       set({ status: "signedOut", me: null });
+      markBoot("bootstrap-done");
       return;
     }
+    // Ask for the branch this device was last on; the server validates it
+    // and echoes back the one it actually resolved.
+    setActiveBranchId(recallBranch());
+
+    const cached = recallMe();
+    if (cached) {
+      // Synchronous adoption: `status` leaves "loading" now, so the splash
+      // lifts on fonts alone. `offline` stays false — the copy is being
+      // confirmed right here, and SnapshotRefresher (which re-reads /me while
+      // `offline` is set) must not fire a second, duplicate request.
+      setActiveBranchId(cached.branch.id);
+      set({ status: "signedIn", me: cached, offline: false, signInError: null });
+      markBoot("bootstrap-done");
+      void revalidateMe(cached);
+      return;
+    }
+
+    // Never synced on this device: nothing to render from, so /me is awaited
+    // as before — the login screen (with the reason) is the only alternative.
     try {
-      // Ask for the branch this device was last on; the server validates it
-      // and echoes back the one it actually resolved.
-      setActiveBranchId(recallBranch());
       const me = await meApi.getMe(api);
       adoptMe(me);
       set({ status: "signedIn", me, offline: false });
@@ -171,21 +238,11 @@ export const useSession = create<SessionState>((set, get) => ({
       if (fatal) {
         applyBranch(null);
         set({ status: "signedOut", me: null, offline: false, signInError: null });
-        return;
+      } else {
+        set({ status: "signedOut", me: null, offline: false, signInError: messageFor(error) });
       }
-      // Offline-at-launch is NOT a signed-out state: the tokens are still
-      // good and stay in the keychain. With a cached /me the session is
-      // restored as-is and the app renders from the snapshots; the first
-      // successful /me (SnapshotRefresher asks on reconnect) replaces it.
-      const cached = recallMe();
-      if (cached) {
-        setActiveBranchId(cached.branch.id);
-        set({ status: "signedIn", me: cached, offline: true, signInError: null });
-        return;
-      }
-      // Never synced on this device: nothing to render yet, so the login
-      // screen it is, with the reason.
-      set({ status: "signedOut", me: null, offline: false, signInError: messageFor(error) });
+    } finally {
+      markBoot("bootstrap-done");
     }
   },
 

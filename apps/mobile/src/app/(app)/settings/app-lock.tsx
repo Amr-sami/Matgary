@@ -13,7 +13,9 @@ import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import * as LocalAuthentication from "expo-local-authentication";
 import { AuthenticationType, SecurityLevel } from "expo-local-authentication";
-import { CheckCircle, LockKey, WarningCircle } from "phosphor-react-native";
+import { CheckCircleIcon as CheckCircle } from "phosphor-react-native/src/icons/CheckCircle";
+import { LockKeyIcon as LockKey } from "phosphor-react-native/src/icons/LockKey";
+import { WarningCircleIcon as WarningCircle } from "phosphor-react-native/src/icons/WarningCircle";
 
 import { Screen } from "@/components/layout/Screen";
 import { Button } from "@/components/ui/Button";

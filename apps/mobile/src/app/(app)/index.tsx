@@ -10,12 +10,10 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
-import {
-  ArrowCounterClockwise,
-  CurrencyDollar,
-  Package,
-  ShoppingCart,
-} from "phosphor-react-native";
+import { ArrowCounterClockwiseIcon as ArrowCounterClockwise } from "phosphor-react-native/src/icons/ArrowCounterClockwise";
+import { CurrencyDollarIcon as CurrencyDollar } from "phosphor-react-native/src/icons/CurrencyDollar";
+import { PackageIcon as Package } from "phosphor-react-native/src/icons/Package";
+import { ShoppingCartIcon as ShoppingCart } from "phosphor-react-native/src/icons/ShoppingCart";
 import { ApiError, dashboard as dashboardApi } from "@matgary/api-client";
 
 import { api } from "@/api/client";

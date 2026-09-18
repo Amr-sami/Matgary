@@ -12,7 +12,9 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
-import { CaretDown, Check, Storefront } from "phosphor-react-native";
+import { CaretDownIcon as CaretDown } from "phosphor-react-native/src/icons/CaretDown";
+import { CheckIcon as Check } from "phosphor-react-native/src/icons/Check";
+import { StorefrontIcon as Storefront } from "phosphor-react-native/src/icons/Storefront";
 import { ApiError, type BranchSummary } from "@matgary/api-client";
 
 import { t, useLocale } from "@/i18n";

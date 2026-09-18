@@ -10,22 +10,20 @@ import {
 } from "react-native";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useIsFocused } from "expo-router";
-import {
-  ChartBar,
-  ClockCounterClockwise,
-  Gear,
-  ListChecks,
-  Package,
-  PlusCircle,
-  Receipt,
-  ShieldCheck,
-  ShoppingCart,
-  Storefront,
-  Truck,
-  Users,
-  Wallet,
-  type Icon,
-} from "phosphor-react-native";
+import type { Icon } from "phosphor-react-native";
+import { ChartBarIcon as ChartBar } from "phosphor-react-native/src/icons/ChartBar";
+import { ClockCounterClockwiseIcon as ClockCounterClockwise } from "phosphor-react-native/src/icons/ClockCounterClockwise";
+import { GearIcon as Gear } from "phosphor-react-native/src/icons/Gear";
+import { ListChecksIcon as ListChecks } from "phosphor-react-native/src/icons/ListChecks";
+import { PackageIcon as Package } from "phosphor-react-native/src/icons/Package";
+import { PlusCircleIcon as PlusCircle } from "phosphor-react-native/src/icons/PlusCircle";
+import { ReceiptIcon as Receipt } from "phosphor-react-native/src/icons/Receipt";
+import { ShieldCheckIcon as ShieldCheck } from "phosphor-react-native/src/icons/ShieldCheck";
+import { ShoppingCartIcon as ShoppingCart } from "phosphor-react-native/src/icons/ShoppingCart";
+import { StorefrontIcon as Storefront } from "phosphor-react-native/src/icons/Storefront";
+import { TruckIcon as Truck } from "phosphor-react-native/src/icons/Truck";
+import { UsersIcon as Users } from "phosphor-react-native/src/icons/Users";
+import { WalletIcon as Wallet } from "phosphor-react-native/src/icons/Wallet";
 import { useQueryClient } from "@tanstack/react-query";
 import { ApiError, auth } from "@matgary/api-client";
 import { dictionaries } from "@matgary/i18n";

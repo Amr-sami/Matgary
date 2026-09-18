@@ -28,13 +28,14 @@ import * as Application from "expo-application";
 import * as Updates from "expo-updates";
 import { useNavigationContainerRef } from "expo-router";
 import type { ErrorBoundaryProps } from "expo-router";
-import { WarningCircle } from "phosphor-react-native";
+import { WarningCircleIcon as WarningCircle } from "phosphor-react-native/src/icons/WarningCircle";
 import {
   scrubSentryBreadcrumb,
   scrubSentryEvent,
 } from "@matgary/domain/observability/scrub";
 
 import { getLocale, t } from "@/i18n";
+import { setPerfReporter } from "@/observability/perf";
 import { directionStyle } from "@/theme/rtl";
 import { colors, fonts, MIN_TOUCH, radius, spacing } from "@/theme/tokens";
 
@@ -146,6 +147,10 @@ export function initSentry(): void {
 
   Sentry.setTag("locale", getLocale());
   initialised = true;
+  // perf.ts imports nothing (its `js-start` stamp must precede every other
+  // module's evaluation), so the tracing side plugs in here rather than
+  // being imported there. Until this line, measures compute but file nothing.
+  setPerfReporter({ startSpan, setMeasurement });
 }
 
 /**
@@ -242,6 +247,54 @@ export function captureException(
     tags: context?.tags,
     extra: context?.extra,
   });
+}
+
+// ---------------------------------------------------------------------------
+// Spans + measurements (doc 06 §10.3 rule 7 — the marks in observability/perf.ts)
+// ---------------------------------------------------------------------------
+
+/** A started span; `end()` closes it. A no-op object when Sentry is off. */
+export interface SpanHandle {
+  /** Close the span, at `endTimestampMs` (epoch ms) or now. */
+  end(endTimestampMs?: number): void;
+}
+
+const NOOP_SPAN: SpanHandle = { end() {} };
+
+/**
+ * Start a span that is NOT made the active span (it wraps no callback, so it
+ * cannot leak onto unrelated work). With an active transaction — the app-start
+ * one during boot, the navigation one on a screen — it becomes that
+ * transaction's child; otherwise it is its own root, sampled by
+ * `tracesSampleRate`. `startTimestampMs` back-dates the start so an interval
+ * measured with performance marks is filed with its real boundaries.
+ */
+export function startSpan(
+  name: string,
+  op: string,
+  opts?: {
+    startTimestampMs?: number;
+    attributes?: Record<string, string | number | boolean>;
+  },
+): SpanHandle {
+  if (!initialised) return NOOP_SPAN;
+  const span = Sentry.startInactiveSpan({
+    name,
+    op,
+    startTime: opts?.startTimestampMs,
+    attributes: opts?.attributes,
+  });
+  return { end: (endTimestampMs) => span.end(endTimestampMs) };
+}
+
+/**
+ * A millisecond measurement on the active transaction (rule 7: "reported to
+ * Sentry as measurements"), so boot phases and POS spans can be charted
+ * against the §10.3 budgets. No-op without a DSN or an active span.
+ */
+export function setMeasurement(name: string, valueMs: number): void {
+  if (!initialised) return;
+  Sentry.setMeasurement(name, valueMs, "millisecond");
 }
 
 /** Breadcrumb for the custom instrumentation the spec lists (scan, drain, print). */

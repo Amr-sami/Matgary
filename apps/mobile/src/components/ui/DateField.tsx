@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import DateTimePicker, { DateTimePickerAndroid, type DateTimePickerEvent } from "@react-native-community/datetimepicker";
-import { CalendarBlank } from "phosphor-react-native";
+import { CalendarBlankIcon as CalendarBlank } from "phosphor-react-native/src/icons/CalendarBlank";
 
 import { getLocale, t } from "@/i18n";
 import { shortDate } from "@/lib/format";

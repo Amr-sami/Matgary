@@ -4,7 +4,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Device from "expo-device";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowClockwise, Barcode, Camera, CheckCircle, Trash } from "phosphor-react-native";
+import { ArrowClockwiseIcon as ArrowClockwise } from "phosphor-react-native/src/icons/ArrowClockwise";
+import { BarcodeIcon as Barcode } from "phosphor-react-native/src/icons/Barcode";
+import { CameraIcon as Camera } from "phosphor-react-native/src/icons/Camera";
+import { CheckCircleIcon as CheckCircle } from "phosphor-react-native/src/icons/CheckCircle";
+import { TrashIcon as Trash } from "phosphor-react-native/src/icons/Trash";
 import { ApiError, catalog, taxonomy } from "@matgary/api-client";
 
 import { api } from "@/api/client";

@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
-import { Barcode } from "phosphor-react-native";
+import { BarcodeIcon as Barcode } from "phosphor-react-native/src/icons/Barcode";
 
 import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";

@@ -15,7 +15,12 @@ import {
 import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, taxonomy } from "@matgary/api-client";
-import { CaretDown, CaretUp, PencilSimple, Plus, SlidersHorizontal, Trash } from "phosphor-react-native";
+import { CaretDownIcon as CaretDown } from "phosphor-react-native/src/icons/CaretDown";
+import { CaretUpIcon as CaretUp } from "phosphor-react-native/src/icons/CaretUp";
+import { PencilSimpleIcon as PencilSimple } from "phosphor-react-native/src/icons/PencilSimple";
+import { PlusIcon as Plus } from "phosphor-react-native/src/icons/Plus";
+import { SlidersHorizontalIcon as SlidersHorizontal } from "phosphor-react-native/src/icons/SlidersHorizontal";
+import { TrashIcon as Trash } from "phosphor-react-native/src/icons/Trash";
 
 import { api } from "@/api/client";
 import { Screen } from "@/components/layout/Screen";

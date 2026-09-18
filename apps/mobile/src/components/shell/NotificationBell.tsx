@@ -1,14 +1,12 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import {
-  Bell,
-  Check,
-  Info,
-  ListChecks,
-  Package,
-  type Icon,
-} from "phosphor-react-native";
+import type { Icon } from "phosphor-react-native";
+import { BellIcon as Bell } from "phosphor-react-native/src/icons/Bell";
+import { CheckIcon as Check } from "phosphor-react-native/src/icons/Check";
+import { InfoIcon as Info } from "phosphor-react-native/src/icons/Info";
+import { ListChecksIcon as ListChecks } from "phosphor-react-native/src/icons/ListChecks";
+import { PackageIcon as Package } from "phosphor-react-native/src/icons/Package";
 import { notifications, type MeResponse } from "@matgary/api-client";
 
 type NotificationKind = notifications.NotificationKind;

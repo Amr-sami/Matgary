@@ -1,0 +1,121 @@
+# Inventory adjust — inventory tab → first product → +1 → save → the history
+# card gains a "Restocked" row → −1 → save → a "Quantity decreased" row.
+# Net stock change is zero, so the seeded store is left as it was found.
+#
+# Elements are addressed by testID: inventory-row, adjust-increase /
+# adjust-decrease / adjust-delta, adjust-apply (wraps the save Button), and
+# history-row inside product-history. The save button itself is tapped by its
+# label because the shared Button has no testID prop.
+# Signs in first when the app is on the login screen. Ends on the dashboard.
+appId: com.thestoro.app
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      text: "المزيد|More|تسجيل الدخول|Sign in"
+    timeout: 45000
+- runFlow:
+    when:
+      visible:
+        id: "login-identifier"
+    file: login.yaml
+- runFlow: helpers/dismiss-logbox.yaml
+
+- tapOn:
+    text: "المخزن|Inventory"
+- extendedWaitUntil:
+    visible:
+      id: "inventory-row"
+    timeout: 30000
+
+# First product → detail, which shows the product-history card once loaded.
+# The list header (KPIs, search, add button, chips) fills the first viewport
+# and the first cell only peeks out above the tab bar, so its centre sits under
+# the bar — scroll it fully into view before tapping.
+- scrollUntilVisible:
+    element:
+      id: "inventory-row"
+      index: 0
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: "inventory-row"
+    index: 0
+# The detail page opens on the header + adjust card; the history card sits
+# below the details and tags cards and is scrolled to after the first save.
+- extendedWaitUntil:
+    visible:
+      id: "adjust-increase"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "adjust-increase"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+
+# +1 → save. The delta resets on success; the history refetch then shows the
+# row at the top as "Restocked".
+- tapOn:
+    id: "adjust-increase"
+- assertVisible:
+    id: "adjust-delta"
+    text: "1"
+- tapOn:
+    text: "حفظ التعديل|Save adjustment"
+# The success notice renders under the header card, off the top of the screen
+# while the adjust card is centred, and lives 4 s. The delta field resetting to
+# "0" is the on-screen success signal; the history row below proves the write.
+- extendedWaitUntil:
+    visible:
+      id: "adjust-delta"
+      text: "0"
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: "history-row"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    id: "history-row"
+- assertVisible:
+    text: "زيادة كمية|Restocked"
+
+# −1 → save → "Quantity decreased" row, stock back where it started.
+- scrollUntilVisible:
+    element:
+      id: "adjust-decrease"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: "adjust-decrease"
+- assertVisible:
+    id: "adjust-delta"
+    text: "-1"
+- tapOn:
+    text: "حفظ التعديل|Save adjustment"
+# The success notice renders under the header card, off the top of the screen
+# while the adjust card is centred, and lives 4 s. The delta field resetting to
+# "0" is the on-screen success signal; the history row below proves the write.
+- extendedWaitUntil:
+    visible:
+      id: "adjust-delta"
+      text: "0"
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      text: "إنقاص كمية|Quantity decreased"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    text: "إنقاص كمية|Quantity decreased"
+
+# Back to the dashboard.
+- tapOn:
+    text: "لوحة|Home"
+- assertVisible:
+    text: "أهلاً، .+|Welcome back, .+"

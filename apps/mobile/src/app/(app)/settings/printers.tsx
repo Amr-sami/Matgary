@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { Bluetooth, BluetoothSlash, BluetoothX, CheckCircle, Printer, Star, Trash } from "phosphor-react-native";
+import { BluetoothIcon as Bluetooth } from "phosphor-react-native/src/icons/Bluetooth";
+import { BluetoothSlashIcon as BluetoothSlash } from "phosphor-react-native/src/icons/BluetoothSlash";
+import { BluetoothXIcon as BluetoothX } from "phosphor-react-native/src/icons/BluetoothX";
+import { CheckCircleIcon as CheckCircle } from "phosphor-react-native/src/icons/CheckCircle";
+import { PrinterIcon as Printer } from "phosphor-react-native/src/icons/Printer";
+import { StarIcon as Star } from "phosphor-react-native/src/icons/Star";
+import { TrashIcon as Trash } from "phosphor-react-native/src/icons/Trash";
 
 import { testTicket, type CodeTableNumbering, type PaperWidth } from "@matgary/domain";
 
@@ -187,7 +193,7 @@ function BleStateRow({ state }: { state: BleState }) {
   };
   const { key, color, Icon } = map[state];
   return (
-    <View style={styles.stateRow} accessibilityLiveRegion="polite">
+    <View style={styles.stateRow} accessibilityLiveRegion="polite" testID={`ble-state-${state}`}>
       {state === "unknown" ? <ActivityIndicator color={colors.textSecondary} /> : <Icon size={22} color={color} weight="bold" />}
       <Text style={[styles.stateText, { color }]}>{t(key)}</Text>
     </View>

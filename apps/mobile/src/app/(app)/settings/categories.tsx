@@ -14,25 +14,23 @@ import {
 import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, catalog, taxonomy } from "@matgary/api-client";
-import {
-  CaretDown,
-  CaretUp,
-  Coffee,
-  Cookie,
-  DeviceMobile,
-  Eyeglasses,
-  Flask,
-  Headphones,
-  Package,
-  PencilSimple,
-  Pill,
-  Plus,
-  ShoppingBag,
-  Trash,
-  TShirt,
-  Watch,
-  type Icon,
-} from "phosphor-react-native";
+import type { Icon } from "phosphor-react-native";
+import { CaretDownIcon as CaretDown } from "phosphor-react-native/src/icons/CaretDown";
+import { CaretUpIcon as CaretUp } from "phosphor-react-native/src/icons/CaretUp";
+import { CoffeeIcon as Coffee } from "phosphor-react-native/src/icons/Coffee";
+import { CookieIcon as Cookie } from "phosphor-react-native/src/icons/Cookie";
+import { DeviceMobileIcon as DeviceMobile } from "phosphor-react-native/src/icons/DeviceMobile";
+import { EyeglassesIcon as Eyeglasses } from "phosphor-react-native/src/icons/Eyeglasses";
+import { FlaskIcon as Flask } from "phosphor-react-native/src/icons/Flask";
+import { HeadphonesIcon as Headphones } from "phosphor-react-native/src/icons/Headphones";
+import { PackageIcon as Package } from "phosphor-react-native/src/icons/Package";
+import { PencilSimpleIcon as PencilSimple } from "phosphor-react-native/src/icons/PencilSimple";
+import { PillIcon as Pill } from "phosphor-react-native/src/icons/Pill";
+import { PlusIcon as Plus } from "phosphor-react-native/src/icons/Plus";
+import { ShoppingBagIcon as ShoppingBag } from "phosphor-react-native/src/icons/ShoppingBag";
+import { TrashIcon as Trash } from "phosphor-react-native/src/icons/Trash";
+import { TShirtIcon as TShirt } from "phosphor-react-native/src/icons/TShirt";
+import { WatchIcon as Watch } from "phosphor-react-native/src/icons/Watch";
 
 import { api } from "@/api/client";
 import { Screen } from "@/components/layout/Screen";

@@ -1,12 +1,7 @@
 import * as SecureStore from "expo-secure-store";
 import { create } from "zustand";
-import {
-  defaultLocale,
-  dictionaries,
-  interpolate,
-  lookup,
-  type Locale,
-} from "@matgary/i18n";
+import { defaultLocale, interpolate, lookup, type Locale } from "@matgary/i18n";
+import { asDictionary, mobileDictionaries } from "@matgary/i18n/mobile";
 
 /**
  * Locale — switchable LIVE, no reload.
@@ -77,6 +72,7 @@ export function isRTL(): boolean {
 
 /** t("auth.login.title") — dictionary lookup; the path echoes back when missing. */
 export function t(path: string, vars?: Record<string, string | number>): string {
-  const s = lookup(dictionaries[current], path);
+  // The phone's subset of the web dictionary — see packages/i18n/src/mobile.ts.
+  const s = lookup(asDictionary(mobileDictionaries[current]), path);
   return vars ? interpolate(s, vars) : s;
 }

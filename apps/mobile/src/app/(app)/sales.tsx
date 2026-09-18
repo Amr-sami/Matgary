@@ -9,7 +9,13 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
-import { CheckCircle, ClockCounterClockwise, CloudSlash, Minus, Plus, Trash, WarningCircle } from "phosphor-react-native";
+import { CheckCircleIcon as CheckCircle } from "phosphor-react-native/src/icons/CheckCircle";
+import { ClockCounterClockwiseIcon as ClockCounterClockwise } from "phosphor-react-native/src/icons/ClockCounterClockwise";
+import { CloudSlashIcon as CloudSlash } from "phosphor-react-native/src/icons/CloudSlash";
+import { MinusIcon as Minus } from "phosphor-react-native/src/icons/Minus";
+import { PlusIcon as Plus } from "phosphor-react-native/src/icons/Plus";
+import { TrashIcon as Trash } from "phosphor-react-native/src/icons/Trash";
+import { WarningCircleIcon as WarningCircle } from "phosphor-react-native/src/icons/WarningCircle";
 import { ApiError, catalog, sales as salesApi } from "@matgary/api-client";
 import { calcLineDiscount } from "@matgary/domain";
 
@@ -26,6 +32,7 @@ import { SearchField } from "@/components/ui/SearchField";
 import { ScannerSheet, type ScanTone } from "@/components/scanner/ScannerSheet";
 import { ReceiptActions } from "@/components/receipt/ReceiptActions";
 import { money } from "@/lib/format";
+import { clearMark, mark, measure } from "@/observability/perf";
 import { useOffline, useOutbox } from "@/offline";
 import { applyLocalDelta } from "@/offline/local-delta-cache";
 import { enqueueSale, ensureSaleHandler, isQueueableFailure, type SaleOutboxItem } from "@/offline/sales";
@@ -280,8 +287,23 @@ export default function SalesScreen() {
       void qc.invalidateQueries({ queryKey: ["dashboard"] });
       void qc.invalidateQueries({ queryKey: ["insights-overview"] });
     },
-    onError: (e) => setError(messageFor(e)),
+    onError: (e) => {
+      clearMark("pos.checkout-tap");
+      setError(messageFor(e));
+    },
   });
+
+  // §10.3 "checkout tap → receipt screen" (≤ 150 ms offline, ≤ 800 ms online):
+  // closed here, after the commit that put the receipt card on screen, not in
+  // onSuccess (which runs before React has rendered it). `queued` tells the
+  // two budgets apart: a queued sale never left the device.
+  useEffect(() => {
+    if (!lastSale) return;
+    measure("pos.checkout-receipt", "pos.checkout-tap", {
+      consume: true,
+      attributes: { queued: lastSale.rowId != null },
+    });
+  }, [lastSale]);
 
   // The queued row landed: prefer the server's own lines / total on the card.
   const shownResult = queuedRow?.status === "done" && queuedRow.response ? queuedRow.response : lastSale?.result ?? null;
@@ -311,18 +333,23 @@ export default function SalesScreen() {
       try {
         result = await catalog.findProductByBarcode(api, code);
       } catch (e) {
+        // Staleness first: in continuous mode a failed lookup for scan A must
+        // not wipe the start mark scan B has already stamped.
         if (seq !== scanSeq.current) return;
+        clearMark("pos.scan-decoded");
         setScan({ text: messageFor(e), tone: "error" });
         return;
       }
       if (seq !== scanSeq.current) return;
       const p = result.product;
       if (!p) {
+        clearMark("pos.scan-decoded");
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
         setScan({ text: t("app.sales.form.productSearch.scannedNotFound", { code }), tone: "error" });
         return;
       }
       if (p.quantity <= 0) {
+        clearMark("pos.scan-decoded");
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
         setScan({ text: `${p.name} — ${t("app.sales.form.productSearch.scannedOutOfStock")}`, tone: "error" });
         return;
@@ -332,6 +359,11 @@ export default function SalesScreen() {
       const store = useCart.getState();
       const already = store.lines.some((l) => l.productId === p.id);
       store.add(p);
+      // §10.3 "scan → line added to cart" (≤ 150 ms). The start is stamped by
+      // ScannerSheet on a CAMERA decode only; a typed code (the sheet's manual
+      // field or the search box) has none, so this is a no-op for that path.
+      // Consumed: one line per scan.
+      measure("pos.scan-to-cart", "pos.scan-decoded", { consume: true });
       setScan({
         text: already
           ? t("app.sales.form.productSearch.scannedIncremented", { name: p.name })
@@ -658,7 +690,10 @@ export default function SalesScreen() {
             label={t("app.sales.form.submit")}
             loading={checkout.isPending}
             disabled={!canCheckout}
-            onPress={() => checkout.mutate()}
+            onPress={() => {
+              mark("pos.checkout-tap");
+              checkout.mutate();
+            }}
           />
         </Card>
       ) : null}

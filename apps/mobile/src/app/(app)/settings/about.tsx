@@ -3,14 +3,12 @@ import { Linking, Platform, Pressable, StyleSheet, Text, View } from "react-nati
 import { useRouter } from "expo-router";
 import * as Application from "expo-application";
 import * as WebBrowser from "expo-web-browser";
-import {
-  ChatCircleText,
-  EnvelopeSimple,
-  FileText,
-  Globe,
-  ShieldCheck,
-  type Icon,
-} from "phosphor-react-native";
+import type { Icon } from "phosphor-react-native";
+import { ChatCircleTextIcon as ChatCircleText } from "phosphor-react-native/src/icons/ChatCircleText";
+import { EnvelopeSimpleIcon as EnvelopeSimple } from "phosphor-react-native/src/icons/EnvelopeSimple";
+import { FileTextIcon as FileText } from "phosphor-react-native/src/icons/FileText";
+import { GlobeIcon as Globe } from "phosphor-react-native/src/icons/Globe";
+import { ShieldCheckIcon as ShieldCheck } from "phosphor-react-native/src/icons/ShieldCheck";
 import { dictionaries } from "@matgary/i18n";
 
 import { Logo } from "@/components/Logo";

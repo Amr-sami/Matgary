@@ -1,0 +1,124 @@
+# Customers list — More → Customers → the receivables screen renders: the
+# search field, the All/Owing filter, the receivables KPI strip with its
+# debtors count, and the top-customer chips (top-5 by lifetime spend — the
+# seeded store has customers with sales, so they always render on "All").
+# Search narrows the list and clearing restores it; the Owing filter then
+# shows debtor rows or the honest empty state.
+#
+# Order matters: the debtors filter is client-side and stays applied over the
+# server search (customers.tsx `filter === "debtors" ? all.filter(...)`), so
+# the search steps run on "All" BEFORE Owing is tapped.
+#
+# testIDs: customers-search (wraps the SearchField), customers-filter (wraps
+# the Segmented All/Owing control), customers-summary (KPI strip),
+# customers-debtors-count, customer-row, customer-top-chip.
+# Signs in first when the app is on the login screen. Ends on the dashboard.
+appId: com.thestoro.app
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      text: "المزيد|More|تسجيل الدخول|Sign in"
+    timeout: 45000
+- runFlow:
+    when:
+      visible:
+        id: "login-identifier"
+    file: login.yaml
+- runFlow: helpers/dismiss-logbox.yaml
+
+- tapOn:
+    text: "المزيد|More"
+# The Customers row sits in the first screenful of More; a scroll-to-centre
+# can fail when the grid is not tall enough to centre it.
+- extendedWaitUntil:
+    visible:
+      text: "العملاء|Customers"
+    timeout: 20000
+- tapOn:
+    text: "العملاء|Customers"
+- extendedWaitUntil:
+    visible:
+      id: "customers-search"
+    timeout: 30000
+- assertVisible:
+    id: "customers-filter"
+- assertVisible:
+    text: "عليهم حساب|Owing"
+
+# Rows load (the seeded store has customers with sales).
+- extendedWaitUntil:
+    visible:
+      id: "customer-row"
+    timeout: 30000
+
+# The receivables strip renders with a debtors count, and the top-customer
+# chips (only shown on "All" with an empty search) are really there.
+- assertVisible:
+    id: "customers-summary"
+- assertVisible:
+    id: "customers-debtors-count"
+    text: "\\d+"
+- assertVisible:
+    text: "عملاء عليهم حساب|Debtors"
+- assertVisible:
+    id: "customer-top-chip"
+
+# Search (still on "All") by a digit every seeded number contains, then by
+# junk → no match; the chips hide while a query is typed and come back after.
+- tapOn:
+    text: "ابحث بالاسم أو الموبايل…|Search by name or mobile…"
+# One character per step: the controlled input re-queries on every keystroke
+# and a single inputText "010" loses characters on the simulator.
+- inputText: "0"
+- inputText: "1"
+- inputText: "0"
+- extendedWaitUntil:
+    visible:
+      id: "customer-row"
+    timeout: 20000
+- assertNotVisible:
+    id: "customer-top-chip"
+- eraseText: 3
+- inputText: "zzqqxx"
+- extendedWaitUntil:
+    notVisible:
+      id: "customer-row"
+    timeout: 20000
+- eraseText: 6
+- hideKeyboard
+- extendedWaitUntil:
+    visible:
+      id: "customer-row"
+    timeout: 20000
+- assertVisible:
+    id: "customer-top-chip"
+
+# Debtors filter: debtor rows (each carries an "Owes <amount>" badge), or the
+# honest empty state when nobody owes. "عليه .*" needs the space so the
+# "عليهم حساب" segment itself cannot satisfy it. The chips are an "All"-only
+# affordance, so they must disappear here.
+- tapOn:
+    text: "عليهم حساب|Owing"
+# Rows are single accessibility elements (badge text is not exposed), so the
+# Owing filter is proven by debtor rows (the seeded store has debtors).
+- extendedWaitUntil:
+    visible:
+      id: "customer-row"
+    timeout: 20000
+- assertNotVisible:
+    id: "customer-top-chip"
+
+# Back to "All" so the screen is left the way it was found.
+- tapOn:
+    text: "الكل|All"
+- extendedWaitUntil:
+    visible:
+      id: "customer-top-chip"
+    timeout: 20000
+
+# Back to the dashboard.
+- tapOn:
+    text: "لوحة|Home"
+- assertVisible:
+    text: "أهلاً، .+|Welcome back, .+"

@@ -11,7 +11,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useMutation } from "@tanstack/react-query";
-import { Key } from "phosphor-react-native";
+import { KeyIcon as Key } from "phosphor-react-native/src/icons/Key";
 
 import { api } from "@/api/client";
 import { ChevronBack } from "@/components/ui/Chevron";

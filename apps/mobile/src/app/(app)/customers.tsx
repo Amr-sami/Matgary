@@ -2,7 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { Clock, HandCoins, Star, Users } from "phosphor-react-native";
+import { ClockIcon as Clock } from "phosphor-react-native/src/icons/Clock";
+import { HandCoinsIcon as HandCoins } from "phosphor-react-native/src/icons/HandCoins";
+import { StarIcon as Star } from "phosphor-react-native/src/icons/Star";
+import { UsersIcon as Users } from "phosphor-react-native/src/icons/Users";
 import { catalog, type CustomerSummary } from "@matgary/api-client";
 
 import { api } from "@/api/client";
@@ -13,6 +16,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { SearchField } from "@/components/ui/SearchField";
 import { Segmented } from "@/components/ui/Segmented";
 import { money, shortDate } from "@/lib/format";
+import { customerRoute } from "@/lib/customer-phone";
 import { RTL_TEXT } from "@/theme/rtl";
 import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
 import { t } from "@/i18n";
@@ -183,17 +187,19 @@ export default function CustomersScreen() {
       onRefresh={() => void list.refetch()}
       refreshing={list.isRefetching && !list.isFetchingNextPage}
     >
-      <SearchField
-        value={search}
-        onChangeText={setSearch}
-        placeholder={t("app.customers.search.placeholder")}
-      />
+      <View testID="customers-search">
+        <SearchField
+          value={search}
+          onChangeText={setSearch}
+          placeholder={t("app.customers.search.placeholder")}
+        />
+      </View>
 
       {/* The web's four KPI tiles, collapsed into one strip — only the
           receivables numbers survive, because they are the ones that change
           what the shop does next. */}
       {all.length > 0 ? (
-        <View style={styles.kpis}>
+        <View testID="customers-summary" style={styles.kpis}>
           <View style={styles.kpiRow}>
             <Kpi
               icon={<HandCoins size={14} color={colors.warningStrong} />}
@@ -205,6 +211,7 @@ export default function CustomersScreen() {
               icon={<Users size={14} color={colors.textSecondary} />}
               label={t("mobile.customers.debtors")}
               value={String(summary.debtors)}
+              testID="customers-debtors-count"
             />
             <Kpi
               icon={<Clock size={14} color={colors.textSecondary} />}
@@ -237,9 +244,10 @@ export default function CustomersScreen() {
             {topCustomers.map((c) => (
               <Pressable
                 key={c.phone}
+                testID="customer-top-chip"
                 accessibilityRole="button"
                 accessibilityLabel={t("mobile.customers.profileOf", { name: c.name ?? c.phone })}
-                onPress={() => router.push(`/customers/${encodeURIComponent(c.phone)}`)}
+                onPress={() => router.push(customerRoute(c.phone) as never)}
                 style={({ pressed }) => [styles.chip, pressed && styles.rowPressed]}
               >
                 <Text numberOfLines={1} style={styles.chipName}>
@@ -254,7 +262,9 @@ export default function CustomersScreen() {
         </View>
       ) : null}
 
-      <Segmented items={filters()} value={filter} onChange={setFilter} />
+      <View testID="customers-filter">
+        <Segmented items={filters()} value={filter} onChange={setFilter} />
+      </View>
 
       {list.isLoading ? (
         <ActivityIndicator color={colors.accent} />
@@ -275,13 +285,14 @@ export default function CustomersScreen() {
             const age = c.outstanding > 0 ? daysSince(c.oldestUnpaidAt) : null;
             return (
               // The phone is the route key AND can start with "+", which has to
-              // survive the URL — hence encodeURIComponent on the way out and a
-              // decode on the way in.
+              // survive the URL — customerRoute() normalises to E.164 and
+              // encodes; the detail screen decodes and normalises the same way.
               <Pressable
                 key={c.phone}
+                testID="customer-row"
                 accessibilityRole="button"
                 accessibilityLabel={t("mobile.customers.profileOf", { name: c.name ?? c.phone })}
-                onPress={() => router.push(`/customers/${encodeURIComponent(c.phone)}`)}
+                onPress={() => router.push(customerRoute(c.phone) as never)}
                 style={({ pressed }) => [
                   styles.row,
                   c.outstanding > 0 && styles.rowDebtor,
@@ -339,11 +350,13 @@ function Kpi({
   label,
   value,
   tone,
+  testID,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   tone?: "warning";
+  testID?: string;
 }) {
   return (
     <View style={styles.kpi}>
@@ -353,7 +366,11 @@ function Kpi({
           {label}
         </Text>
       </View>
-      <Text numberOfLines={1} style={[styles.kpiValue, tone === "warning" && styles.kpiWarning]}>
+      <Text
+        testID={testID}
+        numberOfLines={1}
+        style={[styles.kpiValue, tone === "warning" && styles.kpiWarning]}
+      >
         {value}
       </Text>
     </View>

@@ -37,7 +37,9 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://thestoro.com"
+        "EXPO_PUBLIC_API_URL": "https://thestoro.com",
+        "EXPO_UNSTABLE_TREE_SHAKING": "1",
+        "EXPO_UNSTABLE_METRO_OPTIMIZE_GRAPH": "1"
       }
     },
     "production": {
@@ -50,7 +52,9 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://thestoro.com"
+        "EXPO_PUBLIC_API_URL": "https://thestoro.com",
+        "EXPO_UNSTABLE_TREE_SHAKING": "1",
+        "EXPO_UNSTABLE_METRO_OPTIMIZE_GRAPH": "1"
       }
     }
   },

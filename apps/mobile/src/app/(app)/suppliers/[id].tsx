@@ -10,7 +10,12 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { At, MapPin, Phone, Receipt, Truck, Wallet } from "phosphor-react-native";
+import { AtIcon as At } from "phosphor-react-native/src/icons/At";
+import { MapPinIcon as MapPin } from "phosphor-react-native/src/icons/MapPin";
+import { PhoneIcon as Phone } from "phosphor-react-native/src/icons/Phone";
+import { ReceiptIcon as Receipt } from "phosphor-react-native/src/icons/Receipt";
+import { TruckIcon as Truck } from "phosphor-react-native/src/icons/Truck";
+import { WalletIcon as Wallet } from "phosphor-react-native/src/icons/Wallet";
 import { ApiError, catalog, type Expense, type PurchaseOrder, type Supplier } from "@matgary/api-client";
 
 import { api } from "@/api/client";

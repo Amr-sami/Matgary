@@ -12,18 +12,16 @@ import {
 import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, settings } from "@matgary/api-client";
-import {
-  ArrowCounterClockwise,
-  Camera,
-  CaretDown,
-  CaretUp,
-  Eye,
-  EyeSlash,
-  PencilSimple,
-  Plus,
-  Receipt,
-  Trash,
-} from "phosphor-react-native";
+import { ArrowCounterClockwiseIcon as ArrowCounterClockwise } from "phosphor-react-native/src/icons/ArrowCounterClockwise";
+import { CameraIcon as Camera } from "phosphor-react-native/src/icons/Camera";
+import { CaretDownIcon as CaretDown } from "phosphor-react-native/src/icons/CaretDown";
+import { CaretUpIcon as CaretUp } from "phosphor-react-native/src/icons/CaretUp";
+import { EyeIcon as Eye } from "phosphor-react-native/src/icons/Eye";
+import { EyeSlashIcon as EyeSlash } from "phosphor-react-native/src/icons/EyeSlash";
+import { PencilSimpleIcon as PencilSimple } from "phosphor-react-native/src/icons/PencilSimple";
+import { PlusIcon as Plus } from "phosphor-react-native/src/icons/Plus";
+import { ReceiptIcon as Receipt } from "phosphor-react-native/src/icons/Receipt";
+import { TrashIcon as Trash } from "phosphor-react-native/src/icons/Trash";
 
 import { api } from "@/api/client";
 import { Screen } from "@/components/layout/Screen";
@@ -259,7 +257,9 @@ export default function ReceiptSettingsScreen() {
         <>
           {/* المعاينة المباشرة */}
           <Card title={t("mobile.settings.receiptPreview")}>
-            <ReceiptPreview server={server} draft={draft} order={order} />
+            <View testID="receipt-preview">
+              <ReceiptPreview server={server} draft={draft} order={order} />
+            </View>
             <Text style={[styles.hint, { marginTop: spacing.sm }]}>
               {t("mobile.settings.fontNote")}
             </Text>
@@ -380,6 +380,7 @@ export default function ReceiptSettingsScreen() {
                 <Text style={styles.hint}>{t("app.settingsPage.receiptCard.showLoyaltyHint")}</Text>
               </View>
               <Switch
+                testID="receipt-toggle-loyalty"
                 value={draft.receiptShowLoyalty}
                 onValueChange={(v) => update("receiptShowLoyalty", v)}
                 trackColor={{ true: colors.accent, false: colors.border }}

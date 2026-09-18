@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Animated, StyleSheet, Text, View } from "react-native";
 import { usePathname, useRootNavigationState, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ShieldWarning } from "phosphor-react-native";
+import { ShieldWarningIcon as ShieldWarning } from "phosphor-react-native/src/icons/ShieldWarning";
 
 import type { MeResponse } from "@matgary/api-client";
 

@@ -1,22 +1,27 @@
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
+import { FlashList } from "@shopify/flash-list";
 import { Image } from "expo-image";
-import { Package, Plus, WarningOctagon, Wallet, Warning } from "phosphor-react-native";
-import { catalog } from "@matgary/api-client";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { PackageIcon as Package } from "phosphor-react-native/src/icons/Package";
+import { PlusIcon as Plus } from "phosphor-react-native/src/icons/Plus";
+import { WarningOctagonIcon as WarningOctagon } from "phosphor-react-native/src/icons/WarningOctagon";
+import { WalletIcon as Wallet } from "phosphor-react-native/src/icons/Wallet";
+import { WarningIcon as Warning } from "phosphor-react-native/src/icons/Warning";
+import { catalog, type Product } from "@matgary/api-client";
 
 import { API_BASE_URL, api } from "@/api/client";
-import { Screen } from "@/components/layout/Screen";
+import { HeaderAccessories } from "@/components/shell/HeaderAccessories";
 import { Badge } from "@/components/ui/Badge";
-import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SearchField } from "@/components/ui/SearchField";
 import { ScannerSheet } from "@/components/scanner/ScannerSheet";
 import { StatCard } from "@/components/ui/StatCard";
 import { money } from "@/lib/format";
-import { RTL_TEXT } from "@/theme/rtl";
+import { RTL, RTL_TEXT } from "@/theme/rtl";
 import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
 import { t } from "@/i18n";
 
@@ -29,13 +34,18 @@ type StatusFilter = "all" | "in" | "low" | "out";
  * then category and status chip rows, the result count, and the product list.
  *
  * Doc 04 marks this RECOMPOSE — filters into a bottom sheet, a FAB, a
- * virtualised list. That is a redesign, and the brief here is to match what
- * shipped, so the filter rows stay inline. The chip rows scroll horizontally
- * rather than wrapping, which is the one change the web already made for
- * phones (session-record §1g).
+ * virtualised list. The bottom sheet and FAB are a redesign, and the brief
+ * here is to match what shipped, so the filter rows stay inline. The list IS
+ * virtualised: spec §10.3 budgets "inventory, 2,000 items — 60fps, zero blank
+ * cells", so the screen is one FlashList whose ListHeaderComponent carries
+ * everything above the rows (the same frame components/layout/Screen draws,
+ * minus its ScrollView — a list inside a ScrollView would not recycle). The
+ * chip rows scroll horizontally rather than wrapping, which is the one change
+ * the web already made for phones (session-record §1g).
  */
 export default function InventoryScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<string>("all");
   const [status, setStatus] = useState<StatusFilter>("all");
@@ -81,15 +91,24 @@ export default function InventoryScreen() {
     });
   }, [all, query, category, status]);
 
-  const labelFor = (id: string) =>
-    categories.data?.find((c) => c.id === id)?.label ?? "";
+  // One lookup per render rather than a find() per row — 2,000 rows × N
+  // categories is the kind of thing that costs frames while scrolling.
+  const categoryLabels = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const c of categories.data ?? []) map.set(c.id, c.label);
+    return map;
+  }, [categories.data]);
 
-  return (
-    <Screen
-      title={t("app.inventory.title")}
-      onRefresh={() => void products.refetch()}
-      refreshing={products.isRefetching}
-    >
+  // Same frame as components/layout/Screen: the accessories row, then the
+  // title shrink-wrapped to the reading edge (alignItems flex-start), then
+  // everything the capture shows above the first product row.
+  const header = (
+    <View style={styles.headerWrap}>
+      <View style={styles.titleBlock}>
+        <HeaderAccessories />
+        <Text style={styles.title}>{t("app.inventory.title")}</Text>
+      </View>
+
       <View style={styles.grid}>
         <View style={styles.gridRow}>
           <StatCard
@@ -134,12 +153,6 @@ export default function InventoryScreen() {
         placeholder={t("mobile.inventory.searchPlaceholder")}
         onPressScan={() => setScannerOpen(true)}
       />
-      <ScannerSheet
-        visible={scannerOpen}
-        mode="single"
-        onClose={() => setScannerOpen(false)}
-        onScan={setQuery}
-      />
 
       <Pressable style={styles.cta} accessibilityRole="button">
         <Plus size={18} color="#FFFFFF" weight="bold" />
@@ -168,67 +181,109 @@ export default function InventoryScreen() {
       </ChipRow>
 
       <Text style={styles.count}>{t("app.inventory.count", { n: visible.length })}</Text>
-
-      {products.isLoading ? (
-        <ActivityIndicator color={colors.accent} />
-      ) : visible.length === 0 ? (
-        <EmptyState
-          title={t("mobile.inventory.empty")}
-          hint={query ? t("mobile.inventory.searchHint") : undefined}
-        />
-      ) : (
-        <View style={styles.list}>
-          {visible.map((p) => {
-            const out = p.quantity === 0;
-            const low = p.quantity > 0 && p.quantity <= p.lowStockThreshold;
-            const thumb = catalog.resolveUploadUrl(API_BASE_URL, p.imageUrl);
-            return (
-              <Pressable
-                key={p.id}
-                accessibilityRole="button"
-                accessibilityLabel={t("mobile.product.detailsOf", { name: p.name })}
-                onPress={() => router.push(`/inventory/${encodeURIComponent(p.id)}`)}
-                style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-              >
-                {thumb ? (
-                  <Image
-                    source={{ uri: thumb }}
-                    style={styles.thumb}
-                    contentFit="cover"
-                    transition={100}
-                    recyclingKey={p.id}
-                    accessibilityLabel={t("mobile.product.a11yPhotoPreview")}
-                  />
-                ) : null}
-                <View style={styles.rowBody}>
-                  <View style={styles.rowHead}>
-                    <Text numberOfLines={1} style={styles.name}>
-                      {p.name}
-                    </Text>
-                    {labelFor(p.category) ? (
-                      <Badge label={labelFor(p.category)} variant="accent" />
-                    ) : null}
-                  </View>
-                  <View style={styles.rowMeta}>
-                    <Text style={styles.price}>{money(p.price)}</Text>
-                    <Badge
-                      label={out ? t("app.inventory.filters.stockStatus.out") : t("mobile.common.pieces", { n: p.quantity })}
-                      variant={out ? "outofstock" : low ? "lowstock" : "success"}
-                    />
-                    {p.brand ? (
-                      <Text numberOfLines={1} style={styles.brand}>
-                        {p.brand}
-                      </Text>
-                    ) : null}
-                  </View>
-                </View>
-              </Pressable>
-            );
-          })}
-        </View>
-      )}
-    </Screen>
+    </View>
   );
+
+  const empty = products.isLoading ? (
+    <ActivityIndicator color={colors.accent} />
+  ) : (
+    <EmptyState
+      title={t("mobile.inventory.empty")}
+      hint={query ? t("mobile.inventory.searchHint") : undefined}
+    />
+  );
+
+  return (
+    <View style={styles.root}>
+      <FlashList
+        data={visible}
+        keyExtractor={(p) => p.id}
+        renderItem={({ item }) => (
+          <ProductRow
+            p={item}
+            categoryLabel={categoryLabels.get(item.category) ?? ""}
+            onPress={() => router.push(`/inventory/${encodeURIComponent(item.id)}`)}
+          />
+        )}
+        ItemSeparatorComponent={Separator}
+        ListHeaderComponent={header}
+        ListEmptyComponent={empty}
+        refreshControl={
+          <RefreshControl refreshing={products.isRefetching} onRefresh={() => void products.refetch()} />
+        }
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.lg }]}
+        keyboardShouldPersistTaps="handled"
+      />
+
+      {/* A Modal with its own native root, so it sits beside the list rather
+          than inside its header — a recycled header cell must not own it. */}
+      <ScannerSheet
+        visible={scannerOpen}
+        mode="single"
+        onClose={() => setScannerOpen(false)}
+        onScan={setQuery}
+      />
+    </View>
+  );
+}
+
+function ProductRow({
+  p,
+  categoryLabel,
+  onPress,
+}: {
+  p: Product;
+  categoryLabel: string;
+  onPress: () => void;
+}) {
+  const out = p.quantity === 0;
+  const low = p.quantity > 0 && p.quantity <= p.lowStockThreshold;
+  const thumb = catalog.resolveUploadUrl(API_BASE_URL, p.imageUrl);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      testID="inventory-row"
+      accessibilityLabel={t("mobile.product.detailsOf", { name: p.name })}
+      onPress={onPress}
+      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+    >
+      {thumb ? (
+        <Image
+          source={{ uri: thumb }}
+          style={styles.thumb}
+          contentFit="cover"
+          transition={100}
+          recyclingKey={p.id}
+          accessibilityLabel={t("mobile.product.a11yPhotoPreview")}
+        />
+      ) : null}
+      <View style={styles.rowBody}>
+        <View style={styles.rowHead}>
+          <Text numberOfLines={1} style={styles.name}>
+            {p.name}
+          </Text>
+          {categoryLabel ? <Badge label={categoryLabel} variant="accent" /> : null}
+        </View>
+        <View style={styles.rowMeta}>
+          <Text style={styles.price}>{money(p.price)}</Text>
+          <Badge
+            label={out ? t("app.inventory.filters.stockStatus.out") : t("mobile.common.pieces", { n: p.quantity })}
+            variant={out ? "outofstock" : low ? "lowstock" : "success"}
+          />
+          {p.brand ? (
+            <Text numberOfLines={1} style={styles.brand}>
+              {p.brand}
+            </Text>
+          ) : null}
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+/** The `gap` the old `<View style={styles.list}>` had between cards. */
+function Separator() {
+  return <View style={styles.separator} />;
 }
 
 /**
@@ -245,6 +300,14 @@ function ChipRow({ children }: { children: React.ReactNode }) {
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg, ...RTL },
+  content: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xxl * 2,
+  },
+  headerWrap: { gap: spacing.lg, marginBottom: spacing.lg },
+  titleBlock: { gap: 4, alignItems: "flex-start" },
+  title: { fontFamily: fonts.bold, fontSize: 26, color: colors.text, ...RTL_TEXT },
   grid: { gap: spacing.lg },
   gridRow: { flexDirection: "row", gap: spacing.lg },
   cta: {
@@ -260,7 +323,7 @@ const styles = StyleSheet.create({
   chipRowWrap: { overflow: "hidden" },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   count: { fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary, ...RTL_TEXT },
-  list: { gap: spacing.md },
+  separator: { height: spacing.md },
   row: {
     backgroundColor: colors.card,
     borderRadius: radius.lg,

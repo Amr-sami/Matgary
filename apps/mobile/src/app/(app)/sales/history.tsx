@@ -1,17 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  FlatList,
   Pressable,
   RefreshControl,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { FlashList } from "@shopify/flash-list";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { Coins, Receipt } from "phosphor-react-native";
+import { CoinsIcon as Coins } from "phosphor-react-native/src/icons/Coins";
+import { ReceiptIcon as Receipt } from "phosphor-react-native/src/icons/Receipt";
 import { sales as salesApi } from "@matgary/api-client";
 
 import { api } from "@/api/client";
@@ -332,7 +333,7 @@ export default function SalesHistoryScreen() {
 
   return (
     <View style={styles.root}>
-      <FlatList
+      <FlashList
         data={invoices}
         keyExtractor={(inv) => inv.key}
         renderItem={({ item }) => <InvoiceRow inv={item} onPress={() => open(item)} />}

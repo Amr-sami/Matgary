@@ -13,16 +13,14 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  CalendarBlank,
-  CheckCircle,
-  Coins,
-  Phone,
-  Receipt,
-  ShoppingCart,
-  Star,
-  Wallet,
-} from "phosphor-react-native";
+import { CalendarBlankIcon as CalendarBlank } from "phosphor-react-native/src/icons/CalendarBlank";
+import { CheckCircleIcon as CheckCircle } from "phosphor-react-native/src/icons/CheckCircle";
+import { CoinsIcon as Coins } from "phosphor-react-native/src/icons/Coins";
+import { PhoneIcon as Phone } from "phosphor-react-native/src/icons/Phone";
+import { ReceiptIcon as Receipt } from "phosphor-react-native/src/icons/Receipt";
+import { ShoppingCartIcon as ShoppingCart } from "phosphor-react-native/src/icons/ShoppingCart";
+import { StarIcon as Star } from "phosphor-react-native/src/icons/Star";
+import { WalletIcon as Wallet } from "phosphor-react-native/src/icons/Wallet";
 import { ApiError, catalog } from "@matgary/api-client";
 
 import { api } from "@/api/client";
@@ -35,6 +33,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
 import { Segmented } from "@/components/ui/Segmented";
 import { money, shortDate } from "@/lib/format";
+import { customerPhoneParam } from "@/lib/customer-phone";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT, directionStyle } from "@/theme/rtl";
 import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
@@ -76,20 +75,6 @@ function settleErrorMessage(error: unknown): string {
   return t(`app.customers.settle.errors.${known.includes(code) ? code : "GENERIC"}`);
 }
 
-/**
- * expo-router hands params already decoded, but a phone arrives as
- * `%2B201…` from `encodeURIComponent`, and double-decoding a value with no
- * percent escapes is a no-op — so this is safe either way. A malformed escape
- * throws URIError rather than returning the input, hence the catch.
- */
-function decodeParam(raw: string): string {
-  try {
-    return decodeURIComponent(raw);
-  } catch {
-    return raw;
-  }
-}
-
 function daysSince(iso: string | null | undefined): number | null {
   if (!iso) return null;
   const ms = new Date(iso).getTime();
@@ -101,8 +86,10 @@ export default function CustomerDetailScreen() {
   const router = useRouter();
   const qc = useQueryClient();
   const params = useLocalSearchParams<{ phone: string | string[] }>();
-  const raw = Array.isArray(params.phone) ? params.phone[0] : params.phone;
-  const phone = decodeParam(raw ?? "");
+  // Decoded to a stable value, then E.164 — the in-app push, a custom-scheme
+  // deep link (`%2B…`, or double-encoded) and a "+" mangled into a space all
+  // resolve to the same key. See lib/customer-phone.ts.
+  const phone = customerPhoneParam(params.phone);
 
   const isOwner = useSession((s) => s.me?.isOwner ?? false);
   const permissions = useSession((s) => s.me?.permissions);

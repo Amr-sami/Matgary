@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  FlatList,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -11,9 +10,10 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { FlashList } from "@shopify/flash-list";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChatCircle } from "phosphor-react-native";
+import { ChatCircleIcon as ChatCircle } from "phosphor-react-native/src/icons/ChatCircle";
 import { ApiError } from "@matgary/api-client";
 
 import { api } from "@/api/client";
@@ -33,12 +33,18 @@ import { colors, elevation, fonts, radius, spacing, MIN_TOUCH } from "@/theme/to
  * Gate: `manage_whatsapp`, exactly like the web page (can(principal,
  * "manage_whatsapp")). Two in-screen views, swapped by local state instead of
  * the web's `?c=` search param:
- *  - Inbox: All/Unread/Archived tabs + conversation FlatList paged by the
+ *  - Inbox: All/Unread/Archived tabs + conversation FlashList paged by the
  *    API's `before` cursor — exactly the mobile-fold PNG, no status card above
  *    the tabs. When no number is linked, the empty state carries the hint.
- *  - Thread: inverted FlatList of message bubbles (server order is newest
- *    first, so no reversing) + a composer that POSTs /api/whatsapp/cloud/send
- *    — the same route the web ThreadView uses — and invalidates the thread.
+ *  - Thread: chat-style FlashList of message bubbles. FlashList v2 has no
+ *    `inverted`; instead the rows are reversed to chronological order and
+ *    `maintainVisibleContentPosition.startRenderingFromBottom` anchors the
+ *    newest bubble at the bottom while older pages prepend at the top via
+ *    `onStartReached`. Pull-to-refresh therefore sits at the oldest end (the
+ *    top), where it shares a gesture with `onStartReached`; the latter is
+ *    guarded on `!refreshing` so one pull is one request, not a refetch plus
+ *    an older page. A composer POSTs /api/whatsapp/cloud/send — the same
+ *    route the web ThreadView uses — and invalidates the thread.
  *
  * Connecting a number is NOT ported: the Meta OAuth dance needs a browser
  * session, so the disconnected empty state points at the web dashboard.
@@ -325,7 +331,7 @@ function InboxView({ onSelect }: { onSelect: (id: string) => void }) {
 
   return (
     <View style={styles.root}>
-      <FlatList
+      <FlashList
         data={rows}
         keyExtractor={(c) => c.id}
         renderItem={({ item, index }) => (
@@ -427,8 +433,10 @@ function ThreadView({ conversationId, onBack }: { conversationId: string; onBack
     void Promise.all([messages.refetch(), conversation.refetch()]).finally(() => setRefreshing(false));
   };
 
-  // Newest first, matching the API order; the FlatList is inverted so the
-  // newest bubble sits at the bottom and "older" pages append at the top.
+  // The API (and each infinite page) is newest first; FlashList v2 has no
+  // `inverted`, so flatten in API order, dedupe, then reverse to chronological
+  // — the newest bubble is the last row and sits at the bottom thanks to
+  // `startRenderingFromBottom`, and older pages prepend at the top.
   const rows = useMemo(() => {
     const seen = new Set<string>();
     const out: MessageDTO[] = [];
@@ -439,6 +447,7 @@ function ThreadView({ conversationId, onBack }: { conversationId: string; onBack
         out.push(m);
       }
     }
+    out.reverse();
     return out;
   }, [messages.data]);
 
@@ -521,7 +530,7 @@ function ThreadView({ conversationId, onBack }: { conversationId: string; onBack
       <ActivityIndicator color={colors.accent} />
     </View>
   ) : messages.isError ? (
-    <View style={[styles.centered, styles.invertedFix]}>
+    <View style={styles.centered}>
       <Text style={styles.errorText}>
         {t("app.whatsappInbox.list.errorPrefix")}{" "}
         {errorMessage(messages.error, t("mobile.whatsapp.genericError"))}
@@ -529,7 +538,7 @@ function ThreadView({ conversationId, onBack }: { conversationId: string; onBack
       <Button label={t("mobile.whatsapp.retry")} variant="outline" onPress={refreshThread} />
     </View>
   ) : (
-    <View style={[styles.centered, styles.invertedFix]}>
+    <View style={styles.centered}>
       <Text style={styles.emptyText}>{t("app.whatsappInbox.thread.emptyMessages")}</Text>
     </View>
   );
@@ -591,19 +600,38 @@ function ThreadView({ conversationId, onBack }: { conversationId: string; onBack
         ) : null}
       </View>
 
-      <FlatList
+      <FlashList
         data={rows}
-        inverted
         keyExtractor={(m) => m.id}
         renderItem={({ item }) => <MessageBubble m={item} />}
-        ListFooterComponent={older}
+        // Rows are chronological, so "older" is the header (top) and older
+        // pages are pulled by onStartReached — the mirror of the inverted
+        // FlatList's ListFooterComponent + onEndReached.
+        ListHeaderComponent={older}
         ListEmptyComponent={empty}
-        onEndReached={() => {
-          if (messages.hasNextPage && !messages.isFetchingNextPage) void messages.fetchNextPage();
+        // `!refreshing`: a pull-to-refresh happens at this same (oldest) end and
+        // also satisfies FlashList's isNearStart, so without the guard one pull
+        // fired fetchNextPage() alongside refreshThread()'s refetch of every
+        // loaded page — two requests, and v5 cancels the refetch for the page
+        // fetch. Re-arms once the pull settles; the header's "load older" button
+        // covers the rare miss.
+        onStartReached={() => {
+          if (!refreshing && messages.hasNextPage && !messages.isFetchingNextPage) {
+            void messages.fetchNextPage();
+          }
         }}
-        onEndReachedThreshold={0.3}
-        // Inverted list: the control lives at the newest end, next to the
-        // composer, so pulling past the latest bubble refreshes the thread.
+        onStartReachedThreshold={0.3}
+        // New arch only. Start scrolled to the newest bubble; when the user is
+        // near the bottom and a new message lands, follow it; when older pages
+        // prepend at the top, hold the visible bubble in place.
+        maintainVisibleContentPosition={{
+          startRenderingFromBottom: true,
+          autoscrollToBottomThreshold: 0.2,
+        }}
+        // Pull-to-refresh lives at the top (the oldest end) — the inverted
+        // FlatList had it beside the composer; chronological rows move it to
+        // the standard chat position. Kept because a poll every THREAD_POLL_MS
+        // is not "now": the pull is the owner's way to force it.
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refreshThread} />}
         contentContainerStyle={styles.threadContent}
         keyboardShouldPersistTaps="handled"
@@ -732,7 +760,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xxl * 3,
     paddingHorizontal: spacing.lg,
   },
-  invertedFix: { transform: [{ scaleY: -1 }] },
   emptyText: {
     fontFamily: fonts.regular,
     fontSize: 16,

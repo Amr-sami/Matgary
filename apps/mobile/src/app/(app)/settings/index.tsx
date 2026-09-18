@@ -1,18 +1,16 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import {
-  ChatCircle,
-  Info,
-  Key,
-  LockKey,
-  Printer,
-  Receipt,
-  ShieldCheck,
-  SlidersHorizontal,
-  SquaresFour,
-  Storefront,
-  Tag,
-} from "phosphor-react-native";
+import { ChatCircleIcon as ChatCircle } from "phosphor-react-native/src/icons/ChatCircle";
+import { InfoIcon as Info } from "phosphor-react-native/src/icons/Info";
+import { KeyIcon as Key } from "phosphor-react-native/src/icons/Key";
+import { LockKeyIcon as LockKey } from "phosphor-react-native/src/icons/LockKey";
+import { PrinterIcon as Printer } from "phosphor-react-native/src/icons/Printer";
+import { ReceiptIcon as Receipt } from "phosphor-react-native/src/icons/Receipt";
+import { ShieldCheckIcon as ShieldCheck } from "phosphor-react-native/src/icons/ShieldCheck";
+import { SlidersHorizontalIcon as SlidersHorizontal } from "phosphor-react-native/src/icons/SlidersHorizontal";
+import { SquaresFourIcon as SquaresFour } from "phosphor-react-native/src/icons/SquaresFour";
+import { StorefrontIcon as Storefront } from "phosphor-react-native/src/icons/Storefront";
+import { TagIcon as Tag } from "phosphor-react-native/src/icons/Tag";
 
 import { Screen } from "@/components/layout/Screen";
 import { ChevronForward } from "@/components/ui/Chevron";

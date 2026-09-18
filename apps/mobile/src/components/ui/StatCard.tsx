@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { TrendDown, TrendUp } from "phosphor-react-native";
+import { TrendDownIcon as TrendDown } from "phosphor-react-native/src/icons/TrendDown";
+import { TrendUpIcon as TrendUp } from "phosphor-react-native/src/icons/TrendUp";
 
 import { RTL_TEXT } from "@/theme/rtl";
 import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";

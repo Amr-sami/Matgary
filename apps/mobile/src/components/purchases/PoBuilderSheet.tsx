@@ -13,7 +13,13 @@ import {
 } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Check, CheckCircle, Minus, Plus, Trash, UserPlus, X } from "phosphor-react-native";
+import { CheckIcon as Check } from "phosphor-react-native/src/icons/Check";
+import { CheckCircleIcon as CheckCircle } from "phosphor-react-native/src/icons/CheckCircle";
+import { MinusIcon as Minus } from "phosphor-react-native/src/icons/Minus";
+import { PlusIcon as Plus } from "phosphor-react-native/src/icons/Plus";
+import { TrashIcon as Trash } from "phosphor-react-native/src/icons/Trash";
+import { UserPlusIcon as UserPlus } from "phosphor-react-native/src/icons/UserPlus";
+import { XIcon as X } from "phosphor-react-native/src/icons/X";
 import { ApiError, catalog, type Product, type Supplier } from "@matgary/api-client";
 
 import { api } from "@/api/client";

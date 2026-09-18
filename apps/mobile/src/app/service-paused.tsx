@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { Redirect, useRouter } from "expo-router";
-import { Prohibit } from "phosphor-react-native";
+import { ProhibitIcon as Prohibit } from "phosphor-react-native/src/icons/Prohibit";
 
 import { ApiError } from "@matgary/api-client";
 

@@ -2,7 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Platform, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import { ArrowCounterClockwise, CloudSlash, PauseCircle, PencilSimple, ShoppingCartSimple, Trash, WarningCircle } from "phosphor-react-native";
+import { ArrowCounterClockwiseIcon as ArrowCounterClockwise } from "phosphor-react-native/src/icons/ArrowCounterClockwise";
+import { CloudSlashIcon as CloudSlash } from "phosphor-react-native/src/icons/CloudSlash";
+import { PauseCircleIcon as PauseCircle } from "phosphor-react-native/src/icons/PauseCircle";
+import { PencilSimpleIcon as PencilSimple } from "phosphor-react-native/src/icons/PencilSimple";
+import { ShoppingCartSimpleIcon as ShoppingCartSimple } from "phosphor-react-native/src/icons/ShoppingCartSimple";
+import { TrashIcon as Trash } from "phosphor-react-native/src/icons/Trash";
+import { WarningCircleIcon as WarningCircle } from "phosphor-react-native/src/icons/WarningCircle";
 import { catalog } from "@matgary/api-client";
 
 import { api } from "@/api/client";

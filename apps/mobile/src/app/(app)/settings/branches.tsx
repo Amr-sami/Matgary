@@ -10,13 +10,11 @@ import {
 import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "@matgary/api-client";
-import {
-  Eye,
-  EyeSlash,
-  PencilSimple,
-  Storefront,
-  Trash,
-} from "phosphor-react-native";
+import { EyeIcon as Eye } from "phosphor-react-native/src/icons/Eye";
+import { EyeSlashIcon as EyeSlash } from "phosphor-react-native/src/icons/EyeSlash";
+import { PencilSimpleIcon as PencilSimple } from "phosphor-react-native/src/icons/PencilSimple";
+import { StorefrontIcon as Storefront } from "phosphor-react-native/src/icons/Storefront";
+import { TrashIcon as Trash } from "phosphor-react-native/src/icons/Trash";
 
 import { api } from "@/api/client";
 import { Screen } from "@/components/layout/Screen";

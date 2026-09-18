@@ -14,7 +14,10 @@ import {
 import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, catalog, taxonomy } from "@matgary/api-client";
-import { PencilSimple, Plus, Tag, Trash } from "phosphor-react-native";
+import { PencilSimpleIcon as PencilSimple } from "phosphor-react-native/src/icons/PencilSimple";
+import { PlusIcon as Plus } from "phosphor-react-native/src/icons/Plus";
+import { TagIcon as Tag } from "phosphor-react-native/src/icons/Tag";
+import { TrashIcon as Trash } from "phosphor-react-native/src/icons/Trash";
 
 import { api } from "@/api/client";
 import { Screen } from "@/components/layout/Screen";

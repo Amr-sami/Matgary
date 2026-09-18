@@ -5,7 +5,7 @@
 import { useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
-import { Receipt } from "phosphor-react-native";
+import { ReceiptIcon as Receipt } from "phosphor-react-native/src/icons/Receipt";
 
 import { hasArabic, saleToTicket } from "@matgary/domain";
 

@@ -16,15 +16,13 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import * as Location from "expo-location";
-import {
-  ArrowsClockwise,
-  CheckCircle,
-  Crosshair,
-  MapPin,
-  MapPinArea,
-  ShieldWarning,
-  WarningCircle,
-} from "phosphor-react-native";
+import { ArrowsClockwiseIcon as ArrowsClockwise } from "phosphor-react-native/src/icons/ArrowsClockwise";
+import { CheckCircleIcon as CheckCircle } from "phosphor-react-native/src/icons/CheckCircle";
+import { CrosshairIcon as Crosshair } from "phosphor-react-native/src/icons/Crosshair";
+import { MapPinIcon as MapPin } from "phosphor-react-native/src/icons/MapPin";
+import { MapPinAreaIcon as MapPinArea } from "phosphor-react-native/src/icons/MapPinArea";
+import { ShieldWarningIcon as ShieldWarning } from "phosphor-react-native/src/icons/ShieldWarning";
+import { WarningCircleIcon as WarningCircle } from "phosphor-react-native/src/icons/WarningCircle";
 import { ApiError, attendance } from "@matgary/api-client";
 
 import { api } from "@/api/client";

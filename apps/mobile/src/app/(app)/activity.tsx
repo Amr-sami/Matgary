@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  FlatList,
   Modal,
   Pressable,
   RefreshControl,
@@ -10,9 +9,10 @@ import {
   Text,
   View,
 } from "react-native";
+import { FlashList } from "@shopify/flash-list";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Check } from "phosphor-react-native";
+import { CheckIcon as Check } from "phosphor-react-native/src/icons/Check";
 
 import { api } from "@/api/client";
 import { getLocale, t } from "@/i18n";
@@ -33,7 +33,7 @@ import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
  * Same route as the web (GET /api/activity), same permission gate
  * (view_activity_log), same four filters. The web paginates with a
  * `before=<createdAt of last row>` keyset cursor and treats a full page as
- * "there is more", so this screen is a FlatList over useInfiniteQuery with the
+ * "there is more", so this screen is a FlashList over useInfiniteQuery with the
  * exact same rule. The web's date inputs are native <input type="date">; here
  * they are the kit's DateField (Field-shaped box, calendar glyph, platform
  * picker) which only ever emits YYYY-MM-DD — the dd/mm/yyyy spelling is still
@@ -324,7 +324,7 @@ export default function ActivityScreen() {
 
   return (
     <View style={styles.root}>
-      <FlatList
+      <FlashList
         data={rows}
         keyExtractor={(r) => r.id}
         renderItem={({ item, index }) => (

@@ -1,23 +1,21 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import {
-  ArrowCounterClockwise,
-  Bell,
-  CalendarBlank,
-  ClockCounterClockwise,
-  CloudArrowUp,
-  CreditCard,
-  Gear,
-  ListChecks,
-  MapPinArea,
-  SignOut,
-  Storefront,
-  Truck,
-  Users,
-  UsersThree,
-  Wallet,
-  WhatsappLogo,
-} from "phosphor-react-native";
+import { ArrowCounterClockwiseIcon as ArrowCounterClockwise } from "phosphor-react-native/src/icons/ArrowCounterClockwise";
+import { BellIcon as Bell } from "phosphor-react-native/src/icons/Bell";
+import { CalendarBlankIcon as CalendarBlank } from "phosphor-react-native/src/icons/CalendarBlank";
+import { ClockCounterClockwiseIcon as ClockCounterClockwise } from "phosphor-react-native/src/icons/ClockCounterClockwise";
+import { CloudArrowUpIcon as CloudArrowUp } from "phosphor-react-native/src/icons/CloudArrowUp";
+import { CreditCardIcon as CreditCard } from "phosphor-react-native/src/icons/CreditCard";
+import { GearIcon as Gear } from "phosphor-react-native/src/icons/Gear";
+import { ListChecksIcon as ListChecks } from "phosphor-react-native/src/icons/ListChecks";
+import { MapPinAreaIcon as MapPinArea } from "phosphor-react-native/src/icons/MapPinArea";
+import { SignOutIcon as SignOut } from "phosphor-react-native/src/icons/SignOut";
+import { StorefrontIcon as Storefront } from "phosphor-react-native/src/icons/Storefront";
+import { TruckIcon as Truck } from "phosphor-react-native/src/icons/Truck";
+import { UsersIcon as Users } from "phosphor-react-native/src/icons/Users";
+import { UsersThreeIcon as UsersThree } from "phosphor-react-native/src/icons/UsersThree";
+import { WalletIcon as Wallet } from "phosphor-react-native/src/icons/Wallet";
+import { WhatsappLogoIcon as WhatsappLogo } from "phosphor-react-native/src/icons/WhatsappLogo";
 
 import { Screen } from "@/components/layout/Screen";
 import { ChevronForward } from "@/components/ui/Chevron";

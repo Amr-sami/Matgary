@@ -2,7 +2,8 @@ import { useMemo } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowUUpLeft, User } from "phosphor-react-native";
+import { ArrowUUpLeftIcon as ArrowUUpLeft } from "phosphor-react-native/src/icons/ArrowUUpLeft";
+import { UserIcon as User } from "phosphor-react-native/src/icons/User";
 import { ApiError, sales as salesApi } from "@matgary/api-client";
 
 import { api } from "@/api/client";

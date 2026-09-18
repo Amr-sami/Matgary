@@ -12,22 +12,20 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Image } from "expo-image";
-import {
-  ArrowCounterClockwise,
-  ArrowDown,
-  ArrowUp,
-  Barcode,
-  Camera,
-  Coins,
-  Minus,
-  Package,
-  PencilSimple,
-  Plus,
-  ShoppingCart,
-  Sparkle,
-  Tag,
-  Wallet,
-} from "phosphor-react-native";
+import { ArrowCounterClockwiseIcon as ArrowCounterClockwise } from "phosphor-react-native/src/icons/ArrowCounterClockwise";
+import { ArrowDownIcon as ArrowDown } from "phosphor-react-native/src/icons/ArrowDown";
+import { ArrowUpIcon as ArrowUp } from "phosphor-react-native/src/icons/ArrowUp";
+import { BarcodeIcon as Barcode } from "phosphor-react-native/src/icons/Barcode";
+import { CameraIcon as Camera } from "phosphor-react-native/src/icons/Camera";
+import { CoinsIcon as Coins } from "phosphor-react-native/src/icons/Coins";
+import { MinusIcon as Minus } from "phosphor-react-native/src/icons/Minus";
+import { PackageIcon as Package } from "phosphor-react-native/src/icons/Package";
+import { PencilSimpleIcon as PencilSimple } from "phosphor-react-native/src/icons/PencilSimple";
+import { PlusIcon as Plus } from "phosphor-react-native/src/icons/Plus";
+import { ShoppingCartIcon as ShoppingCart } from "phosphor-react-native/src/icons/ShoppingCart";
+import { SparkleIcon as Sparkle } from "phosphor-react-native/src/icons/Sparkle";
+import { TagIcon as Tag } from "phosphor-react-native/src/icons/Tag";
+import { WalletIcon as Wallet } from "phosphor-react-native/src/icons/Wallet";
 import { ApiError, catalog, type Product, type Supplier } from "@matgary/api-client";
 
 import { API_BASE_URL, api } from "@/api/client";
@@ -476,6 +474,7 @@ export default function ProductDetailScreen() {
               <View style={styles.adjust}>
                 <View style={styles.stepper}>
                   <Pressable
+                    testID="adjust-decrease"
                     accessibilityRole="button"
                     accessibilityLabel={t("mobile.common.decrease")}
                     disabled={adjust.isPending}
@@ -485,6 +484,7 @@ export default function ProductDetailScreen() {
                     <Minus size={22} color={colors.accent} weight="bold" />
                   </Pressable>
                   <TextInput
+                    testID="adjust-delta"
                     accessibilityLabel={t("app.common.quantity")}
                     value={deltaText}
                     onChangeText={(v) => {
@@ -497,6 +497,7 @@ export default function ProductDetailScreen() {
                     style={[styles.stepValue, delta > 0 && styles.stepUp, delta < 0 && styles.stepDown]}
                   />
                   <Pressable
+                    testID="adjust-increase"
                     accessibilityRole="button"
                     accessibilityLabel={t("mobile.common.increase")}
                     disabled={adjust.isPending}
@@ -526,12 +527,14 @@ export default function ProductDetailScreen() {
                   </Text>
                 </View>
                 {adjustError ? <Text style={styles.err}>{adjustError}</Text> : null}
-                <Button
-                  label={t("mobile.inventoryDetail.applyAdjust")}
-                  disabled={!canAdjust}
-                  loading={adjust.isPending}
-                  onPress={() => adjust.mutate({ id: product.id, delta })}
-                />
+                <View testID="adjust-apply">
+                  <Button
+                    label={t("mobile.inventoryDetail.applyAdjust")}
+                    disabled={!canAdjust}
+                    loading={adjust.isPending}
+                    onPress={() => adjust.mutate({ id: product.id, delta })}
+                  />
+                </View>
               </View>
             ) : (
               <Text style={styles.muted}>{t("mobile.inventoryDetail.readOnly")}</Text>
@@ -596,7 +599,7 @@ export default function ProductDetailScreen() {
             ) : historyRows.length === 0 ? (
               <Text style={styles.muted}>{t("app.inventory.history.empty")}</Text>
             ) : (
-              <View style={styles.history}>
+              <View style={styles.history} testID="product-history">
                 {visibleHistory.map((event) => (
                   <HistoryRow key={event.id} event={event} />
                 ))}
@@ -749,7 +752,7 @@ function HistoryRow({ event }: { event: catalog.ProductHistoryEvent }) {
   const hasDelta = typeof event.delta === "number";
   const hasAfter = typeof event.quantityAfter === "number";
   return (
-    <View style={styles.historyRow}>
+    <View style={styles.historyRow} testID="history-row">
       <View style={styles.historyIcon}>{eventIcon(event.type)}</View>
       <View style={styles.historyBody}>
         <View style={styles.historyHead}>

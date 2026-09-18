@@ -1,7 +1,8 @@
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
-import { Printer, ShareNetwork } from "phosphor-react-native";
+import { PrinterIcon as Printer } from "phosphor-react-native/src/icons/Printer";
+import { ShareNetworkIcon as ShareNetwork } from "phosphor-react-native/src/icons/ShareNetwork";
 
 import { Segmented } from "@/components/ui/Segmented";
 import { t } from "@/i18n";

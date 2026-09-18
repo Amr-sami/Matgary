@@ -12,7 +12,10 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarBlank, Clock, Key, UserMinus } from "phosphor-react-native";
+import { CalendarBlankIcon as CalendarBlank } from "phosphor-react-native/src/icons/CalendarBlank";
+import { ClockIcon as Clock } from "phosphor-react-native/src/icons/Clock";
+import { KeyIcon as Key } from "phosphor-react-native/src/icons/Key";
+import { UserMinusIcon as UserMinus } from "phosphor-react-native/src/icons/UserMinus";
 import { ApiError, team } from "@matgary/api-client";
 
 import { api } from "@/api/client";
@@ -373,6 +376,7 @@ export default function TeamMemberScreen() {
     >
       <Pressable
         accessibilityRole="button"
+        testID="team-breadcrumb"
         onPress={() => router.navigate("/team")}
         style={styles.breadcrumb}
       >
@@ -435,6 +439,7 @@ export default function TeamMemberScreen() {
           </Card>
 
           {/* Permissions */}
+          <View testID="team-permissions">
           <Card title={t("app.teamAdmin.row.permissions")}>
             {targetIsOwner ? (
               <Text style={styles.hint}>{t("mobile.team.ownerAllPermissions")}</Text>
@@ -479,6 +484,7 @@ export default function TeamMemberScreen() {
               </>
             )}
           </Card>
+          </View>
 
           {/* Account — owner only, and never on the owner's own row: the web's
               TeamEditor hides every row action there, and the API answers 409

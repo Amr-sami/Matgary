@@ -13,7 +13,8 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { PencilSimple, Trash } from "phosphor-react-native";
+import { PencilSimpleIcon as PencilSimple } from "phosphor-react-native/src/icons/PencilSimple";
+import { TrashIcon as Trash } from "phosphor-react-native/src/icons/Trash";
 import { ApiError, catalog, type Supplier } from "@matgary/api-client";
 
 import { api } from "@/api/client";

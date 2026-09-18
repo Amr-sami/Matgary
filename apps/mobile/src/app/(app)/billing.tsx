@@ -3,7 +3,8 @@ import { ActivityIndicator, AppState, Platform, Pressable, StyleSheet, Text, Vie
 import { useMutation, useQuery } from "@tanstack/react-query";
 import * as WebBrowser from "expo-web-browser";
 import { ApiError, me as meApi } from "@matgary/api-client";
-import { CheckCircle, Globe } from "phosphor-react-native";
+import { CheckCircleIcon as CheckCircle } from "phosphor-react-native/src/icons/CheckCircle";
+import { GlobeIcon as Globe } from "phosphor-react-native/src/icons/Globe";
 
 import { api } from "@/api/client";
 import { Screen } from "@/components/layout/Screen";

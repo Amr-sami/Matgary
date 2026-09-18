@@ -17,10 +17,11 @@ import {
   type BarcodeType,
 } from "expo-camera";
 import * as Haptics from "expo-haptics";
-import { X } from "phosphor-react-native";
+import { XIcon as X } from "phosphor-react-native/src/icons/X";
 
 import { Button } from "@/components/ui/Button";
 import { isRTL, t } from "@/i18n";
+import { clearMark, mark, measure } from "@/observability/perf";
 import { RTL_TEXT, directionStyle } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
 
@@ -108,7 +109,7 @@ export function ScannerSheet({
   }, [visible]);
 
   const accept = useCallback(
-    (raw: string) => {
+    (raw: string, source: "camera" | "manual") => {
       const code = raw.trim();
       if (!code || finished.current) return;
       const now = Date.now();
@@ -116,6 +117,17 @@ export function ScannerSheet({
         return;
       }
       last.current = { code, at: now };
+      if (source === "camera") {
+        // §10.3 "camera open → first decode": measured once per opening, from
+        // the frame the CameraView mounted (consumed so later codes in a
+        // "continuous" session are not re-measured against the same start).
+        // A typed code is not a decode: it neither closes this interval (the
+        // camera decoded nothing) nor consumes the start the first real
+        // decode of this opening is still waiting to be measured against.
+        measure("pos.scan-decode", "pos.camera-open", { consume: true });
+        // Start of "scan → line added": sales.tsx closes it after `cart.add`.
+        mark("pos.scan-decoded");
+      }
       // Fire-and-forget: a device without a Taptic engine rejects, and that
       // must never block the scan.
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -129,7 +141,7 @@ export function ScannerSheet({
   );
 
   const onBarcode = useCallback(
-    (r: BarcodeScanningResult) => accept(r.data),
+    (r: BarcodeScanningResult) => accept(r.data, "camera"),
     [accept],
   );
 
@@ -137,11 +149,19 @@ export function ScannerSheet({
     const code = manual.trim();
     if (!code) return;
     setManual("");
-    accept(code);
+    accept(code, "manual");
   };
 
   const granted = permission?.granted === true;
   const cameraOn = visible && granted && available === true;
+
+  // The camera is mounted in this commit: the decode budget starts here.
+  // Closing the sheet before any decode drops the mark, so the next opening
+  // never inherits a stale start.
+  useEffect(() => {
+    if (cameraOn) mark("pos.camera-open");
+    else clearMark("pos.camera-open");
+  }, [cameraOn]);
 
   return (
     <Modal

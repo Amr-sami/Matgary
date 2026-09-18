@@ -2,15 +2,13 @@ import { useEffect, type ComponentType } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
-import {
-  ChartBar,
-  GridFour,
-  List,
-  Package,
-  PlusSquare,
-  Receipt,
-  ShoppingCart,
-} from "phosphor-react-native";
+import { ChartBarIcon as ChartBar } from "phosphor-react-native/src/icons/ChartBar";
+import { GridFourIcon as GridFour } from "phosphor-react-native/src/icons/GridFour";
+import { ListIcon as List } from "phosphor-react-native/src/icons/List";
+import { PackageIcon as Package } from "phosphor-react-native/src/icons/Package";
+import { PlusSquareIcon as PlusSquare } from "phosphor-react-native/src/icons/PlusSquare";
+import { ReceiptIcon as Receipt } from "phosphor-react-native/src/icons/Receipt";
+import { ShoppingCartIcon as ShoppingCart } from "phosphor-react-native/src/icons/ShoppingCart";
 
 import { api } from "@/api/client";
 import { UNREAD_TASKS_KEY, badgeText, useBadges } from "@/stores/badges";

@@ -2,7 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocalSearchParams } from "expo-router";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CurrencyDollar, Percent, ShoppingCart, TrendUp } from "phosphor-react-native";
+import { CurrencyDollarIcon as CurrencyDollar } from "phosphor-react-native/src/icons/CurrencyDollar";
+import { PercentIcon as Percent } from "phosphor-react-native/src/icons/Percent";
+import { ShoppingCartIcon as ShoppingCart } from "phosphor-react-native/src/icons/ShoppingCart";
+import { TrendUpIcon as TrendUp } from "phosphor-react-native/src/icons/TrendUp";
 
 import { api } from "@/api/client";
 import { TrendChart } from "@/components/charts/TrendChart";

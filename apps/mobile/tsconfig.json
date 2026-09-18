@@ -11,6 +11,9 @@
       ],
       "@matgary/*": [
         "../../packages/*/src"
+      ],
+      "phosphor-react-native/src/icons/*": [
+        "../../node_modules/phosphor-react-native/lib/typescript/icons/*"
       ]
     }
   },
