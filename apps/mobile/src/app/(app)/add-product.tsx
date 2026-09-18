@@ -402,7 +402,7 @@ export default function AddProductScreen() {
               onRemove={removePhoto}
               onRetry={retryUpload}
             />
-            <Field label={t("app.sales.form.quickAddProduct.name")} value={name} onChangeText={setName} placeholder={t("app.sales.form.quickAddProduct.namePlaceholder")} />
+            <Field testID="add-product-name" label={t("app.sales.form.quickAddProduct.name")} value={name} onChangeText={setName} placeholder={t("app.sales.form.quickAddProduct.namePlaceholder")} />
             <View>
               <BarcodeField
                 value={barcode}
@@ -563,12 +563,14 @@ export default function AddProductScreen() {
           <Button label={t("app.common.back")} variant="outline" onPress={() => goTo(-1)} style={styles.navBtn} />
         ) : null}
         {step !== "review" ? (
+          <View testID="add-product-next">
           <Button
             label={t("app.inventory.addProduct.footer.next")}
             disabled={!canAdvance}
             onPress={() => goTo(1)}
             style={styles.navBtn}
           />
+          </View>
         ) : (
           <Button
             label={t("app.inventory.addProduct.footer.save")}

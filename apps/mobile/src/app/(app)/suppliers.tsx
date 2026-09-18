@@ -157,6 +157,7 @@ export default function SuppliersScreen() {
         <View style={styles.list}>
           {rows.map((s) => (
             <Pressable
+              testID="supplier-row"
               key={s.id}
               accessibilityRole="button"
               accessibilityLabel={t("mobile.suppliers.profileOf", { name: s.name })}

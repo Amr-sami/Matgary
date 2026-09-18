@@ -707,6 +707,8 @@ export default function SalesScreen() {
             </View>
           ) : null}
 
+          {/* Button takes no testID; the wrapper is the automation handle. */}
+          <View testID="pos-record">
           <Button
             label={t("app.sales.form.submit")}
             loading={checkout.isPending}
@@ -716,6 +718,7 @@ export default function SalesScreen() {
               checkout.mutate();
             }}
           />
+          </View>
         </Card>
       ) : null}
 

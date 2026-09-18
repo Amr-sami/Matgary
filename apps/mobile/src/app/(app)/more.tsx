@@ -120,6 +120,7 @@ export default function MoreScreen() {
       <Pressable
         style={[styles.row, styles.signOut]}
         accessibilityRole="button"
+        testID="more-sign-out"
         onPress={() => void signOut()}
       >
         <SignOut size={22} color={colors.danger} />
