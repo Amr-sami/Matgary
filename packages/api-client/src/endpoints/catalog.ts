@@ -364,10 +364,62 @@ export const createReturn = (c: ApiClient, input: CreateReturnInput) =>
 export interface CreatePurchaseOrderInput {
   supplierId: string;
   notes?: string | null;
-  items: { productId?: string | null; productName: string; quantity: number; unitCost: number }[];
+  items: {
+    productId?: string | null;
+    productName: string;
+    quantity: number;
+    unitCost: number;
+    /** External (productId=null) lines only: category the product is filed under on receive. */
+    categoryId?: string;
+  }[];
 }
+/** 201 `{ id }` — there is no order number; the server keys drafts by uuid only. */
 export const createPurchaseOrder = (c: ApiClient, input: CreatePurchaseOrderInput) =>
   c.request<{ id: string }>("/api/purchase-orders", { method: "POST", body: input });
+
+/** GET /api/purchase-orders/[id] — the list row plus its lines (repo getPurchaseOrder). */
+export interface PurchaseOrderLine {
+  id: string;
+  productId: string | null;
+  productName: string;
+  quantity: number;
+  unitCost: number;
+  lineTotal: number;
+}
+export interface PurchaseOrderDetail extends PurchaseOrder {
+  updatedAt: string;
+  items: PurchaseOrderLine[];
+}
+export const getPurchaseOrder = async (c: ApiClient, id: string) => {
+  const res = await c.request<{ data: PurchaseOrderDetail }>(
+    `/api/purchase-orders/${encodeURIComponent(id)}`,
+  );
+  return res.data;
+};
+
+/**
+ * POST /api/purchase-orders/[id]/receive — whole-order receive, exactly as the
+ * web does it: every line's quantity lands in stock, the total becomes owed to
+ * the supplier. `updateCost: true` also copies each line's unit cost onto the
+ * product (the web always sends true). Draft only — a received/cancelled order
+ * is a 409 whose `error` is an Arabic sentence.
+ */
+export const receivePurchaseOrder = (c: ApiClient, id: string, opts: { updateCost?: boolean } = {}) =>
+  c.request<{ ok: true }>(`/api/purchase-orders/${encodeURIComponent(id)}/receive`, {
+    method: "POST",
+    body: { updateCost: opts.updateCost ?? true },
+  });
+
+/** POST /api/purchase-orders/[id]/cancel — drafts only; a received order is a 409. */
+export const cancelPurchaseOrder = (c: ApiClient, id: string) =>
+  c.request<{ ok: true }>(`/api/purchase-orders/${encodeURIComponent(id)}/cancel`, {
+    method: "POST",
+    body: {},
+  });
+
+/** DELETE /api/purchase-orders/[id] — `{ ok: true }`; a received order is a 409. */
+export const deletePurchaseOrder = (c: ApiClient, id: string) =>
+  c.request<{ ok: true }>(`/api/purchase-orders/${encodeURIComponent(id)}`, { method: "DELETE" });
 
 export const deleteProduct = (c: ApiClient, id: string) =>
   c.request<unknown>(`/api/products/${id}`, { method: "DELETE" });

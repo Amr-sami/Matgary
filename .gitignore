@@ -89,3 +89,4 @@ tests/perf/.cookies/
 
 # Mobile port working docs (screenshots, specs, design system). Local only.
 /mobile-dev-docs/
+apps/web/uploads/

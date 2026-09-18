@@ -503,7 +503,12 @@ export const productHistory = pgTable(
       .references(() => tenants.id, { onDelete: "cascade" }),
     productId: uuid("product_id").notNull(),
     productName: text("product_name").notNull(),
-    type: text("type").notNull(), // 'created' | 'updated' | 'restocked' | 'decreased' | 'sold' | 'returned'
+    // 'created' | 'updated' | 'restocked' | 'decreased' | 'sold' | 'returned'.
+    // An offline oversell (S7) appends a 'restocked' row whose note starts
+    // "oversell:" — the +delta reconciles the per-line 'sold' rows to the
+    // floor (0) the product actually landed on; the queryable record is
+    // stock_discrepancies below.
+    type: text("type").notNull(),
     delta: integer("delta"),
     quantityAfter: integer("quantity_after"),
     note: text("note"),
@@ -512,6 +517,36 @@ export const productHistory = pgTable(
       .default(sql`now()`),
   },
   (t) => [index("product_history_tenant_product_idx").on(t.tenantId, t.productId)],
+);
+
+// S7 (doc 02 §2.2 S13, migration 0050): one row per product an offline
+// replay sold past its shelf with `allowOversell: true`. The sale is booked
+// as rung, the product is driven to 0, and this row is what the owner
+// reviews — `requested - available` is the phantom quantity that was sold
+// but never counted in.
+export const stockDiscrepancies = pgTable(
+  "stock_discrepancies",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branches.id, { onDelete: "restrict" }),
+    productId: uuid("product_id").notNull(),
+    productName: text("product_name").notNull(),
+    invoiceId: text("invoice_id").notNull(),
+    requested: integer("requested").notNull(),
+    available: integer("available").notNull(),
+    recordedByUserId: uuid("recorded_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [index("stock_discrepancies_tenant_created_idx").on(t.tenantId, t.createdAt)],
 );
 
 // Catalog relations

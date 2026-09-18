@@ -159,12 +159,19 @@ export async function signup(client: ApiClient, input: SignupInput): Promise<Log
 }
 
 /**
+ * Body of POST /api/v1/auth/demo (apps/web/app/api/v1/auth/demo/route.ts
+ * bodySchema): device meta plus `locale`, which seeds the ephemeral owner's
+ * language so the trial store's copy matches the app's.
+ */
+export type DemoInput = Omit<SignupInput, "email" | "password" | "storeName" | "storeHandle">;
+
+/**
  * Open the trial store: an ephemeral owner on a fresh clone of the demo
  * template, signed in. Rate-limited to 10/hour per IP server-side.
  */
 export async function startDemo(
   client: ApiClient,
-  meta: Omit<SignupInput, "email" | "password" | "storeName" | "storeHandle"> = {},
+  meta: DemoInput = {},
 ): Promise<LoginResponse & { demo: true }> {
   const data = await client.request<LoginResponse & { demo: true }>("/api/v1/auth/demo", {
     method: "POST",

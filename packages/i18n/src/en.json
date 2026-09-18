@@ -3484,7 +3484,9 @@
         "arabic": "العربية",
         "english": "English",
         "switching": "Switching…",
-        "error": "Couldn't change language"
+        "error": "Couldn't change language",
+        "shortArabic": "ع",
+        "shortEnglish": "EN"
       },
       "notifications": {
         "title": "Notifications",
@@ -4388,7 +4390,25 @@
       "priceMin": "Enter a price of at least 1 — a decimal point or comma is fine",
       "costInvalid": "Enter a valid cost (0 or more)",
       "quantityMin": "Enter an opening stock of at least 1 whole piece",
-      "thresholdInvalid": "Enter a whole number (0 or more) — leave it empty to use 3"
+      "thresholdInvalid": "Enter a whole number (0 or more) — leave it empty to use 3",
+      "photo": "Product photo (optional)",
+      "takePhoto": "Take photo",
+      "choosePhoto": "Choose",
+      "removePhoto": "Remove",
+      "photoHint": "Preview only for now — the photo stays on this phone and isn't saved with the product yet",
+      "photoUploading": "Uploading the photo…",
+      "photoReady": "Photo uploaded",
+      "photoUploadFailed": "Couldn't upload the photo — the product will be saved without it",
+      "photoNoPermission": "Your account can't upload photos — the product will be saved without one",
+      "photoInvalid": "Photo not accepted — JPG, PNG or WebP up to 3 MB",
+      "retryUpload": "Retry upload",
+      "cameraDenied": "Camera access is off — allow it in Settings or choose from the library",
+      "libraryDenied": "Photo library access is off — allow it in Settings",
+      "cameraUnavailable": "No camera on this device — choose from the library",
+      "openSettings": "Open Settings",
+      "skuFromPos": "Barcode carried over from the sale: {code}",
+      "a11yPhotoPreview": "Product photo preview",
+      "photoPickFailed": "Couldn't open the photo — try again"
     },
     "returns": {
       "empty": "No returns yet",
@@ -4428,7 +4448,37 @@
       "total": "Total: {amount}",
       "orderMeta": "{n} items · {date}",
       "remaining": "{amount} remaining",
-      "itemCount": "{n} items"
+      "itemCount": "{n} items",
+      "builder": {
+        "step": "Step {n} of {total}",
+        "stepSupplier": "Supplier",
+        "stepLines": "Items",
+        "stepReview": "Review",
+        "stepDone": "Done",
+        "searchSupplier": "Search suppliers…",
+        "noSuppliers": "No supplier matches",
+        "newSupplier": "Add a new supplier",
+        "newSupplierHint": "The supplier is saved and selected for this order",
+        "next": "Next",
+        "back": "Back",
+        "scanHint": "Scan a barcode or search by name to add items",
+        "scanned": "Added: {name}",
+        "scanNotFound": "No product with this barcode",
+        "scanFailed": "Barcode lookup failed",
+        "freeText": "Add an unregistered item",
+        "lineNamePlaceholder": "Item name",
+        "noLines": "No items yet",
+        "linesSummary": "{n} items · {amount}",
+        "notesPlaceholder": "Notes for this order (optional)",
+        "createdHint": "Saved as a draft. When the goods arrive, tap Receive to add them to stock.",
+        "orderRef": "Order #{ref}",
+        "receiveNow": "Receive now",
+        "close": "Close",
+        "lineTotal": "{qty} × {cost} = {total}",
+        "remove": "Remove item"
+      },
+      "actionFailed": "The action failed, try again",
+      "filterAll": "All"
     },
     "expenses": {
       "empty": "No expenses yet",
@@ -4841,13 +4891,14 @@
       "sellAnywayBody": "The customer already has the goods. Invoice {{id}} will be recorded as rung; the short product goes to zero stock and a stock discrepancy is logged for review.",
       "sellAnywayConfirm": "Record sale",
       "sellAnywayHint": "If stock is still short on the server the same refusal comes back — edit the quantities or discard.",
-      "oversellHint": "Stock was short of what was rung. Retrying will not help: the server remembers this refusal for a day. Edit the quantities and ring it again under a new invoice number, or discard the sale.",
+      "oversellHint": "Stock was short of what was rung and the customer already has the goods. Tap Sell anyway to record the invoice — the product goes to zero and a stock discrepancy is logged for review — or edit the quantities, or discard the sale.",
       "productGoneHint": "The product was deleted from the catalogue. Edit the sale to pick another product, or discard it.",
       "dev": {
         "title": "Developer tools · DEV",
         "simulateOffline": "Simulate offline",
         "simulateOfflineHint": "Dev build only: the app behaves as if the network is down — sales queue up and nothing syncs."
-      }
+      },
+      "signedOut": "Your session has ended. Sign in again, then try once more."
     },
     "notifications": {
       "title": "Notifications",

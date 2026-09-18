@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireTenant } from "@/lib/api/auth-helpers";
+import { requirePermissionAudited, requireTenant } from "@/lib/api/auth-helpers";
 import { deleteProduct, updateProduct } from "@/lib/repo/catalog";
 import { logActivity } from "@/lib/repo/activity";
 
@@ -23,7 +23,10 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const r = await requireTenant();
+  // Same gate as POST /api/products (manage_inventory), audit-mode until
+  // PERMISSION_ENFORCE_WRITES=1. The route has no branch context, so use the
+  // branch-less audited helper.
+  const r = await requirePermissionAudited("manage_inventory");
   if (!r.ok) return r.response;
   const { id } = await params;
   const body = await req.json().catch(() => null);

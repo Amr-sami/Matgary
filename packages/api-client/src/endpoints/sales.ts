@@ -33,6 +33,13 @@ export interface CartOptions {
    * lands on the day the customer's receipt shows, not the day it synced.
    */
   customDate?: string;
+  /**
+   * S7 (doc 06 §6.5) "sell anyway": book the sale even though a line exceeds
+   * stock — the product floors at 0 and the server writes a discrepancy row
+   * to product_history. Sent by the sync screen's resolution sheet only;
+   * interactive sales omit it and keep the INSUFFICIENT_STOCK refusal.
+   */
+  allowOversell?: boolean;
 }
 
 /** apps/web/lib/repo/operations.ts — CartSaleResult */
@@ -45,6 +52,9 @@ export interface CartSaleResult {
   customerName: string | null;
   customerPhone: string | null;
   note: string | null;
+  /** S7: products the sale took past their shelf (`allowOversell` replays
+   *  only). Optional: servers older than migration 0050 do not send it. */
+  oversold?: { productId: string; productName: string; requested: number; available: number }[];
 }
 
 /**

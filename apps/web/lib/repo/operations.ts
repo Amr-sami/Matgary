@@ -10,6 +10,7 @@ import {
   returns as returnsTable,
   shopSettings,
   salePayments,
+  stockDiscrepancies,
 } from "@/lib/db/schema";
 import type {
   Sale,
@@ -143,7 +144,7 @@ async function adjustProductStock(
   tenantId: string,
   productId: string,
   delta: number,
-  opts: { allowNegative?: boolean } = {},
+  opts: { allowNegative?: boolean; floorAtZero?: boolean } = {},
 ): Promise<number> {
   const [row] = await tx
     .select({ quantity: products.quantity, branchId: products.branchId })
@@ -155,7 +156,11 @@ async function adjustProductStock(
   if (!row) {
     throw new Error("المنتج غير موجود");
   }
-  const next = row.quantity + delta;
+  // S7 oversell: a sale that physically already happened may take more
+  // than the shelf shows — drive the quantity to the floor, never below.
+  const next = opts.floorAtZero
+    ? Math.max(0, row.quantity + delta)
+    : row.quantity + delta;
   if (next < 0 && !opts.allowNegative) {
     throw new Error("الكمية المطلوبة غير متوفرة في هذا الفرع");
   }
@@ -583,6 +588,12 @@ export interface CartSaleOptions {
    *  reflects exactly the unpaid remainder. Ignored for non-deferred sales
    *  (those are always fully paid). Defaults to 0. */
   amountPaidNow?: number;
+  /** S7 (doc 06 §6.5): the offline POS replaying a sale the customer already
+   *  walked out with. When true, a line that exceeds stock still books —
+   *  the product is driven to 0 and a discrepancy row is appended to
+   *  product_history ("oversell: requested N, available M, …"). Interactive
+   *  online sales keep the hard INSUFFICIENT_STOCK 400 (default false). */
+  allowOversell?: boolean;
 }
 
 export interface CartSaleLineSummary {
@@ -603,6 +614,14 @@ export interface CartSaleResult {
   customerName: string | null;
   customerPhone: string | null;
   note: string | null;
+  /** S7: products this cart sold past their shelf (allowOversell only);
+   *  empty for every ordinary sale. Mirrors the stock_discrepancies rows. */
+  oversold: {
+    productId: string;
+    productName: string;
+    requested: number;
+    available: number;
+  }[];
 }
 
 export async function recordCartSale(
@@ -677,6 +696,19 @@ async function recordCartSaleImpl(
 
     const pre: Pre[] = [];
     let cartGross = 0;
+    // S7: products this cart takes past their stock (allowOversell only).
+    const oversold = new Map<
+      string,
+      {
+        productName: string;
+        requested: number;
+        /** Shelf as shown to the cashier (never negative). */
+        available: number;
+        /** Raw pre-cart quantity — the ledger reconciles from THIS, since a
+         *  shelf can already be below zero (allowNegative adjustments). */
+        priorQty: number;
+      }
+    >();
 
     for (const line of lines) {
       const p = productById.get(line.productId);
@@ -698,11 +730,19 @@ async function recordCartSaleImpl(
 
       const totalRequested = requestedByProductId.get(line.productId) ?? line.quantity;
       if (p.quantity < totalRequested) {
-        throw new DomainError("INSUFFICIENT_STOCK", 400, {
-          productId: p.id,
+        if (!options.allowOversell) {
+          throw new DomainError("INSUFFICIENT_STOCK", 400, {
+            productId: p.id,
+            productName: p.name,
+            requested: totalRequested,
+            available: p.quantity,
+          });
+        }
+        oversold.set(p.id, {
           productName: p.name,
           requested: totalRequested,
-          available: p.quantity,
+          available: Math.max(0, p.quantity),
+          priorQty: p.quantity,
         });
       }
 
@@ -865,6 +905,7 @@ async function recordCartSaleImpl(
         tenantId,
         p.line.productId,
         -p.line.quantity,
+        { floorAtZero: oversold.has(p.line.productId) },
       );
 
       const [created] = await tx
@@ -931,6 +972,47 @@ async function recordCartSaleImpl(
         priorQty: p.product.quantity,
         threshold: p.product.lowStockThreshold,
         nextQty: nextBranchQty,
+      });
+    }
+
+    // S7 discrepancy audit, one per oversold product:
+    //  1. a product_history row that RECONCILES the ledger. The per-line
+    //     "sold" rows above already carry -requested; the product actually
+    //     landed on 0, so the phantom shortfall (units sold that were never
+    //     on the shelf) is booked back with a POSITIVE delta —
+    //     prior - requested + (requested - prior) = 0 = quantityAfter.
+    //     Typed "restocked" so every history view renders it; the note
+    //     prefix says what it really is.
+    //  2. a stock_discrepancies row (doc 02 S13) — the queryable record the
+    //     owner reviews, so nobody has to parse the note.
+    const oversoldSummary: CartSaleResult["oversold"] = [];
+    for (const [productId, o] of oversold) {
+      const nextQty = finalQtyByProduct.get(productId)?.nextQty ?? 0;
+      const note = `oversell: requested ${o.requested}, available ${o.available}, offline sale ${invoiceId}`;
+      await tx.insert(productHistory).values({
+        tenantId,
+        productId,
+        productName: o.productName,
+        type: "restocked",
+        delta: o.requested - o.priorQty,
+        quantityAfter: nextQty,
+        note,
+      });
+      await tx.insert(stockDiscrepancies).values({
+        tenantId,
+        branchId: options.branchId,
+        productId,
+        productName: o.productName,
+        invoiceId,
+        requested: o.requested,
+        available: o.available,
+        recordedByUserId: options.recordedByUserId ?? null,
+      });
+      oversoldSummary.push({
+        productId,
+        productName: o.productName,
+        requested: o.requested,
+        available: o.available,
       });
     }
 
@@ -1005,6 +1087,7 @@ async function recordCartSaleImpl(
       customerName: options.customerName?.trim() || null,
       customerPhone: options.customerPhone?.trim() || null,
       note: options.note ?? null,
+      oversold: oversoldSummary,
       lowStockCrossings: Array.from(finalQtyByProduct.values()).filter(
         (f) => f.priorQty > f.threshold && f.nextQty <= f.threshold,
       ),
@@ -1041,6 +1124,7 @@ async function recordCartSaleImpl(
     customerName: result.customerName,
     customerPhone: result.customerPhone,
     note: result.note,
+    oversold: result.oversold,
   };
 }
 

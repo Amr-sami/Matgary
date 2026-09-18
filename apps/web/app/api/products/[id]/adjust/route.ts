@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireTenantWithBranch } from "@/lib/api/auth-helpers";
+import { requirePermissionWithBranch } from "@/lib/api/auth-helpers";
 import { adjustProductQuantity } from "@/lib/repo/catalog";
 import { logActivity } from "@/lib/repo/activity";
 
@@ -11,8 +11,10 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   // Stock adjustments are inherently per-branch — every "+1 / -1" lands at
-  // the active branch only. Use the active context.
-  const r = await requireTenantWithBranch();
+  // the active branch only. Use the active context. Same gate as POST
+  // /api/products: manage_inventory, audit-mode until
+  // PERMISSION_ENFORCE_WRITES=1.
+  const r = await requirePermissionWithBranch("manage_inventory");
   if (!r.ok) return r.response;
   const { id } = await params;
   const body = await req.json().catch(() => null);

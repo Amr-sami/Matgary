@@ -351,6 +351,13 @@
       "when": 1781900400000,
       "tag": "0049_push_receipts",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1781900500000,
+      "tag": "0050_stock_discrepancies",
+      "breakpoints": true
     }
   ]
 }

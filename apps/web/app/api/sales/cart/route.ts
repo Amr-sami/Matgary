@@ -46,6 +46,11 @@ const schema = z.object({
       // Partial payment: amount the customer paid at the counter on a
       // deferred sale. Distributed proportionally across the lines.
       amountPaidNow: z.number().min(0).max(10_000_000).optional(),
+      // S7 (doc 06 §6.5): offline replay of a sale the customer already
+      // walked out with. Books the sale even when a line exceeds stock —
+      // quantity floors at 0 and a discrepancy row lands in product_history.
+      // Interactive sales leave it false and keep the INSUFFICIENT_STOCK 400.
+      allowOversell: z.boolean().default(false),
     })
     .optional(),
 });
@@ -92,6 +97,18 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
   }
+  // S7 guard (doc 02 S13 "keep the hard 400 for interactive online sales"):
+  // the oversell bypass is ONLY for the offline outbox replaying a sale the
+  // customer already left with, and every outbox replay carries an
+  // Idempotency-Key. A bare interactive/crafted POST with the flag is
+  // refused, so `record_sales` alone cannot silently write a stock
+  // adjustment by flipping one boolean.
+  if (parsed.data.options?.allowOversell && !idemp) {
+    return NextResponse.json(
+      { error: "OVERSELL_REQUIRES_IDEMPOTENCY_KEY" },
+      { status: 400 },
+    );
+  }
   // Customer phone normalises to canonical +20 form so the customer-history
   // lookup matches across "0100…" and "+20100…" entries. Junk input becomes
   // null rather than rejecting the sale (the cashier shouldn't be blocked
@@ -130,6 +147,9 @@ export async function POST(req: NextRequest) {
         customerPhone: result.customerPhone,
         note: result.note,
         lines: result.lines,
+        // S7: who booked an oversell, and by how much — auditable without
+        // joining stock_discrepancies.
+        ...(result.oversold.length > 0 ? { oversold: result.oversold } : {}),
       },
     });
     // Cache the response so a replay of the same Idempotency-Key returns
@@ -139,22 +159,18 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json(result, { status: 201 });
   } catch (err) {
+    // Failures are NOT cached — only a 2xx is. A domain refusal (or a 500)
+    // means nothing was booked, so replaying the key cannot double-post,
+    // and the offline POS retries a refused sale under the SAME key with
+    // corrected options (S7: `allowOversell: true` after the cashier
+    // confirms the sell-anyway sheet) — a cached 400 would answer that
+    // corrected retry with the stale refusal for 24h.
     if (isDomainError(err)) {
-      const body = domainErrorBody(err);
-      // Cache 4xx failures too so a stuck outbox row doesn't keep failing
-      // forever — same key returns the same error every time. Outbox owner
-      // can edit + resubmit with a fresh key if needed.
-      if (idemp) {
-        await rememberResponse(r.ctx.tenantId, idemp, err.httpStatus, body);
-      }
-      return NextResponse.json(body, { status: err.httpStatus });
+      return NextResponse.json(domainErrorBody(err), { status: err.httpStatus });
     }
     // Truly unexpected — log and 500. Sentry breadcrumb already captured
     // by the global handler.
     const errorBody = { error: "INTERNAL", detail: err instanceof Error ? err.message : String(err) };
-    if (idemp) {
-      await rememberResponse(r.ctx.tenantId, idemp, 500, errorBody);
-    }
     return NextResponse.json(errorBody, { status: 500 });
   }
 }
