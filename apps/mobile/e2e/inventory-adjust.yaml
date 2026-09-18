@@ -62,8 +62,14 @@ appId: com.thestoro.app
 - assertVisible:
     id: "adjust-delta"
     text: "1"
+- scrollUntilVisible:
+    element:
+      id: "adjust-apply"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
 - tapOn:
-    text: "حفظ التعديل|Save adjustment"
+    id: "adjust-apply"
 # The success notice renders under the header card, off the top of the screen
 # while the adjust card is centred, and lives 4 s. The delta field resetting to
 # "0" is the on-screen success signal; the history row below proves the write.
@@ -95,8 +101,14 @@ appId: com.thestoro.app
 - assertVisible:
     id: "adjust-delta"
     text: "-1"
+- scrollUntilVisible:
+    element:
+      id: "adjust-apply"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
 - tapOn:
-    text: "حفظ التعديل|Save adjustment"
+    id: "adjust-apply"
 # The success notice renders under the header card, off the top of the screen
 # while the adjust card is centred, and lives 4 s. The delta field resetting to
 # "0" is the on-screen success signal; the history row below proves the write.

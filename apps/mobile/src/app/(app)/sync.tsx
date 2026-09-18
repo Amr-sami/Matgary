@@ -275,6 +275,8 @@ export default function SyncScreen() {
             disabled={!off.online || off.draining}
           />
         </View>
+        {/* Dev-only, sits first so a QA run never has to scroll past synced items. */}
+        {__DEV__ ? <DevTools /> : null}
         {failed.length > 0 ? (
           <Button label={t("mobile.sync.retryAll")} variant="outline" onPress={() => void onRetryAll()} disabled={off.draining} style={styles.grow} />
         ) : null}
@@ -334,7 +336,6 @@ export default function SyncScreen() {
         </>
       ) : null}
 
-      {__DEV__ ? <DevTools /> : null}
     </Screen>
   );
 }
