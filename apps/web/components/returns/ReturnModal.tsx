@@ -14,11 +14,14 @@ interface ReturnModalProps {
   onClose: () => void;
   sale: Sale | null;
   onSuccess: () => void;
+  /** Surfaces a failed POST /api/returns (400 / 403 / network) — the
+   *  host page feeds it to its Toast. Mirrors SupplierPaymentModal. */
+  onError?: (message: string) => void;
 }
 
 type ReturnReasonKey = "defect" | "not_liked" | "wrong_size" | "other";
 
-export function ReturnModal({ isOpen, onClose, sale, onSuccess }: ReturnModalProps) {
+export function ReturnModal({ isOpen, onClose, sale, onSuccess, onError }: ReturnModalProps) {
   const dict = useDictionary();
   const t = dict.app.sales.returnModal;
   const [loading, setLoading] = useState(false);
@@ -52,6 +55,7 @@ export function ReturnModal({ isOpen, onClose, sale, onSuccess }: ReturnModalPro
       setOtherReason("");
     } catch (error) {
       console.error(error);
+      onError?.(error instanceof Error && error.message ? error.message : dict.app.common.error);
     } finally {
       setLoading(false);
     }

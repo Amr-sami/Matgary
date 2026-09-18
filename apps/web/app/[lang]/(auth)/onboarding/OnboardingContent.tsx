@@ -26,12 +26,9 @@ import {
   type OnboardingErrorCode,
 } from "../actions";
 
-type Preset = "cornerstore" | "blank";
-type Step = 1 | 2;
+import { TIP_HREFS, type OnboardingPreset as Preset } from "./tip-hrefs";
 
-// Where each step-2 (review) tip's `link` token actually lands the user.
-// Logged-in app routes are unprefixed.
-const TIP_HREFS = ["/inventory/new", "/sales", "/settings"] as const;
+type Step = 1 | 2;
 
 // Visual config for the tour slides. Pairs each slide (by index, same order
 // as `t.tour.slides[]`) with the icon + accent + screenshot to render.
@@ -226,7 +223,7 @@ export function OnboardingContent({ initialShopName }: Props) {
                 {tip.before}
                 {tip.link && (
                   <Link
-                    href={TIP_HREFS[i] ?? "/"}
+                    href={TIP_HREFS[preset][i] ?? "/"}
                     className="text-accent hover:underline underline-offset-4"
                   >
                     {tip.link}

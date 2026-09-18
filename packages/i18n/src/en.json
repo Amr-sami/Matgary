@@ -1071,7 +1071,21 @@
     },
     "returns": {
       "title": "Returns",
-      "monthLabel": "Returns this month"
+      "monthLabel": "Returns this month",
+      "record": "Record return",
+      "pickSale": {
+        "title": "Choose the sale to return",
+        "search": "Search by product, invoice or customer…",
+        "empty": "No sales match your search.",
+        "noSales": "No sales in the last 60 days to return.",
+        "qty": "{n} pcs"
+      },
+      "table": {
+        "date": "Date",
+        "product": "Product",
+        "quantity": "Returned qty",
+        "reason": "Reason"
+      }
     },
     "admin": {
       "shell": {
@@ -2699,9 +2713,18 @@
         "purchaseOrdersEmpty": "No purchase orders for this supplier yet.",
         "itemCount": "{n} items",
         "payments": "Payments",
-        "paymentsEmpty": "No payments recorded. Add one from the Expenses page using the \"Supplier\" category.",
+        "paymentsEmpty": "No payments recorded yet. Use \"Record payment\" to add the first one.",
         "toast": {
-          "edited": "Changes saved"
+          "edited": "Changes saved",
+          "paymentRecorded": "Payment recorded"
+        },
+        "recordPayment": "Record payment",
+        "paymentModal": {
+          "title": "Record supplier payment",
+          "defaultTitle": "Payment to {name}",
+          "hint": "Recorded as an expense under the Supplier category and deducted from the balance owed.",
+          "owed": "Currently owed: {amount}",
+          "submit": "Record payment"
         }
       },
       "form": {
@@ -4061,6 +4084,12 @@
         "subtitle": "Your changes reset on refresh. Edit anything safely.",
         "exit": "Exit demo",
         "exitting": "Exiting…"
+      },
+      "exitCta": {
+        "title": "Liked what you saw? Start your store",
+        "body": "Set up your own TheStoro store in two minutes — your products, your team, your numbers. No commitment.",
+        "button": "Start your store",
+        "haveAccount": "Already have an account? Sign in below."
       }
     }
   },

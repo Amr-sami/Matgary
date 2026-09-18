@@ -556,6 +556,7 @@ function SalesPageInner() {
         onClose={() => setReturnSale(null)}
         sale={returnSale}
         onSuccess={handleReturnSuccess}
+        onError={(message) => setToast({ type: "error", message })}
       />
 
       <EditSaleModal

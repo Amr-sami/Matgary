@@ -17,6 +17,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/Button";
 import { Toast } from "@/components/ui/Toast";
 import { SupplierFormModal } from "@/components/suppliers/SupplierFormModal";
+import { SupplierPaymentModal } from "@/components/suppliers/SupplierPaymentModal";
 import { usePurchaseOrders } from "@/hooks/usePurchaseOrders";
 import { useExpenses } from "@/hooks/useExpenses";
 import { can } from "@/lib/permissions";
@@ -45,14 +46,18 @@ export default function SupplierDetailPage({
     ? { role: session.user.role, permissions: session.user.permissions }
     : null;
   const canManage = can(principal, "manage_suppliers");
+  // A supplier payment is an expense (category "supplier"), so it is gated
+  // by the same permission POST /api/expenses enforces.
+  const canPay = can(principal, "manage_expenses");
 
   const [supplier, setSupplier] = useState<SupplierDescriptor | null>(null);
   const [loading, setLoading] = useState(true);
   const [editOpen, setEditOpen] = useState(false);
+  const [payOpen, setPayOpen] = useState(false);
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const { data: orders } = usePurchaseOrders({ supplierId: id });
-  const { expenses } = useExpenses();
+  const { expenses, refresh: refreshExpenses } = useExpenses();
 
   const supplierExpenses = useMemo(
     () =>
@@ -154,12 +159,20 @@ export default function SupplierDetailPage({
               )}
             </div>
           </div>
-          {canManage && (
-            <Button variant="secondary" onClick={() => setEditOpen(true)}>
-              <Pencil className="w-4 h-4 me-1" />
-              {t.edit}
-            </Button>
-          )}
+          <div className="flex flex-wrap gap-2 shrink-0">
+            {canPay && (
+              <Button onClick={() => setPayOpen(true)}>
+                <Wallet className="w-4 h-4 me-1" />
+                {t.recordPayment}
+              </Button>
+            )}
+            {canManage && (
+              <Button variant="secondary" onClick={() => setEditOpen(true)}>
+                <Pencil className="w-4 h-4 me-1" />
+                {t.edit}
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Stats */}
@@ -234,10 +247,17 @@ export default function SupplierDetailPage({
 
         {/* Payments (linked expenses) */}
         <section>
-          <h2 className="text-lg font-bold text-text-primary mb-3 flex items-center gap-2">
-            <Wallet className="w-5 h-5" />
-            {t.payments}
-          </h2>
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
+              <Wallet className="w-5 h-5" />
+              {t.payments}
+            </h2>
+            {canPay && supplierExpenses.length > 0 && (
+              <Button variant="secondary" className="min-h-[44px]" onClick={() => setPayOpen(true)}>
+                {t.recordPayment}
+              </Button>
+            )}
+          </div>
           {supplierExpenses.length === 0 ? (
             <p className="text-sm text-text-secondary">
               {t.paymentsEmpty}
@@ -267,6 +287,19 @@ export default function SupplierDetailPage({
         onSaved={async () => {
           setToast({ type: "success", message: t.toast.edited });
           await fetchSupplier();
+        }}
+        onError={(message) => setToast({ type: "error", message })}
+      />
+
+      <SupplierPaymentModal
+        isOpen={payOpen}
+        onClose={() => setPayOpen(false)}
+        supplier={supplier}
+        onSaved={async () => {
+          // Balance lives on the supplier row (debited server-side); the
+          // payment list is the linked expenses. Refresh both before the toast.
+          await Promise.all([fetchSupplier(), refreshExpenses()]);
+          setToast({ type: "success", message: t.toast.paymentRecorded });
         }}
         onError={(message) => setToast({ type: "error", message })}
       />

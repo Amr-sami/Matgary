@@ -9,6 +9,14 @@
 // seed data changes.
 //
 //   pnpm tsx scripts/seed-demo-template.ts
+//
+// RE-SEED CADENCE: every dated row (sales, returns, expenses, tasks…) is
+// stamped relative to the moment this script runs, and lib/demo/clone-tenant.ts
+// copies those timestamps verbatim into each visitor's clone. Nothing shifts
+// them later, so "this month" / "this week" tiles (مرتجعات الشهر, مبيعات
+// الأسبوع) decay as the calendar moves on and read 0 after a month boundary.
+// Re-run `npm run db:seed:demo` at least monthly — ideally on the 1st — or
+// whenever the trial's dashboard starts looking empty.
 
 import "dotenv/config";
 import bcrypt from "bcryptjs";
@@ -26,6 +34,7 @@ import {
   productHistory,
   categories,
   subscriptions,
+  returns,
 } from "@/lib/db/schema";
 import { seedCornerStorePreset } from "@/lib/seeds/cornerstore";
 import { DEFAULT_MESSAGE_TEMPLATE } from "@/lib/settings.defaults";
@@ -33,7 +42,7 @@ import { addSupplier } from "@/lib/repo/suppliers";
 import { createPurchaseOrder } from "@/lib/repo/purchase-orders";
 import { createTask } from "@/lib/repo/tasks";
 import { addExpense } from "@/lib/repo/expenses";
-import { recordSale } from "@/lib/repo/operations";
+import { recordReturn, recordSale } from "@/lib/repo/operations";
 import { logActivity } from "@/lib/repo/activity";
 
 const TEMPLATE_EMAIL = "demo-template@matgary.local";
@@ -334,6 +343,9 @@ async function main() {
   const SALE_COUNT = 45;
   console.log(`Recording ${SALE_COUNT} sales across the past 30 days…`);
   const PAYMENT_METHODS = ["cash", "cash", "cash", "instapay", "card", "deferred"] as const;
+  // Sales worth returning later — recent, non-deferred, qty >= 1. The demo
+  // must show مرتجعات الشهر > 0 and a populated /returns (HANDOFF §8 item 11).
+  const returnable: Array<{ saleId: string; productId: string; qty: number; soldAt: Date }> = [];
   for (let i = 0; i < SALE_COUNT; i++) {
     const product = pick(productIds);
     const qty = Math.random() < 0.7 ? 1 : 2;
@@ -341,15 +353,16 @@ async function main() {
     const paymentMethod = pick(PAYMENT_METHODS);
     const discountPct = Math.random() < 0.3 ? Math.floor(Math.random() * 15) + 5 : 0;
     const offsetDays = i < SALE_COUNT * 0.25 ? 0 : Math.floor(Math.random() * 30);
+    const soldAt = daysAgo(offsetDays);
     try {
-      await recordSale(tenantId, {
+      const { saleId } = await recordSale(tenantId, {
         productId: product.id,
         quantitySold: qty,
         pricePerUnit: product.price,
         customerName: customer?.name,
         customerPhone: customer?.phone,
         paymentMethod,
-        customDate: daysAgo(offsetDays),
+        customDate: soldAt,
         recordedByUserId: userId,
         branchId,
         ...(discountPct > 0
@@ -357,8 +370,40 @@ async function main() {
           : {}),
         ...(paymentMethod === "deferred" ? { amountPaidNow: 0 } : {}),
       });
+      if (paymentMethod !== "deferred" && offsetDays <= 7) {
+        returnable.push({ saleId, productId: product.id, qty, soldAt });
+      }
     } catch (err) {
       console.warn(`  skipped sale #${i}: ${(err as Error).message ?? String(err)}`);
+    }
+  }
+
+  // Returns — two of this week's sales come back, so the dashboard's
+  // مرتجعات الشهر tile and /returns aren't empty in the trial. recordReturn
+  // re-credits stock and flags the sale, exactly like the POS return flow.
+  const RETURN_REASONS = ["عيب في المنتج", "المقاس مش مناسب", "العميل غيّر رأيه"];
+  const RETURN_COUNT = Math.min(2, returnable.length);
+  console.log(`Recording ${RETURN_COUNT} returns…`);
+  for (let i = 0; i < RETURN_COUNT; i++) {
+    const r = returnable[i];
+    try {
+      const { returnId } = await recordReturn(tenantId, {
+        saleId: r.saleId,
+        productId: r.productId,
+        returnedQuantity: r.qty,
+        reason: RETURN_REASONS[i % RETURN_REASONS.length],
+      });
+      // recordReturn stamps return_date = now(). Back-date it to the day
+      // after the sale (never in the future) so the row reads as a real
+      // return — and, for a sale from earlier today, so the return isn't
+      // filed at the exact second the seed ran. Still inside the current
+      // month at seed time; see RE-SEED CADENCE in the header.
+      const returnDate = new Date(
+        Math.min(Date.now(), r.soldAt.getTime() + 24 * 60 * 60 * 1000),
+      );
+      await db.update(returns).set({ returnDate }).where(eq(returns.id, returnId));
+    } catch (err) {
+      console.warn(`  skipped return #${i}: ${(err as Error).message ?? String(err)}`);
     }
   }
 

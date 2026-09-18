@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/Input";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
 import { safeNext } from "@/lib/url-safe";
+import { Store } from "@/lib/icons";
 import { AuthSuspenseCard } from "../SuspenseCard";
 
 function cleanIdentifier(v: string): string {
@@ -34,6 +35,9 @@ function LoginInner() {
   // safeNext keeps an attacker from turning ?next=https://evil.com into an
   // open redirect after sign-in. Only same-origin relative paths survive.
   const next = safeNext(search.get("next"));
+  // Set by /api/demo/exit: the visitor just left the trial store. Lead with
+  // the conversion card instead of a bare login form (HANDOFF §8 item 12).
+  const fromDemo = search.get("from") === "demo";
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // H03 — 2FA step is shown after a first-pass submit returns TotpRequired.
@@ -122,6 +126,25 @@ function LoginInner() {
 
   return (
     <div className="w-full bg-white p-4 lg:p-8 lg:rounded-2xl lg:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.18)]">
+      {fromDemo && (
+        <section
+          data-testid="demo-exit-cta"
+          className="mb-6 rounded-xl border border-accent/30 bg-accent/5 p-4 text-center space-y-3"
+        >
+          <div className="mx-auto w-10 h-10 rounded-full bg-accent text-white flex items-center justify-center">
+            <Store className="w-5 h-5" />
+          </div>
+          <h2 className="text-lg font-bold text-text-primary">{auth.demo.exitCta.title}</h2>
+          <p className="text-sm text-text-secondary">{auth.demo.exitCta.body}</p>
+          <Link href={`/${locale}/signup`} className="block">
+            <Button type="button" className="w-full">
+              {auth.demo.exitCta.button}
+            </Button>
+          </Link>
+          <p className="text-xs text-text-secondary">{auth.demo.exitCta.haveAccount}</p>
+        </section>
+      )}
+
       <div className="text-center mb-6">
         <h1 className="text-2xl font-bold text-text-primary">{t.title}</h1>
         <p className="text-sm text-text-secondary mt-1">{t.subhead}</p>

@@ -37,7 +37,9 @@ async function exitDemo(req: NextRequest): Promise<NextResponse> {
   }
 
   const locale = req.headers.get("x-locale") === "en" ? "en" : "ar";
-  const redirect = new URL(`/${locale}/login`, appOrigin(req));
+  // `from=demo` lets the login page show the "Start your store" conversion
+  // card above the form — the prospect just finished the trial.
+  const redirect = new URL(`/${locale}/login?from=demo`, appOrigin(req));
   const res = NextResponse.redirect(redirect);
   for (const name of AUTH_COOKIE_NAMES) {
     res.cookies.set({
