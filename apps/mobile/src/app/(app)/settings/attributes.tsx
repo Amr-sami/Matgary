@@ -1,10 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -31,10 +28,12 @@ import { ChevronBack } from "@/components/ui/Chevron";
 import { Chip } from "@/components/ui/Chip";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
+import { Sheet } from "@/components/ui/Sheet";
+import { countLabel } from "@/lib/format";
 import { useSession } from "@/stores/session";
-import { RTL_TEXT, directionStyle } from "@/theme/rtl";
-import { MIN_TOUCH, colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
-import { getLocale, t } from "@/i18n";
+import { RTL_TEXT } from "@/theme/rtl";
+import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
+import { t } from "@/i18n";
 
 /**
  * Port of the web's AttributesEditor — the accordion body inside each category
@@ -75,17 +74,6 @@ function errText(e: unknown): string {
 
 const byPosition = <T extends { position: number; label: string }>(rows: T[]) =>
   [...rows].sort((a, b) => a.position - b.position || a.label.localeCompare(b.label));
-
-/**
- * "1 attribute", not "1 attributes" — and Arabic counts differently again:
- * 1 is the bare noun, 2 the dual (خاصيتان), 3–10 the plural (خصائص), 11+ the
- * singular after the number. The dictionary carries One/Two/Few next to the
- * default form (same shape as app.activity.relative.*); this picks one.
- */
-function countLabel(key: "attributeCount" | "valuesCount", n: number): string {
-  const form = n === 1 ? "One" : n === 2 ? "Two" : n >= 3 && n <= 10 ? "Few" : "";
-  return t(`mobile.catalog.${key}${form}`, { n });
-}
 
 export default function AttributesSettingsScreen() {
   const router = useRouter();
@@ -317,7 +305,7 @@ export default function AttributesSettingsScreen() {
             />
           ) : (
             <View style={{ gap: spacing.sm }}>
-              <Text style={styles.countLine}>{countLabel("attributeCount", attrs.length)}</Text>
+              <Text style={styles.countLine}>{countLabel("mobile.catalog.attributeCount", attrs.length)}</Text>
               {attrs.map((a, i) => {
                 const open = expanded === a.id;
                 const values = byPosition(a.values);
@@ -338,7 +326,7 @@ export default function AttributesSettingsScreen() {
                         <Text style={styles.rowTitle} numberOfLines={1}>{a.label}</Text>
                         <View style={styles.metaRow}>
                           <Text style={styles.key} numberOfLines={1}>{a.key}</Text>
-                          <Badge label={countLabel("valuesCount", a.values.length)} variant="neutral" />
+                          <Badge label={countLabel("mobile.catalog.valuesCount", a.values.length)} variant="neutral" />
                           {a.required ? <Badge label={t("app.common.required")} variant="accent" /> : null}
                         </View>
                       </View>
@@ -430,44 +418,42 @@ export default function AttributesSettingsScreen() {
         </View>
       )}
 
-      <Modal visible={sheet !== null} transparent animationType="slide" onRequestClose={() => setSheet(null)}>
-        {sheet?.kind === "add-attr" ? (
-          <NameSheet
-            key="add-attr"
-            title={t("app.catalog.categoriesAdmin.attributes.addAttribute")}
-            fieldLabel={t("mobile.catalog.attributeLabel")}
-            placeholder={t("app.catalog.categoriesAdmin.attributes.namePlaceholder")}
-            initial=""
-            required={false}
-            pending={createAttr.isPending}
-            onClose={() => setSheet(null)}
-            onSubmit={(label, required) => createAttr.mutate({ label, required: required ?? false })}
-          />
-        ) : sheet?.kind === "edit-attr" ? (
-          <NameSheet
-            key={sheet.attr.id}
-            title={t("mobile.catalog.editAttribute")}
-            fieldLabel={t("mobile.catalog.attributeLabel")}
-            placeholder={t("app.catalog.categoriesAdmin.attributes.namePlaceholder")}
-            initial={sheet.attr.label}
-            required={sheet.attr.required}
-            pending={updateAttr.isPending}
-            onClose={() => setSheet(null)}
-            onSubmit={(label, required) => updateAttr.mutate({ id: sheet.attr.id, label, required })}
-          />
-        ) : sheet?.kind === "edit-value" ? (
-          <NameSheet
-            key={sheet.value.id}
-            title={t("mobile.catalog.editValue")}
-            fieldLabel={t("mobile.catalog.valueLabel")}
-            placeholder={t("app.catalog.categoriesAdmin.attributes.valuePlaceholder")}
-            initial={sheet.value.label}
-            pending={updateValue.isPending}
-            onClose={() => setSheet(null)}
-            onSubmit={(label) => updateValue.mutate({ id: sheet.value.id, label })}
-          />
-        ) : null}
-      </Modal>
+      {/* One sheet, three configurations; `seedKey` flips per open so the
+          field re-seeds from the row being edited. */}
+      <NameSheet
+        visible={sheet !== null}
+        seedKey={
+          sheet?.kind === "add-attr"
+            ? "add-attr"
+            : sheet?.kind === "edit-attr"
+              ? sheet.attr.id
+              : sheet?.kind === "edit-value"
+                ? sheet.value.id
+                : null
+        }
+        title={
+          sheet?.kind === "add-attr"
+            ? t("app.catalog.categoriesAdmin.attributes.addAttribute")
+            : sheet?.kind === "edit-value"
+              ? t("mobile.catalog.editValue")
+              : t("mobile.catalog.editAttribute")
+        }
+        fieldLabel={sheet?.kind === "edit-value" ? t("mobile.catalog.valueLabel") : t("mobile.catalog.attributeLabel")}
+        placeholder={
+          sheet?.kind === "edit-value"
+            ? t("app.catalog.categoriesAdmin.attributes.valuePlaceholder")
+            : t("app.catalog.categoriesAdmin.attributes.namePlaceholder")
+        }
+        initial={sheet?.kind === "edit-attr" ? sheet.attr.label : sheet?.kind === "edit-value" ? sheet.value.label : ""}
+        required={sheet?.kind === "add-attr" ? false : sheet?.kind === "edit-attr" ? sheet.attr.required : undefined}
+        pending={createAttr.isPending || updateAttr.isPending || updateValue.isPending}
+        onClose={() => setSheet(null)}
+        onSubmit={(label, required) => {
+          if (sheet?.kind === "add-attr") createAttr.mutate({ label, required: required ?? false });
+          else if (sheet?.kind === "edit-attr") updateAttr.mutate({ id: sheet.attr.id, label, required });
+          else if (sheet?.kind === "edit-value") updateValue.mutate({ id: sheet.value.id, label });
+        }}
+      />
     </Screen>
   );
 }
@@ -492,6 +478,8 @@ function IconBtn({ label, disabled, onPress, children }: { label: string; disabl
  * and value edit (label only — `required` is omitted so the toggle hides).
  */
 function NameSheet({
+  visible,
+  seedKey,
   title,
   fieldLabel,
   placeholder,
@@ -501,6 +489,9 @@ function NameSheet({
   onClose,
   onSubmit,
 }: {
+  visible: boolean;
+  /** Changes per open — re-seeds the field and the toggle. */
+  seedKey: string | null;
   title: string;
   fieldLabel: string;
   placeholder: string;
@@ -512,48 +503,57 @@ function NameSheet({
 }) {
   const [label, setLabel] = useState(initial);
   const [req, setReq] = useState(required ?? false);
+  useEffect(() => {
+    if (seedKey !== null) {
+      setLabel(initial);
+      setReq(required ?? false);
+    }
+    // Only re-seed when a sheet OPENS (seedKey flips), not on every parent render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seedKey]);
   const showRequired = required !== undefined;
   const valid = label.trim().length > 0 && label.trim().length <= 80;
   const submit = () => onSubmit(label.trim(), showRequired ? req : undefined);
   return (
-    <View style={[styles.overlay, directionStyle(getLocale() === "ar")]}>
-      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel={t("app.common.close")} />
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <View style={styles.sheet}>
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetBody}>
-            <Text style={styles.sheetTitle}>{title}</Text>
-            <Field
-              label={fieldLabel}
-              value={label}
-              onChangeText={setLabel}
-              placeholder={placeholder}
-              autoFocus
-              maxLength={80}
-              returnKeyType="done"
-              onSubmitEditing={() => valid && !pending && submit()}
-            />
-            {showRequired ? (
-              <View style={styles.switchRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.switchLabel}>{t("mobile.catalog.requiredLabel")}</Text>
-                  <Text style={styles.hint}>{t("mobile.catalog.requiredHint")}</Text>
-                </View>
-                <Switch
-                  value={req}
-                  onValueChange={setReq}
-                  trackColor={{ true: colors.accent, false: colors.border }}
-                  accessibilityLabel={t("mobile.catalog.requiredLabel")}
-                />
-              </View>
-            ) : null}
-            <View style={styles.sheetActions}>
-              <Button label={t("app.common.cancel")} variant="ghost" onPress={onClose} style={{ flex: 1 }} />
-              <Button label={t("app.common.save")} onPress={submit} disabled={!valid} loading={pending} style={{ flex: 1 }} />
-            </View>
-          </ScrollView>
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title={title}
+      testID="attribute-form"
+      primaryAction={{
+        label: t("app.common.save"),
+        onPress: submit,
+        disabled: !valid,
+        loading: pending,
+        testID: "attribute-form-submit",
+      }}
+      secondaryAction={{ label: t("app.common.cancel"), onPress: onClose }}
+    >
+      <Field
+        label={fieldLabel}
+        value={label}
+        onChangeText={setLabel}
+        placeholder={placeholder}
+        autoFocus
+        maxLength={80}
+        returnKeyType="done"
+        onSubmitEditing={() => valid && !pending && submit()}
+      />
+      {showRequired ? (
+        <View style={styles.switchRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.switchLabel}>{t("mobile.catalog.requiredLabel")}</Text>
+            <Text style={styles.hint}>{t("mobile.catalog.requiredHint")}</Text>
+          </View>
+          <Switch
+            value={req}
+            onValueChange={setReq}
+            trackColor={{ true: colors.accent, false: colors.border }}
+            accessibilityLabel={t("mobile.catalog.requiredLabel")}
+          />
         </View>
-      </KeyboardAvoidingView>
-    </View>
+      ) : null}
+    </Sheet>
   );
 }
 
@@ -609,19 +609,6 @@ const styles = StyleSheet.create({
   valueLabel: { fontFamily: fonts.medium, fontSize: 15, color: colors.text, ...RTL_TEXT },
   addValueRow: { flexDirection: "row", alignItems: "flex-end", gap: spacing.sm },
   addValueBtn: { minWidth: 88 },
-  overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: colors.scrim },
-  sheet: {
-    backgroundColor: colors.card,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    maxHeight: "90%",
-    ...elevation.modal,
-  },
-  sheetBody: { padding: spacing.xl, gap: spacing.lg },
-  sheetTitle: { fontFamily: fonts.bold, fontSize: 18, color: colors.text, ...RTL_TEXT },
   switchRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   switchLabel: { fontFamily: fonts.medium, fontSize: 15, color: colors.text, ...RTL_TEXT },
-  sheetActions: { flexDirection: "row", gap: spacing.md },
 });

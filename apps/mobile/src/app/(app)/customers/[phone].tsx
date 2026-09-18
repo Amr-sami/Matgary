@@ -2,11 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -32,12 +28,13 @@ import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
 import { Segmented } from "@/components/ui/Segmented";
+import { Sheet } from "@/components/ui/Sheet";
 import { money, shortDate } from "@/lib/format";
 import { customerPhoneParam } from "@/lib/customer-phone";
 import { useSession } from "@/stores/session";
-import { RTL_TEXT, directionStyle } from "@/theme/rtl";
+import { RTL_TEXT } from "@/theme/rtl";
 import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
-import { getLocale, t } from "@/i18n";
+import { t } from "@/i18n";
 
 /**
  * Doc 02 §1.1 row 6 — RECOMPOSE: ledger + wallet + tap-to-settle per invoice
@@ -570,60 +567,51 @@ function SettleSheet({
   const wouldOverpay = typed > balance;
 
   return (
-    <Modal visible={Boolean(invoice)} transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={[styles.overlay, directionStyle(getLocale() === "ar")]}
-      >
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel={t("app.common.close")} />
-        <View style={styles.sheet}>
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetBody}>
-            <Text style={styles.sheetTitle}>{t("app.customers.settle.title")}</Text>
-            {invoice ? (
-              <Text style={styles.sheetSub}>
-                {/* LRI…PDI: the Latin id must not be the paragraph's first strong
-                    character, or TextKit lays the whole Arabic line out LTR. */}
-                {`\u2066${invoice.invoiceId}\u2069`} · {t("mobile.customers.remaining", { amount: money(invoice.balance) })}
-              </Text>
-            ) : null}
-            {invoice && invoice.amountPaid > 0 ? (
-              <Text style={styles.sheetSub}>
-                {t("mobile.customers.paid", { amount: money(invoice.amountPaid) })}
-              </Text>
-            ) : null}
+    <Sheet
+      visible={Boolean(invoice)}
+      onClose={onClose}
+      title={t("app.customers.settle.title")}
+      testID="settle"
+      bodyStyle={styles.sheetBody}
+      primaryAction={{
+        label: `${t("app.customers.settle.submit")} · ${money(amount)}`,
+        onPress: () => onSubmit(amount, method),
+        loading: busy,
+        disabled: amount <= 0,
+        testID: "settle-submit",
+      }}
+      secondaryAction={{ label: t("app.common.cancel"), onPress: onClose, disabled: busy }}
+    >
+      {invoice ? (
+        <Text style={styles.sheetSub}>
+          {/* LRI…PDI: the Latin id must not be the paragraph's first strong
+              character, or TextKit lays the whole Arabic line out LTR. */}
+          {`\u2066${invoice.invoiceId}\u2069`} · {t("mobile.customers.remaining", { amount: money(invoice.balance) })}
+        </Text>
+      ) : null}
+      {invoice && invoice.amountPaid > 0 ? (
+        <Text style={styles.sheetSub}>
+          {t("mobile.customers.paid", { amount: money(invoice.amountPaid) })}
+        </Text>
+      ) : null}
 
-            <Field
-              label={t("app.customers.settle.amountLabel")}
-              value={amountInput}
-              onChangeText={setAmountInput}
-              keyboardType="decimal-pad"
-              editable={!busy}
-              testID="settle-amount"
-            />
-            {wouldOverpay ? (
-              <Text style={styles.hint}>{t("app.customers.settle.overpayHint")}</Text>
-            ) : null}
+      <Field
+        label={t("app.customers.settle.amountLabel")}
+        value={amountInput}
+        onChangeText={setAmountInput}
+        keyboardType="decimal-pad"
+        editable={!busy}
+        testID="settle-amount"
+      />
+      {wouldOverpay ? (
+        <Text style={styles.hint}>{t("app.customers.settle.overpayHint")}</Text>
+      ) : null}
 
-            <Text style={styles.fieldLabel}>{t("app.customers.settle.methodLabel")}</Text>
-            <Segmented items={METHODS()} value={method} onChange={setMethod} />
+      <Text style={styles.fieldLabel}>{t("app.customers.settle.methodLabel")}</Text>
+      <Segmented items={METHODS()} value={method} onChange={setMethod} />
 
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-            <View style={styles.sheetActions}>
-              <View testID="settle-submit">
-                <Button
-                  label={`${t("app.customers.settle.submit")} · ${money(amount)}`}
-                  onPress={() => onSubmit(amount, method)}
-                  loading={busy}
-                  disabled={amount <= 0}
-                />
-              </View>
-              <Button variant="ghost" label={t("app.common.cancel")} onPress={onClose} disabled={busy} />
-            </View>
-          </ScrollView>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+    </Sheet>
   );
 }
 
@@ -713,8 +701,10 @@ const styles = StyleSheet.create({
   },
   actions: { marginTop: spacing.lg },
 
-  walletRow: { flexDirection: "row", gap: spacing.md, marginTop: spacing.md },
-  walletCell: { flex: 1, minWidth: 0, gap: 2, alignItems: "flex-start" },
+  // Same 50% + end-gutter columns as `stat`, so the wallet's second column
+  // starts on the stats grid's second column (a row gap + flex:1 put it ~6pt off).
+  walletRow: { flexDirection: "row", marginTop: spacing.md },
+  walletCell: { width: "50%", paddingEnd: spacing.md, gap: 2, alignItems: "flex-start" },
   walletValue: {
     fontFamily: fonts.bold,
     fontSize: 18,
@@ -804,22 +794,9 @@ const styles = StyleSheet.create({
   },
 
   // Settle sheet
-  overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: colors.scrim },
-  sheet: {
-    backgroundColor: colors.card,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    maxHeight: "85%",
-    paddingBottom: spacing.xxl,
-    ...elevation.modal,
-  },
-  sheetBody: { paddingHorizontal: spacing.xl, paddingTop: spacing.xl, gap: spacing.md },
-  sheetTitle: { fontFamily: fonts.bold, fontSize: 16, color: colors.text, ...RTL_TEXT },
+  sheetBody: { gap: spacing.md },
   sheetSub: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },
   fieldLabel: { fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },
   hint: { fontFamily: fonts.regular, fontSize: 12, color: colors.warningStrong, ...RTL_TEXT },
   errorText: { fontFamily: fonts.medium, fontSize: 13, color: colors.danger, ...RTL_TEXT },
-  sheetActions: { gap: spacing.sm, marginTop: spacing.sm },
 });

@@ -60,6 +60,9 @@ interface LastSale {
   rungAt: Date;
 }
 
+/** Cart-line trash glyph; sized here so trashBtn can centre it on the card edge. */
+const TRASH_ICON = 18;
+
 /**
  * The four methods the cart route accepts. Labels come from ONE namespace —
  * app.activityLabels.paymentMethods — the same one the dashboard badge,
@@ -581,7 +584,6 @@ export default function SalesScreen() {
                   style={styles.pill}
                   testID="pos-recent-chip"
                   onPress={() => cart.add(p)}
-                  hitSlop={{ top: 4, bottom: 4 }}
                   accessibilityRole="button"
                   accessibilityLabel={p.name}
                 >
@@ -623,7 +625,7 @@ export default function SalesScreen() {
                     accessibilityRole="button"
                     accessibilityLabel={t("app.sales.void.confirm")}
                   >
-                    <Trash size={18} color={colors.textSecondary} />
+                    <Trash size={TRASH_ICON} color={colors.textSecondary} />
                   </Pressable>
                 </View>
                 <View style={styles.cartControls}>
@@ -808,7 +810,7 @@ const styles = StyleSheet.create({
   // fonts.medium matches Field's own label, so the free-standing labels on
   // this card do not read lighter than the ones the inputs draw themselves.
   label: { fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary, marginBottom: spacing.sm, ...RTL_TEXT },
-  recentLabel: { marginTop: spacing.md },
+  recentLabel: { marginTop: spacing.lg },
   muted: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, marginTop: spacing.sm, ...RTL_TEXT },
   pillRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginBottom: spacing.sm },
   // Recent-product chips. flexShrink 0 + numberOfLines 1 is the Chip lesson
@@ -817,8 +819,11 @@ const styles = StyleSheet.create({
   // Coco Mademoiselle 50ml") each measured wider than half the card, so Yoga
   // wrapped every one onto its own line and the row read as a vertical list.
   // The cap ellipsises a long name instead; the full name shows in the cart.
-  pill: { backgroundColor: colors.accentLight, borderRadius: radius.full, paddingHorizontal: spacing.md, minHeight: 40, justifyContent: "center", flexShrink: 0, maxWidth: "100%" },
-  pillText: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 13, color: colors.accent },
+  // Same height, corner radius and type size as the payment <Chip>s that share
+  // this card, so the two pill rows read as one system; accent tint (not the
+  // Chip's bordered outline) keeps "tap to add" distinct from "select one".
+  pill: { backgroundColor: colors.accentLight, borderRadius: radius.md, paddingHorizontal: spacing.md, minHeight: MIN_TOUCH, justifyContent: "center", flexShrink: 0, maxWidth: "100%" },
+  pillText: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.accent },
   results: { marginTop: spacing.md, gap: spacing.sm },
   result: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md, minHeight: 56, paddingHorizontal: spacing.lg, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border },
   resultOut: { opacity: 0.45 },
@@ -831,7 +836,10 @@ const styles = StyleSheet.create({
   cartHead: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
   cartControls: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
   cartText: { flex: 1, minWidth: 0 },
-  trashBtn: { width: MIN_TOUCH, height: MIN_TOUCH, alignItems: "center", justifyContent: "center", marginTop: -spacing.sm, marginEnd: -spacing.sm },
+  // Negative end margin pulls the 44pt hit box out so the 18pt glyph's outer
+  // edge lands on the edge the line total and totals column share (Field.tsx
+  // does the same for its eye slot).
+  trashBtn: { width: MIN_TOUCH, height: MIN_TOUCH, alignItems: "center", justifyContent: "center", marginTop: -spacing.sm, marginEnd: -((MIN_TOUCH - TRASH_ICON) / 2) },
   cartName: { fontFamily: fonts.medium, fontSize: 14, color: colors.text, ...RTL_TEXT },
   cartUnit: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
   qty: { flexDirection: "row", alignItems: "center", gap: 4 },
@@ -851,7 +859,9 @@ const styles = StyleSheet.create({
   scanStrip: { marginTop: spacing.sm, minHeight: 44, justifyContent: "center", borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, backgroundColor: colors.neutralTint },
   scanStripSuccess: { backgroundColor: colors.successLight },
   scanStripError: { backgroundColor: colors.dangerLight },
-  scanStripText: { fontFamily: fonts.medium, fontSize: 14, color: colors.neutralText, textAlign: "center", ...RTL_TEXT },
+  // Centred on purpose (no RTL_TEXT): the feedback strip is a banner, not a
+  // start-aligned label — and RTL_TEXT after textAlign would win and pin it left.
+  scanStripText: { fontFamily: fonts.medium, fontSize: 14, color: colors.neutralText, textAlign: "center" },
   scanStripTextSuccess: { color: colors.successStrong },
   scanStripTextError: { color: colors.danger },
   errorText: { fontFamily: fonts.medium, fontSize: 14, color: colors.danger, textAlign: "center" },

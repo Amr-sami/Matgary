@@ -64,6 +64,7 @@ import { isRTL, t } from "@/i18n";
  * be handed off twice (cleared barcode, or "Add another" then re-scan).
  */
 type StepKey = "details" | "attributes" | "price" | "review";
+const STEPS: StepKey[] = ["details", "attributes", "price", "review"];
 
 /** Sentinel for the web's "Other (add a new brand)" option. */
 const OTHER_BRAND = "__other__";
@@ -137,12 +138,13 @@ export default function AddProductScreen() {
   // Retry before Next opens up; a category without attributes is not blocked.
   const attrsBlocked = attributes.isError && !!pickedCategory?.hasAttributes;
 
-  // The web skips step 2 when the category has no attributes; here the step
-  // simply is not in the list, so the rail and "step n of total" stay honest.
-  const steps: StepKey[] = attrs.length > 0
-    ? ["details", "attributes", "price", "review"]
-    : ["details", "price", "review"];
-  const step = steps[Math.min(stepIdx, steps.length - 1)];
+  // The rail is always four segments. The web skips step 2 when the category
+  // has no attributes, and so does goTo() here — but the step stays in the
+  // list: dropping it re-counted "step 1 of 3" to "of 4" and re-drew the rail
+  // the moment a category was tapped, mid-step (F77). Its segment is dimmed
+  // instead.
+  const hasAttrs = attrs.length > 0;
+  const step = STEPS[Math.min(stepIdx, STEPS.length - 1)];
 
   const priceN = parseMoney(price);
   // undefined = not given (the field is optional); null = typed but unparseable.
@@ -325,7 +327,12 @@ export default function AddProductScreen() {
   const goTo = (delta: number) => {
     setError(null);
     create.reset();
-    setStepIdx((i) => Math.min(steps.length - 1, Math.max(0, i + delta)));
+    setStepIdx((i) => {
+      const clamp = (n: number) => Math.min(STEPS.length - 1, Math.max(0, n));
+      const next = clamp(i + delta);
+      // Step over the attributes step in either direction when there are none.
+      return STEPS[next] === "attributes" && !hasAttrs ? clamp(next + delta) : next;
+    });
   };
 
   // Pull-to-refresh re-runs the lookups without touching the draft; with the
@@ -365,15 +372,24 @@ export default function AddProductScreen() {
   return (
     <Screen
       title={t("app.inventory.tools.addProduct")}
-      subtitle={t("mobile.common.step", { step: stepIdx + 1, total: steps.length, title: STEP_TITLES()[step] })}
+      subtitle={t("mobile.common.step", { step: stepIdx + 1, total: STEPS.length, title: STEP_TITLES()[step] })}
       onRefresh={refresh}
       refreshing={categories.isRefetching || brands.isRefetching}
     >
       <View style={styles.rail}>
-        {steps.map((key, i) => (
-          <View key={key} style={[styles.dot, i <= stepIdx && styles.dotActive]} />
-        ))}
+        {STEPS.map((key, i) => {
+          const skipped = key === "attributes" && category !== null && !hasAttrs && !attrsPending;
+          return (
+            <View
+              key={key}
+              style={[styles.dot, i <= stepIdx && styles.dotActive, skipped && styles.dotSkipped]}
+            />
+          );
+        })}
       </View>
+      {step === "details" && attrsLoadedEmpty ? (
+        <Text style={styles.railNote}>{t("mobile.product.noAttributesStep")}</Text>
+      ) : null}
 
       {step === "details" ? (
         <Card>
@@ -467,7 +483,7 @@ export default function AddProductScreen() {
         </Card>
       ) : step === "attributes" ? (
         <Card title={t("app.inventory.addProduct.step2.heading")}>
-          <Text style={styles.hint}>{t("mobile.product.attributesHint")}</Text>
+          <Text style={styles.stepHint}>{t("mobile.product.attributesHint")}</Text>
           <View style={styles.form}>
             {attrs.map((a) => (
               <View key={a.id}>
@@ -487,7 +503,7 @@ export default function AddProductScreen() {
             {/* Hints say why Next is disabled: grey guidance while the field is
                 empty, red once something unparseable (or 0) has been typed. */}
             <View>
-              <Field label={t("app.sales.form.quickAddProduct.price")} value={price} onChangeText={setPrice} keyboardType="decimal-pad" placeholder="0" />
+              <Field label={t("app.sales.form.quickAddProduct.price")} value={price} onChangeText={setPrice} keyboardType="decimal-pad" placeholder={t("mobile.product.pricePlaceholder")} />
               {!priceValid ? (
                 <Text style={price.trim() ? styles.fieldError : styles.hint}>{t("mobile.product.priceMin")}</Text>
               ) : null}
@@ -497,7 +513,7 @@ export default function AddProductScreen() {
               {!costValid ? <Text style={styles.fieldError}>{t("mobile.product.costInvalid")}</Text> : null}
             </View>
             <View>
-              <Field label={t("mobile.product.openingStock")} value={quantity} onChangeText={setQuantity} keyboardType="number-pad" placeholder="0" />
+              <Field label={t("mobile.product.openingStock")} value={quantity} onChangeText={setQuantity} keyboardType="number-pad" placeholder={t("mobile.product.quantityPlaceholder")} />
               {!quantityValid ? (
                 <Text style={quantity.trim() ? styles.fieldError : styles.hint}>{t("mobile.product.quantityMin")}</Text>
               ) : null}
@@ -788,11 +804,17 @@ const styles = StyleSheet.create({
   rail: { flexDirection: "row", gap: spacing.sm },
   dot: { flex: 1, height: 6, borderRadius: 3, backgroundColor: colors.accentLight },
   dotActive: { backgroundColor: colors.accent },
+  // The attributes segment when the category has none: kept in the rail so
+  // the count never changes, dimmed so it reads as skipped.
+  dotSkipped: { backgroundColor: colors.border },
+  railNote: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, marginTop: -spacing.sm, ...RTL_TEXT },
   form: { gap: spacing.lg },
   label: { fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary, marginBottom: spacing.sm, ...RTL_TEXT },
   hint: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, marginTop: spacing.sm, marginBottom: spacing.sm, ...RTL_TEXT },
   scanNote: { fontFamily: fonts.medium, fontSize: 13, color: colors.successStrong, marginTop: spacing.sm, ...RTL_TEXT },
   hintTight: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },
+  // Under a Card title (which owns the gap above): bottom margin only.
+  stepHint: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, marginBottom: spacing.sm, ...RTL_TEXT },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   otherBrand: { marginTop: spacing.md },
   photoEmpty: {

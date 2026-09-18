@@ -21,6 +21,7 @@ import { InfoIcon as Info } from "phosphor-react-native/src/icons/Info";
 import { notifications, type MeResponse } from "@matgary/api-client";
 
 import { api } from "@/api/client";
+import { usePullRefresh } from "@/components/layout/usePullRefresh";
 import {
   KIND_ICON,
   KIND_TONE,
@@ -98,6 +99,7 @@ export default function NotificationsScreen() {
     () => queryClient.invalidateQueries({ queryKey: NOTIFICATION_KEYS.root }),
     [queryClient],
   );
+  const pull = usePullRefresh(invalidate, q.isRefetching && !q.isFetchingNextPage);
 
   /** Flip rows in the list cache without waiting for the server. */
   const patchCache = useCallback(
@@ -256,10 +258,7 @@ export default function NotificationsScreen() {
         }}
         onEndReachedThreshold={0.4}
         refreshControl={
-          <RefreshControl
-            refreshing={q.isRefetching && !q.isFetchingNextPage}
-            onRefresh={() => void invalidate()}
-          />
+          <RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />
         }
         contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.lg }]}
         keyboardShouldPersistTaps="handled"

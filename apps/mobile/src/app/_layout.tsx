@@ -20,6 +20,16 @@ import { useLocale } from "@/i18n";
 import { directionStyle } from "@/theme/rtl";
 import { colors } from "@/theme/tokens";
 
+/**
+ * The app-wide error boundary. expo-router wraps this layout's component in
+ * `<Try catch={ErrorBoundary}>`, so a render throw anywhere below with no
+ * boundary of its own — the (public) group, AppLockGate, service-paused, the
+ * Stack itself — renders the bilingual fallback (retry / back to home / Sentry
+ * report) instead of unmounting the tree into a blank white screen once the
+ * dev red box is dismissed. Layout scope: "back to home" also remounts.
+ */
+export { LayoutErrorFallback as ErrorBoundary } from "@/observability/sentry";
+
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient({

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import Svg, { Line, Path, Text as SvgText } from "react-native-svg";
 
+import { compact } from "@/lib/format";
 import { colors, fonts } from "@/theme/tokens";
 
 /**
@@ -28,13 +29,18 @@ export function TrendChart({
     return <View style={{ height }} onLayout={(e) => setWidth(e.nativeEvent.layout.width)} />;
   }
 
-  const padLeft = 44;
+  const max = Math.max(...data.map((d) => d.revenue), 1);
+  // compact(), not a local "K": the suffix comes from mobile.format.thousand /
+  // .million, so the ticks read "ألف" like the heatmap totals on this screen.
+  const ticks = [0.25, 0.5, 0.75, 1].map((f) => ({ v: max * f, label: compact(max * f) }));
+  // The y-axis gutter follows the widest label: "40.0K" fits 44pt, "40.0 ألف"
+  // does not (≈6pt per glyph at 10pt, plus the 6pt gap before the plot).
+  const padLeft = Math.max(44, 12 + Math.max(...ticks.map((tick) => tick.label.length)) * 6);
   const padBottom = 18;
   const padTop = 8;
   const plotW = Math.max(width - padLeft - 8, 1);
   const plotH = Math.max(height - padBottom - padTop, 1);
 
-  const max = Math.max(...data.map((d) => d.revenue), 1);
   const x = (i: number) => padLeft + (i / (data.length - 1)) * plotW;
   const y = (v: number) => padTop + plotH - (v / max) * plotH;
 
@@ -43,36 +49,32 @@ export function TrendChart({
     .join(" ");
   const area = `${path} L${x(data.length - 1).toFixed(1)},${(padTop + plotH).toFixed(1)} L${padLeft},${(padTop + plotH).toFixed(1)} Z`;
 
-  const ticks = [0.25, 0.5, 0.75, 1].map((f) => ({ v: max * f, y: y(max * f) }));
-  const short = (v: number) =>
-    v >= 1000 ? `${(v / 1000).toFixed(1)}K` : String(Math.round(v));
-
   return (
     <View style={styles.wrap} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
       <Svg width={width} height={height}>
-        {ticks.map((t) => (
+        {ticks.map((tick) => (
           <Line
-            key={t.v}
+            key={tick.v}
             x1={padLeft}
-            y1={t.y}
+            y1={y(tick.v)}
             x2={width - 8}
-            y2={t.y}
+            y2={y(tick.v)}
             stroke={colors.border}
             strokeWidth={1}
             strokeDasharray="4 4"
           />
         ))}
-        {ticks.map((t) => (
+        {ticks.map((tick) => (
           <SvgText
-            key={`l-${t.v}`}
+            key={`l-${tick.v}`}
             x={padLeft - 6}
-            y={t.y + 4}
+            y={y(tick.v) + 4}
             fontSize={10}
             fill={colors.textSecondary}
             fontFamily={fonts.regular}
             textAnchor="end"
           >
-            {short(t.v)}
+            {tick.label}
           </SvgText>
         ))}
         <Path d={area} fill={colors.accent} fillOpacity={0.07} />

@@ -17,6 +17,7 @@ import { ShoppingCartIcon as ShoppingCart } from "phosphor-react-native/src/icon
 import { ApiError, dashboard as dashboardApi } from "@matgary/api-client";
 
 import { api } from "@/api/client";
+import { usePullRefresh } from "@/components/layout/usePullRefresh";
 import { HeaderAccessories } from "@/components/shell/HeaderAccessories";
 import { money, shortDate } from "@/lib/format";
 import { useSnapshotAge } from "@/offline/hydrate";
@@ -57,6 +58,7 @@ export default function DashboardScreen() {
   // snapshot stays in `data`: it is shown, with its age, never hidden
   // behind the error (doc 06 §6.2 — staleness is said, not concealed).
   const snapshotAge = useSnapshotAge();
+  const pull = usePullRefresh(() => refetch(), isRefetching);
 
   // The web formats through Intl; doc 06 §4.3 requires a deterministic
   // formatter on device, because Hermes ships a trimmed ICU and the same
@@ -71,7 +73,7 @@ export default function DashboardScreen() {
           { paddingTop: insets.top + spacing.lg },
         ]}
         refreshControl={
-          <RefreshControl refreshing={isRefetching} onRefresh={() => void refetch()} />
+          <RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />
         }
       >
         <HeaderAccessories />

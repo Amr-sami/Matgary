@@ -4,9 +4,7 @@ import {
   Image,
   Pressable,
   StyleSheet,
-  Switch,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -20,22 +18,22 @@ import { EyeIcon as Eye } from "phosphor-react-native/src/icons/Eye";
 import { EyeSlashIcon as EyeSlash } from "phosphor-react-native/src/icons/EyeSlash";
 import { PencilSimpleIcon as PencilSimple } from "phosphor-react-native/src/icons/PencilSimple";
 import { PlusIcon as Plus } from "phosphor-react-native/src/icons/Plus";
-import { ReceiptIcon as Receipt } from "phosphor-react-native/src/icons/Receipt";
 import { TrashIcon as Trash } from "phosphor-react-native/src/icons/Trash";
 
 import { api } from "@/api/client";
 import { Screen } from "@/components/layout/Screen";
-import { ChevronBack } from "@/components/ui/Chevron";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
 import { Field } from "@/components/ui/Field";
 import { Segmented } from "@/components/ui/Segmented";
+import { SettingsHeader } from "@/components/ui/SettingsHeader";
+import { ToggleRow } from "@/components/ui/ToggleRow";
 import { shortDate } from "@/lib/format";
 import { receiptMoney } from "@/receipt/html";
 import { useLogoPicker } from "@/lib/useLogoPicker";
 import { useSession } from "@/stores/session";
-import { RTL_TEXT } from "@/theme/rtl";
+import { RTL_TEXT, directionStyle } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
 import { t } from "@/i18n";
 
@@ -211,22 +209,12 @@ export default function ReceiptSettingsScreen() {
 
   return (
     <Screen onRefresh={() => void q.refetch()} refreshing={q.isRefetching}>
-      <View style={styles.header}>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.back()}
-          hitSlop={12}
-          style={styles.back}
-        >
-          <ChevronBack size={16} color={colors.textSecondary} />
-          <Text style={styles.backLabel}>{t("app.settingsPage.title")}</Text>
-        </Pressable>
-        <View style={styles.titleRow}>
-          <Receipt size={24} color={colors.accent} />
-          <Text style={styles.title}>{t("app.settingsPage.receiptCard.heading")}</Text>
-        </View>
-        <Text style={styles.subtitle}>{t("app.settingsPage.receiptCard.subhead")}</Text>
-      </View>
+      <SettingsHeader
+        parentLabel={t("app.settingsPage.title")}
+        title={t("app.settingsPage.receiptCard.heading")}
+        subtitle={t("app.settingsPage.receiptCard.subhead")}
+        onBack={() => router.back()}
+      />
 
       {notice ? (
         <Pressable onPress={() => setNotice(null)}>
@@ -373,20 +361,13 @@ export default function ReceiptSettingsScreen() {
 
           {/* النقاط على الفاتورة */}
           <Card>
-            <View style={styles.toggleRow}>
-              <View style={styles.toggleBody}>
-                <Text style={styles.sectionTitle}>
-                  {t("app.settingsPage.receiptCard.showLoyalty")}
-                </Text>
-                <Text style={styles.hint}>{t("app.settingsPage.receiptCard.showLoyaltyHint")}</Text>
-              </View>
-              <Switch
-                testID="receipt-toggle-loyalty"
-                value={draft.receiptShowLoyalty}
-                onValueChange={(v) => update("receiptShowLoyalty", v)}
-                trackColor={{ true: colors.accent, false: colors.border }}
-              />
-            </View>
+            <ToggleRow
+              testID="receipt-toggle-loyalty"
+              label={t("app.settingsPage.receiptCard.showLoyalty")}
+              hint={t("app.settingsPage.receiptCard.showLoyaltyHint")}
+              value={draft.receiptShowLoyalty}
+              onValueChange={(v) => update("receiptShowLoyalty", v)}
+            />
           </Card>
 
           {/* ترتيب الأقسام */}
@@ -651,8 +632,12 @@ function ReceiptPreview({
       if (!c) {
         return <Text style={p.muted}>{t("app.receiptDesigner.blockBody.customDeletedMark")}</Text>;
       }
+      // html.ts prints `text-align: left|right` — PHYSICAL sides. flex-start/end
+      // follow the paper's direction, so under an Arabic paper they are swapped.
+      const physicalStart = lang === "ar" ? "flex-end" : "flex-start";
+      const physicalEnd = lang === "ar" ? "flex-start" : "flex-end";
       const align =
-        c.align === "center" ? "center" : c.align === "left" ? "flex-start" : "flex-end";
+        c.align === "center" ? "center" : c.align === "left" ? physicalStart : physicalEnd;
       return (
         <View style={{ alignItems: align }}>
           <Text style={c.text ? p.body : p.muted}>
@@ -754,9 +739,14 @@ function ReceiptPreview({
     }
   };
 
+  // The paper reads in the RECEIPT language, not the app locale: html.ts sets
+  // `dir` from receiptLanguage ("both" prints LTR), so the mock does the same.
+  // Yoga propagates this direction to every row and Text below, and Fabric's
+  // textAlign swap (theme/rtl.ts) makes the `...RTL_TEXT` starts follow it —
+  // no per-Text locale read needed.
   return (
     <View style={p.paperWrap}>
-      <View style={p.paper}>
+      <View style={[p.paper, directionStyle(lang === "ar")]}>
         {order.length === 0 ? (
           <Text style={p.muted}>{t("app.receiptDesigner.emptyReceipt")}</Text>
         ) : (
@@ -829,13 +819,6 @@ const styles = StyleSheet.create({
   logoBtnText: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 13, color: colors.accent },
   logoMsg: { fontFamily: fonts.regular, fontSize: 13, color: colors.success, marginTop: spacing.xs, ...RTL_TEXT },
   logoMsgError: { color: colors.danger },
-  header: { gap: spacing.xs },
-  back: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 32 },
-  backLabel: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
-  titleRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  title: { fontFamily: fonts.bold, fontSize: 26, color: colors.text, ...RTL_TEXT },
-  subtitle: { fontFamily: fonts.regular, fontSize: 15, color: colors.textSecondary, ...RTL_TEXT },
-
   notice: {
     fontFamily: fonts.medium,
     fontSize: 13,
@@ -875,14 +858,6 @@ const styles = StyleSheet.create({
   fontBody: { flex: 1, minWidth: 0 },
   fontName: { ...RTL_TEXT, fontFamily: fonts.semibold, fontSize: 15, color: colors.text },
   fontSelected: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 12, color: colors.accent },
-
-  toggleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md,
-  },
-  toggleBody: { flex: 1, minWidth: 0, gap: 2 },
 
   blockList: { gap: spacing.sm, marginTop: spacing.md },
   blockWrap: {

@@ -8,23 +8,21 @@ import {
   Text,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AndroidLogoIcon as AndroidLogo } from "phosphor-react-native/src/icons/AndroidLogo";
 import { AppleLogoIcon as AppleLogo } from "phosphor-react-native/src/icons/AppleLogo";
 import { DesktopIcon as Desktop } from "phosphor-react-native/src/icons/Desktop";
 import { DeviceMobileIcon as DeviceMobile } from "phosphor-react-native/src/icons/DeviceMobile";
-import { ShieldCheckIcon as ShieldCheck } from "phosphor-react-native/src/icons/ShieldCheck";
 import { auth, type DeviceSummary } from "@matgary/api-client";
 
 import { api } from "@/api/client";
 import { Screen } from "@/components/layout/Screen";
-import { ChevronBack } from "@/components/ui/Chevron";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
+import { SettingsHeader } from "@/components/ui/SettingsHeader";
 import { shortDate } from "@/lib/format";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
@@ -215,7 +213,6 @@ function DeviceRow({
 }
 
 export default function SecurityScreen() {
-  const router = useRouter();
   const qc = useQueryClient();
   const me = useSession((s) => s.me);
   const signOut = useSession((s) => s.signOut);
@@ -422,25 +419,11 @@ export default function SecurityScreen() {
   };
 
   const header = (
-    <View style={styles.header}>
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => router.back()}
-        hitSlop={12}
-        style={styles.back}
-      >
-        <ChevronBack size={16} color={colors.textSecondary} />
-        <Text style={styles.backLabel}>{t("app.settingsPage.title")}</Text>
-      </Pressable>
-      {/* Leading icon at the reading start, like Shop info — not parked at the far edge. */}
-      <View style={styles.titleRow}>
-        <ShieldCheck size={24} color={colors.accent} />
-        <Text style={styles.title}>{t("app.accountSecurity.heading")}</Text>
-      </View>
-      <Text style={styles.subtitle}>
-        {t("app.accountSecurity.subhead")}
-      </Text>
-    </View>
+    <SettingsHeader
+      parentLabel={t("app.settingsPage.title")}
+      title={t("app.accountSecurity.heading")}
+      subtitle={t("app.accountSecurity.subhead")}
+    />
   );
 
   const devices = devicesQuery.data ?? [];
@@ -737,24 +720,6 @@ export default function SecurityScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: { gap: spacing.xs },
-  back: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 32 },
-  backLabel: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
-  titleRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  title: {
-    flexShrink: 1,
-    fontFamily: fonts.bold,
-    fontSize: 26,
-    color: colors.text,
-    ...RTL_TEXT,
-  },
-  subtitle: {
-    fontFamily: fonts.regular,
-    fontSize: 15,
-    color: colors.textSecondary,
-    ...RTL_TEXT,
-  },
-
   error: {
     fontFamily: fonts.medium,
     fontSize: 13,

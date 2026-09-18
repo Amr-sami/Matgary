@@ -23,6 +23,7 @@ import { api } from "@/api/client";
 import { getLocale, t } from "@/i18n";
 import { Screen } from "@/components/layout/Screen";
 import { HeaderAccessories } from "@/components/shell/HeaderAccessories";
+import { BackLink } from "@/components/ui/BackLink";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
@@ -30,7 +31,6 @@ import { NativeDatePicker, dateToIsoDay, isoDayToDate } from "@/components/ui/Da
 import { CaretDownIcon as CaretDown } from "phosphor-react-native/src/icons/CaretDown";
 import { CaretUpIcon as CaretUp } from "phosphor-react-native/src/icons/CaretUp";
 
-import { ChevronBack } from "@/components/ui/Chevron";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
 import { Segmented } from "@/components/ui/Segmented";
@@ -304,19 +304,17 @@ export default function TeamAttendanceScreen() {
         void eventsQ.refetch();
       }}
       refreshing={eventsQ.isRefetching}
+      // "‹ Team" in the FIXED header band — the one BackLink recipe, at the
+      // same y as team/[userId] (HeaderAccessories above it on both).
+      header={
+        <View style={styles.fixedHeader}>
+          <HeaderAccessories />
+          <BackLink label={t("mobile.team.back")} onPress={() => router.navigate("/team")} />
+        </View>
+      }
     >
-      {/* Own header, the settings sub-page shape: back link ABOVE the title. */}
+      {/* The settings sub-page shape: title + subtitle scroll with the page. */}
       <View style={styles.header}>
-        <HeaderAccessories />
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.navigate("/team")}
-          hitSlop={12}
-          style={styles.back}
-        >
-          <ChevronBack size={16} color={colors.textSecondary} />
-          <Text style={styles.backLabel}>{t("mobile.team.back")}</Text>
-        </Pressable>
         <Text style={styles.title}>
           {isToday ? t("app.team.roster.todayHeading") : t("mobile.team.attendance.dayHeading")}
         </Text>
@@ -642,9 +640,8 @@ function IconButton({
 const styles = StyleSheet.create({
   stack: { gap: spacing.md },
   // Same shape as the settings sub-pages: back link, then title, then subtitle.
+  fixedHeader: { gap: spacing.xs, alignItems: "flex-start" },
   header: { gap: spacing.xs, alignItems: "flex-start" },
-  back: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 32 },
-  backLabel: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
   title: { fontFamily: fonts.bold, fontSize: 26, color: colors.text, ...RTL_TEXT },
   subtitle: { fontFamily: fonts.regular, fontSize: 15, color: colors.textSecondary, ...RTL_TEXT },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },

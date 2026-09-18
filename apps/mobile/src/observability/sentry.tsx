@@ -14,9 +14,11 @@
  *   - `useSentryNavigationTracking()` one call inside RootLayout so route
  *                          changes become navigation spans (expo-router is
  *                          React Navigation underneath).
- *   - `RouteErrorFallback` see the JSDoc — expo-router has no `+error.tsx`;
- *                          error boundaries are a named `ErrorBoundary` export
- *                          from a route or layout file.
+ *   - `LayoutErrorFallback` `export { LayoutErrorFallback as ErrorBoundary }`
+ *                          from app/_layout.tsx AND (app)/_layout.tsx —
+ *                          expo-router has no `+error.tsx`; error boundaries
+ *                          are a named `ErrorBoundary` export from a route or
+ *                          layout file. See the JSDoc on `RouteErrorFallback`.
  *
  * Without EXPO_PUBLIC_SENTRY_DSN every export is a safe no-op, so the dev
  * client, tests and CI never need a DSN.
@@ -26,7 +28,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import * as Sentry from "@sentry/react-native";
 import * as Application from "expo-application";
 import * as Updates from "expo-updates";
-import { useNavigationContainerRef } from "expo-router";
+import { router, useNavigationContainerRef } from "expo-router";
 import type { ErrorBoundaryProps } from "expo-router";
 import { WarningCircleIcon as WarningCircle } from "phosphor-react-native/src/icons/WarningCircle";
 import {
@@ -312,31 +314,40 @@ export function addBreadcrumb(
 // ---------------------------------------------------------------------------
 
 /**
- * Bilingual "something went wrong" screen with a Try-again button. Matches
- * expo-router's `ErrorBoundaryProps` (`{ error, retry }`) so it drops straight
- * into a route's error boundary. Reports the error to Sentry once per mount
- * and surfaces the event id so support can find the report.
+ * Bilingual "something went wrong" screen with Try-again and Back-to-home
+ * buttons. Matches expo-router's `ErrorBoundaryProps` (`{ error, retry }`) so
+ * it drops straight into a route's error boundary. Reports the error to Sentry
+ * once per mount and surfaces the event id so support can find the report.
  *
- * How to mount (root layout is owned by another agent — this is the recipe):
+ * Direction: this fallback can render OUTSIDE the root Stack (when the root
+ * layout itself threw, nothing above it applies `contentStyle.direction`), so
+ * it sets `directionStyle(locale)` on its own root; every Text is start-
+ * aligned via RTL_TEXT or deliberately centred (theme/rtl.ts).
  *
- *   // app/_layout.tsx  (or any (group)/_layout.tsx / screen file)
- *   export { RouteErrorFallback as ErrorBoundary } from "@/observability/sentry";
+ * Mounting — expo-router 57 does NOT support a `+error.tsx` route file
+ * (`getRoutesCore` rejects every `+`-prefixed name except `+not-found`); the
+ * named `ErrorBoundary` export from a route or layout is the mechanism, and
+ * expo-router wraps the EXPORTING file's own component in
+ * `<Try catch={ErrorBoundary}>` (useScreens.js `fromImport`). Three mounts
+ * cover the app:
  *
- * expo-router 57 does NOT support a `+error.tsx` route file — `getRoutesCore`
- * rejects every `+`-prefixed name except `+not-found`. The named
- * `ErrorBoundary` export from a route or layout is the supported mechanism;
- * exporting it from the ROOT layout catches everything below it.
+ *   // app/_layout.tsx — catches everything: a throw in the root layout, the
+ *   // (public) group, AppLockGate, service-paused… Without it a render throw
+ *   // unmounted the whole tree — blank white screen once the red box closed.
+ *   export { LayoutErrorFallback as ErrorBoundary } from "@/observability/sentry";
  *
- * Note that expo-router wraps the EXPORTING route's own component in
- * `<Try catch={ErrorBoundary}>` (useScreens.js `fromImport`), so an
- * `ErrorBoundary` exported from `(app)/_layout.tsx` replaces the whole
- * `<Tabs>` — tab bar included — when a screen throws. To keep the tab chrome
- * alive around a broken screen, either export `ErrorBoundary` from each
- * screen file, or use the layout-level setting that wraps every CHILD screen
- * instead of the layout itself:
- *
- *   // app/(app)/_layout.tsx
+ *   // app/(app)/_layout.tsx — the Tabs, BottomNav and nested layouts
+ *   // (settings/_layout.tsx is a layout, so the per-screen wrapper below
+ *   // does not cover it).
+ *   export { LayoutErrorFallback as ErrorBoundary } from "@/observability/sentry";
+ *   // …and every CHILD screen, so the tab bar stays alive around a broken tab:
  *   export const unstable_settings = { screenErrorBoundary: RouteErrorFallback };
+ *
+ * The layout mounts use `LayoutErrorFallback` (scope "layout"): there the
+ * fallback has REPLACED a navigator, so "back to home" must also `retry()` to
+ * remount it on the new route. At screen scope the navigator is still there;
+ * "back to home" only switches route and leaves the broken screen in its
+ * fallback (re-rendering it would just throw — and report — again).
  *
  * `SentryErrorBoundary` below is the alternative for wrapping an arbitrary
  * subtree (e.g. a modal) outside the router.
@@ -345,6 +356,7 @@ export function RouteErrorFallback({
   error,
   retry,
   eventId: reportedEventId,
+  scope = "screen",
 }: ErrorBoundaryProps & {
   /**
    * Event id of a report an outer boundary already made (e.g.
@@ -352,9 +364,28 @@ export function RouteErrorFallback({
    * shows it instead of capturing a second, duplicate event.
    */
   eventId?: string;
+  /**
+   * Where the boundary sits. `"layout"`: the fallback replaced a navigator, so
+   * "back to home" navigates AND retries (remount at the new route).
+   * `"screen"` (default): navigate only.
+   */
+  scope?: "screen" | "layout";
 }) {
   const rtl = getLocale() === "ar";
   const eventId = useReportedOnce(error, reportedEventId);
+
+  const goHome = () => {
+    // Navigate first so a remount lands on the dashboard, not back on the
+    // screen that just threw. `router.replace` can throw of its own (no
+    // navigator ready) — and a throw inside a fallback has no boundary left
+    // to catch it, so it is swallowed here rather than blanking the screen.
+    try {
+      router.replace("/");
+    } catch (navError) {
+      if (__DEV__) console.warn("[errors] router.replace('/') failed", navError);
+    }
+    if (scope === "layout") void retry();
+  };
 
   return (
     <View style={[styles.root, directionStyle(rtl)]}>
@@ -386,8 +417,31 @@ export function RouteErrorFallback({
           {t("mobile.errors.tryAgain")}
         </Text>
       </Pressable>
+      <Pressable
+        onPress={goHome}
+        accessibilityRole="button"
+        accessibilityLabel={t("mobile.errors.backHome")}
+        style={({ pressed }) => [
+          styles.button,
+          styles.buttonOutline,
+          pressed && styles.buttonOutlinePressed,
+        ]}
+      >
+        <Text style={[styles.buttonLabel, styles.buttonOutlineLabel]} numberOfLines={1}>
+          {t("mobile.errors.backHome")}
+        </Text>
+      </Pressable>
     </View>
   );
+}
+
+/**
+ * `RouteErrorFallback` at layout scope — what `app/_layout.tsx` and
+ * `(app)/_layout.tsx` export as `ErrorBoundary`. Same screen; "back to home"
+ * also remounts the navigator the fallback replaced (see `scope`).
+ */
+export function LayoutErrorFallback(props: ErrorBoundaryProps) {
+  return <RouteErrorFallback {...props} scope="layout" />;
 }
 
 /**
@@ -501,10 +555,22 @@ const styles = StyleSheet.create({
   buttonPressed: {
     backgroundColor: colors.accentPressed,
   },
+  buttonOutline: {
+    marginTop: spacing.sm,
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  buttonOutlinePressed: {
+    backgroundColor: colors.accentLight,
+  },
   buttonLabel: {
     ...RTL_TEXT,
     fontFamily: fonts.semibold,
     fontSize: 15,
     color: colors.bg,
+  },
+  buttonOutlineLabel: {
+    color: colors.text,
   },
 });

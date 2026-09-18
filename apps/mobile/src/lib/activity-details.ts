@@ -21,8 +21,10 @@
  * regex and dates are dd/mm/yyyy, the same shapes as "@/lib/format". Money
  * fields (total, price, amount, salary) take the app's currency shape through
  * the same `mobile.format.money` key `money()` reads — "3,400 ج.م" here must
- * look like "3,400 ج.م" on the notification for the same sale — while
- * quantities and the per-line "qty × price" stay bare, as on the web.
+ * look like "3,400 ج.م" on the notification for the same sale. The per-line
+ * "qty × price" carries the currency too — "Casio (1 × 3,400 ج.م)" — so the
+ * bare quantity and the money amount can never be read as two prices; only
+ * quantities stay bare.
  */
 
 export interface ActivityDetail {
@@ -104,14 +106,14 @@ interface SaleLine {
   lineTotal?: unknown;
 }
 
-/** `lines: [{productName, quantity, pricePerUnit}]` → "Pepsi (2 × 15), Chips (1)" (locale separator). */
+/** `lines: [{productName, quantity, pricePerUnit}]` → "Pepsi (2 × 15 ج.م), Chips (1)" (locale separator). */
 function summariseSaleLines(lines: SaleLine[], t: Translate): string {
   return lines
     .map((l) => {
       const name = l.productName ? String(l.productName) : "—";
       const qty = typeof l.quantity === "number" ? l.quantity : null;
       const price = typeof l.pricePerUnit === "number" ? l.pricePerUnit : null;
-      if (qty != null && price != null) return `${name} (${formatNumber(qty)} × ${formatNumber(price)})`;
+      if (qty != null && price != null) return `${name} (${formatNumber(qty)} × ${formatMoney(t, price)})`;
       if (qty != null) return `${name} (${formatNumber(qty)})`;
       return name;
     })
@@ -123,20 +125,27 @@ function summariseSaleLines(lines: SaleLine[], t: Translate): string {
  * of "label: value" pairs. Returns an empty array when there is nothing
  * meaningful to show. Unknown actions fall back to exposing only the keys the
  * dictionary knows how to label — internal ids never leak into the row.
+ *
+ * `entityLabel` is the row's own label (the API sets it to the invoice id for
+ * sales), which the screen already prints as the title's grey "— INV-…"
+ * suffix. Pass it so the first detail line does not repeat the same id.
  */
 export function formatActivityDetails(
   action: string,
   metadata: Record<string, unknown> | null | undefined,
   t: Translate,
+  opts?: { entityLabel?: string | null },
 ): ActivityDetail[] {
   if (!metadata) return [];
   const out: ActivityDetail[] = [];
   const m = metadata;
   const f = (key: string) => t(`${NS}.fields.${key}`);
+  const entityLabel = opts?.entityLabel ?? null;
 
   switch (action) {
     case "sale.create": {
-      if (m.invoiceId) out.push({ label: f("invoiceId"), value: String(m.invoiceId) });
+      if (m.invoiceId && String(m.invoiceId) !== entityLabel)
+        out.push({ label: f("invoiceId"), value: String(m.invoiceId) });
       if (Array.isArray(m.lines) && m.lines.length > 0)
         out.push({ label: f("lines"), value: summariseSaleLines(m.lines as SaleLine[], t) });
       if (typeof m.totalQuantity === "number")

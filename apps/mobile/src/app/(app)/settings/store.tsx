@@ -4,11 +4,9 @@ import {
   Image,
   Pressable,
   StyleSheet,
-  Switch,
   Text,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, settings } from "@matgary/api-client";
 import { CameraIcon as Camera } from "phosphor-react-native/src/icons/Camera";
@@ -17,10 +15,11 @@ import { WarningCircleIcon as WarningCircle } from "phosphor-react-native/src/ic
 
 import { api } from "@/api/client";
 import { Screen } from "@/components/layout/Screen";
-import { ChevronBack } from "@/components/ui/Chevron";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Field } from "@/components/ui/Field";
+import { SettingsHeader } from "@/components/ui/SettingsHeader";
+import { ToggleRow } from "@/components/ui/ToggleRow";
 import { money } from "@/lib/format";
 import { useLogoPicker } from "@/lib/useLogoPicker";
 import { useSession } from "@/stores/session";
@@ -74,7 +73,6 @@ const parseRate = (raw: string) => {
 };
 
 export default function StoreSettingsScreen() {
-  const router = useRouter();
   const qc = useQueryClient();
   const me = useSession((s) => s.me);
   const branchId = me?.branch.id ?? null;
@@ -177,22 +175,11 @@ export default function StoreSettingsScreen() {
 
   return (
     <Screen onRefresh={() => void q.refetch()} refreshing={q.isRefetching}>
-      <View style={styles.header}>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.back()}
-          hitSlop={12}
-          style={styles.back}
-        >
-          <ChevronBack size={16} color={colors.textSecondary} />
-          <Text style={styles.backLabel}>{t("app.settingsPage.title")}</Text>
-        </Pressable>
-        <View style={styles.titleRow}>
-          <Storefront size={24} color={colors.accent} />
-          <Text style={styles.title}>{t("app.settingsPage.shopInfo.section")}</Text>
-        </View>
-        <Text style={styles.subtitle}>{t("mobile.settings.storeIntro")}</Text>
-      </View>
+      <SettingsHeader
+        parentLabel={t("app.settingsPage.title")}
+        title={t("app.settingsPage.shopInfo.section")}
+        subtitle={t("mobile.settings.storeIntro")}
+      />
 
       {notice ? (
         <Pressable onPress={() => setNotice(null)}>
@@ -269,57 +256,40 @@ export default function StoreSettingsScreen() {
                     : t("app.receiptDesigner.logoEmptyTitle")}
                 </Text>
                 <Text style={styles.sectionHint}>{t("mobile.settings.logoHint")}</Text>
+                {/* The CTA belongs to the title/hint column it describes, not
+                    under the placeholder square — and it is the shared Button
+                    like every sibling CTA, not a one-off pill. */}
+                <Button
+                  variant="outline"
+                  icon={Camera}
+                  label={server.receiptLogoUrl ? t("mobile.settings.changeLogo") : t("mobile.settings.addLogo")}
+                  loading={logo.status === "uploading"}
+                  disabled={logo.status === "uploading"}
+                  onPress={() => void logo.pick()}
+                  style={styles.logoBtn}
+                />
               </View>
             </View>
-            <Pressable
-                onPress={() => void logo.pick()}
-                disabled={logo.status === "uploading"}
-                accessibilityRole="button"
-                accessibilityLabel={server.receiptLogoUrl ? t("mobile.settings.changeLogo") : t("mobile.settings.addLogo")}
-                style={({ pressed }) => [styles.logoBtn, (pressed || logo.status === "uploading") && styles.logoBtnPressed]}
-              >
-                {logo.status === "uploading" ? (
-                  <ActivityIndicator size="small" color={colors.accent} />
-                ) : (
-                  <Camera size={18} color={colors.accent} />
-                )}
-                <Text style={styles.logoBtnText}>
-                  {logo.status === "uploading"
-                    ? t("mobile.settings.logoUploading")
-                    : server.receiptLogoUrl
-                      ? t("mobile.settings.changeLogo")
-                      : t("mobile.settings.addLogo")}
-                </Text>
-              </Pressable>
-              {logo.message ? (
-                <Text style={[styles.logoMsg, logo.status === "error" && styles.logoMsgError]}>{logo.message}</Text>
-              ) : null}
+            {logo.message ? (
+              <Text style={[styles.logoMsg, logo.status === "error" && styles.logoMsgError]}>{logo.message}</Text>
+            ) : null}
           </Card>
 
           {/* برنامج الولاء */}
-          <Card>
-            <View style={styles.enableRow}>
-              <View style={styles.enableBody}>
-                <Text style={styles.sectionTitle}>{t("app.settingsPage.loyalty.title")}</Text>
-                <Text style={styles.sectionHint}>{t("app.settingsPage.loyalty.subtitle")}</Text>
-              </View>
-              <View style={styles.switchWrap}>
-                <Switch
-                  value={draft.loyaltyEnabled}
-                  onValueChange={(v) => update("loyaltyEnabled", v)}
-                  trackColor={{ true: colors.accent, false: colors.border }}
-                  accessibilityLabel={t("app.settingsPage.loyalty.title")}
-                />
-                <Text style={styles.switchLabel}>
-                  {draft.loyaltyEnabled
-                    ? t("app.settingsPage.loyalty.enabled")
-                    : t("app.settingsPage.loyalty.disabled")}
-                </Text>
-              </View>
-            </View>
+          <Card title={t("app.settingsPage.loyalty.title")}>
+            <ToggleRow
+              label={
+                draft.loyaltyEnabled
+                  ? t("app.settingsPage.loyalty.enabled")
+                  : t("app.settingsPage.loyalty.disabled")
+              }
+              hint={t("app.settingsPage.loyalty.subtitle")}
+              value={draft.loyaltyEnabled}
+              onValueChange={(v) => update("loyaltyEnabled", v)}
+            />
 
             {draft.loyaltyEnabled ? (
-              <View style={styles.stack}>
+              <View style={styles.stackAfterTitle}>
                 <Field
                   label={t("app.settingsPage.loyalty.pointsPerEgp")}
                   value={pointsText}
@@ -417,13 +387,6 @@ export default function StoreSettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: { gap: spacing.xs },
-  back: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 32 },
-  backLabel: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
-  titleRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  title: { fontFamily: fonts.bold, fontSize: 26, color: colors.text, ...RTL_TEXT },
-  subtitle: { fontFamily: fonts.regular, fontSize: 15, color: colors.textSecondary, ...RTL_TEXT },
-
   notice: {
     fontFamily: fonts.medium,
     fontSize: 13,
@@ -444,7 +407,11 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     ...RTL_TEXT,
   },
-  stack: { gap: spacing.md, marginTop: spacing.md },
+  // No top inset: the Shop-info Card has no title, so the stack starts at the
+  // card's own padding like the logo card does. The loyalty fields sit under
+  // the enable row and keep theirs.
+  stack: { gap: spacing.md },
+  stackAfterTitle: { gap: spacing.md, marginTop: spacing.md },
   stackTop: { marginTop: spacing.md },
   fieldGroup: { gap: spacing.xs },
   fieldHint: { fontFamily: fonts.regular, fontSize: 11, color: colors.textSecondary, ...RTL_TEXT },
@@ -456,35 +423,13 @@ const styles = StyleSheet.create({
     ...RTL_TEXT,
   },
 
-  logoBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    alignSelf: "flex-start",
-    gap: spacing.xs,
-    minHeight: MIN_TOUCH,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.full,
-    backgroundColor: colors.accentLight,
-    marginTop: spacing.sm,
-  },
-  logoBtnPressed: { opacity: 0.7 },
-  logoBtnText: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 13, color: colors.accent },
+  logoBtn: { alignSelf: "flex-start", marginTop: spacing.xs },
   logoMsg: { fontFamily: fonts.regular, fontSize: 13, color: colors.success, marginTop: spacing.xs, ...RTL_TEXT },
   logoMsgError: { color: colors.danger },
-  logoRow: { flexDirection: "row", alignItems: "center", gap: spacing.lg },
+  logoRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.lg },
   logo: { width: 72, height: 72, borderRadius: radius.lg, backgroundColor: colors.neutralTint },
   logoEmpty: { alignItems: "center", justifyContent: "center" },
   logoBody: { flex: 1, minWidth: 0, gap: 4 },
-
-  enableRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: spacing.md,
-  },
-  enableBody: { flex: 1, minWidth: 0, gap: 4 },
-  switchWrap: { alignItems: "center", gap: 2, flexShrink: 0 },
-  switchLabel: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 12, color: colors.textSecondary },
 
   example: {
     backgroundColor: colors.accentLight,

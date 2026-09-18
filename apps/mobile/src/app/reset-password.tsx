@@ -11,17 +11,17 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
-import { GlobeIcon as Globe } from "phosphor-react-native/src/icons/Globe";
 import { LightningIcon as Lightning } from "phosphor-react-native/src/icons/Lightning";
 import { ApiError } from "@matgary/api-client";
 
-import { useLocale, t } from "@/i18n";
+import { t } from "@/i18n";
 import { api } from "@/api/client";
 import { useSession } from "@/stores/session";
 import { DottedGround } from "@/components/DottedGround";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
+import { LanguagePill } from "@/components/ui/LanguagePill";
 import { RTL, RTL_TEXT } from "@/theme/rtl";
 import { colors, fonts, radius, spacing } from "@/theme/tokens";
 
@@ -75,8 +75,6 @@ export default function ResetPasswordScreen() {
 
   const startDemo = useSession((s) => s.startDemo);
   const signingIn = useSession((s) => s.signingIn);
-  const locale = useLocale((s) => s.locale);
-  const setLocale = useLocale((s) => s.setLocale);
 
   // Demo pill — the same flow login.tsx runs. startDemo never throws: a
   // failure lands in session.signInError, which login renders in its own box.
@@ -279,17 +277,7 @@ export default function ResetPasswordScreen() {
                 {t(signingIn ? "auth.demo.busy" : "auth.demo.cta")}
               </Text>
             </Pressable>
-            <Pressable
-              style={styles.langToggle}
-              accessibilityRole="button"
-              accessibilityLabel={
-                locale === "ar" ? t("app.shell.language.english") : t("app.shell.language.arabic")
-              }
-              onPress={() => void setLocale(locale === "ar" ? "en" : "ar")}
-            >
-              <Globe size={20} color={colors.textSecondary} />
-              <Text style={styles.langText}>{locale === "ar" ? "EN" : "ع"}</Text>
-            </Pressable>
+            <LanguagePill />
           </View>
 
           {demoError ? (
@@ -340,17 +328,10 @@ const styles = StyleSheet.create({
   },
   demoPillText: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 14, color: colors.onAccent },
   demoError: { marginTop: spacing.md },
-  langToggle: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    minHeight: 44,
-    paddingHorizontal: spacing.sm,
-    flexShrink: 0,
-  },
-  langText: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
   centre: { flex: 1 },
-  brand: { alignItems: "center", marginBottom: spacing.xxl },
+  // Same marginTop as login.tsx/signup.tsx/forgot-password.tsx `brand`, so
+  // the logo sits at one height across all four auth screens.
+  brand: { alignItems: "center", marginTop: spacing.xxl * 1.5, marginBottom: spacing.xxl },
   heading: {
     fontFamily: fonts.bold,
     fontSize: 32,

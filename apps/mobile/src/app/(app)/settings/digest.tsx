@@ -3,11 +3,9 @@ import {
   ActivityIndicator,
   Pressable,
   StyleSheet,
-  Switch,
   Text,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ApiError } from "@matgary/api-client";
 import { CaretDownIcon as CaretDown } from "phosphor-react-native/src/icons/CaretDown";
@@ -16,11 +14,12 @@ import { MinusCircleIcon as MinusCircle } from "phosphor-react-native/src/icons/
 
 import { api } from "@/api/client";
 import { Screen } from "@/components/layout/Screen";
-import { ChevronBack } from "@/components/ui/Chevron";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
 import { Field } from "@/components/ui/Field";
+import { SettingsHeader } from "@/components/ui/SettingsHeader";
+import { ToggleRow } from "@/components/ui/ToggleRow";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
@@ -59,7 +58,6 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const hh = (h: number) => `${String(h).padStart(2, "0")}:00`;
 
 export default function DigestSettingsScreen() {
-  const router = useRouter();
   const me = useSession((s) => s.me);
 
   const [notice, setNotice] = useState<{ tone: "ok" | "err"; text: string } | null>(
@@ -124,21 +122,11 @@ export default function DigestSettingsScreen() {
 
   return (
     <Screen onRefresh={() => void q.refetch()} refreshing={q.isRefetching}>
-      <View style={styles.header}>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.back()}
-          hitSlop={12}
-          style={styles.back}
-        >
-          <ChevronBack size={16} color={colors.textSecondary} />
-          <Text style={styles.backLabel}>{t("app.settingsPage.title")}</Text>
-        </Pressable>
-        <Text style={styles.title}>{t("app.digestSettings.title")}</Text>
-        <Text style={styles.subtitle}>
-          {t("app.digestSettings.intro")}
-        </Text>
-      </View>
+      <SettingsHeader
+        parentLabel={t("app.settingsPage.title")}
+        title={t("app.digestSettings.title")}
+        subtitle={t("app.digestSettings.intro")}
+      />
 
       {notice ? (
         <Pressable onPress={() => setNotice(null)}>
@@ -261,13 +249,13 @@ export default function DigestSettingsScreen() {
               label={t("app.digestSettings.behavior.sendOnEmpty")}
               value={settings.sendOnEmpty}
               disabled={save.isPending}
-              onChange={(v) => save.mutate({ sendOnEmpty: v })}
+              onValueChange={(v) => save.mutate({ sendOnEmpty: v })}
             />
             <ToggleRow
               label={t("app.digestSettings.behavior.emailFallback")}
               value={settings.emailFallback}
               disabled={save.isPending}
-              onChange={(v) => save.mutate({ emailFallback: v })}
+              onValueChange={(v) => save.mutate({ emailFallback: v })}
             />
           </Card>
 
@@ -382,42 +370,7 @@ export default function DigestSettingsScreen() {
   );
 }
 
-function ToggleRow({
-  label,
-  value,
-  onChange,
-  disabled,
-}: {
-  label: string;
-  value: boolean;
-  onChange: (v: boolean) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <View style={styles.toggleRow}>
-      <Text style={styles.toggleLabel}>{label}</Text>
-      <Switch
-        value={value}
-        disabled={disabled}
-        onValueChange={onChange}
-        trackColor={{ true: colors.accent, false: colors.border }}
-      />
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  header: { gap: spacing.xs },
-  back: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 32 },
-  backLabel: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
-  title: { fontFamily: fonts.bold, fontSize: 26, color: colors.text, ...RTL_TEXT },
-  subtitle: {
-    fontFamily: fonts.regular,
-    fontSize: 15,
-    color: colors.textSecondary,
-    ...RTL_TEXT,
-  },
-
   notice: {
     fontFamily: fonts.medium,
     fontSize: 13,
@@ -485,21 +438,6 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: spacing.sm,
     marginTop: spacing.md,
-  },
-
-  toggleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md,
-    minHeight: MIN_TOUCH,
-  },
-  toggleLabel: {
-    flex: 1,
-    fontFamily: fonts.regular,
-    fontSize: 14,
-    color: colors.text,
-    ...RTL_TEXT,
   },
 
   empty: {

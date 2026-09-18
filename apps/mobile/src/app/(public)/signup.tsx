@@ -10,13 +10,12 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
-import { GlobeIcon as Globe } from "phosphor-react-native/src/icons/Globe";
 import { LightningIcon as Lightning } from "phosphor-react-native/src/icons/Lightning";
 
 import { ApiError, auth } from "@matgary/api-client";
 import { dictionaries } from "@matgary/i18n";
 
-import { getLocale, t, useLocale } from "@/i18n";
+import { getLocale, t } from "@/i18n";
 import { api, deviceMeta } from "@/api/client";
 import { getInstallId } from "@/auth/installId";
 import { useSession } from "@/stores/session";
@@ -24,6 +23,7 @@ import { DottedGround } from "@/components/DottedGround";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
+import { LanguagePill } from "@/components/ui/LanguagePill";
 import { RTL, RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
 
@@ -141,8 +141,6 @@ export default function SignupScreen() {
 
   const startDemo = useSession((s) => s.startDemo);
   const signingIn = useSession((s) => s.signingIn);
-  const locale = useLocale((s) => s.locale);
-  const setLocale = useLocale((s) => s.setLocale);
 
   const emailStatus = useAvailability(
     "/api/account/email/check",
@@ -255,17 +253,7 @@ export default function SignupScreen() {
                 {t(signingIn ? "auth.demo.busy" : "auth.demo.cta")}
               </Text>
             </Pressable>
-            <Pressable
-              style={styles.langToggle}
-              accessibilityRole="button"
-              accessibilityLabel={
-                locale === "ar" ? t("app.shell.language.english") : t("app.shell.language.arabic")
-              }
-              onPress={() => void setLocale(locale === "ar" ? "en" : "ar")}
-            >
-              <Globe size={20} color={colors.textSecondary} />
-              <Text style={styles.langText}>{locale === "ar" ? "EN" : "ع"}</Text>
-            </Pressable>
+            <LanguagePill />
           </View>
 
           {demoError ? (
@@ -447,21 +435,15 @@ export default function SignupScreen() {
               The sentence is ONE dictionary template with {terms}/{privacy}
               placeholders so each locale keeps its own word order and
               typography (Arabic "و" attaches to the next word). The document
-              names are emphasised in place; the tappable links sit beneath as
-              full-height rows, because a nested <Text onPress> is only as
-              tall as its glyphs — well under MIN_TOUCH. */}
+              names are NOT emphasised in the sentence — a darker run reads as
+              a link but is not tappable, and the real links sit 40pt beneath;
+              the pills are the one affordance. They are full-height rows
+              because a nested <Text onPress> is only as tall as its glyphs —
+              well under MIN_TOUCH. */}
           <Text style={styles.consent} accessibilityRole="text">
             {renderTemplate(t("mobile.legal.consent"), {
-              terms: (
-                <Text key="terms" style={styles.consentEmphasis}>
-                  {t("mobile.legal.termsLabel")}
-                </Text>
-              ),
-              privacy: (
-                <Text key="privacy" style={styles.consentEmphasis}>
-                  {t("mobile.legal.privacyLabel")}
-                </Text>
-              ),
+              terms: t("mobile.legal.termsLabel"),
+              privacy: t("mobile.legal.privacyLabel"),
             })}
           </Text>
           <View style={styles.consentLinks}>
@@ -556,15 +538,6 @@ const styles = StyleSheet.create({
   },
   demoPillText: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 14, color: colors.onAccent },
   demoError: { marginTop: spacing.md },
-  langToggle: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    minHeight: 44,
-    paddingHorizontal: spacing.sm,
-    flexShrink: 0,
-  },
-  langText: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
   brand: { alignItems: "center", marginTop: spacing.xxl * 1.5, marginBottom: spacing.xxl },
   heading: {
     fontFamily: fonts.bold,
@@ -612,13 +585,13 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     padding: spacing.md,
   },
-  // Start-aligned like the labels and inline hints above it — the one centred
-  // line broke the form's edge.
+  // Centred like login/forgot/reset-password errorText — the four auth
+  // screens share one banner treatment.
   errorText: {
     fontFamily: fonts.medium,
     fontSize: 14,
     color: colors.danger,
-    ...RTL_TEXT,
+    textAlign: "center",
   },
   consent: {
     fontFamily: fonts.regular,
@@ -628,12 +601,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: spacing.lg,
     paddingHorizontal: spacing.sm,
-  },
-  // Plain weight: bold names read as links but were not tappable; the pill
-  // links beneath are the one affordance.
-  consentEmphasis: {
-    ...RTL_TEXT,
-    color: colors.text,
   },
   consentLinks: {
     flexDirection: "row",

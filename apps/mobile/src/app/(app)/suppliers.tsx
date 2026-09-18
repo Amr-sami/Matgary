@@ -2,11 +2,7 @@ import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -23,13 +19,13 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
+import { Sheet } from "@/components/ui/Sheet";
 import { money } from "@/lib/format";
 import { useSession } from "@/stores/session";
-import { RTL_TEXT, directionStyle } from "@/theme/rtl";
+import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { isRTL, t } from "@/i18n";
+import { t } from "@/i18n";
 
 /**
  * ApiError → one line the user can read.
@@ -251,9 +247,6 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * PATCH on that supplier. Client-side checks mirror the schema's two hard
  * rules (name non-empty, email well-formed when given) so the user reads an
  * Arabic line instead of zod's English 400.
- *
- * RTL is re-applied here on purpose: a Modal mounts its own native root, so the
- * `direction` set on the screen root does not reach inside it.
  */
 function SupplierFormSheet({
   visible,
@@ -266,7 +259,6 @@ function SupplierFormSheet({
   onClose: () => void;
   onSaved: (id: string, created: boolean) => void;
 }) {
-  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -344,88 +336,68 @@ function SupplierFormSheet({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
-      <View style={[styles.overlay, directionStyle(isRTL())]}>
-        {/* The KAV is the full-height flex-end container and the scrim sits
-            INSIDE it: with an auto-height KAV the sheet's maxHeight resolved
-            against its own content, clipping the CTAs at the bottom edge. */}
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.kav}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel={t("app.common.close")} />
-          <View style={styles.sheet}>
-            <ScrollView keyboardShouldPersistTaps="handled" style={styles.sheetScroll} contentContainerStyle={styles.sheetBody}>
-              <Text style={styles.sheetTitle}>
-                {initial ? t("app.suppliers.form.editTitle") : t("app.suppliers.form.createTitle")}
-              </Text>
+    <Sheet
+      visible={visible}
+      onClose={close}
+      title={initial ? t("app.suppliers.form.editTitle") : t("app.suppliers.form.createTitle")}
+      testID="supplier-form"
+      primaryAction={{
+        label: initial ? t("app.suppliers.form.save") : t("app.suppliers.form.add"),
+        onPress: submit,
+        disabled: !name.trim(),
+        loading: save.isPending,
+        testID: "supplier-form-submit",
+      }}
+      secondaryAction={{ label: t("app.suppliers.form.cancel"), onPress: close }}
+    >
+      <Field
+        label={t("app.suppliers.form.name")}
+        value={name}
+        onChangeText={setName}
+        autoFocus={!initial}
+        maxLength={120}
+        returnKeyType="next"
+      />
+      <Field
+        label={t("app.suppliers.form.phone")}
+        value={phone}
+        onChangeText={setPhone}
+        keyboardType="phone-pad"
+        textContentType="telephoneNumber"
+        maxLength={40}
+        ltr
+      />
+      <Field
+        label={t("app.suppliers.form.email")}
+        value={email}
+        onChangeText={setEmail}
+        keyboardType="email-address"
+        textContentType="emailAddress"
+        autoCapitalize="none"
+        autoCorrect={false}
+        maxLength={120}
+        ltr
+      />
+      <Field
+        label={t("app.suppliers.form.address")}
+        value={address}
+        onChangeText={setAddress}
+        maxLength={255}
+      />
+      <Field
+        label={t("app.suppliers.form.notes")}
+        value={notes}
+        onChangeText={setNotes}
+        maxLength={2000}
+        multiline
+      />
 
-              <Field
-                label={t("app.suppliers.form.name")}
-                value={name}
-                onChangeText={setName}
-                autoFocus={!initial}
-                maxLength={120}
-                returnKeyType="next"
-              />
-              <Field
-                label={t("app.suppliers.form.phone")}
-                value={phone}
-                onChangeText={setPhone}
-                keyboardType="phone-pad"
-                textContentType="telephoneNumber"
-                maxLength={40}
-                ltr
-              />
-              <Field
-                label={t("app.suppliers.form.email")}
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                textContentType="emailAddress"
-                autoCapitalize="none"
-                autoCorrect={false}
-                maxLength={120}
-                ltr
-              />
-              <Field
-                label={t("app.suppliers.form.address")}
-                value={address}
-                onChangeText={setAddress}
-                maxLength={255}
-              />
-              <Field
-                label={t("app.suppliers.form.notes")}
-                value={notes}
-                onChangeText={setNotes}
-                maxLength={2000}
-                multiline
-              />
-
-              {error ? (
-                <Text numberOfLines={3} style={styles.error}>
-                  {error}
-                </Text>
-              ) : null}
-
-            </ScrollView>
-            {/* Pinned footer with the home-indicator inset: inside the ScrollView the CTAs were clipped. Cancel leads. */}
-            <View style={[styles.actions, styles.sheetFooter, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
-              <Button
-                label={t("app.suppliers.form.cancel")}
-                variant="outline"
-                onPress={close}
-                style={styles.actionGrow}
-              />
-              <Button
-                label={initial ? t("app.suppliers.form.save") : t("app.suppliers.form.add")}
-                onPress={submit}
-                disabled={!name.trim()}
-                loading={save.isPending}
-                style={styles.actionGrow}
-              />
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </View>
-    </Modal>
+      {error ? (
+        <Text numberOfLines={3} style={styles.error}>
+          {error}
+        </Text>
+      ) : null}
+    </Sheet>
   );
 }
 
@@ -471,23 +443,6 @@ const styles = StyleSheet.create({
   },
   refreshFailedText: { alignSelf: "flex-start", fontFamily: fonts.medium, fontSize: 13, color: colors.danger, ...RTL_TEXT },
 
-  overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: colors.scrim },
-  kav: { flex: 1, justifyContent: "flex-end" },
-  sheet: {
-    backgroundColor: colors.card,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    maxHeight: "90%",
-    ...elevation.modal,
-  },
-  sheetBody: { padding: spacing.xl, gap: spacing.lg },
-  sheetTitle: { alignSelf: "flex-start", fontFamily: fonts.bold, fontSize: 18, color: colors.text, ...RTL_TEXT },
   error: { alignSelf: "flex-start", fontFamily: fonts.medium, fontSize: 14, color: colors.danger, ...RTL_TEXT },
-  actions: { flexDirection: "row", gap: spacing.sm },
-  sheetScroll: { flexShrink: 1 },
-  sheetFooter: { paddingHorizontal: spacing.xl, paddingTop: spacing.md },
   metaLtr: { writingDirection: "ltr", alignSelf: "flex-start", fontVariant: ["tabular-nums"] },
-  actionGrow: { flex: 1 },
 });

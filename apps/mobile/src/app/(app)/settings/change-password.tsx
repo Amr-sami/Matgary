@@ -1,26 +1,18 @@
 import { useState } from "react";
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  type TextInputProps,
-} from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useMutation } from "@tanstack/react-query";
-import { KeyIcon as Key } from "phosphor-react-native/src/icons/Key";
 
 import { api } from "@/api/client";
-import { ChevronBack } from "@/components/ui/Chevron";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { Field } from "@/components/ui/Field";
+import { SettingsHeader } from "@/components/ui/SettingsHeader";
 import { useSession } from "@/stores/session";
 import { colors, fonts, radius, spacing } from "@/theme/tokens";
 import { RTL_TEXT } from "@/theme/rtl";
-import { isRTL, t } from "@/i18n";
+import { t } from "@/i18n";
 
 /**
  * Port of app__account-change-password.png (/account/change-password on the
@@ -58,52 +50,11 @@ function serverError(e: unknown, fallback: string): string {
 }
 
 /**
- * The capture's password inputs are plain bordered boxes: label hugging the
- * reading edge, placeholder aligned the same way, no show/hide eye. The shared
- * `Field` cannot draw that here — its `ltr` mode pins the text to the physical
- * left, its `secure` mode always renders the eye, and its label leans on
- * natural alignment, which this build resolves to the LEFT even under the
- * root's `direction: rtl`. So the three boxes are drawn locally.
- *
- * Alignment is Yoga's job, not textAlign's: the label is shrink-wrapped in a
- * `flex-start` row, which the inherited direction resolves to the right edge
- * in Arabic and the left in English. (On iOS Fabric, `textAlign: "right"` on a
- * Text under an RTL layout is swapped to the physical left — see
- * RCTAttributedTextUtils.mm — so it is exactly the wrong tool.) The input is
- * a native control with no such swap, so it gets an explicit textAlign
- * resolved from the locale at render time, never inside StyleSheet.create.
+ * The three inputs are the shared <Field secure>: 52pt box, 15pt type, the
+ * show/hide eye — the same control every other form in the app draws. The
+ * web capture has no eye and a slightly taller box; sibling consistency on
+ * mobile wins over pixel parity with the browser.
  */
-function PasswordField({ label, ...props }: { label: string } & Omit<TextInputProps, "style">) {
-  const [focused, setFocused] = useState(false);
-  return (
-    <View style={styles.fieldWrap}>
-      <View style={styles.labelRow}>
-        <Text style={styles.label}>{label}</Text>
-      </View>
-      <TextInput
-        {...props}
-        secureTextEntry
-        autoCapitalize="none"
-        autoCorrect={false}
-        onFocus={(e) => {
-          setFocused(true);
-          props.onFocus?.(e);
-        }}
-        onBlur={(e) => {
-          setFocused(false);
-          props.onBlur?.(e);
-        }}
-        placeholderTextColor={colors.textSecondary}
-        style={[
-          styles.input,
-          isRTL() ? styles.inputRtl : styles.inputLtr,
-          focused && styles.inputFocused,
-        ]}
-      />
-    </View>
-  );
-}
-
 export default function ChangePasswordScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -167,90 +118,80 @@ export default function ChangePasswordScreen() {
   const canSubmit =
     current.length > 0 && next.length > 0 && confirm.length > 0 && !save.isPending;
 
-  const header = (
-    <View style={styles.header}>
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => router.back()}
-        hitSlop={12}
-        style={styles.back}
-      >
-        <ChevronBack size={16} color={colors.textSecondary} />
-        <Text style={styles.backLabel}>{t("app.settingsPage.title")}</Text>
-      </Pressable>
-    </View>
-  );
-
-  // Own frame instead of <Screen>: the capture centres the card vertically in
-  // the fold, which needs the scroll content to fill the viewport
-  // (flexGrow: 1) — <Screen> does not expose its contentContainerStyle. Same
-  // safe-area top, side gutter and tab-bar-clearing bottom padding as Screen.
-  // Direction is inherited from the root Stack's contentStyle.
+  // Own frame instead of <Screen>: the form needs
+  // `automaticallyAdjustKeyboardInsets`, which <Screen> does not expose. Same
+  // safe-area top (on the ROOT, so the bg is painted behind the clock while
+  // the form scrolls under it — see Screen.tsx), side gutter and
+  // tab-bar-clearing bottom padding as Screen. Direction is inherited from
+  // the root Stack's contentStyle.
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { paddingTop: insets.top }]}>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.lg }]}
+        contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
       >
-        {header}
+        <SettingsHeader
+          parentLabel={t("app.settingsPage.title")}
+          title={t("app.changePassword.title")}
+        />
 
-        <View style={styles.center}>
-          <Card style={styles.card}>
-            <View style={styles.iconWrap}>
-              <Key size={24} color={colors.accent} weight="bold" />
+        <Card style={styles.card}>
+          <Field
+            secure
+            label={t("app.changePassword.current")}
+            value={current}
+            onChangeText={setCurrent}
+            autoCapitalize="none"
+            autoCorrect={false}
+            textContentType="password"
+            autoComplete="current-password"
+          />
+          <Field
+            secure
+            label={t("app.changePassword.new")}
+            value={next}
+            onChangeText={setNext}
+            placeholder={t("app.changePassword.newPlaceholder")}
+            autoCapitalize="none"
+            autoCorrect={false}
+            textContentType="newPassword"
+            autoComplete="new-password"
+          />
+          <Field
+            secure
+            label={t("app.changePassword.confirm")}
+            value={confirm}
+            onChangeText={setConfirm}
+            autoCapitalize="none"
+            autoCorrect={false}
+            textContentType="newPassword"
+            autoComplete="new-password"
+            onSubmitEditing={submit}
+            returnKeyType="done"
+          />
+
+          {error ? (
+            <View style={[styles.message, styles.messageError]}>
+              <Text style={[styles.messageText, styles.messageErrorText]}>{error}</Text>
             </View>
-            <Text style={styles.title}>{t("app.changePassword.title")}</Text>
-
-            <View style={styles.form}>
-              <PasswordField
-                label={t("app.changePassword.current")}
-                value={current}
-                onChangeText={setCurrent}
-                textContentType="password"
-                autoComplete="current-password"
-              />
-              <PasswordField
-                label={t("app.changePassword.new")}
-                value={next}
-                onChangeText={setNext}
-                placeholder={t("app.changePassword.newPlaceholder")}
-                textContentType="newPassword"
-                autoComplete="new-password"
-              />
-              <PasswordField
-                label={t("app.changePassword.confirm")}
-                value={confirm}
-                onChangeText={setConfirm}
-                textContentType="newPassword"
-                autoComplete="new-password"
-                onSubmitEditing={submit}
-                returnKeyType="done"
-              />
-
-              {error ? (
-                <View style={[styles.message, styles.messageError]}>
-                  <Text style={[styles.messageText, styles.messageErrorText]}>{error}</Text>
-                </View>
-              ) : null}
-              {success ? (
-                <View style={[styles.message, styles.messageSuccess]}>
-                  <Text style={[styles.messageText, styles.messageSuccessText]}>
-                    {t("app.changePassword.success")}
-                  </Text>
-                </View>
-              ) : null}
-
-              <Button
-                label={t("app.changePassword.submit")}
-                onPress={submit}
-                disabled={!canSubmit}
-                loading={save.isPending}
-              />
+          ) : null}
+          {success ? (
+            <View style={[styles.message, styles.messageSuccess]}>
+              <Text style={[styles.messageText, styles.messageSuccessText]}>
+                {t("app.changePassword.success")}
+              </Text>
             </View>
-          </Card>
-        </View>
+          ) : null}
+
+          <Button
+            label={t("app.changePassword.submit")}
+            onPress={submit}
+            disabled={!canSubmit}
+            loading={save.isPending}
+          />
+        </Card>
       </ScrollView>
     </View>
   );
@@ -260,67 +201,15 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   scroll: { flex: 1 },
   content: {
-    flexGrow: 1,
+    paddingTop: spacing.lg,
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xxl * 2,
-    gap: spacing.lg,
   },
 
-  header: { gap: spacing.xs },
-  back: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 32 },
-  backLabel: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
+  card: { gap: spacing.lg },
 
-  // Fills whatever the header leaves, so the card floats mid-fold as in the
-  // capture. When the keyboard is up the scroll view's keyboard inset takes
-  // over and the focused input scrolls into view.
-  center: { flex: 1, justifyContent: "center" },
-  card: { padding: spacing.xl, gap: spacing.md },
-
-  iconWrap: {
-    alignSelf: "center",
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.accentLight,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  title: {
-    fontFamily: fonts.bold,
-    fontSize: 26,
-    color: colors.text,
-    textAlign: "center",
-    marginBottom: spacing.md,
-  },
-
-  form: { gap: spacing.lg },
-
-  fieldWrap: { gap: 8 },
-  // Yoga resolves flex-start against the inherited direction: right edge in
-  // Arabic, left edge in English. No textAlign involved.
-  labelRow: { alignItems: "flex-start" },
-  label: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
-  input: {
-    minHeight: 52,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    backgroundColor: colors.bg,
-    fontFamily: fonts.regular,
-    fontSize: 16,
-    color: colors.text,
-    // Without this, Android adds ~6px of invisible padding that makes the
-    // field taller than the 52px the border box promises.
-    includeFontPadding: false,
-  },
-  inputRtl: { textAlign: "right" },
-  inputLtr: { textAlign: "left" },
-  inputFocused: { borderColor: colors.accent },
-
-  // Same flex-start trick as the labels: the text shrink-wraps and hugs the
-  // reading edge inside the tinted pill.
+  // flex-start shrink-wraps the text so Yoga (not the paragraph's natural
+  // alignment) hugs it to the reading edge inside the tinted pill.
   message: {
     alignItems: "flex-start",
     paddingHorizontal: spacing.lg,

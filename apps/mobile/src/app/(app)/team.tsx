@@ -190,7 +190,18 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   avatarOwner: { backgroundColor: colors.accent },
-  initial: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 18, color: colors.accent },
+  // lineHeight = the circle's height so the line box IS the circle; Cairo's
+  // ascent-heavy box then parks the glyph a few pt low, hence the negative
+  // marginTop (م / ي / A checked optically). includeFontPadding is Android.
+  initial: {
+    fontFamily: fonts.bold,
+    fontSize: 18,
+    lineHeight: 44,
+    textAlign: "center",
+    includeFontPadding: false,
+    marginTop: -2,
+    color: colors.accent,
+  },
   initialOwner: { color: colors.card },
   body: { flex: 1, minWidth: 0, gap: 2 },
   name: { fontFamily: fonts.semibold, fontSize: 15, color: colors.text, ...RTL_TEXT },

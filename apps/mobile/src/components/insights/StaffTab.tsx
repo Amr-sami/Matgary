@@ -6,7 +6,7 @@ import { api } from "@/api/client";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { money } from "@/lib/format";
+import { countLabel, money } from "@/lib/format";
 import { RTL_TEXT } from "@/theme/rtl";
 import { colors, fonts, radius, spacing } from "@/theme/tokens";
 import { t } from "@/i18n";
@@ -16,7 +16,9 @@ import type { InsightsRange } from "./DeepTab";
 /**
  * Port of apps/web/components/insights/StaffPerformance.tsx — the "الموظفون"
  * tab. Same `/api/insights/staff-performance` endpoint; when the range is
- * "all" the API silently defaults to the last 30 days, so the subtitle says so.
+ * "all" the API silently defaults to the last 30 days, so a subtitle says so —
+ * only then: for every other range the selected chip sits 40–60pt above the
+ * card and already names the window.
  */
 
 interface StaffStat {
@@ -33,14 +35,6 @@ interface StaffResponse {
 }
 
 const UNATTRIBUTED = "__unattributed__";
-
-const RANGE_LABEL = (): Record<InsightsRange, string> => ({
-  all: t("app.insights.staff.rangeFallback"),
-  today: t("app.dateRange.today"),
-  yesterday: t("app.dateRange.yesterday"),
-  "7d": t("app.dateRange.7d"),
-  "30d": t("app.dateRange.30d"),
-});
 
 export function StaffTab({ range, from, to }: { range: InsightsRange; from?: string; to?: string }) {
   const hasWindow = Boolean(from && to);
@@ -86,7 +80,7 @@ export function StaffTab({ range, from, to }: { range: InsightsRange; from?: str
   return (
     <>
       <Card title={t("app.insights.staff.title")}>
-        <Text style={styles.subtitle}>{RANGE_LABEL()[range]}</Text>
+        {range === "all" ? <Text style={styles.subtitle}>{t("app.insights.staff.rangeFallback")}</Text> : null}
         {empty ? (
           <EmptyState title={t("app.insights.staff.empty.title")} hint={t("app.insights.staff.empty.subtitle")} />
         ) : (
@@ -114,12 +108,12 @@ export function StaffTab({ range, from, to }: { range: InsightsRange; from?: str
                     <View style={[styles.fill, { width: `${(s.salesRevenue / model.max) * 100}%` }]} />
                   </View>
                   <View style={styles.metaRow}>
-                    <Text style={styles.meta}>{t("app.insights.staff.metric.ops", { n: s.salesCount })}</Text>
+                    <Text style={styles.meta}>{countLabel("app.insights.staff.metric.ops", s.salesCount)}</Text>
                     {s.returnsCount > 0 ? (
                       <>
                         <Text style={styles.meta}>{"·"}</Text>
                         <Text style={[styles.meta, styles.metaDanger]}>
-                          {t("app.insights.staff.metric.returns", { n: s.returnsCount })}
+                          {countLabel("app.insights.staff.metric.returns", s.returnsCount)}
                         </Text>
                       </>
                     ) : null}

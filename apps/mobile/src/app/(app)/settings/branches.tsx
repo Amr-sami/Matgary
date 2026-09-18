@@ -7,7 +7,6 @@ import {
   Text,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "@matgary/api-client";
 import { EyeIcon as Eye } from "phosphor-react-native/src/icons/Eye";
@@ -18,12 +17,12 @@ import { TrashIcon as Trash } from "phosphor-react-native/src/icons/Trash";
 
 import { api } from "@/api/client";
 import { Screen } from "@/components/layout/Screen";
-import { ChevronBack } from "@/components/ui/Chevron";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
+import { SettingsHeader } from "@/components/ui/SettingsHeader";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
@@ -65,7 +64,6 @@ async function listBranches(): Promise<BranchRow[]> {
 }
 
 export default function BranchesScreen() {
-  const router = useRouter();
   const qc = useQueryClient();
   const me = useSession((s) => s.me);
   const switchBranch = useSession((s) => s.switchBranch);
@@ -185,33 +183,23 @@ export default function BranchesScreen() {
 
   return (
     <Screen onRefresh={() => void q.refetch()} refreshing={q.isRefetching}>
-      <View style={styles.header}>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.back()}
-          hitSlop={12}
-          style={styles.back}
-        >
-          {/* Back points RIGHT in an RTL page — the mirror of CaretLeft. */}
-          <ChevronBack size={16} color={colors.textSecondary} />
-          <Text style={styles.backLabel}>{t("app.settingsPage.title")}</Text>
-        </Pressable>
-
-        <View style={styles.titleRow}>
-          <Text style={styles.title}>{t("app.branchesPage.heading")}</Text>
-          {isOwner && !draft ? (
+      {/* Shared settings sub-screen header: same back-link metrics, title size
+          and subtitle line box as Notifications and every other sibling. */}
+      <SettingsHeader
+        parentLabel={t("app.settingsPage.title")}
+        title={t("app.branchesPage.heading")}
+        subtitle={t("app.branchesPage.subhead")}
+        accessories={
+          isOwner && !draft ? (
             <Button
               label={t("mobile.settings.addBranch")}
               onPress={() => setDraft({ ...EMPTY_DRAFT })}
               disabled={busy}
               style={styles.addButton}
             />
-          ) : null}
-        </View>
-        <Text style={styles.subtitle}>
-          {t("app.branchesPage.subhead")}
-        </Text>
-      </View>
+          ) : undefined
+        }
+      />
 
       {notice ? (
         <Pressable onPress={() => setNotice(null)}>
@@ -408,26 +396,11 @@ function IconButton({
   );
 }
 
+/** Glyph size inside the 44pt action boxes (PencilSimple / Eye / Trash). */
+const ICON_GLYPH = 18;
+
 const styles = StyleSheet.create({
-  // Mirrors Screen's own header block; rendered here so the back link can sit
-  // ABOVE the title instead of below it.
-  header: { gap: spacing.xs },
-  back: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 32 },
-  backLabel: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
-  titleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md,
-  },
-  title: { fontFamily: fonts.bold, fontSize: 26, color: colors.text, flexShrink: 1, ...RTL_TEXT },
   addButton: { flexShrink: 0, minHeight: MIN_TOUCH, paddingHorizontal: spacing.lg },
-  subtitle: {
-    fontFamily: fonts.regular,
-    fontSize: 15,
-    color: colors.textSecondary,
-    ...RTL_TEXT,
-  },
 
   notice: {
     fontFamily: fonts.medium,
@@ -487,6 +460,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: spacing.sm,
     marginTop: spacing.lg,
+    // Same rule as attendance's iconBtn: keep the 44pt target but pull the row
+    // out by the box's inner padding so the trailing glyph lands on the card's
+    // content edge instead of ~13pt inside it. Horizontal only — the 52pt
+    // "Open" button sets the row height, so a negative bottom margin would
+    // push it into the card padding.
+    marginEnd: -((MIN_TOUCH - ICON_GLYPH) / 2),
   },
   iconButton: {
     width: MIN_TOUCH,

@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,12 +12,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CheckIcon as Check } from "phosphor-react-native/src/icons/Check";
 import { CheckCircleIcon as CheckCircle } from "phosphor-react-native/src/icons/CheckCircle";
-import { MagnifyingGlassIcon as MagnifyingGlass } from "phosphor-react-native/src/icons/MagnifyingGlass";
 import { MinusIcon as Minus } from "phosphor-react-native/src/icons/Minus";
 import { PlusIcon as Plus } from "phosphor-react-native/src/icons/Plus";
 import { TrashIcon as Trash } from "phosphor-react-native/src/icons/Trash";
 import { UserPlusIcon as UserPlus } from "phosphor-react-native/src/icons/UserPlus";
-import { XIcon as X } from "phosphor-react-native/src/icons/X";
 import { ApiError, catalog, type Product, type Supplier } from "@matgary/api-client";
 
 import { api } from "@/api/client";
@@ -30,10 +25,14 @@ import { ChevronBack } from "@/components/ui/Chevron";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
 import { SearchField } from "@/components/ui/SearchField";
+import { Sheet } from "@/components/ui/Sheet";
 import { ScannerSheet, type ScanTone } from "@/components/scanner/ScannerSheet";
 import { money } from "@/lib/format";
-import { RTL_TEXT, directionStyle } from "@/theme/rtl";
+import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
+
+/** Visible-caret inset inside a 16pt Phosphor caret icon box. */
+const GLYPH_INSET = 5;
 
 /**
  * The web's PurchaseOrderBuilder (one modal, inline editable table) split into
@@ -55,8 +54,6 @@ import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
 
 type Step = 1 | 2 | 3 | 4;
 const STEP_COUNT = 4;
-const HEADER_BTN = 36;
-const HEADER_ICON = 22;
 
 export interface BuilderLine {
   uid: string;
@@ -165,71 +162,72 @@ export function PoBuilderSheet({
   }[step];
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={goBack}>
-      <View style={[styles.root, directionStyle(isRTL()), { paddingTop: insets.top }]}>
-        <View style={styles.header}>
-          <Pressable
-            onPress={goBack}
-            testID="po-builder-back"
-            hitSlop={12}
-            accessibilityRole="button"
-            accessibilityLabel={step === 1 || step === 4 ? t("mobile.purchases.builder.close") : t("mobile.purchases.builder.back")}
-            style={styles.headerBtn}
-          >
-            {step === 1 || step === 4 ? <X size={HEADER_ICON} color={colors.text} /> : <ChevronBack size={HEADER_ICON} color={colors.text} />}
-          </Pressable>
-          <View style={styles.headerText}>
-            <Text style={styles.title} numberOfLines={1}>{t("app.purchases.builder.title")}</Text>
-            <Text style={styles.stepLabel} numberOfLines={1}>
-              {t("mobile.common.step", { step, total: STEP_COUNT, title: stepTitle })}
-            </Text>
-          </View>
-        </View>
-        <View style={styles.progress}>
-          {[1, 2, 3, 4].map((n) => (
-            <View key={n} style={[styles.progressSeg, n <= step && styles.progressSegActive]} />
-          ))}
-        </View>
-
-        <KeyboardAvoidingView
-          style={styles.body}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-        >
-          {step === 1 ? (
-            <SupplierStep
-              canCreate={canCreateSupplier}
-              selected={supplier}
-              onSelect={(s) => { setSupplier(s); setError(null); }}
-              onNext={() => setStep(2)}
-            />
-          ) : step === 2 ? (
-            <LinesStep lines={lines} setLines={setLines} onNext={() => setStep(3)} />
-          ) : step === 3 ? (
-            <ReviewStep
-              supplier={supplier}
-              lines={validLines}
-              total={total}
-              notes={notes}
-              setNotes={setNotes}
-              error={error}
-              submitting={create.isPending}
-              onSubmit={() => create.mutate()}
-            />
-          ) : (
-            <DoneStep
-              id={createdId ?? ""}
-              supplierName={supplier?.name ?? ""}
-              lineCount={validLines.length}
-              total={total}
-              receiving={receiving}
-              onReceiveNow={() => createdId && onReceiveNow(createdId)}
-              onClose={onClose}
-            />
-          )}
-        </KeyboardAvoidingView>
-        <View style={{ height: insets.bottom }} />
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      onRequestClose={goBack}
+      title={t("app.purchases.builder.title")}
+      subtitle={t("mobile.common.step", { step, total: STEP_COUNT, title: stepTitle })}
+      size="full"
+      testID="po-builder"
+      closeOnBackdrop={false}
+      scrollable={false}
+      bodyStyle={[styles.wizardBody, { paddingBottom: insets.bottom }]}
+    >
+      <View style={styles.progress}>
+        {[1, 2, 3, 4].map((n) => (
+          <View key={n} style={[styles.progressSeg, n <= step && styles.progressSegActive]} />
+        ))}
       </View>
-    </Modal>
+      {step === 2 || step === 3 ? (
+        // Sheet's X (po-builder-close) closes the whole draft; this is the
+        // one-step-back affordance the wizard still needs.
+        <Pressable
+          onPress={goBack}
+          testID="po-builder-back"
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={t("mobile.purchases.builder.back")}
+          style={styles.backRow}
+        >
+          <View style={styles.backGlyph}>
+            <ChevronBack size={16} color={colors.accent} />
+          </View>
+          <Text style={styles.backLabel}>{t("mobile.purchases.builder.back")}</Text>
+        </Pressable>
+      ) : null}
+      {step === 1 ? (
+        <SupplierStep
+          canCreate={canCreateSupplier}
+          selected={supplier}
+          onSelect={(s) => { setSupplier(s); setError(null); }}
+          onNext={() => setStep(2)}
+        />
+      ) : step === 2 ? (
+        <LinesStep lines={lines} setLines={setLines} onNext={() => setStep(3)} />
+      ) : step === 3 ? (
+        <ReviewStep
+          supplier={supplier}
+          lines={validLines}
+          total={total}
+          notes={notes}
+          setNotes={setNotes}
+          error={error}
+          submitting={create.isPending}
+          onSubmit={() => create.mutate()}
+        />
+      ) : (
+        <DoneStep
+          id={createdId ?? ""}
+          supplierName={supplier?.name ?? ""}
+          lineCount={validLines.length}
+          total={total}
+          receiving={receiving}
+          onReceiveNow={() => createdId && onReceiveNow(createdId)}
+          onClose={onClose}
+        />
+      )}
+    </Sheet>
   );
 }
 
@@ -272,10 +270,12 @@ export function describeError(e: unknown, fallback: string): string {
  * here so the caption keeps one shape across the wizard.
  */
 function linesSummary(n: number, total: number): string {
-  return t(n === 1 ? "mobile.purchases.builder.linesSummaryOne" : "mobile.purchases.builder.linesSummary", {
-    n,
-    amount: money(total),
-  });
+  return t(`mobile.purchases.builder.linesSummary${countForm(n)}`, { n, amount: money(total) });
+}
+
+/** Arabic counts 1 / 2 / 3–10 / 11+ differently; the dictionary carries One/Two/Few beside the default. */
+function countForm(n: number): string {
+  return n === 1 ? "One" : n === 2 ? "Two" : n >= 3 && n <= 10 ? "Few" : "";
 }
 
 /**
@@ -345,18 +345,11 @@ function SupplierStep({
   return (
     <>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <View testID="po-supplier-search" style={styles.searchBox}>
-          <MagnifyingGlass size={20} color={colors.textSecondary} />
-          <TextInput
-            value={q}
-            onChangeText={setQ}
-            placeholder={t("mobile.purchases.builder.searchSupplier")}
-            placeholderTextColor={colors.textSecondary}
-            returnKeyType="search"
-            autoCapitalize="none"
-            autoCorrect={false}
-            style={[styles.searchInput, inputAlign()]}
-          />
+        {/* The same SearchField step 2 uses, minus its barcode button (a
+            supplier is not scanned) — a bespoke box here jogged the
+            placeholder inset between consecutive steps (F28). */}
+        <View testID="po-supplier-search">
+          <SearchField value={q} onChangeText={setQ} placeholder={t("mobile.purchases.builder.searchSupplier")} />
         </View>
 
         {canCreate ? (
@@ -535,7 +528,7 @@ function LinesStep({
   return (
     <>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.hint}>{t("mobile.purchases.builder.scanHint")}</Text>
+        {lines.length > 0 ? <Text style={styles.hint}>{t("mobile.purchases.builder.scanHint")}</Text> : null}
         <View testID="po-product-search">
           <SearchField
             value={q}
@@ -569,8 +562,8 @@ function LinesStep({
           </Pressable>
         ))}
 
-        <Pressable onPress={addFreeText} accessibilityRole="button" style={styles.freeTextBtn}>
-          <Plus size={16} color={colors.accent} weight="bold" />
+        <Pressable onPress={addFreeText} accessibilityRole="button" style={styles.newSupplierBtn}>
+          <Plus size={18} color={colors.accent} weight="bold" />
           <Text style={styles.newSupplierText}>{t("mobile.purchases.builder.freeText")}</Text>
         </Pressable>
 
@@ -701,7 +694,7 @@ function ReviewStep({
 
         <View style={styles.reviewCard}>
           <Text style={styles.editorLabel}>
-            {t(lines.length === 1 ? "app.purchases.row.itemCountOne" : "app.purchases.row.itemCount", { n: lines.length })}
+            {t(`app.purchases.row.itemCount${countForm(lines.length)}`, { n: lines.length })}
           </Text>
           {lines.map((l) => (
             <View key={l.uid} style={styles.reviewLine}>
@@ -798,36 +791,27 @@ function DoneStep({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
-  // Title first, step caption under it (the Screen/add-product header order);
-  // the row is top-aligned so the X / chevron centres on the TITLE line, not
-  // on the two-line block. Cairo at 20pt lays out a ~34pt line, so a 36pt
-  // button sits on it; hitSlop={12} keeps the touch area above MIN_TOUCH.
-  header: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: spacing.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-  },
-  headerBtn: {
-    width: HEADER_BTN,
-    height: HEADER_BTN,
-    // The 22pt glyph is centred in a 36pt box; pull it back so the glyph's
-    // edge sits on the 16pt content edge the rail and body use, not 7pt in.
-    marginStart: -(HEADER_BTN - HEADER_ICON) / 2,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerText: { flex: 1, gap: 2 },
-  title: { fontFamily: fonts.bold, fontSize: 20, color: colors.text, ...RTL_TEXT },
-  stepLabel: { fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },
+  // The steps bring their own ScrollView + footer, so the Sheet body is a
+  // bare flex column (bottom inset added at render).
+  wizardBody: { paddingHorizontal: 0, paddingTop: 0, paddingBottom: 0, gap: 0 },
   // Same rail as add-product.tsx (6pt, gap sm, accentLight -> accent) so the
   // two wizards read as one pattern.
   progress: { flexDirection: "row", gap: spacing.sm, paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
+  backRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: spacing.xs,
+    minHeight: MIN_TOUCH - 8,
+    paddingHorizontal: spacing.lg,
+  },
+  // The Phosphor caret path fills ~37% of its viewBox, so at 16pt the visible
+  // glyph starts ~5pt inside the icon box; pull it back so the caret's edge
+  // lands on the same 16pt start as the progress rail below (U72).
+  backGlyph: { marginStart: -GLYPH_INSET },
+  backLabel: { fontFamily: fonts.semibold, fontSize: 14, color: colors.accent, ...RTL_TEXT },
   progressSeg: { flex: 1, height: 6, borderRadius: 3, backgroundColor: colors.accentLight },
   progressSegActive: { backgroundColor: colors.accent },
-  body: { flex: 1 },
   content: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xl },
   footer: {
     padding: spacing.lg,
@@ -841,28 +825,32 @@ const styles = StyleSheet.create({
   err: { fontFamily: fonts.medium, fontSize: 13, color: colors.danger, ...RTL_TEXT },
   list: { gap: spacing.sm },
   grow: { flex: 1 },
+  // pickRow / newSupplierBtn take SearchField's horizontal inset and radius
+  // so the stacked boxes on step 1 share one start edge and one corner (F30).
   pickRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
     minHeight: MIN_TOUCH,
-    padding: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     backgroundColor: colors.card,
   },
   pickRowActive: { borderColor: colors.accent, backgroundColor: colors.accentLight },
   pickText: { flex: 1, gap: 2 },
   pickName: { fontFamily: fonts.semibold, fontSize: 15, color: colors.text, ...RTL_TEXT },
   meta: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },
+  // Also the "add unlisted item" row on step 2 — one chrome for "add something new" (F29).
   newSupplierBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
     minHeight: MIN_TOUCH,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
     borderStyle: "dashed",
@@ -877,7 +865,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  freeTextBtn: { flexDirection: "row", alignItems: "center", gap: spacing.xs, minHeight: MIN_TOUCH },
   lineCard: {
     gap: spacing.sm,
     padding: spacing.md,
@@ -924,26 +911,6 @@ const styles = StyleSheet.create({
   },
   inputLtr: { textAlign: "left", writingDirection: "ltr" },
   inputRtl: { textAlign: "right", writingDirection: "rtl" },
-  // SearchField's box without its barcode button: a supplier is not scanned.
-  searchBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    minHeight: 52,
-    paddingHorizontal: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    backgroundColor: colors.bg,
-  },
-  searchInput: {
-    flex: 1,
-    fontFamily: fonts.regular,
-    fontSize: 15,
-    color: colors.text,
-    includeFontPadding: false,
-    paddingVertical: 12,
-  },
   lineTotal: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 15, color: colors.text, fontVariant: ["tabular-nums"] },
   reviewCard: {
     gap: spacing.sm,

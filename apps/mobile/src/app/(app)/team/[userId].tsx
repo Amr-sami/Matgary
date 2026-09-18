@@ -2,11 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
-  Switch,
   Text,
   View,
 } from "react-native";
@@ -21,16 +18,19 @@ import { ApiError, team } from "@matgary/api-client";
 import { api } from "@/api/client";
 import { getLocale, isRTL, t } from "@/i18n";
 import { Screen } from "@/components/layout/Screen";
+import { HeaderAccessories } from "@/components/shell/HeaderAccessories";
+import { BackLink } from "@/components/ui/BackLink";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { ChevronBack } from "@/components/ui/Chevron";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
 import { Segmented } from "@/components/ui/Segmented";
+import { Sheet } from "@/components/ui/Sheet";
+import { ToggleRow } from "@/components/ui/ToggleRow";
 import { money, shortDate } from "@/lib/format";
 import { useSession } from "@/stores/session";
-import { RTL_TEXT, directionStyle } from "@/theme/rtl";
+import { RTL_TEXT } from "@/theme/rtl";
 import { colors, elevation, fonts, radius, spacing, MIN_TOUCH } from "@/theme/tokens";
 
 /**
@@ -366,7 +366,6 @@ export default function TeamMemberScreen() {
   });
 
   // -- render -------------------------------------------------------------
-  const rtl = getLocale() === "ar";
   const busy = savePerms.isPending || saveDetails.isPending || resetPwd.isPending || remove.isPending;
 
   return (
@@ -378,16 +377,15 @@ export default function TeamMemberScreen() {
         void leaveQ.refetch();
       }}
       refreshing={teamQ.isRefetching}
+      // "‹ Team" in the FIXED header band — the one BackLink recipe, at the
+      // same y as team/attendance (HeaderAccessories above it on both).
+      header={
+        <View style={styles.fixedHeader}>
+          <HeaderAccessories />
+          <BackLink label={t("mobile.team.back")} onPress={() => router.navigate("/team")} testID="team-breadcrumb" />
+        </View>
+      }
     >
-      <Pressable
-        accessibilityRole="button"
-        testID="team-breadcrumb"
-        onPress={() => router.navigate("/team")}
-        style={styles.breadcrumb}
-      >
-        <ChevronBack size={14} color={colors.textSecondary} />
-        <Text style={styles.breadcrumbText}>{t("mobile.team.back")}</Text>
-      </Pressable>
 
       {banner ? (
         <View style={[styles.banner, banner.kind === "ok" ? styles.bannerOk : styles.bannerError]}>
@@ -460,20 +458,18 @@ export default function TeamMemberScreen() {
                   <View key={g.title} style={styles.group}>
                     <Text style={styles.groupTitle}>{g.title}</Text>
                     {g.permissions.map((p) => (
-                      <View key={p} style={styles.toggleRow}>
-                        <Text style={styles.toggleLabel}>{permissionLabel(p)}</Text>
-                        <Switch
-                          value={effectivePerms.has(p)}
-                          disabled={busy || isSelf || !meIsOwner}
-                          onValueChange={(v) => {
-                            const next = new Set(effectivePerms);
-                            if (v) next.add(p);
-                            else next.delete(p);
-                            setPerms(next);
-                          }}
-                          trackColor={{ true: colors.accent, false: colors.border }}
-                        />
-                      </View>
+                      <ToggleRow
+                        key={p}
+                        label={permissionLabel(p)}
+                        value={effectivePerms.has(p)}
+                        disabled={busy || isSelf || !meIsOwner}
+                        onValueChange={(v) => {
+                          const next = new Set(effectivePerms);
+                          if (v) next.add(p);
+                          else next.delete(p);
+                          setPerms(next);
+                        }}
+                      />
                     ))}
                   </View>
                 ))}
@@ -521,11 +517,11 @@ export default function TeamMemberScreen() {
                 <ActivityIndicator color={colors.accent} />
               ) : (
                 <>
-                  <Text style={styles.valueBig}>
-                    {latestComp
-                      ? compensationSummary(latestComp)
-                      : t("app.team.compensation.noCompensation")}
-                  </Text>
+                  {latestComp ? (
+                    <Text style={styles.valueBig}>{compensationSummary(latestComp)}</Text>
+                  ) : (
+                    <Text style={styles.hint}>{t("app.team.compensation.noCompensation")}</Text>
+                  )}
                   {latestComp ? (
                     <Text style={styles.hint}>
                       {t("mobile.team.compensationHistory", { date: shortDate(latestComp.effectiveFrom) })}
@@ -628,125 +624,127 @@ export default function TeamMemberScreen() {
       )}
 
       {/* Details modal */}
-      <Modal visible={detailsOpen} animationType="slide" onRequestClose={() => setDetailsOpen(false)}>
-        <View style={[styles.modal, directionStyle(rtl)]}>
-          <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled">
-            <Text style={styles.modalTitle}>{t("app.teamAdmin.row.editDetailsTitle")}</Text>
-            <Field label={t("app.activityLabels.fieldNames.displayName")} value={displayName} onChangeText={setDisplayName} />
-            <Field label={t("mobile.team.phone")} value={phone} onChangeText={setPhone} keyboardType="phone-pad" ltr />
-            <Field label={t("mobile.team.nationalId")} value={nationalId} onChangeText={setNationalId} keyboardType="number-pad" ltr />
-            <Field label={t("mobile.team.address")} value={address} onChangeText={setAddress} />
-            <Button
-              label={t("app.team.editEvent.save")}
-              onPress={() => saveDetails.mutate()}
-              loading={saveDetails.isPending}
-              disabled={displayName.trim().length === 0}
-            />
-            <Button label={t("app.team.editEvent.cancel")} variant="ghost" onPress={() => setDetailsOpen(false)} />
-          </ScrollView>
-        </View>
-      </Modal>
+      <Sheet
+        visible={detailsOpen}
+        onClose={() => setDetailsOpen(false)}
+        title={t("app.teamAdmin.row.editDetailsTitle")}
+        testID="team-details"
+        primaryAction={{
+          label: t("app.team.editEvent.save"),
+          onPress: () => saveDetails.mutate(),
+          loading: saveDetails.isPending,
+          disabled: displayName.trim().length === 0,
+          testID: "team-details-submit",
+        }}
+        secondaryAction={{ label: t("app.team.editEvent.cancel"), onPress: () => setDetailsOpen(false) }}
+      >
+        <Field label={t("app.activityLabels.fieldNames.displayName")} value={displayName} onChangeText={setDisplayName} />
+        <Field label={t("mobile.team.phone")} value={phone} onChangeText={setPhone} keyboardType="phone-pad" ltr />
+        <Field label={t("mobile.team.nationalId")} value={nationalId} onChangeText={setNationalId} keyboardType="number-pad" ltr />
+        <Field label={t("mobile.team.address")} value={address} onChangeText={setAddress} />
+      </Sheet>
 
       {/* Reset password modal */}
-      <Modal visible={pwdOpen} animationType="slide" onRequestClose={() => setPwdOpen(false)}>
-        <View style={[styles.modal, directionStyle(rtl)]}>
-          <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled">
-            <Text style={styles.modalTitle}>{t("app.teamAdmin.row.resetPassword")}</Text>
-            <Text style={styles.hint}>{t("mobile.team.passwordHint")}</Text>
-            <Field
-              label={t("mobile.team.newPassword")}
-              value={newPassword}
-              onChangeText={setNewPassword}
-              secure
-              ltr
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <Button
-              label={t("app.team.editEvent.save")}
-              onPress={() => resetPwd.mutate()}
-              loading={resetPwd.isPending}
-              disabled={newPassword.length < 8}
-            />
-            <Button label={t("app.team.editEvent.cancel")} variant="ghost" onPress={() => setPwdOpen(false)} />
-          </ScrollView>
-        </View>
-      </Modal>
+      <Sheet
+        visible={pwdOpen}
+        onClose={() => setPwdOpen(false)}
+        title={t("app.teamAdmin.row.resetPassword")}
+        testID="team-password"
+        primaryAction={{
+          label: t("app.team.editEvent.save"),
+          onPress: () => resetPwd.mutate(),
+          loading: resetPwd.isPending,
+          disabled: newPassword.length < 8,
+          testID: "team-password-submit",
+        }}
+        secondaryAction={{ label: t("app.team.editEvent.cancel"), onPress: () => setPwdOpen(false) }}
+      >
+        <Text style={styles.hint}>{t("mobile.team.passwordHint")}</Text>
+        <Field
+          label={t("mobile.team.newPassword")}
+          value={newPassword}
+          onChangeText={setNewPassword}
+          secure
+          ltr
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+      </Sheet>
 
       {/* Compensation modal */}
-      <Modal visible={compOpen} animationType="slide" onRequestClose={() => setCompOpen(false)}>
-        <View style={[styles.modal, directionStyle(rtl)]}>
-          <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled">
-            <Text style={styles.modalTitle}>{t("app.team.compensation.edit")}</Text>
-            <Text style={styles.fieldLabel}>{t("app.team.compensation.form.payType")}</Text>
-            <Segmented items={PAY_TYPES()} value={payType} onChange={setPayType} />
-            {payType !== "hourly" ? (
-              <Field
-                label={t("app.team.compensation.form.baseSalary")}
-                placeholder={t("app.team.compensation.form.baseSalaryPlaceholder")}
-                value={baseSalary}
-                onChangeText={setBaseSalary}
-                keyboardType="decimal-pad"
-                ltr
-              />
-            ) : null}
-            {payType !== "fixed" ? (
-              <Field
-                label={t("app.team.compensation.form.hourlyRate")}
-                placeholder={t("app.team.compensation.form.hourlyRatePlaceholder")}
-                value={hourlyRate}
-                onChangeText={setHourlyRate}
-                keyboardType="decimal-pad"
-                ltr
-              />
-            ) : null}
-            {payType === "hybrid" ? (
-              <Field
-                label={t("app.team.compensation.form.standardHours")}
-                placeholder={t("app.team.compensation.form.standardHoursPlaceholder")}
-                value={standardHours}
-                onChangeText={setStandardHours}
-                keyboardType="number-pad"
-                ltr
-              />
-            ) : null}
-            <Field
-              label={t("app.team.compensation.form.effectiveFrom")}
-              placeholder={ymd(new Date())}
-              value={effectiveFrom}
-              onChangeText={setEffectiveFrom}
-              keyboardType="numbers-and-punctuation"
-              autoCorrect={false}
-              ltr
-            />
-            {!effectiveDate ? (
-              <Text style={styles.fieldError}>{t("mobile.team.attendance.invalidDate")}</Text>
-            ) : null}
-            {compQ.data && compQ.data.length > 0 ? (
-              <View style={styles.history}>
-                <Text style={styles.groupTitle}>{t("app.team.compensation.form.historyHeading")}</Text>
-                {compQ.data.slice(0, 5).map((row) => (
-                  <View key={row.id} style={styles.historyRow}>
-                    <Text style={[styles.shiftTime, styles.grow]}>{compensationSummary(row)}</Text>
-                    <Text style={styles.shiftDate}>{shortDate(row.effectiveFrom)}</Text>
-                  </View>
-                ))}
+      <Sheet
+        visible={compOpen}
+        onClose={() => setCompOpen(false)}
+        title={t("app.team.compensation.edit")}
+        testID="team-compensation"
+        primaryAction={{
+          label: t("app.team.compensation.form.save"),
+          onPress: () => saveComp.mutate(),
+          loading: saveComp.isPending,
+          disabled:
+            !effectiveDate ||
+            (payType !== "hourly" && !(num(baseSalary) ?? 0)) ||
+            (payType !== "fixed" && !(num(hourlyRate) ?? 0)),
+          testID: "team-compensation-submit",
+        }}
+        secondaryAction={{ label: t("app.team.editEvent.cancel"), onPress: () => setCompOpen(false) }}
+      >
+        <Text style={styles.fieldLabel}>{t("app.team.compensation.form.payType")}</Text>
+        <Segmented items={PAY_TYPES()} value={payType} onChange={setPayType} />
+        {payType !== "hourly" ? (
+          <Field
+            label={t("app.team.compensation.form.baseSalary")}
+            placeholder={t("app.team.compensation.form.baseSalaryPlaceholder")}
+            value={baseSalary}
+            onChangeText={setBaseSalary}
+            keyboardType="decimal-pad"
+            ltr
+          />
+        ) : null}
+        {payType !== "fixed" ? (
+          <Field
+            label={t("app.team.compensation.form.hourlyRate")}
+            placeholder={t("app.team.compensation.form.hourlyRatePlaceholder")}
+            value={hourlyRate}
+            onChangeText={setHourlyRate}
+            keyboardType="decimal-pad"
+            ltr
+          />
+        ) : null}
+        {payType === "hybrid" ? (
+          <Field
+            label={t("app.team.compensation.form.standardHours")}
+            placeholder={t("app.team.compensation.form.standardHoursPlaceholder")}
+            value={standardHours}
+            onChangeText={setStandardHours}
+            keyboardType="number-pad"
+            ltr
+          />
+        ) : null}
+        <Field
+          label={t("app.team.compensation.form.effectiveFrom")}
+          placeholder={ymd(new Date())}
+          value={effectiveFrom}
+          onChangeText={setEffectiveFrom}
+          keyboardType="numbers-and-punctuation"
+          autoCorrect={false}
+          ltr
+        />
+        {!effectiveDate ? (
+          <Text style={styles.fieldError}>{t("mobile.team.attendance.invalidDate")}</Text>
+        ) : null}
+        {compQ.data && compQ.data.length > 0 ? (
+          <View style={styles.history}>
+            <Text style={styles.groupTitle}>{t("app.team.compensation.form.historyHeading")}</Text>
+            {compQ.data.slice(0, 5).map((row) => (
+              <View key={row.id} style={styles.historyRow}>
+                <Text style={[styles.shiftTime, styles.grow]}>{compensationSummary(row)}</Text>
+                <Text style={styles.shiftDate}>{shortDate(row.effectiveFrom)}</Text>
               </View>
-            ) : null}
-            <Button
-              label={t("app.team.compensation.form.save")}
-              onPress={() => saveComp.mutate()}
-              loading={saveComp.isPending}
-              disabled={
-                !effectiveDate ||
-                (payType !== "hourly" && !(num(baseSalary) ?? 0)) ||
-                (payType !== "fixed" && !(num(hourlyRate) ?? 0))
-              }
-            />
-            <Button label={t("app.team.editEvent.cancel")} variant="ghost" onPress={() => setCompOpen(false)} />
-          </ScrollView>
-        </View>
-      </Modal>
+            ))}
+          </View>
+        ) : null}
+      </Sheet>
     </Screen>
   );
 }
@@ -801,14 +799,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 const styles = StyleSheet.create({
   stack: { gap: spacing.md },
-  breadcrumb: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-    minHeight: MIN_TOUCH,
-    marginBottom: spacing.sm,
-  },
-  breadcrumbText: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
+  fixedHeader: { gap: spacing.xs, alignItems: "flex-start" },
   banner: {
     borderRadius: radius.md,
     padding: spacing.md,
@@ -819,8 +810,10 @@ const styles = StyleSheet.create({
   bannerText: { fontFamily: fonts.medium, fontSize: 14, ...RTL_TEXT },
   bannerTextOk: { color: colors.successStrong },
   bannerTextError: { color: colors.danger },
+  // Start-aligned like the supplier hero and every other screen — the
+  // centred card was the one odd one out.
   header: {
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: spacing.sm,
     backgroundColor: colors.card,
     borderRadius: radius.lg,
@@ -838,11 +831,22 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   avatarOwner: { backgroundColor: colors.accent },
-  initial: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 26, color: colors.accent },
+  // lineHeight = the circle's height so the line box IS the circle; Cairo's
+  // ascent-heavy box then parks the glyph a few pt low, hence the negative
+  // marginTop (م / ي / A checked optically). includeFontPadding is Android.
+  initial: {
+    fontFamily: fonts.bold,
+    fontSize: 26,
+    lineHeight: 64,
+    textAlign: "center",
+    includeFontPadding: false,
+    marginTop: -3,
+    color: colors.accent,
+  },
   initialOwner: { color: colors.card },
-  name: { fontFamily: fonts.bold, fontSize: 20, color: colors.text, textAlign: "center" },
+  name: { fontFamily: fonts.bold, fontSize: 20, color: colors.text, ...RTL_TEXT },
   handle: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, writingDirection: "ltr" },
-  badges: { flexDirection: "row", gap: spacing.sm, flexWrap: "wrap", justifyContent: "center" },
+  badges: { flexDirection: "row", gap: spacing.sm, flexWrap: "wrap", justifyContent: "flex-start" },
   joined: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary },
   hint: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },
   valueBig: { fontFamily: fonts.semibold, fontSize: 17, color: colors.text, ...RTL_TEXT },
@@ -861,17 +865,6 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     ...RTL_TEXT,
   },
-  toggleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md,
-    minHeight: MIN_TOUCH,
-  },
-  // Shrink-wrapped, not flex:1 — a stretched Text leans on Fabric's alignment
-  // swap, and in Arabic the label ended up glued to the Switch on the left.
-  // An explicit lineHeight keeps Cairo's tall line box centred on the switch.
-  toggleLabel: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 20, color: colors.text, flexShrink: 1, ...RTL_TEXT },
   actionRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -909,8 +902,5 @@ const styles = StyleSheet.create({
   grow: { flex: 1 },
   history: { gap: spacing.xs },
   historyRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingVertical: spacing.xs },
-  modal: { flex: 1, backgroundColor: colors.bg },
-  modalBody: { padding: spacing.xl, paddingTop: spacing.xxl * 1.5, gap: spacing.lg },
-  modalTitle: { fontFamily: fonts.bold, fontSize: 20, color: colors.text, ...RTL_TEXT },
   fieldLabel: { fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary, ...RTL_TEXT },
 });

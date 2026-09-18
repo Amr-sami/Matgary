@@ -709,12 +709,15 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxl * 2,
     flexGrow: 1,
   },
-  headerWrap: { gap: spacing.lg },
+  // gap 4 = Screen.header's accessories→title gap, so "WhatsApp" sits at the
+  // same height as "Team" / "Activity log" under the identical accessories row.
+  headerWrap: { gap: spacing.xs },
   title: { fontFamily: fonts.bold, fontSize: 26, color: colors.text, ...RTL_TEXT },
   // "WhatsApp" is Latin, so bidi would left-anchor it inside an RTL page —
   // pin it to the header's start edge explicitly.
   // Shrink-wrap so Yoga places the Latin brand name at the reading edge; on
   // iOS Fabric `textAlign: "right"` is swapped to physical left under RTL.
+  // (Kept as its own row so the tabs below are NOT shrink-wrapped with it.)
   titleRow: { alignItems: "flex-start" },
   notAllowed: {
     fontFamily: fonts.regular,
@@ -726,6 +729,9 @@ const styles = StyleSheet.create({
   // Tabs are the top edge of the conversation card (mobile-fold PNG): rows and
   // the empty/footer views carry the side + bottom borders that close it.
   tabsRow: {
+    // Restores the page rhythm (spacing.lg) between the title and the tabs
+    // now that headerWrap's gap is the tight accessories→title 4pt.
+    marginTop: spacing.lg - spacing.xs,
     flexDirection: "row",
     borderWidth: 1,
     borderColor: colors.border,
@@ -768,6 +774,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.textSecondary,
     textAlign: "center",
+    maxWidth: 300,
   },
   emptyHint: {
     fontFamily: fonts.regular,

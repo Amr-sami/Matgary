@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -30,17 +28,18 @@ import { ApiError, catalog, type Product, type Supplier } from "@matgary/api-cli
 import { API_BASE_URL, api } from "@/api/client";
 import { pickLibraryPhoto, uploadErrorText } from "@/lib/productPhoto";
 import { Screen } from "@/components/layout/Screen";
-import { ChevronForward } from "@/components/ui/Chevron";
+import { BackLink } from "@/components/ui/BackLink";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Field } from "@/components/ui/Field";
+import { Sheet } from "@/components/ui/Sheet";
 import { StatCard } from "@/components/ui/StatCard";
 import { money, shortDate } from "@/lib/format";
 import { useSession } from "@/stores/session";
-import { RTL_TEXT, directionStyle } from "@/theme/rtl";
+import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
-import { isRTL, t } from "@/i18n";
+import { t } from "@/i18n";
 
 /** History rows shown before the first "show more"; each tap adds another page. */
 const HISTORY_PAGE = 30;
@@ -341,23 +340,16 @@ export default function ProductDetailScreen() {
         void historyQ.refetch();
       }}
       refreshing={productsQ.isRefetching}
+      // "‹ Parent" in the FIXED header band — the same shape sale/customer
+      // detail and settings use, and it no longer scrolls away with the page.
+      // The product name is the content heading in the hero Card below.
+      header={
+        <BackLink
+          label={t("app.inventory.title")}
+          onPress={() => (router.canGoBack() ? router.back() : router.navigate("/inventory"))}
+        />
+      }
     >
-      <View style={styles.crumb}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t("mobile.inventory.backToList")}
-          hitSlop={8}
-          style={styles.crumbLink}
-          onPress={() => router.navigate("/inventory")}
-        >
-          <Text style={styles.crumbText}>{t("app.inventory.title")}</Text>
-        </Pressable>
-        {/* A breadcrumb SEPARATOR points in the reading direction, into the child. */}
-        <ChevronForward size={16} color={colors.textSecondary} />
-        <Text numberOfLines={1} style={styles.crumbCurrent}>
-          {product?.name ?? ""}
-        </Text>
-      </View>
 
       {productsQ.isLoading ? (
         <ActivityIndicator color={colors.accent} />
@@ -599,15 +591,20 @@ export default function ProductDetailScreen() {
               <Text style={styles.muted}>{t("app.inventory.history.empty")}</Text>
             ) : (
               <View style={styles.history} testID="product-history">
-                {visibleHistory.map((event) => (
-                  <HistoryRow key={event.id} event={event} />
+                {visibleHistory.map((event, i) => (
+                  <View key={event.id}>
+                    {i > 0 ? <View style={styles.historySep} /> : null}
+                    <HistoryRow event={event} />
+                  </View>
                 ))}
                 {historyRows.length > visibleHistory.length ? (
-                  <Button
-                    label={t("app.common.showMore")}
-                    variant="outline"
-                    onPress={() => setHistoryLimit((n) => n + HISTORY_PAGE)}
-                  />
+                  <View style={styles.historyMore}>
+                    <Button
+                      label={t("app.common.showMore")}
+                      variant="outline"
+                      onPress={() => setHistoryLimit((n) => n + HISTORY_PAGE)}
+                    />
+                  </View>
                 ) : null}
               </View>
             )}
@@ -615,57 +612,57 @@ export default function ProductDetailScreen() {
         </>
       )}
 
-      <Modal visible={editOpen} animationType="slide" onRequestClose={() => setEditOpen(false)}>
-        <View style={[styles.modal, directionStyle(isRTL())]}>
-          <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
-            <Text style={styles.modalTitle}>{t("mobile.inventoryDetail.editTitle")}</Text>
-            <Text numberOfLines={1} style={styles.muted}>
-              {product?.name ?? ""}
-            </Text>
-            <Field
-              label={t("app.inventory.editForm.fields.price")}
-              value={price}
-              onChangeText={(v) => {
-                setEditError(null);
-                setPrice(v);
-              }}
-              keyboardType="decimal-pad"
-              ltr
-            />
-            <Field
-              label={t("app.inventory.editForm.fields.costPrice")}
-              value={cost}
-              onChangeText={(v) => {
-                setEditError(null);
-                setCost(v);
-              }}
-              keyboardType="decimal-pad"
-              ltr
-            />
-            <Field
-              label={t("app.inventory.editForm.fields.lowStockThreshold")}
-              value={threshold}
-              onChangeText={(v) => {
-                setEditError(null);
-                setThreshold(v);
-              }}
-              keyboardType="number-pad"
-              ltr
-            />
-            {!editValid && (price.trim() || cost.trim() || threshold.trim()) ? (
-              <Text style={styles.err}>{t("mobile.common.checkInput")}</Text>
-            ) : null}
-            {editError ? <Text style={styles.err}>{editError}</Text> : null}
-            <Button
-              label={t("app.common.save")}
-              disabled={!canSaveEdit}
-              loading={update.isPending}
-              onPress={saveEdit}
-            />
-            <Button label={t("app.common.cancel")} variant="ghost" onPress={() => setEditOpen(false)} />
-          </ScrollView>
-        </View>
-      </Modal>
+      <Sheet
+        visible={editOpen}
+        onClose={() => setEditOpen(false)}
+        title={t("mobile.inventoryDetail.editTitle")}
+        subtitle={product?.name ?? ""}
+        testID="product-edit"
+        bodyStyle={styles.modalContent}
+        primaryAction={{
+          label: t("app.common.save"),
+          onPress: saveEdit,
+          disabled: !canSaveEdit,
+          loading: update.isPending,
+          testID: "product-edit-submit",
+        }}
+        secondaryAction={{ label: t("app.common.cancel"), onPress: () => setEditOpen(false) }}
+      >
+        <Field
+          label={t("app.inventory.editForm.fields.price")}
+          value={price}
+          onChangeText={(v) => {
+            setEditError(null);
+            setPrice(v);
+          }}
+          keyboardType="decimal-pad"
+          ltr
+        />
+        <Field
+          label={t("app.inventory.editForm.fields.costPrice")}
+          value={cost}
+          onChangeText={(v) => {
+            setEditError(null);
+            setCost(v);
+          }}
+          keyboardType="decimal-pad"
+          ltr
+        />
+        <Field
+          label={t("app.inventory.editForm.fields.lowStockThreshold")}
+          value={threshold}
+          onChangeText={(v) => {
+            setEditError(null);
+            setThreshold(v);
+          }}
+          keyboardType="number-pad"
+          ltr
+        />
+        {!editValid && (price.trim() || cost.trim() || threshold.trim()) ? (
+          <Text style={styles.err}>{t("mobile.common.checkInput")}</Text>
+        ) : null}
+        {editError ? <Text style={styles.err}>{editError}</Text> : null}
+      </Sheet>
     </Screen>
   );
 }
@@ -823,10 +820,6 @@ function Detail({
 }
 
 const styles = StyleSheet.create({
-  crumb: { flexDirection: "row", alignItems: "center", gap: spacing.sm, minHeight: 44 },
-  crumbLink: { justifyContent: "center", minHeight: 44 },
-  crumbText: { fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary, ...RTL_TEXT },
-  crumbCurrent: { flexShrink: 1, fontFamily: fonts.medium, fontSize: 14, color: colors.text, ...RTL_TEXT },
 
   notFound: { fontFamily: fonts.regular, fontSize: 15, color: colors.textSecondary, ...RTL_TEXT },
   backLink: { minHeight: 44, justifyContent: "center" },
@@ -928,7 +921,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  quickText: { ...RTL_TEXT, fontFamily: fonts.semibold, fontSize: 14, color: colors.text, fontVariant: ["tabular-nums"] },
+  // "+10" / "−5" carry no strong-direction character: on an Arabic-language
+  // phone the sign would trail the digits. `writingDirection: "ltr"` is a
+  // locale-independent constant, so it may live here (theme/rtl.ts).
+  quickText: { ...RTL_TEXT, writingDirection: "ltr", fontFamily: fonts.semibold, fontSize: 14, color: colors.text, fontVariant: ["tabular-nums"] },
   projection: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
   projLabel: { flexShrink: 1, fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },
   projValue: { fontFamily: fonts.semibold, fontSize: 14, color: colors.text, ...RTL_TEXT },
@@ -967,18 +963,19 @@ const styles = StyleSheet.create({
   tagRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
 
   // History
-  history: { gap: spacing.sm },
+  // Plain rows inside the History Card — a bordered box per row nested in the
+  // bordered Card doubled every hairline (U79); a hairline between rows
+  // instead, like the Detail rows above.
+  history: { gap: 0 },
   historyState: { gap: spacing.md },
   historyRow: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: spacing.md,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    backgroundColor: colors.card,
+    paddingVertical: spacing.sm,
   },
+  historySep: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
+  historyMore: { marginTop: spacing.md },
   historyIcon: {
     width: 32,
     height: 32,
@@ -990,14 +987,12 @@ const styles = StyleSheet.create({
   historyBody: { flex: 1, minWidth: 0, gap: 2 },
   historyHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: spacing.xs },
   historyLabel: { fontFamily: fonts.medium, fontSize: 14, color: colors.text, ...RTL_TEXT },
-  historyTime: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, fontVariant: ["tabular-nums"] },
+  historyTime: { ...RTL_TEXT, writingDirection: "ltr", fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, fontVariant: ["tabular-nums"] },
   historyMeta: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: spacing.sm },
-  historyDelta: { ...RTL_TEXT, fontFamily: fonts.semibold, fontSize: 13, fontVariant: ["tabular-nums"] },
+  historyDelta: { ...RTL_TEXT, writingDirection: "ltr", fontFamily: fonts.semibold, fontSize: 13, fontVariant: ["tabular-nums"] },
   historyDown: { color: colors.warningStrong },
   historyAfter: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, fontVariant: ["tabular-nums"] },
   historyNote: { flexShrink: 1, fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
 
-  modal: { flex: 1, backgroundColor: colors.bg },
-  modalContent: { padding: spacing.xl, paddingTop: 60, gap: spacing.md },
-  modalTitle: { fontFamily: fonts.bold, fontSize: 24, color: colors.text, ...RTL_TEXT },
+  modalContent: { gap: spacing.md },
 });

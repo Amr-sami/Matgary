@@ -8,11 +8,11 @@ import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SearchField } from "@/components/ui/SearchField";
-import { dayMonth, groupDigits, money } from "@/lib/format";
+import { compact, countLabel, dayMonth, money } from "@/lib/format";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
 import { colors, fonts, MIN_TOUCH, radius, spacing } from "@/theme/tokens";
-import { t } from "@/i18n";
+import { t, useLocale } from "@/i18n";
 
 /**
  * Port of apps/web/components/insights/deep/DeepDive.tsx — the "تحليل معمّق"
@@ -63,16 +63,6 @@ const REPORTS = (): { key: ReportKey; label: string; hint: string }[] => ([
   { key: "branches", label: t("app.insights.deep.picker.branches.label"), hint: t("app.insights.deep.picker.branches.hint") },
   { key: "product", label: t("app.insights.deep.picker.product.label"), hint: t("app.insights.deep.picker.product.hint") },
 ]);
-
-/**
- * "160.0K" in English, "160.0 ألف" in Arabic — the dictionary owns the
- * suffix so a K/M never leaks into an Arabic screen (same rule as money()).
- */
-function compact(n: number): string {
-  if (Math.abs(n) >= 1_000_000) return t("mobile.format.million", { n: (n / 1_000_000).toFixed(1) });
-  if (Math.abs(n) >= 1_000) return t("mobile.format.thousand", { n: (n / 1_000).toFixed(1) });
-  return groupDigits(Math.round(n));
-}
 
 /**
  * "+12.5%" / "-3.0%" / "41.2%", isolated LTR (U+2066 … U+2069). The sign and
@@ -542,6 +532,12 @@ function methodLabel(m: string): string {
 
 function PaymentsReport(props: ReportProps) {
   const q = useDeep<PaymentsData>("payments", props);
+  // Digits are an LTR run in both locales, so the ones column sits at the
+  // PHYSICAL right of every amount: the reading start in Arabic ("1,234 ج.م"),
+  // the reading end in English ("EGP 1,234"). Read at render time — a
+  // StyleSheet value is fixed at import (see theme/rtl.ts).
+  const rtl = useLocale((s) => s.locale) === "ar";
+  const valueAlign = { alignItems: rtl ? ("flex-start" as const) : ("flex-end" as const) };
 
   const model = useMemo(() => {
     const methods = q.data?.methods ?? [];
@@ -573,7 +569,7 @@ function PaymentsReport(props: ReportProps) {
                 <Text style={styles.methodShare}>
                   {model.grand ? percent((x.total / model.grand) * 100) : "—"}
                 </Text>
-                <View style={styles.methodValue}>
+                <View style={[styles.methodValue, valueAlign]}>
                   <Text style={styles.methodValueText}>{money(x.total)}</Text>
                 </View>
               </View>
@@ -700,8 +696,10 @@ function ProductReport(props: ReportProps) {
   const detail = useDeep<ProductData>("product", props, { productId: picked?.id }, Boolean(picked));
 
   return (
-    <Card title={t("app.insights.deep.product.title")}>
-      {/* No Subtitle: the picker hint above already explains the report. */}
+    <Card title={picked ? undefined : t("mobile.insights.deep.product.pickTitle")}>
+      {/* Not app.insights.deep.product.title: that is the exact text of the
+          selected report chip ~100pt above. Before a pick the card asks for
+          one; after it the viewing block below is the header. */}
       {picked ? (
         <View style={styles.viewing}>
           <Text style={styles.statLabel}>{t("app.insights.deep.product.viewingLabel")}</Text>
@@ -745,7 +743,7 @@ function ProductReport(props: ReportProps) {
                         reading order in both locales (StaffTab does the same). */}
                     <View style={styles.hitMeta}>
                       <Text style={styles.statLabel}>
-                        {t("app.insights.deep.product.unitsSold", { n: h.unitsSold })}
+                        {countLabel("mobile.common.pieces", h.unitsSold)}
                       </Text>
                       {h.brand ? (
                         <>
@@ -882,8 +880,10 @@ const styles = StyleSheet.create({
   list: { gap: spacing.sm },
   methodRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, minHeight: 28 },
   methodName: { flex: 1, fontFamily: fonts.medium, fontSize: 14, color: colors.text, ...RTL_TEXT },
-  methodShare: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, fontVariant: ["tabular-nums"] },
-  methodValue: { minWidth: 90, alignItems: "flex-end" },
+  // Fixed width so the share column lines up across rows ("41.2%" / "8.0%").
+  methodShare: { width: 48, ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, fontVariant: ["tabular-nums"] },
+  // alignItems is set per render (PaymentsReport): the ones digit must align.
+  methodValue: { minWidth: 90 },
   methodValueText: { ...RTL_TEXT, fontFamily: fonts.semibold, fontSize: 14, color: colors.text, fontVariant: ["tabular-nums"] },
 
   rowCard: { gap: spacing.sm, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },

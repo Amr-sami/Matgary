@@ -19,13 +19,23 @@ interface FieldProps extends Omit<TextInputProps, "style"> {
   /** Renders the show/hide eye and manages secureTextEntry. */
   secure?: boolean;
   /**
-   * Force a left-to-right WRITING direction for values that are never Arabic
-   * (phones, emails, codes, URLs): a "+" stays first, digits stay one run.
-   * Alignment is NOT forced — the value still starts at the form's reading
-   * edge (right in Arabic, left in English) so a phone number under an Arabic
-   * label does not sit alone on the far side of the box.
+   * Left-to-right WRITING direction *and* physical left alignment for values
+   * that are never Arabic (phones, emails, login identifiers, codes, URLs):
+   * a "+" stays first, digits stay one run — and the caret behaves. The
+   * alignment is deliberate: an LTR run that is right-aligned puts all of the
+   * box's blank space *before* index 0, so in Arabic a tap at box centre
+   * parked the caret at the start and backspace deleted nothing (login
+   * identifier, U63). The web sets dir="ltr" on the same inputs, which
+   * left-aligns them too.
    */
   ltr?: boolean;
+  /**
+   * Short passive text in the end slot inside the box — a unit or currency
+   * cue ("ج.م" / "EGP") beside the value so a bare "4800" is not the only
+   * format on a screen whose CTA reads "EGP 4,800". Row order mirrors in RTL,
+   * so it lands at the reading end in both locales.
+   */
+  adornment?: string;
 }
 
 /**
@@ -51,7 +61,7 @@ const INPUT_HEIGHT = 52;
 const INPUT_PADDING_H = 16;
 const EYE_ICON = 20;
 
-export function Field({ label, secure = false, ltr = false, ...props }: FieldProps) {
+export function Field({ label, secure = false, ltr = false, adornment, ...props }: FieldProps) {
   const [focused, setFocused] = useState(false);
   const [revealed, setRevealed] = useState(false);
   // Subscribe so a live language switch re-renders the alignment.
@@ -81,6 +91,11 @@ export function Field({ label, secure = false, ltr = false, ...props }: FieldPro
             multiline && styles.inputMultiline,
           ]}
         />
+        {adornment ? (
+          <Text style={styles.adornment} accessibilityElementsHidden importantForAccessibility="no">
+            {adornment}
+          </Text>
+        ) : null}
         {secure ? (
           <Pressable
             onPress={() => setRevealed((v) => !v)}
@@ -140,9 +155,12 @@ const styles = StyleSheet.create({
   // Physical alignment picked from the locale at render (see docblock).
   inputRtl: { textAlign: "right" },
   inputLtr: { textAlign: "left" },
-  // `ltr` prop: direction only — alignment above still wins.
-  inputForceLtr: { writingDirection: "ltr" },
+  // `ltr` prop: direction AND physical left alignment (see the prop doc) —
+  // listed after inputRtl/inputLtr in the style array so it wins.
+  inputForceLtr: { writingDirection: "ltr", textAlign: "left" },
   inputMultiline: { paddingTop: 12, paddingBottom: 12, textAlignVertical: "top" },
+  // Passive end-slot cue; shrink-wrapped, so no textAlign is needed.
+  adornment: { fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary },
   // A real 44pt target instead of an 18pt glyph + hitSlop. The negative
   // marginEnd (-12) pulls the target outward so the 20pt icon's outer edge
   // lands on the 16pt text inset, not 12pt further in.

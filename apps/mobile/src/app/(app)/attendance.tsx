@@ -804,12 +804,18 @@ const styles = StyleSheet.create({
   },
   inlineBtn: { alignSelf: "flex-start", marginTop: spacing.xs },
   btnRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.xs },
+  // The 18pt glyph is centred in a 44pt target, so without the pull-back it
+  // sat (44 - 18) / 2 = 13pt inside the card's content edge while the status
+  // pill above was flush. The negative marginEnd lands the glyph on that edge
+  // and keeps the full 44pt target — it grows into the Card's own padding
+  // (spacing.xl), never past the card.
   iconBtn: {
     minWidth: MIN_TOUCH,
     minHeight: MIN_TOUCH,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: radius.full,
+    marginEnd: -((MIN_TOUCH - 18) / 2),
   },
   fenceBox: {
     flexDirection: "row",

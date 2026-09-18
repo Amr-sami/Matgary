@@ -4,11 +4,9 @@ import {
   Linking,
   Pressable,
   StyleSheet,
-  Switch,
   Text,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { notifications } from "@matgary/api-client";
@@ -17,11 +15,12 @@ import { api } from "@/api/client";
 import { forgetRegistration } from "@/effects/PushRegistrar";
 import { Screen } from "@/components/layout/Screen";
 import { Button } from "@/components/ui/Button";
-import { ChevronBack } from "@/components/ui/Chevron";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Segmented } from "@/components/ui/Segmented";
+import { SettingsHeader } from "@/components/ui/SettingsHeader";
+import { ToggleRow } from "@/components/ui/ToggleRow";
 import { usePush, type PushStatus } from "@/stores/push";
 import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
@@ -90,7 +89,6 @@ const DELIVERY = () => ([
 ]);
 
 export default function NotificationSettingsScreen() {
-  const router = useRouter();
   const [notice, setNotice] = useState<{ tone: "ok" | "err"; text: string } | null>(
     null,
   );
@@ -139,26 +137,24 @@ export default function NotificationSettingsScreen() {
 
   return (
     <Screen onRefresh={() => void q.refetch()} refreshing={q.isRefetching}>
-      <View style={styles.header}>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.back()}
-          hitSlop={12}
-          style={styles.back}
-        >
-          <ChevronBack size={16} color={colors.textSecondary} />
-          <Text style={styles.backLabel}>{t("app.settingsPage.title")}</Text>
-        </Pressable>
-        <Text style={styles.title}>{t("app.shell.notifications.title")}</Text>
-        <Text style={styles.subtitle}>
-          {t("app.notificationSettings.intro")}
-        </Text>
-        {q.data ? (
-          <Text style={styles.role}>
-            {q.data.role === "owner" ? t("app.notificationSettings.role.owner") : t("app.notificationSettings.role.staff")}
-          </Text>
-        ) : null}
-      </View>
+      {/* The role rides in the header's accessory slot as a Badge — it is a
+          two-word status, not a second subtitle. */}
+      <SettingsHeader
+        parentLabel={t("app.settingsPage.title")}
+        title={t("app.shell.notifications.title")}
+        subtitle={t("app.notificationSettings.intro")}
+        accessories={
+          q.data ? (
+            <Badge
+              label={
+                q.data.role === "owner"
+                  ? t("app.notificationSettings.role.owner")
+                  : t("app.notificationSettings.role.staff")
+              }
+            />
+          ) : undefined
+        }
+      />
 
       {notice ? (
         <Pressable onPress={() => setNotice(null)}>
@@ -216,49 +212,27 @@ export default function NotificationSettingsScreen() {
 
               <View style={styles.divider} />
 
-              <View style={styles.toggleRow}>
-                <Text numberOfLines={1} style={styles.toggleLabel}>
-                  {t("app.notificationSettings.headers.inApp")}
-                </Text>
-                <Switch
-                  value={p.inApp}
-                  disabled={saving}
-                  onValueChange={(v) => save.mutate({ ...p, inApp: v })}
-                  trackColor={{ true: colors.accent, false: colors.border }}
-                />
-              </View>
+              <ToggleRow
+                label={t("app.notificationSettings.headers.inApp")}
+                value={p.inApp}
+                disabled={saving}
+                onValueChange={(v) => save.mutate({ ...p, inApp: v })}
+              />
 
-              <View
-                pointerEvents={!pushBlocked && !saving ? "auto" : "none"}
-                style={[styles.toggleRow, pushBlocked ? styles.disabled : undefined]}
-              >
-                <View style={styles.toggleText}>
-                  <Text numberOfLines={1} style={styles.toggleLabel}>
-                    {t("mobile.push.perEvent")}
-                  </Text>
-                  <Text numberOfLines={2} style={styles.toggleHint}>
-                    {pushHint}
-                  </Text>
-                </View>
-                <Switch
-                  value={!pushBlocked && p.push}
-                  disabled={saving || pushBlocked}
-                  onValueChange={(v) => save.mutate({ ...p, push: v })}
-                  trackColor={{ true: colors.accent, false: colors.border }}
-                />
-              </View>
+              <ToggleRow
+                label={t("mobile.push.perEvent")}
+                hint={pushHint}
+                value={!pushBlocked && p.push}
+                disabled={saving || pushBlocked}
+                onValueChange={(v) => save.mutate({ ...p, push: v })}
+              />
 
-              <View style={styles.toggleRow}>
-                <Text numberOfLines={1} style={styles.toggleLabel}>
-                  {t("app.notificationSettings.headers.email")}
-                </Text>
-                <Switch
-                  value={p.email}
-                  disabled={saving}
-                  onValueChange={(v) => save.mutate({ ...p, email: v })}
-                  trackColor={{ true: colors.accent, false: colors.border }}
-                />
-              </View>
+              <ToggleRow
+                label={t("app.notificationSettings.headers.email")}
+                value={p.email}
+                disabled={saving}
+                onValueChange={(v) => save.mutate({ ...p, email: v })}
+              />
 
               <Text style={styles.deliveryLabel}>{t("app.notificationSettings.headers.delivery")}</Text>
               {/* The web disables the delivery select while email is off —
@@ -420,24 +394,6 @@ function ThisDeviceCard({
 }
 
 const styles = StyleSheet.create({
-  header: { gap: spacing.xs },
-  back: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 32 },
-  backLabel: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
-  title: { fontFamily: fonts.bold, fontSize: 26, color: colors.text, ...RTL_TEXT },
-  subtitle: {
-    fontFamily: fonts.regular,
-    fontSize: 15,
-    color: colors.textSecondary,
-    ...RTL_TEXT,
-  },
-  role: {
-    fontFamily: fonts.regular,
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: spacing.sm,
-    ...RTL_TEXT,
-  },
-
   notice: {
     fontFamily: fonts.medium,
     fontSize: 13,
@@ -490,14 +446,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     color: colors.text,
     flexShrink: 1,
-    ...RTL_TEXT,
-  },
-  toggleText: { flex: 1, flexShrink: 1, gap: 2 },
-  toggleHint: {
-    fontFamily: fonts.regular,
-    fontSize: 12,
-    lineHeight: 18,
-    color: colors.textSecondary,
     ...RTL_TEXT,
   },
   deliveryLabel: {

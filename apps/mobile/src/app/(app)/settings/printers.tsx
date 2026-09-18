@@ -15,9 +15,9 @@ import { Screen } from "@/components/layout/Screen";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { ChevronBack } from "@/components/ui/Chevron";
 import { Chip } from "@/components/ui/Chip";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { SettingsHeader } from "@/components/ui/SettingsHeader";
 import { t } from "@/i18n";
 import { type BleState, type FoundDevice, getBleState, onBleStateChange, scanForPrinters } from "@/printing/ble";
 import { printTicket, printerErrorKey } from "@/printing/print";
@@ -106,25 +106,28 @@ export default function PrintersSettingsScreen() {
 
   return (
     <Screen>
-      <View style={styles.header}>
-        <Pressable accessibilityRole="button" onPress={() => router.back()} hitSlop={12} style={styles.back}>
-          <ChevronBack size={16} color={colors.textSecondary} />
-          <Text style={styles.backLabel}>{t("app.settingsPage.title")}</Text>
-        </Pressable>
-        <Text style={styles.title}>{t("mobile.printing.title")}</Text>
-        <Text style={styles.subtitle}>{t("mobile.printing.subtitle")}</Text>
-      </View>
+      <SettingsHeader
+        parentLabel={t("app.settingsPage.title")}
+        title={t("mobile.printing.title")}
+        subtitle={t("mobile.printing.subtitle")}
+        onBack={() => router.back()}
+      />
 
       <Card title={t("mobile.printing.bluetooth")}>
         <BleStateRow state={ble} />
         {ble === "unauthorized" || permissionDenied ? (
-          <Button label={t("mobile.printing.openSettings")} variant="outline" onPress={() => void Linking.openSettings()} />
+          <Button
+            label={t("mobile.printing.openSettings")}
+            variant="outline"
+            onPress={() => void Linking.openSettings()}
+            style={styles.hintBeforeButton}
+          />
         ) : null}
         <Text style={styles.hint}>{t("mobile.printing.classicNote")}</Text>
       </Card>
 
       <Card title={t("mobile.printing.scanTitle")}>
-        <Text style={styles.hint}>{t("mobile.printing.scanHint")}</Text>
+        <Text style={[styles.hint, styles.hintBeforeButton]}>{t("mobile.printing.scanHint")}</Text>
         <Button
           label={scanning ? t("mobile.printing.scanning") : t("mobile.printing.scan")}
           onPress={() => void scan()}
@@ -194,8 +197,8 @@ function BleStateRow({ state }: { state: BleState }) {
   const { key, color, Icon } = map[state];
   return (
     <View style={styles.stateRow} accessibilityLiveRegion="polite" testID={`ble-state-${state}`}>
-      {state === "unknown" ? <ActivityIndicator color={colors.textSecondary} /> : <Icon size={22} color={color} weight="bold" />}
-      <Text style={[styles.stateText, { color }]}>{t(key)}</Text>
+      {state === "unknown" ? <ActivityIndicator color={colors.textSecondary} /> : <Icon size={20} color={color} />}
+      <Text style={styles.stateText}>{t(key)}</Text>
     </View>
   );
 }
@@ -302,14 +305,12 @@ function SavedRow({
 }
 
 const styles = StyleSheet.create({
-  header: { gap: 4, alignItems: "flex-start" },
-  back: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 32 },
-  backLabel: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
-  title: { fontFamily: fonts.bold, fontSize: 26, color: colors.text, ...RTL_TEXT },
-  subtitle: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, color: colors.textSecondary, ...RTL_TEXT },
-  hint: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 20, color: colors.textSecondary, ...RTL_TEXT, marginBottom: spacing.sm },
+  // No bottom margin: as a Card's last child it would stack on the Card padding.
+  hint: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 20, color: colors.textSecondary, ...RTL_TEXT },
+  hintBeforeButton: { marginBottom: spacing.sm },
+  // Same StatusRow look as app-lock: 20pt regular icon carrying the tone, 14pt neutral text.
   stateRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, minHeight: MIN_TOUCH, marginBottom: spacing.xs },
-  stateText: { fontFamily: fonts.medium, fontSize: 15, lineHeight: 22, flexShrink: 1, ...RTL_TEXT },
+  stateText: { fontFamily: fonts.medium, fontSize: 14, lineHeight: 20, color: colors.text, flexShrink: 1, ...RTL_TEXT },
   list: { gap: spacing.sm, marginTop: spacing.md },
   sectionLabel: { fontFamily: fonts.semibold, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },
   foundRow: {

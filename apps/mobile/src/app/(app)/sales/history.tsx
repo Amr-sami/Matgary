@@ -18,6 +18,7 @@ import { sales as salesApi } from "@matgary/api-client";
 
 import { api } from "@/api/client";
 import { t } from "@/i18n";
+import { usePullRefresh } from "@/components/layout/usePullRefresh";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
@@ -170,6 +171,7 @@ export default function SalesHistoryScreen() {
       last.nextCursor && last.nextCursor !== lastParam ? last.nextCursor : null,
   });
   const { isFetching, fetchNextPage } = q;
+  const pull = usePullRefresh(() => q.refetch(), q.isRefetching && !q.isFetchingNextPage);
 
   // De-duplicate by line id so a repeated row can never double an invoice's
   // line count or totals in `groupInvoices`.
@@ -353,7 +355,7 @@ export default function SalesHistoryScreen() {
         onEndReachedThreshold={0.4}
         keyboardShouldPersistTaps="handled"
         refreshControl={
-          <RefreshControl refreshing={q.isRefetching && !q.isFetchingNextPage} onRefresh={() => void q.refetch()} />
+          <RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />
         }
         contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.lg }]}
         testID="sales-history-list"
@@ -367,7 +369,9 @@ function Separator() {
 }
 
 function InvoiceRow({ inv, onPress }: { inv: salesApi.Invoice; onPress: () => void }) {
-  const customer = inv.customerName?.trim() || inv.customerPhone || t("app.sales.deferred.noName");
+  // No name and no phone is a walk-in sale, not missing data — so not the
+  // deferred-customer "No name" fallback.
+  const customer = inv.customerName?.trim() || inv.customerPhone || t("mobile.salesHistory.walkIn");
   return (
     <Pressable
       accessibilityRole="button"

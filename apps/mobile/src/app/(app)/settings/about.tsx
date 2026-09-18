@@ -103,14 +103,14 @@ export default function AboutSettingsScreen() {
       icon: ShieldCheck,
       title: t("footer.columns.legal.links.privacy"),
       hint: t("mobile.about.privacySub"),
-      onPress: () => router.push("/legal/privacy"),
+      onPress: () => router.push({ pathname: "/legal/privacy", params: { from: "about" } }),
     },
     {
       key: "terms",
       icon: FileText,
       title: t("footer.columns.legal.links.terms"),
       hint: t("mobile.about.termsSub"),
-      onPress: () => router.push("/legal/terms"),
+      onPress: () => router.push({ pathname: "/legal/terms", params: { from: "about" } }),
     },
   ];
 
@@ -151,6 +151,8 @@ export default function AboutSettingsScreen() {
       icon: Globe,
       title: t("mobile.about.website"),
       hint: t("mobile.about.websiteSub"),
+      // Hint then link, like the email row — the host is the tappable value.
+      detail: WEB_ORIGIN.replace(/^https?:\/\//, ""),
       external: true,
       onPress: () => openWeb("/welcome"),
     },
@@ -271,6 +273,9 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     color: colors.textSecondary,
     textAlign: "center",
+    // Narrow enough that the ar copy breaks at the em dash into two balanced
+    // lines instead of leaving a one-word widow under the logo.
+    maxWidth: 260,
   },
   version: {
     fontFamily: fonts.medium,

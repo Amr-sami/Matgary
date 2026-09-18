@@ -12,6 +12,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AtIcon as At } from "phosphor-react-native/src/icons/At";
 import { MapPinIcon as MapPin } from "phosphor-react-native/src/icons/MapPin";
+import { PencilSimpleIcon as PencilSimple } from "phosphor-react-native/src/icons/PencilSimple";
 import { PhoneIcon as Phone } from "phosphor-react-native/src/icons/Phone";
 import { ReceiptIcon as Receipt } from "phosphor-react-native/src/icons/Receipt";
 import { TruckIcon as Truck } from "phosphor-react-native/src/icons/Truck";
@@ -21,7 +22,7 @@ import { ApiError, catalog, type Expense, type PurchaseOrder, type Supplier } fr
 import { api } from "@/api/client";
 import { isRTL, t } from "@/i18n";
 import { Screen } from "@/components/layout/Screen";
-import { ChevronForward } from "@/components/ui/Chevron";
+import { ChevronBack } from "@/components/ui/Chevron";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -29,12 +30,12 @@ import { Field } from "@/components/ui/Field";
 import { money, shortDate } from "@/lib/format";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT, directionStyle } from "@/theme/rtl";
-import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
+import { MIN_TOUCH, colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
 
 /**
  * Port of app__supplier-detail.png (/suppliers/<id>).
  *
- * Reads the capture top to bottom: breadcrumb, header card (avatar → name →
+ * Reads the capture top to bottom: back link, header card (avatar → name →
  * phone/address → تعديل), the three stacked figures (المستحق الحالي, إجمالي
  * المشتريات, إجمالي المدفوعات), then أوامر الشراء and المدفوعات.
  *
@@ -155,22 +156,20 @@ export default function SupplierDetailScreen() {
 
   return (
     <Screen onRefresh={refresh} refreshing={supplierQ.isRefetching}>
-      <View style={styles.crumb}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t("app.suppliers.detail.backToList")}
-          hitSlop={8}
-          style={styles.crumbLink}
-          onPress={() => router.navigate("/suppliers")}
-        >
-          <Text style={styles.crumbText}>{t("app.suppliers.title")}</Text>
-        </Pressable>
-        {/* A breadcrumb SEPARATOR points in the reading direction, into the child. */}
-        <ChevronForward size={16} color={colors.textSecondary} />
-        <Text numberOfLines={1} style={styles.crumbCurrent}>
-          {supplier?.name ?? ""}
-        </Text>
-      </View>
+      {/* The web's BackLink, as team/[userId] and customers/[phone] render it:
+          a back-pointing caret then the LIST's name. The supplier's own name is
+          the header card's heading below, not a second copy up here. */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t("app.suppliers.detail.backToList")}
+        testID="supplier-breadcrumb"
+        hitSlop={8}
+        style={styles.breadcrumb}
+        onPress={() => router.navigate("/suppliers")}
+      >
+        <ChevronBack size={14} color={colors.textSecondary} />
+        <Text style={styles.breadcrumbText}>{t("app.suppliers.title")}</Text>
+      </Pressable>
 
       {supplierQ.isLoading ? (
         <ActivityIndicator color={colors.accent} />
@@ -222,6 +221,7 @@ export default function SupplierDetailScreen() {
             {canManage ? (
               <Button
                 label={t("app.common.edit")}
+                icon={PencilSimple}
                 variant="outline"
                 style={styles.editButton}
                 onPress={() => setEditOpen(true)}
@@ -455,10 +455,14 @@ function EditSupplierModal({
 }
 
 const styles = StyleSheet.create({
-  crumb: { flexDirection: "row", alignItems: "center", gap: spacing.sm, minHeight: 44 },
-  crumbLink: { justifyContent: "center", minHeight: 44 },
-  crumbText: { fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary, ...RTL_TEXT },
-  crumbCurrent: { flexShrink: 1, fontFamily: fonts.medium, fontSize: 14, color: colors.text, ...RTL_TEXT },
+  breadcrumb: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    minHeight: MIN_TOUCH,
+    marginBottom: spacing.sm,
+  },
+  breadcrumbText: { fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary, ...RTL_TEXT },
 
   notFound: { fontFamily: fonts.regular, fontSize: 15, color: colors.textSecondary, ...RTL_TEXT },
   backLink: { minHeight: 44, justifyContent: "center" },

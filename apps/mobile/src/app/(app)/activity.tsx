@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { DateField } from "@/components/ui/DateField";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { usePullRefresh } from "@/components/layout/usePullRefresh";
 import { HeaderAccessories } from "@/components/shell/HeaderAccessories";
 import { formatActivityDetails } from "@/lib/activity-details";
 import { shortDate } from "@/lib/format";
@@ -193,6 +194,7 @@ export default function ActivityScreen() {
 
   const rows = useMemo(() => q.data?.pages.flatMap((p) => p.rows) ?? [], [q.data]);
   const actors = q.data?.pages[0]?.actors ?? [];
+  const pull = usePullRefresh(() => q.refetch(), q.isRefetching && !q.isFetchingNextPage);
 
   const fromBad = isBadDate(draft.from);
   const toBad = isBadDate(draft.to);
@@ -337,7 +339,7 @@ export default function ActivityScreen() {
           if (q.hasNextPage && !q.isFetchingNextPage) q.fetchNextPage();
         }}
         onEndReachedThreshold={0.4}
-        refreshControl={<RefreshControl refreshing={q.isRefetching && !q.isFetchingNextPage} onRefresh={() => q.refetch()} />}
+        refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
         contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.lg }]}
         keyboardShouldPersistTaps="handled"
       />

@@ -1,17 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, catalog, taxonomy } from "@matgary/api-client";
 import type { Icon } from "phosphor-react-native";
@@ -37,15 +32,16 @@ import { Screen } from "@/components/layout/Screen";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { ChevronBack } from "@/components/ui/Chevron";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
+import { SettingsHeader } from "@/components/ui/SettingsHeader";
+import { Sheet } from "@/components/ui/Sheet";
+import { countLabel } from "@/lib/format";
 import { useSession } from "@/stores/session";
-import { RTL_TEXT, directionStyle } from "@/theme/rtl";
-import { MIN_TOUCH, colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { RTL_TEXT } from "@/theme/rtl";
+import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
 
-import { getLocale, t } from "@/i18n";
+import { t } from "@/i18n";
 
 /**
  * Port of the web's CategoriesEditor (settings page, "الأقسام" section).
@@ -66,6 +62,10 @@ import { getLocale, t } from "@/i18n";
 type Category = taxonomy.Category;
 
 /** lucide names stored by the web → phosphor glyphs. Package is the fallback. */
+/** Icon-picker grid: minimum tile (a comfortable 48pt target) and the gap between tiles. */
+const ICON_TILE_MIN = 48;
+const ICON_GAP = spacing.sm;
+
 const ICON_GLYPHS: Record<string, Icon> = {
   Watch,
   FlaskConical: Flask,
@@ -99,7 +99,6 @@ function errText(e: unknown): string {
 }
 
 export default function CategoriesSettingsScreen() {
-  const router = useRouter();
   const qc = useQueryClient();
   const me = useSession((s) => s.me);
   const canManage = !!me && (me.isOwner || me.permissions.includes("manage_catalog"));
@@ -219,17 +218,12 @@ export default function CategoriesSettingsScreen() {
 
   return (
     <Screen onRefresh={() => void q.refetch()} refreshing={q.isRefetching}>
-      <View style={styles.header}>
-        <Pressable accessibilityRole="button" onPress={() => router.back()} hitSlop={12} style={styles.back}>
-          <ChevronBack size={16} color={colors.textSecondary} />
-          <Text style={styles.backLabel}>{t("app.settingsPage.title")}</Text>
-        </Pressable>
-        <View style={styles.titleRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.title}>{t("app.catalog.categoriesAdmin.title")}</Text>
-            <Text style={styles.subtitle}>{t("mobile.catalog.categoriesIntro")}</Text>
-          </View>
-          {canManage ? (
+      <SettingsHeader
+        parentLabel={t("app.settingsPage.title")}
+        title={t("app.catalog.categoriesAdmin.title")}
+        subtitle={t("mobile.catalog.categoriesIntro")}
+        accessories={
+          canManage ? (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t("app.catalog.categoriesAdmin.addCategory")}
@@ -239,9 +233,9 @@ export default function CategoriesSettingsScreen() {
             >
               <Plus size={20} color={colors.onAccent} weight="bold" />
             </Pressable>
-          ) : null}
-        </View>
-      </View>
+          ) : null
+        }
+      />
 
       {notice ? (
         <Pressable onPress={() => setNotice(null)} style={[styles.notice, notice.tone === "ok" ? styles.noticeOk : styles.noticeErr]}>
@@ -271,7 +265,7 @@ export default function CategoriesSettingsScreen() {
         />
       ) : (
         <View style={{ gap: spacing.sm }}>
-          <Text style={styles.countLine}>{t("mobile.catalog.categoryCount", { n: categories.length })}</Text>
+          <Text style={styles.countLine}>{countLabel("mobile.catalog.categoryCount", categories.length)}</Text>
           {categories.map((c, i) => {
             const n = counts.get(c.id);
             return (
@@ -284,7 +278,7 @@ export default function CategoriesSettingsScreen() {
                     <Text style={styles.rowTitle} numberOfLines={1}>{c.label}</Text>
                     <View style={styles.metaRow}>
                       <Text style={styles.key} numberOfLines={1}>{c.key}</Text>
-                      {n !== undefined ? <Badge label={t("mobile.catalog.productsCount", { n })} variant="neutral" /> : null}
+                      {n !== undefined ? <Badge label={countLabel("mobile.catalog.productsCount", n)} variant="neutral" /> : null}
                       {c.hasAttributes ? <Badge label={t("mobile.catalog.hasAttributes")} variant="accent" /> : null}
                     </View>
                   </View>
@@ -361,108 +355,81 @@ function CategorySheet({
   onSubmit: (label: string, icon: string) => void;
 }) {
   const editing = state?.mode === "edit" ? state.category : null;
-  // Keyed remount on open so the fields seed from the row being edited.
-  return (
-    <Modal visible={state !== null} transparent animationType="slide" onRequestClose={onClose}>
-      {state ? (
-        <SheetBody
-          key={editing?.id ?? "add"}
-          initialLabel={editing?.label ?? ""}
-          initialIcon={editing?.icon ?? "Package"}
-          title={editing ? t("mobile.catalog.editCategory") : t("app.catalog.categoriesAdmin.addCategory")}
-          pending={pending}
-          onClose={onClose}
-          onSubmit={onSubmit}
-        />
-      ) : null}
-    </Modal>
-  );
-}
-
-function SheetBody({
-  initialLabel,
-  initialIcon,
-  title,
-  pending,
-  onClose,
-  onSubmit,
-}: {
-  initialLabel: string;
-  initialIcon: string;
-  title: string;
-  pending: boolean;
-  onClose: () => void;
-  onSubmit: (label: string, icon: string) => void;
-}) {
-  const [label, setLabel] = useState(initialLabel);
-  const [icon, setIcon] = useState(initialIcon);
+  const [label, setLabel] = useState("");
+  const [icon, setIcon] = useState("Package");
+  // Re-seed on every open so the fields come from the row being edited (or
+  // blank for Add), not from whatever the previous sheet left behind.
+  useEffect(() => {
+    if (state) {
+      setLabel(editing?.label ?? "");
+      setIcon(editing?.icon ?? "Package");
+    }
+  }, [state, editing]);
   const valid = label.trim().length > 0 && label.trim().length <= 80;
-  const insets = useSafeAreaInsets();
+  const submit = () => onSubmit(label.trim(), icon);
+
+  // Tiles are sized from the grid's measured width so a full row ends exactly
+  // where the name field above it ends: fixed 48pt tiles + 8pt gaps left
+  // ~30pt of dead width at the trailing edge. As many columns as fit at the
+  // 48pt minimum, then the leftover is shared out; the wrapped last row stays
+  // start-aligned. Before the first layout pass the tiles fall back to 48pt.
+  const [gridWidth, setGridWidth] = useState(0);
+  const tile = useMemo(() => {
+    if (gridWidth <= 0) return ICON_TILE_MIN;
+    const cols = Math.max(1, Math.floor((gridWidth + ICON_GAP) / (ICON_TILE_MIN + ICON_GAP)));
+    return Math.floor((gridWidth - ICON_GAP * (cols - 1)) / cols);
+  }, [gridWidth]);
+
   return (
-    <View style={[styles.overlay, directionStyle(getLocale() === "ar")]}>
-      {/* The KAV is the full-height flex-end container and the scrim sits INSIDE
-          it: with an auto-height KAV the sheet's maxHeight resolved against its
-          own content, clipping the Save/Cancel row at the bottom edge. */}
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.kav}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel={t("app.common.close")} />
-        <View style={styles.sheet}>
-          <ScrollView keyboardShouldPersistTaps="handled" style={styles.sheetScroll} contentContainerStyle={styles.sheetBody}>
-            <Text style={styles.sheetTitle}>{title}</Text>
-            <Field
-              label={t("app.catalog.categoriesAdmin.labelLabel")}
-              value={label}
-              onChangeText={setLabel}
-              placeholder={t("app.catalog.categoriesAdmin.labelPlaceholder")}
-              autoFocus
-              maxLength={80}
-              returnKeyType="done"
-              onSubmitEditing={() => valid && !pending && onSubmit(label.trim(), icon)}
-            />
-            <View>
-              <Text style={styles.label}>{t("app.catalog.categoriesAdmin.iconLabel")}</Text>
-              <View style={styles.iconGrid}>
-                {taxonomy.CATEGORY_ICONS.map((name) => {
-                  const active = icon === name;
-                  return (
-                    <Pressable
-                      key={name}
-                      accessibilityRole="button"
-                      accessibilityLabel={name}
-                      accessibilityState={{ selected: active }}
-                      onPress={() => setIcon(name)}
-                      style={[styles.iconCell, active && styles.iconCellActive]}
-                    >
-                      <CategoryGlyph name={name} size={22} color={active ? colors.accent : colors.textSecondary} />
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-          </ScrollView>
-          {/* Pinned footer: Save is always visible, whatever the keyboard does. */}
-          <View style={[styles.sheetActions, styles.sheetFooter, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
-            <Button label={t("app.common.cancel")} variant="ghost" onPress={onClose} style={{ flex: 1 }} />
-            <Button
-              label={t("app.catalog.categoriesAdmin.save")}
-              onPress={() => onSubmit(label.trim(), icon)}
-              disabled={!valid}
-              loading={pending}
-              style={{ flex: 1 }}
-            />
-          </View>
+    <Sheet
+      visible={state !== null}
+      onClose={onClose}
+      title={editing ? t("mobile.catalog.editCategory") : t("app.catalog.categoriesAdmin.addCategory")}
+      testID="category-form"
+      primaryAction={{
+        label: t("app.catalog.categoriesAdmin.save"),
+        onPress: submit,
+        disabled: !valid,
+        loading: pending,
+        testID: "category-form-submit",
+      }}
+      secondaryAction={{ label: t("app.common.cancel"), onPress: onClose }}
+    >
+      <Field
+        label={t("app.catalog.categoriesAdmin.labelLabel")}
+        value={label}
+        onChangeText={setLabel}
+        placeholder={t("app.catalog.categoriesAdmin.labelPlaceholder")}
+        autoFocus
+        maxLength={80}
+        returnKeyType="done"
+        onSubmitEditing={() => valid && !pending && submit()}
+      />
+      <View>
+        <Text style={styles.label}>{t("app.catalog.categoriesAdmin.iconLabel")}</Text>
+        <View style={styles.iconGrid} onLayout={(e) => setGridWidth(Math.floor(e.nativeEvent.layout.width))}>
+          {taxonomy.CATEGORY_ICONS.map((name) => {
+            const active = icon === name;
+            return (
+              <Pressable
+                key={name}
+                accessibilityRole="button"
+                accessibilityLabel={name}
+                accessibilityState={{ selected: active }}
+                onPress={() => setIcon(name)}
+                style={[styles.iconCell, { width: tile, height: tile }, active && styles.iconCellActive]}
+              >
+                <CategoryGlyph name={name} size={22} color={active ? colors.accent : colors.textSecondary} />
+              </Pressable>
+            );
+          })}
         </View>
-      </KeyboardAvoidingView>
-    </View>
+      </View>
+    </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  header: { gap: spacing.sm, marginBottom: spacing.lg },
-  back: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-start", minHeight: MIN_TOUCH },
-  backLabel: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
-  titleRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md },
-  title: { fontFamily: fonts.bold, fontSize: 24, color: colors.text, ...RTL_TEXT },
-  subtitle: { fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary, marginTop: 4, ...RTL_TEXT },
   addBtn: {
     width: MIN_TOUCH,
     height: MIN_TOUCH,
@@ -503,26 +470,10 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
   },
   iconBtn: { width: MIN_TOUCH, height: MIN_TOUCH, alignItems: "center", justifyContent: "center", borderRadius: radius.md },
-  overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: colors.scrim },
-  sheet: {
-    backgroundColor: colors.card,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    maxHeight: "90%",
-    ...elevation.modal,
-  },
-  kav: { flex: 1, justifyContent: "flex-end" },
-  sheetScroll: { flexShrink: 1 },
-  sheetBody: { padding: spacing.xl, gap: spacing.lg },
-  sheetFooter: { paddingHorizontal: spacing.xl, paddingTop: spacing.md },
-  sheetTitle: { fontFamily: fonts.bold, fontSize: 18, color: colors.text, ...RTL_TEXT },
   label: { fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary, marginBottom: spacing.sm, ...RTL_TEXT },
-  iconGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  iconGrid: { flexDirection: "row", flexWrap: "wrap", gap: ICON_GAP },
+  // width/height come from the measured grid (see CategorySheet).
   iconCell: {
-    width: 48,
-    height: 48,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
@@ -530,5 +481,4 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   iconCellActive: { borderColor: colors.accent, backgroundColor: colors.accentLight },
-  sheetActions: { flexDirection: "row", gap: spacing.md },
 });

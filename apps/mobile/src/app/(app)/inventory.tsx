@@ -13,6 +13,7 @@ import { WarningIcon as Warning } from "phosphor-react-native/src/icons/Warning"
 import { catalog, type Product } from "@matgary/api-client";
 
 import { API_BASE_URL, api } from "@/api/client";
+import { usePullRefresh } from "@/components/layout/usePullRefresh";
 import { HeaderAccessories } from "@/components/shell/HeaderAccessories";
 import { Badge } from "@/components/ui/Badge";
 import { ChevronForward } from "@/components/ui/Chevron";
@@ -31,8 +32,10 @@ type StatusFilter = "all" | "in" | "low" | "out";
 /**
  * Port of app__inventory.png.
  *
- * Order matches the capture: the 2×2 KPI block, search, the add-product CTA,
- * then category and status chip rows, the result count, and the product list.
+ * Order: search first (it must stay above the keyboard — the capture's
+ * KPI-then-search order hid every match behind it), then the 2×2 KPI block
+ * (hidden while a query is typed), the add-product CTA, category and status
+ * chip rows, the result count, and the product list.
  *
  * Doc 04 marks this RECOMPOSE — filters into a bottom sheet, a FAB, a
  * virtualised list. The bottom sheet and FAB are a redesign, and the brief
@@ -60,6 +63,7 @@ export default function InventoryScreen() {
     queryKey: ["categories"],
     queryFn: () => catalog.listCategories(api),
   });
+  const pull = usePullRefresh(() => products.refetch(), products.isRefetching);
 
   const all = products.data ?? [];
 
@@ -110,37 +114,6 @@ export default function InventoryScreen() {
         <Text style={styles.title}>{t("app.inventory.title")}</Text>
       </View>
 
-      <View style={styles.grid}>
-        <View style={styles.gridRow}>
-          <StatCard
-            title={t("app.inventory.summary.totalProducts")}
-            value={String(stats.total)}
-            icon={Package}
-            color="accent"
-          />
-          <StatCard
-            title={t("app.inventory.summary.lowStock")}
-            value={String(stats.low)}
-            icon={Warning}
-            color="danger"
-          />
-        </View>
-        <View style={styles.gridRow}>
-          <StatCard
-            title={t("app.inventory.summary.outOfStock")}
-            value={String(stats.out)}
-            icon={WarningOctagon}
-            color="danger"
-          />
-          <StatCard
-            title={t("app.inventory.summary.stockValue")}
-            value={money(stats.value)}
-            icon={Wallet}
-            color="accent"
-          />
-        </View>
-      </View>
-
       {/* Single-shot: one scan fills the search box, the list filters on
           barcode/sku, and the sheet closes itself. No server lookup here —
           the catalogue is already in memory and the filter matches on both
@@ -154,6 +127,44 @@ export default function InventoryScreen() {
         placeholder={t("mobile.inventory.searchPlaceholder")}
         onPressScan={() => setScannerOpen(true)}
       />
+
+      {/* The KPI block collapses while a query is typed: with the keyboard up
+          the four cards + field + CTA filled everything above it and the
+          first match was never on screen (U77). It returns on clear. */}
+      {query.length === 0 ? (
+      <View style={styles.grid}>
+        <View style={styles.gridRow}>
+          <StatCard
+            title={t("app.inventory.summary.totalProducts")}
+            value={String(stats.total)}
+            icon={Package}
+            color="accent"
+          />
+          <StatCard
+            title={t("app.inventory.summary.lowStock")}
+            value={String(stats.low)}
+            icon={Warning}
+            color="warning"
+            tint={stats.low > 0}
+          />
+        </View>
+        <View style={styles.gridRow}>
+          <StatCard
+            title={t("app.inventory.summary.outOfStock")}
+            value={String(stats.out)}
+            icon={WarningOctagon}
+            color="danger"
+            tint={stats.out > 0}
+          />
+          <StatCard
+            title={t("app.inventory.summary.stockValue")}
+            value={money(stats.value)}
+            icon={Wallet}
+            color="accent"
+          />
+        </View>
+      </View>
+      ) : null}
 
       <Pressable style={styles.cta} accessibilityRole="button" onPress={() => router.push("/add-product")}>
         <Plus size={18} color="#FFFFFF" weight="bold" />
@@ -185,8 +196,8 @@ export default function InventoryScreen() {
           the inventory — the stat card above still says 24 while this says 3. */}
       <Text style={styles.count}>
         {query.trim() || category !== "all" || status !== "all"
-          ? t("mobile.inventory.matchCount", { n: visible.length })
-          : t("app.inventory.count", { n: visible.length })}
+          ? t(`mobile.inventory.matchCount${countForm(visible.length)}`, { n: visible.length })
+          : t(`app.inventory.count${countForm(visible.length)}`, { n: visible.length })}
       </Text>
     </View>
   );
@@ -218,10 +229,11 @@ export default function InventoryScreen() {
         ListHeaderComponent={header}
         ListEmptyComponent={empty}
         refreshControl={
-          <RefreshControl refreshing={products.isRefetching} onRefresh={() => void products.refetch()} />
+          <RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />
         }
         contentContainerStyle={[styles.content, { paddingTop: spacing.lg }]}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
       />
 
       {/* A Modal with its own native root, so it sits beside the list rather

@@ -2,25 +2,23 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
-  Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { CaretDownIcon as CaretDown } from "phosphor-react-native/src/icons/CaretDown";
 import { CheckIcon as Check } from "phosphor-react-native/src/icons/Check";
 import { StorefrontIcon as Storefront } from "phosphor-react-native/src/icons/Storefront";
 import { ApiError, type BranchSummary } from "@matgary/api-client";
 
-import { t, useLocale } from "@/i18n";
+import { Sheet } from "@/components/ui/Sheet";
+import { t } from "@/i18n";
 import { useSession } from "@/stores/session";
-import { directionStyle, RTL_TEXT } from "@/theme/rtl";
-import { MIN_TOUCH, colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
+import { RTL_TEXT } from "@/theme/rtl";
+import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
 
 /** How long the chip wears its "switched to X" face before reverting. */
 const CONFIRM_MS = 1800;
@@ -72,9 +70,7 @@ export function BranchSwitcher() {
   const me = useSession((s) => s.me);
   const switchBranch = useSession((s) => s.switchBranch);
   const refreshMe = useSession((s) => s.refreshMe);
-  const rtl = useLocale((s) => s.locale === "ar");
   const queryClient = useQueryClient();
-  const insets = useSafeAreaInsets();
 
   const [open, setOpen] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -184,82 +180,76 @@ export function BranchSwitcher() {
         )}
       </Pressable>
 
-      <Modal visible={open} transparent animationType="slide" onRequestClose={close}>
-        <View style={[styles.overlay, directionStyle(rtl)]}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel={t("app.common.close")} />
-          <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
-            <View style={styles.grabber} />
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>{t("mobile.branchSwitcher.title")}</Text>
-              <Text style={styles.sheetHint}>{t("mobile.branchSwitcher.hint")}</Text>
+      <Sheet
+        visible={open}
+        onClose={close}
+        title={t("mobile.branchSwitcher.title")}
+        subtitle={t("mobile.branchSwitcher.hint")}
+        testID="branch-sheet"
+        bodyStyle={styles.list}
+        footer={
+          pendingId && !error ? (
+            <Text style={styles.status}>{t("mobile.branchSwitcher.switching")}</Text>
+          ) : error ? (
+            <View style={styles.errorBox} accessibilityRole="alert">
+              <Text style={styles.errorText}>{error}</Text>
             </View>
-
-            <ScrollView bounces={false} contentContainerStyle={styles.list}>
-              {branches.map((branch) => {
-                const active = branch.id === activeId;
-                const pending = branch.id === pendingId;
-                return (
-                  <Pressable
-                    key={branch.id}
-                    onPress={() => void select(branch)}
-                    disabled={pendingId !== null}
-                    accessibilityRole="radio"
-                    accessibilityState={{ checked: active, busy: pending, disabled: pendingId !== null }}
-                    accessibilityLabel={
-                      active ? `${branch.name} — ${t("app.branchesPage.labels.current")}` : branch.name
-                    }
-                    testID="branch-option"
-                    style={({ pressed }) => [
-                      styles.row,
-                      active && styles.rowActive,
-                      pressed && !active && styles.rowPressed,
-                    ]}
-                  >
-                    <View style={[styles.rowIcon, active && styles.rowIconActive]}>
-                      <Storefront
-                        size={18}
-                        weight={active ? "fill" : "regular"}
-                        color={active ? colors.accent : colors.textSecondary}
-                      />
-                    </View>
-                    <View style={styles.rowBody}>
-                      <Text numberOfLines={1} style={[styles.rowName, active && styles.rowNameActive]} testID="branch-option-name">
-                        {branch.name}
-                      </Text>
-                      {(branch.isPrimary || active) && (
-                        <Text numberOfLines={1} style={styles.rowMeta}>
-                          {[
-                            branch.isPrimary ? t("app.branchesPage.labels.primary") : null,
-                            active ? t("app.branchesPage.labels.current") : null,
-                          ]
-                            .filter(Boolean)
-                            .join(" · ")}
-                        </Text>
-                      )}
-                    </View>
-                    <View style={styles.rowTrailing}>
-                      {pending ? (
-                        <ActivityIndicator size="small" color={colors.accent} />
-                      ) : active ? (
-                        <Check size={20} weight="bold" color={colors.accent} />
-                      ) : null}
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-
-            {pendingId && !error ? (
-              <Text style={styles.status}>{t("mobile.branchSwitcher.switching")}</Text>
-            ) : null}
-            {error ? (
-              <View style={styles.errorBox} accessibilityRole="alert">
-                <Text style={styles.errorText}>{error}</Text>
+          ) : undefined
+        }
+      >
+        {branches.map((branch) => {
+          const active = branch.id === activeId;
+          const pending = branch.id === pendingId;
+          return (
+            <Pressable
+              key={branch.id}
+              onPress={() => void select(branch)}
+              disabled={pendingId !== null}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: active, busy: pending, disabled: pendingId !== null }}
+              accessibilityLabel={
+                active ? `${branch.name} — ${t("app.branchesPage.labels.current")}` : branch.name
+              }
+              testID="branch-option"
+              style={({ pressed }) => [
+                styles.row,
+                active && styles.rowActive,
+                pressed && !active && styles.rowPressed,
+              ]}
+            >
+              <View style={[styles.rowIcon, active && styles.rowIconActive]}>
+                <Storefront
+                  size={18}
+                  weight={active ? "fill" : "regular"}
+                  color={active ? colors.accent : colors.textSecondary}
+                />
               </View>
-            ) : null}
-          </View>
-        </View>
-      </Modal>
+              <View style={styles.rowBody}>
+                <Text numberOfLines={1} style={[styles.rowName, active && styles.rowNameActive]} testID="branch-option-name">
+                  {branch.name}
+                </Text>
+                {(branch.isPrimary || active) && (
+                  <Text numberOfLines={1} style={styles.rowMeta}>
+                    {[
+                      branch.isPrimary ? t("app.branchesPage.labels.primary") : null,
+                      active ? t("app.branchesPage.labels.current") : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </Text>
+                )}
+              </View>
+              <View style={styles.rowTrailing}>
+                {pending ? (
+                  <ActivityIndicator size="small" color={colors.accent} />
+                ) : active ? (
+                  <Check size={20} weight="bold" color={colors.accent} />
+                ) : null}
+              </View>
+            </Pressable>
+          );
+        })}
+      </Sheet>
     </>
   );
 }
@@ -283,32 +273,10 @@ const styles = StyleSheet.create({
   chipText: { ...RTL_TEXT, fontFamily: fonts.semibold, fontSize: 13, color: colors.text, flexShrink: 1 },
   chipTextConfirmed: { color: colors.successStrong },
 
-  overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: colors.scrim },
-  sheet: {
-    backgroundColor: colors.card,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    maxHeight: "80%",
-    paddingTop: spacing.sm,
-    ...elevation.modal,
-  },
-  grabber: {
-    alignSelf: "center",
-    width: 36,
-    height: 4,
-    borderRadius: radius.full,
-    backgroundColor: colors.border,
-    marginBottom: spacing.md,
-  },
-  sheetHeader: { paddingHorizontal: spacing.xl, gap: spacing.xs, marginBottom: spacing.md },
-  sheetTitle: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 18, color: colors.accent },
-  sheetHint: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, lineHeight: 20 },
 
   // sm + row md = 20 = sheetHeader xl, so the icon/name column lines up with
   // the title and the active card bleeds a clean 12pt past the text column.
-  list: { paddingHorizontal: spacing.sm, gap: spacing.xs },
+  list: { paddingHorizontal: spacing.sm, paddingTop: 0, gap: spacing.xs },
   row: {
     minHeight: MIN_TOUCH + 12,
     flexDirection: "row",

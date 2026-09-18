@@ -318,7 +318,9 @@ export default function CustomersScreen() {
 
                 {c.outstanding > 0 ? (
                   <View style={styles.debtRow}>
-                    <Badge label={t("mobile.customers.owes", { amount: money(c.outstanding) })} variant="outofstock" />
+                    {/* Status only — the amount already sits bold at the row's end;
+                        printing it twice ~100pt apart reads as two debts. */}
+                    <Badge label={t("mobile.customers.owingPill")} variant="outofstock" />
                     {age !== null ? (
                       <Badge label={sinceLabel(age)} variant={age >= 30 ? "outofstock" : "lowstock"} />
                     ) : null}

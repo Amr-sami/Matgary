@@ -307,6 +307,10 @@ function receiptCss(width: ReceiptWidth, dir: "rtl" | "ltr"): string {
   const base = dir === "rtl" ? arabic : mono;
   // Under RTL the "sub" indent belongs on the start side.
   const subPad = dir === "rtl" ? "padding-right: 6px;" : "padding-left: 6px;";
+  // Tracking pulls Arabic's cursive joins apart, so it is emitted only for
+  // Latin labels — the same lang gate the preview applies (`tracked`). The
+  // barcode line is always Latin (`#CODE`) and keeps its own spacing.
+  const ls = (n: string) => (dir === "ltr" ? ` letter-spacing: ${n};` : "");
 
   return `
 @page { size: ${width}mm auto; margin: 0; }
@@ -322,19 +326,19 @@ body { width: ${width}mm; -webkit-print-color-adjust: exact; print-color-adjust:
 .receipt-logo--small  { width: ${logo.small}mm;  max-height: ${logo.small}mm; }
 .receipt-logo--medium { width: ${logo.medium}mm; max-height: ${logo.medium}mm; }
 .receipt-logo--large  { width: ${logo.large}mm;  max-height: ${logo.large}mm; }
-.receipt-slogan { text-align: center; font-size: ${px(12)}; letter-spacing: 1px; text-transform: uppercase; margin: 2px 0; font-weight: 700; }
-.receipt-contact { text-align: center; font-size: ${px(11)}; margin: 1px 0; letter-spacing: 0.3px; }
-.receipt-title { text-align: center; font-size: ${px(20)}; font-weight: 900; letter-spacing: 2px; margin: 4px 0 6px; text-transform: uppercase; }
+.receipt-slogan { text-align: center; font-size: ${px(12)};${ls("1px")} text-transform: uppercase; margin: 2px 0; font-weight: 700; }
+.receipt-contact { text-align: center; font-size: ${px(11)}; margin: 1px 0;${ls("0.3px")} }
+.receipt-title { text-align: center; font-size: ${px(20)}; font-weight: 900;${ls("2px")} margin: 4px 0 6px; text-transform: uppercase; }
 .receipt-divider { margin: 4px 0; border-top: 1px solid #000; height: 0; overflow: hidden; }
 .receipt-row { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; padding: 1px 0; font-size: ${px(13)}; font-variant-numeric: tabular-nums; }
 .receipt-row > span:first-child { flex: 1 1 auto; min-width: 0; }
 .receipt-row > span:last-child { flex: 0 0 auto; white-space: nowrap; }
 .receipt-items { margin: 2px 0; }
 .receipt-item-main { font-weight: 700; }
-.receipt-item-name { text-transform: uppercase; letter-spacing: 0.5px; }
+.receipt-item-name { text-transform: uppercase;${ls("0.5px")} }
 .receipt-item-sub { font-size: ${px(12)}; ${subPad} color: #000; }
-.receipt-total-row { font-size: ${px(15)}; font-weight: 900; letter-spacing: 0.5px; padding: 2px 0; }
-.receipt-thankyou { text-align: center; font-size: ${px(14)}; font-weight: 700; letter-spacing: 1px; margin: 4px 0 2px; text-transform: uppercase; }
+.receipt-total-row { font-size: ${px(15)}; font-weight: 900;${ls("0.5px")} padding: 2px 0; }
+.receipt-thankyou { text-align: center; font-size: ${px(14)}; font-weight: 700;${ls("1px")} margin: 4px 0 2px; text-transform: uppercase; }
 .receipt-footer { text-align: center; font-size: ${px(11)}; margin: 4px 0; font-family: ${arabic}; direction: rtl; line-height: 1.5; }
 .receipt-custom-block { font-size: ${px(11)}; margin: 4px 0; font-family: ${arabic}; line-height: 1.5; }
 .receipt-eta-notice { text-align: center; font-size: ${px(8)}; font-family: ${arabic}; margin: 2px 0; direction: rtl; color: #555; line-height: 1.4; font-weight: 400; }

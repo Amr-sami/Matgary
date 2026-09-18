@@ -2,11 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -18,18 +14,19 @@ import { PlusIcon as Plus } from "phosphor-react-native/src/icons/Plus";
 import { ApiError } from "@matgary/api-client";
 
 import { api } from "@/api/client";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { getLocale, t } from "@/i18n";
+import { t } from "@/i18n";
 import { Screen } from "@/components/layout/Screen";
+import { HeaderAccessories } from "@/components/shell/HeaderAccessories";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { ChevronBack } from "@/components/ui/Chevron";
 import { DateField } from "@/components/ui/DateField";
 import { Field } from "@/components/ui/Field";
-import { Segmented } from "@/components/ui/Segmented";
+import { Sheet } from "@/components/ui/Sheet";
 import { useSession } from "@/stores/session";
 import { shortDate } from "@/lib/format";
-import { RTL_TEXT, directionStyle } from "@/theme/rtl";
+import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
 
 /**
@@ -49,8 +46,6 @@ import { MIN_TOUCH, colors, elevation, fonts, radius, spacing } from "@/theme/to
  */
 
 type LeaveStatus = "pending" | "approved" | "rejected";
-
-type TeamTab = "team" | "attendance" | "payroll" | "leaves";
 
 interface LeaveRequestDto {
   id: string;
@@ -195,55 +190,37 @@ export default function LeaveScreen() {
     ]);
   };
 
-  // The web's team tab strip. Team and attendance have native screens;
-  // payroll has none (doc 02 §1.1 row 15 drops the CompensationEditor from
-  // v1) — compensation lives in each employee's detail, so that tab explains
-  // where it went at tap time and offers to open the team list. The hint is
-  // an alert rather than inline state: this screen stays mounted under the
-  // Tabs navigator, so a flag set here would be painted after the push and
-  // linger until the next visit.
-  const teamTabs = (): { key: TeamTab; label: string }[] => [
-    { key: "team", label: t("app.team.tabs.team") },
-    { key: "attendance", label: t("app.team.tabs.attendance") },
-    { key: "payroll", label: t("app.team.tabs.payroll") },
-    { key: "leaves", label: t("app.team.tabs.leaves") },
-  ];
-  const onTeamTab = (tab: TeamTab) => {
-    switch (tab) {
-      case "leaves":
-        return;
-      case "team":
-        router.push("/team");
-        return;
-      case "attendance":
-        router.push("/team/attendance");
-        return;
-      case "payroll":
-        Alert.alert(t("app.team.tabs.payroll"), t("mobile.leave.payrollHint"), [
-          { text: t("app.leave.form.cancel"), style: "cancel" },
-          { text: t("app.team.tabs.team"), onPress: () => router.push("/team") },
-        ]);
-        return;
-    }
-  };
-
   return (
-    <Screen
-      title={t(canManageTeam ? "app.team.heading.manager" : "app.team.heading.staff")}
-      subtitle={
-        isManager && pendingCount > 0
-          ? t("app.leave.tab.pendingCount", { n: pendingCount })
-          : t("app.team.tabDescriptions.leaves")
-      }
-      onRefresh={() => void q.refetch()}
-      refreshing={q.isRefetching}
-    >
-      {canManageTeam ? <Segmented items={teamTabs()} value="leaves" onChange={onTeamTab} /> : null}
+    <Screen onRefresh={() => void q.refetch()} refreshing={q.isRefetching}>
+      {/* Own header, the same shape as team/attendance: a "‹ الفريق" back link
+          above the title for whoever can open the Team hub (the web's tab
+          strip — with its payroll tab that has no native screen — is gone;
+          Team sub-screens share one nav model). Staff reach this screen from
+          More and get the plain title. */}
+      <View style={styles.header}>
+        <HeaderAccessories />
+        {canManageTeam ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.navigate("/team")}
+            hitSlop={12}
+            style={styles.back}
+          >
+            <ChevronBack size={16} color={colors.textSecondary} />
+            <Text style={styles.backLabel}>{t("mobile.team.back")}</Text>
+          </Pressable>
+        ) : null}
+        <Text style={styles.title}>{t("mobile.leave.title")}</Text>
+        <Text style={styles.subtitle}>
+          {isManager && pendingCount > 0
+            ? t("app.leave.tab.pendingCount", { n: pendingCount })
+            : t("app.team.tabDescriptions.leaves")}
+        </Text>
+      </View>
 
       {canRequest ? (
-        // The web parks this on the end side of a justify-between row whose
-        // start slot is the pending badge; that badge lives in the subtitle
-        // here, so a lone CTA sits on the leading edge (right in RTL) instead.
+        // End-aligned like every Screen-level action row (the design's
+        // app__leave.png and Activity's "مسح / تطبيق" row).
         <View style={styles.toolbar}>
           <PlusButton label={t("app.leave.tab.request")} onPress={() => setFormOpen(true)} />
         </View>
@@ -407,9 +384,6 @@ function PlusButton({ label, onPress }: { label: string; onPress: () => void }) 
 /**
  * The web's LeaveFormModal. Dates are kept as YYYY-MM-DD (what DateField
  * emits) and sent as ISO datetimes — the server only needs those.
- *
- * RTL is re-applied on the overlay on purpose: a Modal mounts its own native
- * root outside the root layout's direction.
  */
 function LeaveFormSheet({
   visible,
@@ -420,7 +394,6 @@ function LeaveFormSheet({
   onClose: () => void;
   onCreated: () => void;
 }) {
-  const insets = useSafeAreaInsets();
   const today = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
   const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
@@ -465,57 +438,41 @@ function LeaveFormSheet({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
-      <View style={[styles.overlay, directionStyle(getLocale() === "ar")]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel={t("app.common.close")} />
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
-          <View style={styles.sheet}>
-            <ScrollView keyboardShouldPersistTaps="handled" style={styles.sheetScroll} contentContainerStyle={styles.sheetBody}>
-              <Text style={styles.sheetTitle}>{t("app.leave.form.title")}</Text>
+    <Sheet
+      visible={visible}
+      onClose={close}
+      title={t("app.leave.form.title")}
+      testID="leave-form"
+      primaryAction={{
+        label: t("app.leave.form.submit"),
+        onPress: () => create.mutate(),
+        disabled: !datesValid,
+        loading: create.isPending,
+        testID: "leave-form-submit",
+      }}
+      secondaryAction={{ label: t("app.leave.form.cancel"), onPress: close }}
+    >
+      <DateField label={t("mobile.leave.from")} value={start} onChange={setStart} />
+      <DateField label={t("mobile.leave.to")} value={end} onChange={setEnd} min={start || undefined} />
+      {!datesValid && (start.trim() || end.trim()) ? (
+        <Text style={styles.hint}>{t("mobile.leave.invalidDates")}</Text>
+      ) : null}
 
-              <DateField label={t("mobile.leave.from")} value={start} onChange={setStart} />
-              <DateField label={t("mobile.leave.to")} value={end} onChange={setEnd} min={start || undefined} />
-              {!datesValid && (start.trim() || end.trim()) ? (
-                <Text style={styles.hint}>{t("mobile.leave.invalidDates")}</Text>
-              ) : null}
+      <Field
+        label={t("app.leave.form.reasonLabel")}
+        value={reason}
+        onChangeText={setReason}
+        placeholder={t("app.leave.form.reasonPlaceholder")}
+        multiline
+        maxLength={500}
+      />
 
-              <Field
-                label={t("app.leave.form.reasonLabel")}
-                value={reason}
-                onChangeText={setReason}
-                placeholder={t("app.leave.form.reasonPlaceholder")}
-                multiline
-                maxLength={500}
-              />
-
-              {error ? (
-                <Text numberOfLines={3} style={styles.error}>
-                  {error}
-                </Text>
-              ) : null}
-
-            </ScrollView>
-            {/* Pinned footer: inside the ScrollView the CTAs fell below the fold
-                once the keyboard lifted the sheet. Cancel leads, primary trails. */}
-            <View style={[styles.actions, styles.sheetFooter, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
-              <Button
-                label={t("app.leave.form.cancel")}
-                variant="outline"
-                onPress={close}
-                style={styles.actionGrow}
-              />
-              <Button
-                label={t("app.leave.form.submit")}
-                onPress={() => create.mutate()}
-                disabled={!datesValid}
-                loading={create.isPending}
-                style={styles.actionGrow}
-              />
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </View>
-    </Modal>
+      {error ? (
+        <Text numberOfLines={3} style={styles.error}>
+          {error}
+        </Text>
+      ) : null}
+    </Sheet>
   );
 }
 
@@ -529,7 +486,6 @@ function DecideSheet({
   onClose: () => void;
   onDecided: (status: "approved" | "rejected") => void;
 }) {
-  const insets = useSafeAreaInsets();
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -560,81 +516,69 @@ function DecideSheet({
   const approving = target?.status === "approved";
 
   return (
-    <Modal visible={target !== null} transparent animationType="fade" onRequestClose={close}>
-      <View style={[styles.overlay, directionStyle(getLocale() === "ar")]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel={t("app.common.close")} />
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
-          <View style={styles.sheet}>
-            <ScrollView keyboardShouldPersistTaps="handled" style={styles.sheetScroll} contentContainerStyle={styles.sheetBody}>
-              <Text style={styles.sheetTitle}>
-                {approving ? t("app.leave.tab.decision.approveTitle") : t("app.leave.tab.decision.rejectTitle")}
-              </Text>
+    <Sheet
+      visible={target !== null}
+      onClose={close}
+      title={approving ? t("app.leave.tab.decision.approveTitle") : t("app.leave.tab.decision.rejectTitle")}
+      testID="leave-decide"
+      primaryAction={{
+        label: approving ? t("app.leave.tab.decision.approveButton") : t("app.leave.tab.decision.rejectButton"),
+        onPress: () => decide.mutate(),
+        loading: decide.isPending,
+        destructive: !approving,
+        testID: "leave-decide-submit",
+      }}
+      secondaryAction={{ label: t("app.leave.tab.decision.cancel"), onPress: close }}
+    >
+      {target ? (
+        <View>
+          <Text style={styles.who}>
+            {target.item.userName ?? t("app.leave.tab.anonymousEmployee")}
+          </Text>
+          <Text style={styles.range}>
+            {formatRange(target.item.startDate, target.item.endDate)}
+            <Text style={styles.days}>
+              {" "}
+              {t("app.leave.tab.daysSuffix", {
+                n: daysBetween(target.item.startDate, target.item.endDate),
+              })}
+            </Text>
+          </Text>
+          {target.item.reason ? (
+            <Text style={styles.meta}>
+              <Text style={styles.metaLabel}>{t("app.leave.tab.reasonLabel")} </Text>
+              {target.item.reason}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
 
-              {target ? (
-                <View>
-                  <Text style={styles.who}>
-                    {target.item.userName ?? t("app.leave.tab.anonymousEmployee")}
-                  </Text>
-                  <Text style={styles.range}>
-                    {formatRange(target.item.startDate, target.item.endDate)}
-                    <Text style={styles.days}>
-                      {" "}
-                      {t("app.leave.tab.daysSuffix", {
-                        n: daysBetween(target.item.startDate, target.item.endDate),
-                      })}
-                    </Text>
-                  </Text>
-                  {target.item.reason ? (
-                    <Text style={styles.meta}>
-                      <Text style={styles.metaLabel}>{t("app.leave.tab.reasonLabel")} </Text>
-                      {target.item.reason}
-                    </Text>
-                  ) : null}
-                </View>
-              ) : null}
+      <Field
+        label={t("app.leave.tab.decision.noteOptional")}
+        value={note}
+        onChangeText={setNote}
+        placeholder={t("mobile.leave.decisionNoteHint")}
+        multiline
+        maxLength={500}
+      />
 
-              <Field
-                label={t("app.leave.tab.decision.noteOptional")}
-                value={note}
-                onChangeText={setNote}
-                placeholder={t("mobile.leave.decisionNoteHint")}
-                multiline
-                maxLength={500}
-              />
-
-              {error ? (
-                <Text numberOfLines={3} style={styles.error}>
-                  {error}
-                </Text>
-              ) : null}
-
-            </ScrollView>
-            <View style={[styles.actions, styles.sheetFooter, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
-              <Button
-                label={t("app.leave.tab.decision.cancel")}
-                variant="ghost"
-                onPress={close}
-                style={styles.actionGrow}
-              />
-              <Button
-                label={
-                  approving ? t("app.leave.tab.decision.approveButton") : t("app.leave.tab.decision.rejectButton")
-                }
-                variant={approving ? "primary" : "outline"}
-                onPress={() => decide.mutate()}
-                loading={decide.isPending}
-                style={styles.actionGrow}
-              />
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </View>
-    </Modal>
+      {error ? (
+        <Text numberOfLines={3} style={styles.error}>
+          {error}
+        </Text>
+      ) : null}
+    </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  toolbar: { flexDirection: "row", justifyContent: "flex-start" },
+  // Same shape as the settings sub-pages and team/attendance: back link, then title, then subtitle.
+  header: { gap: spacing.xs, alignItems: "flex-start" },
+  back: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 32 },
+  backLabel: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
+  title: { fontFamily: fonts.bold, fontSize: 26, color: colors.text, ...RTL_TEXT },
+  subtitle: { fontFamily: fonts.regular, fontSize: 15, color: colors.textSecondary, ...RTL_TEXT },
+  toolbar: { flexDirection: "row", justifyContent: "flex-end" },
   plusBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -700,18 +644,4 @@ const styles = StyleSheet.create({
   error: { fontFamily: fonts.medium, fontSize: 14, color: colors.danger, ...RTL_TEXT },
   hint: { fontFamily: fonts.regular, fontSize: 13, color: colors.warningStrong, ...RTL_TEXT },
 
-  overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.45)" },
-  sheet: {
-    backgroundColor: colors.card,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    maxHeight: "90%",
-    ...elevation.modal,
-  },
-  sheetScroll: { flexShrink: 1 },
-  sheetBody: { padding: spacing.xl, gap: spacing.lg },
-  sheetFooter: { paddingHorizontal: spacing.xl, paddingTop: spacing.md },
-  sheetTitle: { fontFamily: fonts.bold, fontSize: 18, color: colors.text, ...RTL_TEXT },
 });

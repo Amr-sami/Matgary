@@ -1,11 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -15,21 +11,22 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, catalog } from "@matgary/api-client";
 
 import { api } from "@/api/client";
+import { ArrowCounterClockwiseIcon as ArrowCounterClockwise } from "phosphor-react-native/src/icons/ArrowCounterClockwise";
 import { CheckIcon as Check } from "phosphor-react-native/src/icons/Check";
-import { XIcon as X } from "phosphor-react-native/src/icons/X";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { isRTL, t } from "@/i18n";
+import { t } from "@/i18n";
 import { Screen } from "@/components/layout/Screen";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
+import { DateField, type IsoDay, isoDayToDate } from "@/components/ui/DateField";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
+import { Sheet } from "@/components/ui/Sheet";
 import { UNREAD_TASKS_KEY, isOpenTask, useBadges } from "@/stores/badges";
 import { useSession } from "@/stores/session";
 import { shortDate } from "@/lib/format";
-import { RTL_TEXT, directionStyle } from "@/theme/rtl";
+import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
 
 /** Measured pairs from doc 03 §2: عاجلة on danger-light, عادية on accent-light. */
@@ -197,39 +194,43 @@ export default function TasksScreen() {
                 accessibilityLabel={isDone ? t("mobile.tasks.reopenTitle", { title: task.title }) : t("mobile.tasks.completeTitle", { title: task.title })}
                 disabled={pending}
                 onPress={() => toggle.mutate({ id: task.id, status: task.status })}
-                style={({ pressed }) => [
-                  styles.row,
-                  isDone && styles.rowDone,
-                  pressed && styles.rowPressed,
-                ]}
+                style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
               >
+                {/* A done card fades its inert content only — title, priority,
+                    date — never the footer, which is still the tap target. The
+                    strike-through and the header's done count already say
+                    "done", so no extra pill. */}
                 <View style={styles.head}>
                   <Text numberOfLines={2} style={[styles.title, isDone && styles.titleDone]}>
                     {task.title}
                   </Text>
-                  <Badge label={p.label} variant={p.variant} />
+                  <Badge label={p.label} variant={p.variant} style={isDone ? styles.badgeDone : undefined} />
                 </View>
-                <View style={styles.meta}>
-                  {isDone ? (
-                    <Badge label={t("mobile.tasks.doneState")} variant="success" />
-                  ) : task.dueDate ? (
-                    <Text style={[styles.date, overdue && styles.dateOverdue]}>
+                {task.dueDate ? (
+                  <View style={styles.meta}>
+                    <Text style={[styles.date, isDone && styles.dateDone, overdue && styles.dateOverdue]}>
                       {overdue
                         ? t("mobile.tasks.overdue", { date: shortDate(task.dueDate) })
                         : t("mobile.tasks.due", { date: shortDate(task.dueDate) })}
                     </Text>
-                  ) : null}
-                </View>
+                  </View>
+                ) : null}
                 {/* What a tap does, spelled out. The web says it with two
                     buttons in the card footer; one tap target is the phone's
-                    version of the same affordance. */}
+                    version of the same affordance. Both states share the
+                    icon + label shape; reopen is an accent action, done a
+                    success one. */}
                 <View style={styles.footer}>
                   {pending ? (
                     <ActivityIndicator color={colors.accent} />
                   ) : (
                     <View style={styles.actionRow}>
-                      {isDone ? null : <Check size={14} color={colors.successStrong} weight="bold" />}
-                      <Text numberOfLines={1} style={styles.action}>
+                      {isDone ? (
+                        <ArrowCounterClockwise size={14} color={colors.accent} weight="bold" />
+                      ) : (
+                        <Check size={14} color={colors.successStrong} weight="bold" />
+                      )}
+                      <Text numberOfLines={1} style={[styles.action, isDone && styles.actionReopen]}>
                         {isDone ? t("app.tasks.card.reopenAction") : t("mobile.tasks.markDone")}
                       </Text>
                     </View>
@@ -255,11 +256,10 @@ export default function TasksScreen() {
 }
 
 /**
- * The web's TaskFormModal, minus the fields a phone cannot honestly offer yet
- * (see the report): title, description, assignee, priority.
- *
- * RTL is re-applied here on purpose: a Modal mounts its own native root, so the
- * `direction` set on the screen root does not reach inside it.
+ * The web's TaskFormModal: title, description, priority, due date, assignee.
+ * The due date is a calendar day here (the web takes a datetime) and is sent
+ * as local midnight — the same instant the list's overdue check compares
+ * against, so a task due today is not overdue until tomorrow.
  */
 function TaskFormSheet({
   visible,
@@ -272,11 +272,11 @@ function TaskFormSheet({
   onClose: () => void;
   onCreated: () => void;
 }) {
-  const insets = useSafeAreaInsets();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [assignee, setAssignee] = useState<string | null>(null);
   const [priority, setPriority] = useState<catalog.TaskPriority>("normal");
+  const [dueDate, setDueDate] = useState<IsoDay | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const team = useQuery({
@@ -292,6 +292,7 @@ function TaskFormSheet({
     setDescription("");
     setAssignee(null);
     setPriority("normal");
+    setDueDate(null);
     setError(null);
   };
 
@@ -302,6 +303,7 @@ function TaskFormSheet({
         description: description.trim() ? description.trim() : null,
         assignedToUserId: assignee,
         priority,
+        dueDate: isoDayToDate(dueDate)?.toISOString() ?? null,
       }),
     onSuccess: () => {
       reset();
@@ -317,102 +319,97 @@ function TaskFormSheet({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
-      <View style={[styles.overlay, directionStyle(isRTL())]}>
-        {/* The KAV is the full-height flex-end container and the scrim sits
-            INSIDE it: with an auto-height KAV the sheet's maxHeight resolved
-            against its own content, clipping the CTAs at the bottom edge. */}
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.kav}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel={t("app.common.close")} />
-          <View style={styles.sheet}>
-            <ScrollView keyboardShouldPersistTaps="handled" style={styles.sheetScroll} contentContainerStyle={styles.sheetBody}>
-              <View style={styles.sheetHeader}>
-                <Text style={styles.sheetTitle}>{t("app.tasks.toolbar.newTask")}</Text>
-                <Pressable onPress={close} style={styles.closeBtn} accessibilityRole="button" accessibilityLabel={t("app.common.close")}>
-                  <X size={22} color={colors.text} />
-                </Pressable>
-              </View>
+    <Sheet
+      visible={visible}
+      onClose={close}
+      title={t("app.tasks.toolbar.newTask")}
+      testID="task-form"
+      primaryAction={{
+        label: t("app.tasks.form.create"),
+        onPress: () => create.mutate(),
+        disabled: !canSubmit,
+        loading: create.isPending,
+        testID: "task-form-submit",
+      }}
+      secondaryAction={{ label: t("app.tasks.form.cancel"), onPress: close }}
+    >
+      <Field
+        label={t("app.tasks.form.titleLabel")}
+        value={title}
+        onChangeText={setTitle}
+        placeholder={t("app.tasks.form.titlePlaceholder")}
+      />
+      <Field
+        label={t("app.tasks.form.descriptionLabel")}
+        value={description}
+        onChangeText={setDescription}
+        placeholder={t("app.tasks.form.descriptionPlaceholder")}
+        multiline
+      />
 
-              <Field
-                label={t("app.tasks.form.titleLabel")}
-                value={title}
-                onChangeText={setTitle}
-                placeholder={t("app.tasks.form.titlePlaceholder")}
-              />
-              <Field
-                label={t("app.tasks.form.descriptionLabel")}
-                value={description}
-                onChangeText={setDescription}
-                placeholder={t("app.tasks.form.descriptionPlaceholder")}
-                multiline
-              />
-
-              <View>
-                <Text style={styles.label}>{t("app.tasks.form.priorityLabel")}</Text>
-                <View style={styles.chipRow}>
-                  {PRIORITY_ORDER.map((key) => (
-                    <Chip
-                      key={key}
-                      label={PRIORITY()[key].label}
-                      active={priority === key}
-                      onPress={() => setPriority(key)}
-                    />
-                  ))}
-                </View>
-              </View>
-
-              {canReadTeam ? (
-                <View>
-                  <Text style={styles.label}>{t("mobile.common.assignTo")}</Text>
-                  {team.isLoading ? (
-                    <ActivityIndicator color={colors.accent} />
-                  ) : (team.data ?? []).length === 0 ? (
-                    <Text style={styles.hint}>{t("mobile.common.noStaffYet")}</Text>
-                  ) : (
-                    <View style={styles.chipRow}>
-                      {(team.data ?? []).map((m) => (
-                        <Chip
-                          key={m.userId}
-                          label={`${m.displayName}${m.role === "owner" ? t("app.tasks.form.ownerSuffix") : ""}`}
-                          active={assignee === m.userId}
-                          onPress={() =>
-                            setAssignee((cur) => (cur === m.userId ? null : m.userId))
-                          }
-                        />
-                      ))}
-                    </View>
-                  )}
-                </View>
-              ) : null}
-
-              {error ? (
-                <Text numberOfLines={3} style={styles.error}>
-                  {error}
-                </Text>
-              ) : null}
-
-            </ScrollView>
-            {/* Pinned footer with the home-indicator inset: inside the ScrollView
-                the CTAs were clipped at the sheet's bottom edge. Cancel leads. */}
-            <View style={[styles.actions, styles.sheetFooter, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
-              <Button
-                label={t("app.tasks.form.cancel")}
-                variant="outline"
-                onPress={close}
-                style={styles.actionGrow}
-              />
-              <Button
-                label={t("app.tasks.form.create")}
-                onPress={() => create.mutate()}
-                disabled={!canSubmit}
-                loading={create.isPending}
-                style={styles.actionGrow}
-              />
-            </View>
-          </View>
-        </KeyboardAvoidingView>
+      <View>
+        <Text style={styles.label}>{t("app.tasks.form.priorityLabel")}</Text>
+        <View style={styles.chipRow}>
+          {PRIORITY_ORDER.map((key) => (
+            <Chip
+              key={key}
+              label={PRIORITY()[key].label}
+              active={priority === key}
+              onPress={() => setPriority(key)}
+            />
+          ))}
+        </View>
       </View>
-    </Modal>
+
+      <View>
+        <DateField
+          label={`${t("app.tasks.form.dueDateLabel")} (${t("app.common.optional")})`}
+          value={dueDate}
+          onChange={setDueDate}
+        />
+        {dueDate ? (
+          // DateField has no clear slot of its own; an optional date needs one.
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setDueDate(null)}
+            hitSlop={8}
+            style={styles.clearDate}
+          >
+            <Text style={styles.clearDateLabel}>{t("app.common.remove")}</Text>
+          </Pressable>
+        ) : null}
+      </View>
+
+      {canReadTeam ? (
+        <View>
+          <Text style={styles.label}>{t("mobile.common.assignTo")}</Text>
+          {team.isLoading ? (
+            <ActivityIndicator color={colors.accent} />
+          ) : (team.data ?? []).length === 0 ? (
+            <Text style={styles.hint}>{t("mobile.common.noStaffYet")}</Text>
+          ) : (
+            <View style={styles.chipRow}>
+              {(team.data ?? []).map((m) => (
+                <Chip
+                  key={m.userId}
+                  label={m.displayName}
+                  active={assignee === m.userId}
+                  onPress={() =>
+                    setAssignee((cur) => (cur === m.userId ? null : m.userId))
+                  }
+                />
+              ))}
+            </View>
+          )}
+        </View>
+      ) : null}
+
+      {error ? (
+        <Text numberOfLines={3} style={styles.error}>
+          {error}
+        </Text>
+      ) : null}
+    </Sheet>
   );
 }
 
@@ -427,13 +424,14 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     ...elevation.card,
   },
-  rowDone: { opacity: 0.6 },
   rowPressed: { borderColor: colors.accent },
+  badgeDone: { opacity: 0.6 },
   head: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
   title: { flexShrink: 1, fontFamily: fonts.semibold, fontSize: 15, color: colors.text, ...RTL_TEXT },
-  titleDone: { textDecorationLine: "line-through" },
+  titleDone: { textDecorationLine: "line-through", opacity: 0.6 },
   meta: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   date: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },
+  dateDone: { opacity: 0.6 },
   dateOverdue: { color: colors.danger, fontFamily: fonts.medium },
   actionRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   footer: {
@@ -450,24 +448,10 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     ...RTL_TEXT,
   },
+  actionReopen: { color: colors.accent },
+  clearDate: { alignSelf: "flex-start", minHeight: MIN_TOUCH, justifyContent: "center" },
+  clearDateLabel: { fontFamily: fonts.medium, fontSize: 13, color: colors.accent, ...RTL_TEXT },
 
-  overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.45)" },
-  kav: { flex: 1, justifyContent: "flex-end" },
-  sheet: {
-    backgroundColor: colors.card,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    maxHeight: "90%",
-    ...elevation.modal,
-  },
-  sheetScroll: { flexShrink: 1 },
-  sheetBody: { padding: spacing.xl, gap: spacing.lg },
-  sheetHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
-  closeBtn: { width: MIN_TOUCH, height: MIN_TOUCH, alignItems: "center", justifyContent: "center", marginEnd: -spacing.sm, marginVertical: -spacing.sm },
-  sheetFooter: { paddingHorizontal: spacing.xl, paddingTop: spacing.md },
-  sheetTitle: { fontFamily: fonts.bold, fontSize: 18, color: colors.text, ...RTL_TEXT },
   label: {
     fontFamily: fonts.medium,
     fontSize: 14,
@@ -478,6 +462,4 @@ const styles = StyleSheet.create({
   hint: { fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary, ...RTL_TEXT },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   error: { fontFamily: fonts.medium, fontSize: 14, color: colors.danger, ...RTL_TEXT },
-  actions: { flexDirection: "row", gap: spacing.sm },
-  actionGrow: { flex: 1 },
 });

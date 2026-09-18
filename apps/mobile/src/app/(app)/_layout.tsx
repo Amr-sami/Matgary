@@ -5,10 +5,20 @@ import { RouteErrorFallback } from "@/observability/sentry";
 
 /**
  * Wraps every CHILD screen (not this layout) in the bilingual fallback, so a
- * render throw shows "something went wrong" + retry with the tab bar still
- * alive — instead of a dead white screen after the red box is dismissed.
+ * render throw shows "something went wrong" + retry / back to home with the
+ * tab bar still alive — instead of a dead white screen after the red box is
+ * dismissed. Screen scope: the broken tab keeps its fallback until "try again".
  */
 export const unstable_settings = { screenErrorBoundary: RouteErrorFallback };
+
+/**
+ * The boundary for THIS layout: the Tabs, BottomNav and nested layouts
+ * (settings/_layout.tsx is a layout, not a screen, so the per-screen wrapper
+ * above does not cover it). expo-router wraps this file's component in
+ * `<Try catch={ErrorBoundary}>`; the fallback then replaces the Tabs, so it
+ * is the layout-scope variant whose "back to home" also remounts them.
+ */
+export { LayoutErrorFallback as ErrorBoundary } from "@/observability/sentry";
 
 /**
  * The tab bar is the web's MobileBottomNav, not a stock one: seven items with

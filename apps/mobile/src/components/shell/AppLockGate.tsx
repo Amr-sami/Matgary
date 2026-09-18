@@ -365,14 +365,12 @@ const styles = StyleSheet.create({
     fontSize: 28,
     color: colors.text,
     textAlign: "center",
-    ...RTL_TEXT,
   },
   hint: {
     fontFamily: fonts.regular,
     fontSize: 15,
     color: colors.textSecondary,
     textAlign: "center",
-    ...RTL_TEXT,
   },
   error: {
     fontFamily: fonts.medium,
@@ -385,7 +383,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     alignSelf: "stretch",
     overflow: "hidden",
-    ...RTL_TEXT,
   },
   errorNeutral: {
     color: colors.warningStrong,

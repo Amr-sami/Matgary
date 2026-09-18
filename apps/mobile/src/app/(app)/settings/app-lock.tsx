@@ -3,9 +3,7 @@ import {
   ActivityIndicator,
   AppState,
   Platform,
-  Pressable,
   StyleSheet,
-  Switch,
   Text,
   View, ScrollView
 } from "react-native";
@@ -20,8 +18,9 @@ import { WarningCircleIcon as WarningCircle } from "phosphor-react-native/src/ic
 import { Screen } from "@/components/layout/Screen";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { ChevronBack } from "@/components/ui/Chevron";
 import { Chip } from "@/components/ui/Chip";
+import { SettingsHeader } from "@/components/ui/SettingsHeader";
+import { ToggleRow } from "@/components/ui/ToggleRow";
 import {
   REQUIRE_AFTER_OPTIONS,
   type RequireAfterSeconds,
@@ -166,19 +165,12 @@ export default function AppLockSettingsScreen() {
 
   return (
     <Screen onRefresh={() => void caps.refetch()} refreshing={caps.isRefetching}>
-      <View style={styles.header}>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.back()}
-          hitSlop={12}
-          style={styles.back}
-        >
-          <ChevronBack size={16} color={colors.textSecondary} />
-          <Text style={styles.backLabel}>{t("app.settingsPage.title")}</Text>
-        </Pressable>
-        <Text style={styles.title}>{t("mobile.appLock.title")}</Text>
-        <Text style={styles.subtitle}>{t("mobile.appLock.intro")}</Text>
-      </View>
+      <SettingsHeader
+        parentLabel={t("app.settingsPage.title")}
+        title={t("mobile.appLock.title")}
+        subtitle={t("mobile.appLock.intro")}
+        onBack={() => router.back()}
+      />
 
       {notice ? (
         <Text style={[styles.notice, notice.tone === "ok" ? styles.noticeOk : styles.noticeErr]}>
@@ -188,23 +180,14 @@ export default function AppLockSettingsScreen() {
 
       {/* التفعيل */}
       <Card>
-        <View style={styles.enableRow}>
-          <View style={styles.enableBody}>
-            <Text style={styles.sectionTitle}>{t("mobile.appLock.enable")}</Text>
-            <Text style={styles.sectionHint}>{t("mobile.appLock.enableHint")}</Text>
-          </View>
-          {verifying ? (
-            <ActivityIndicator color={colors.accent} style={styles.switchSlot} />
-          ) : (
-            <Switch
-              value={enabled}
-              onValueChange={(v) => void toggle(v)}
-              trackColor={{ true: colors.accent, false: colors.border }}
-              accessibilityLabel={t("mobile.appLock.enable")}
-              style={styles.switchSlot}
-            />
-          )}
-        </View>
+        <ToggleRow
+          testID="app-lock-toggle"
+          label={t("mobile.appLock.enable")}
+          hint={t("mobile.appLock.enableHint")}
+          value={enabled}
+          onValueChange={(v) => void toggle(v)}
+          busy={verifying}
+        />
         {enabled ? (
           <Button
             label={t("mobile.appLock.lockNow")}
@@ -239,7 +222,7 @@ export default function AppLockSettingsScreen() {
           </View>
         ) : caps.isError || !c ? (
           <View style={styles.statusRow}>
-            <WarningCircle size={18} color={colors.warningStrong} />
+            <WarningCircle size={20} color={colors.warningStrong} />
             <Text style={styles.statusText}>{t("mobile.appLock.checkFailed")}</Text>
           </View>
         ) : (
@@ -252,9 +235,9 @@ export default function AppLockSettingsScreen() {
             {c.hasHardware ? (
               <View style={styles.statusRow}>
                 {c.enrolled ? (
-                  <CheckCircle size={18} color={colors.success} weight="fill" />
+                  <CheckCircle size={20} color={colors.success} />
                 ) : (
-                  <WarningCircle size={18} color={colors.warningStrong} />
+                  <WarningCircle size={20} color={colors.warningStrong} />
                 )}
                 <Text style={styles.statusText}>
                   {c.enrolled ? t("mobile.appLock.enrolled") : t("mobile.appLock.notEnrolled")}
@@ -264,7 +247,7 @@ export default function AppLockSettingsScreen() {
 
             {!biometricsReady && !noPasscode ? (
               <View style={styles.statusRow}>
-                <LockKey size={18} color={colors.textSecondary} />
+                <LockKey size={20} color={colors.textSecondary} />
                 <Text style={styles.sectionHint}>
                   {c.hasHardware
                     ? t("mobile.appLock.notEnrolledHint")
@@ -284,18 +267,6 @@ export default function AppLockSettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: { gap: spacing.xs },
-  back: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 32 },
-  backLabel: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
-  title: { fontFamily: fonts.bold, fontSize: 26, color: colors.text, ...RTL_TEXT },
-  subtitle: {
-    fontFamily: fonts.regular,
-    fontSize: 15,
-    color: colors.textSecondary,
-    lineHeight: 22,
-    ...RTL_TEXT,
-  },
-
   notice: {
     fontFamily: fonts.medium,
     fontSize: 13,
@@ -308,19 +279,8 @@ const styles = StyleSheet.create({
   noticeOk: { backgroundColor: colors.successLight, color: colors.successStrong },
   noticeErr: { backgroundColor: colors.dangerLight, color: colors.danger },
 
-  enableRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md,
-  },
-  enableBody: { flex: 1, minWidth: 0, gap: 4 },
-  switchSlot: { flexShrink: 0, minWidth: 51, minHeight: 31 },
   lockNow: { marginTop: spacing.lg, minHeight: MIN_TOUCH },
 
-  sectionTitle: { fontFamily: fonts.semibold, fontSize: 16, lineHeight: 22, color: colors.text, ...RTL_TEXT },
-  // No flex:1 — as a COLUMN child it collapsed the body's height, so the
-  // Switch centred on the title line instead of title + hint.
   sectionHint: {
     fontFamily: fonts.regular,
     fontSize: 12,
@@ -343,8 +303,9 @@ const styles = StyleSheet.create({
   kv: { gap: 2 },
   kvLabel: { fontFamily: fonts.medium, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
   kvValue: { fontFamily: fonts.semibold, fontSize: 16, color: colors.text, ...RTL_TEXT },
-  statusRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  statusText: { fontFamily: fonts.medium, fontSize: 14, color: colors.text, flex: 1, ...RTL_TEXT },
+  // Same StatusRow look as printers' BleStateRow: 20pt regular icon carrying the tone, 14pt neutral text.
+  statusRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, minHeight: MIN_TOUCH },
+  statusText: { fontFamily: fonts.medium, fontSize: 14, lineHeight: 20, color: colors.text, flex: 1, ...RTL_TEXT },
   warning: {
     fontFamily: fonts.medium,
     fontSize: 13,

@@ -203,11 +203,9 @@ export default function SettingsScreen() {
                   <Text numberOfLines={1} style={styles.tileTitle}>
                     {tile.title}
                   </Text>
-                  {tile.key === "branches" ? (
-                    <Badge
-                      label={`${branchCount} ${branchCount === 1 ? t("app.settingsPage.branches.countOne") : t("app.settingsPage.branches.countMany")}`}
-                    />
-                  ) : null}
+                  {/* Bare count: the title already names the noun, and a digit
+                      needs no Arabic dual/plural agreement ("2 فروع" was wrong). */}
+                  {tile.key === "branches" ? <Badge label={String(branchCount)} /> : null}
                   {tile.soon ? <Badge label={t("app.billing.comingSoon")} variant="lowstock" /> : null}
                 </View>
                 <Text style={styles.tileHint}>{tile.hint}</Text>

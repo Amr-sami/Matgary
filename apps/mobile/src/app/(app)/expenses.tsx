@@ -1,11 +1,6 @@
 import { useState } from "react";
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -14,17 +9,17 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, catalog } from "@matgary/api-client";
 
 import { api } from "@/api/client";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { isRTL, t } from "@/i18n";
+import { t } from "@/i18n";
 import { Screen } from "@/components/layout/Screen";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
+import { Sheet } from "@/components/ui/Sheet";
 import { money, shortDate } from "@/lib/format";
-import { RTL_TEXT, directionStyle } from "@/theme/rtl";
+import { RTL_TEXT } from "@/theme/rtl";
 import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
 
 /**
@@ -156,9 +151,6 @@ export default function ExpensesScreen() {
  * The web renders this form inline above the table; on a phone that pushes the
  * record it belongs to off-screen, so it becomes a bottom sheet opened by the
  * button. The CONTENT is the capture's, field for field and label for label.
- *
- * RTL is re-applied here on purpose: a Modal mounts its own native root, so the
- * `direction` set on the screen root does not reach inside it.
  */
 function ExpenseFormSheet({
   visible,
@@ -169,7 +161,6 @@ function ExpenseFormSheet({
   onClose: () => void;
   onCreated: () => void;
 }) {
-  const insets = useSafeAreaInsets();
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState<catalog.ExpenseCategory>("other");
@@ -210,83 +201,65 @@ function ExpenseFormSheet({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
-      <View style={[styles.overlay, directionStyle(isRTL())]}>
-        {/* The KAV is the full-height flex-end container and the scrim sits
-            INSIDE it: with an auto-height KAV the sheet's maxHeight resolved
-            against its own content, clipping the CTAs at the bottom edge. */}
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.kav}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel={t("app.common.close")} />
-          <View style={styles.sheet}>
-            <ScrollView keyboardShouldPersistTaps="handled" style={styles.sheetScroll} contentContainerStyle={styles.sheetBody}>
-              <Text style={styles.sheetTitle}>{t("app.expenses.form.heading")}</Text>
+    <Sheet
+      visible={visible}
+      onClose={close}
+      title={t("app.expenses.form.heading")}
+      testID="expense-form"
+      primaryAction={{
+        label: t("app.expenses.form.submit"),
+        onPress: () => create.mutate(),
+        disabled: !canSubmit,
+        loading: create.isPending,
+        testID: "expense-form-submit",
+      }}
+      secondaryAction={{ label: t("app.common.cancel"), onPress: close }}
+    >
+      <Field
+        label={t("app.expenses.form.titleLabel")}
+        value={title}
+        onChangeText={setTitle}
+        placeholder={t("app.expenses.form.titlePlaceholder")}
+      />
+      <Field
+        label={t("app.expenses.form.amountLabel")}
+        value={amount}
+        onChangeText={setAmount}
+        placeholder="0.00"
+        keyboardType="decimal-pad"
+      />
 
-              <Field
-                label={t("app.expenses.form.titleLabel")}
-                value={title}
-                onChangeText={setTitle}
-                placeholder={t("app.expenses.form.titlePlaceholder")}
-              />
-              <Field
-                label={t("app.expenses.form.amountLabel")}
-                value={amount}
-                onChangeText={setAmount}
-                placeholder="0.00"
-                keyboardType="decimal-pad"
-              />
-
-              <View>
-                <Text style={styles.label}>{t("app.expenses.form.categoryLabel")}</Text>
-                <View style={styles.grid}>
-                  {CATEGORY_ORDER.map((key) => (
-                    // The cell fixes the two-column grid of the capture; the
-                    // Chip stretches to fill it (a column's default align is
-                    // stretch), so nothing here re-styles the Chip itself.
-                    <View key={key} style={styles.gridCell}>
-                      <Chip
-                        label={CATEGORY()[key]}
-                        active={category === key}
-                        onPress={() => setCategory(key)}
-                      />
-                    </View>
-                  ))}
-                </View>
-              </View>
-
-              <Field
-                label={t("app.expenses.form.noteLabel")}
-                value={note}
-                onChangeText={setNote}
-                placeholder={t("app.expenses.form.notePlaceholder")}
-              />
-
-              {error ? (
-                <Text numberOfLines={3} style={styles.error}>
-                  {error}
-                </Text>
-              ) : null}
-
-            </ScrollView>
-            {/* Pinned footer with the home-indicator inset: inside the ScrollView the CTAs were clipped. Cancel leads. */}
-            <View style={[styles.actions, styles.sheetFooter, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
-              <Button
-                label={t("app.common.cancel")}
-                variant="outline"
-                onPress={close}
-                style={styles.actionGrow}
-              />
-              <Button
-                label={t("app.expenses.form.submit")}
-                onPress={() => create.mutate()}
-                disabled={!canSubmit}
-                loading={create.isPending}
-                style={styles.actionGrow}
+      <View>
+        <Text style={styles.label}>{t("app.expenses.form.categoryLabel")}</Text>
+        <View style={styles.grid}>
+          {CATEGORY_ORDER.map((key) => (
+            // The cell fixes the two-column grid of the capture; the
+            // Chip stretches to fill it (a column's default align is
+            // stretch), so nothing here re-styles the Chip itself.
+            <View key={key} style={styles.gridCell}>
+              <Chip
+                label={CATEGORY()[key]}
+                active={category === key}
+                onPress={() => setCategory(key)}
               />
             </View>
-          </View>
-        </KeyboardAvoidingView>
+          ))}
+        </View>
       </View>
-    </Modal>
+
+      <Field
+        label={t("app.expenses.form.noteLabel")}
+        value={note}
+        onChangeText={setNote}
+        placeholder={t("app.expenses.form.notePlaceholder")}
+      />
+
+      {error ? (
+        <Text numberOfLines={3} style={styles.error}>
+          {error}
+        </Text>
+      ) : null}
+    </Sheet>
   );
 }
 
@@ -314,22 +287,6 @@ const styles = StyleSheet.create({
   meta: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   date: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary },
 
-  overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.45)" },
-  kav: { flex: 1, justifyContent: "flex-end" },
-  sheet: {
-    backgroundColor: colors.card,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    maxHeight: "90%",
-    ...elevation.modal,
-  },
-  sheetBody: { padding: spacing.xl, gap: spacing.lg },
-  // Same sheet-title token as the settle and supplier sheets.
-  sheetTitle: { fontFamily: fonts.bold, fontSize: 16, color: colors.text, ...RTL_TEXT },
-  sheetScroll: { flexShrink: 1 },
-  sheetFooter: { paddingHorizontal: spacing.xl, paddingTop: spacing.md },
   label: {
     fontFamily: fonts.medium,
     fontSize: 14,
@@ -342,6 +299,4 @@ const styles = StyleSheet.create({
   grid: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -spacing.xs, rowGap: spacing.sm },
   gridCell: { width: "50%", paddingHorizontal: spacing.xs },
   error: { fontFamily: fonts.medium, fontSize: 14, color: colors.danger, ...RTL_TEXT },
-  actions: { flexDirection: "row", gap: spacing.sm },
-  actionGrow: { flex: 1 },
 });

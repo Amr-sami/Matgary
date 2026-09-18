@@ -271,7 +271,13 @@
         "leaderboard": "Team leaderboard",
         "metric": {
           "ops": "{n} transactions",
-          "returns": "{n} returns"
+          "returns": "{n} returns",
+          "returnsOne": "1 return",
+          "returnsTwo": "{n} returns",
+          "returnsFew": "{n} returns",
+          "opsOne": "1 transaction",
+          "opsTwo": "{n} transactions",
+          "opsFew": "{n} transactions"
         },
         "unattributed": {
           "title": "Sales with no assigned team member",
@@ -582,7 +588,7 @@
           "loyaltyTrimmedNote": "Redemption was trimmed to match the available wallet balance and order total."
         },
         "customer": {
-          "nameLabel": "Customer name (optional)",
+          "nameLabel": "Customer name",
           "namePlaceholder": "Start typing to pick a past customer…",
           "phoneLabel": "Mobile number",
           "phonePlaceholder": "Start typing to pick a past number…",
@@ -922,7 +928,7 @@
         "httpsRequired": "Camera requires a secure (HTTPS) connection. Use manual entry below or open the deployed site.",
         "genericError": "Could not open camera. Try manual entry below.",
         "manualLabel": "Or type the code manually",
-        "manualPlaceholder": "Barcode / SKU",
+        "manualPlaceholder": "SKU / Barcode",
         "manualSubmit": "Use this code",
         "cancel": "Cancel",
         "detected": "Detected: {code}"
@@ -941,7 +947,7 @@
       "list": {
         "loading": "Loading…",
         "errorPrefix": "Couldn't load conversations:",
-        "emptyAll": "No conversations yet. The first message from a customer will show up here.",
+        "emptyAll": "No conversations yet.\nThe first message from a customer will show up here.",
         "emptyUnread": "No unread messages.",
         "emptyArchived": "No archived conversations.",
         "youPrefix": "You: ",
@@ -1015,7 +1021,7 @@
       "toolbar": {
         "board": "Board",
         "list": "List",
-        "newTask": "New task"
+        "newTask": "Add task"
       },
       "card": {
         "newBadge": "New",
@@ -1731,7 +1737,7 @@
       "receivables": {
         "title": "On-account balances",
         "subtitle": "Customers who still owe money. Collect payments from the customer detail page (Manage on-account).",
-        "totalLabel": "Total owed",
+        "totalLabel": "Total outstanding",
         "debtorCountLabel": "Customers",
         "oldestLabel": "Oldest unpaid",
         "daysFormat": "{n}d",
@@ -2035,7 +2041,7 @@
       "shellTitle": "Branches",
       "loading": "Loading…",
       "heading": "Branches",
-      "subhead": "Multiple branches let you track sales and inventory per location.",
+      "subhead": "Track sales and inventory per location.",
       "add": "Add branch",
       "editTitle": "Edit branch",
       "newTitle": "New branch",
@@ -2481,7 +2487,7 @@
         "loading": "Loading…",
         "loadFailed": "Couldn't load monthly report",
         "empty": "No attendance in this month yet.",
-        "noShifts": "No shifts recorded for this month.",
+        "noShifts": "No shifts recorded for this month",
         "prevMonth": "Previous month",
         "nextMonth": "Next month",
         "thisMonth": "This month",
@@ -2802,7 +2808,9 @@
         "receive": "Receive",
         "cancel": "Cancel",
         "deleteTitle": "Delete",
-        "itemCountOne": "1 item"
+        "itemCountOne": "1 item",
+        "itemCountTwo": "2 items",
+        "itemCountFew": "{n} items"
       },
       "paymentBadge": {
         "paid": "Paid",
@@ -2910,7 +2918,7 @@
         "added": "Expense recorded"
       },
       "form": {
-        "heading": "Record new expense",
+        "heading": "Add expense",
         "titleLabel": "Description",
         "titlePlaceholder": "e.g. Shop rent, electricity bill…",
         "amountLabel": "Amount (EGP)",
@@ -2925,7 +2933,7 @@
         },
         "noteLabel": "Note (optional)",
         "notePlaceholder": "e.g. September rent",
-        "submit": "Record expense"
+        "submit": "Save expense"
       },
       "table": {
         "col": {
@@ -3446,7 +3454,10 @@
             "footnote": "The preview updates as you type."
           }
         }
-      }
+      },
+      "countOne": "1 product in inventory",
+      "countTwo": "2 products in inventory",
+      "countFew": "{n} products in inventory"
     },
     "broadcastStack": {
       "dismissAria": "Dismiss"
@@ -3911,7 +3922,7 @@
       "redirecting": "Redirecting you to sign in…",
       "checkingLink": "Checking the link…",
       "invalidLinkPrefix": "Invalid or expired link. Request a new one from",
-      "invalidLink": "Invalid or expired link. Request a new one.",
+      "invalidLink": "This link is invalid or has expired.",
       "invalidLinkAction": "Forgot password",
       "errors": {
         "short": "Password must be at least 8 characters",
@@ -3919,7 +3930,7 @@
         "generic": "Couldn't reset"
       },
       "requestNewLink": "Request a new link",
-      "invalidTitle": "Link expired"
+      "invalidTitle": "This link no longer works"
     },
     "onboarding": {
       "meta": {
@@ -3941,7 +3952,7 @@
         "internal": "Couldn't finish setup. Please try again."
       },
       "stepLabels": [
-        "Pick a start",
+        "Starting point",
         "Review"
       ],
       "stepCounter": "Step {n} of {total}",
@@ -4369,7 +4380,7 @@
       "yes": "Yes",
       "no": "No",
       "conflict": "The change was not accepted. Refresh and try again.",
-      "tenantSuspended": "Your store’s service has been paused by support. Contact us to reactivate.",
+      "tenantSuspended": "Your store's service has been paused by support. Contact us to reactivate.",
       "passwordChangeRequired": "You must change your password before continuing.",
       "piecesOne": "1 pc",
       "piecesTwo": "{n} pcs",
@@ -4408,8 +4419,8 @@
       "priceAndStock": "Price & stock",
       "openingStock": "Opening stock",
       "lowStockThreshold": "Low-stock threshold",
-      "costOptional": "Cost price (optional)",
-      "barcodeOptional": "Barcode / SKU (optional)",
+      "costOptional": "Cost price (EGP, optional)",
+      "barcodeOptional": "SKU / Barcode (optional)",
       "scanOrType": "Scan or type the barcode",
       "another": "Another product",
       "openInInventory": "Open in inventory",
@@ -4450,7 +4461,10 @@
       "photoPickFailed": "Couldn't open the photo — try again",
       "changePhoto": "Change photo",
       "addPhoto": "Add photo",
-      "photoFailedBlocksSave": "Photo upload failed — retry or remove it in the Photo step before saving"
+      "photoFailedBlocksSave": "Photo upload failed — retry or remove it in the Photo step before saving",
+      "pricePlaceholder": "e.g. 150",
+      "quantityPlaceholder": "e.g. 10",
+      "noAttributesStep": "No attributes for this category — step 2 is skipped"
     },
     "returns": {
       "empty": "No returns yet",
@@ -4522,7 +4536,9 @@
         "lineTotal": "{qty} × {cost} = {total}",
         "remove": "Remove item",
         "noLinesHint": "Search by name above or scan a barcode to add the first item",
-        "linesSummaryOne": "1 item · {amount}"
+        "linesSummaryOne": "1 item · {amount}",
+        "linesSummaryTwo": "2 items · {amount}",
+        "linesSummaryFew": "{n} items · {amount}"
       },
       "actionFailed": "The action failed, try again",
       "filterAll": "All",
@@ -4544,7 +4560,7 @@
       "summary": "{n} customers · {owed} outstanding",
       "owes": "Owes {amount}",
       "profileOf": "Customer: {name}",
-      "lastVisit": "Last visit",
+      "lastVisit": "Last purchase",
       "invoiceCount": "Invoices",
       "paymentLog": "Payment history",
       "previousPayment": "Previous payment",
@@ -4594,7 +4610,8 @@
       "rowMetaFew": "{phone} · {n} invoices · {spend}",
       "summaryOne": "1 customer · {owed} outstanding",
       "summaryTwo": "{n} customers · {owed} outstanding",
-      "summaryFew": "{n} customers · {owed} outstanding"
+      "summaryFew": "{n} customers · {owed} outstanding",
+      "owingPill": "On account"
     },
     "suppliers": {
       "profileOf": "Supplier: {name}",
@@ -4669,7 +4686,6 @@
     },
     "tasks": {
       "summary": "{open} open · {done} done",
-      "newTask": "New task +",
       "doneCheck": "✓ Done",
       "completeTitle": "Complete {title}",
       "reopenTitle": "Reopen {title}",
@@ -4682,7 +4698,7 @@
       "loadFailed": "Couldn't load insights",
       "deepDive": "Deep dive",
       "trendTitle": "Sales trend ({range})",
-      "peakDate": "{month} {day}",
+      "peakDate": "{day} {month}",
       "month": {
         "jan": "Jan",
         "feb": "Feb",
@@ -4710,14 +4726,22 @@
       },
       "heatmap": {
         "footerLabel": "Total"
+      },
+      "deep": {
+        "product": {
+          "pickTitle": "Pick a product"
+        }
       }
     },
     "inventory": {
       "searchHint": "Try another search or clear the filters.",
       "empty": "No products",
       "backToList": "Back to inventory",
-      "searchPlaceholder": "Search by name, barcode, or brand",
-      "matchCount": "{n} matching products"
+      "searchPlaceholder": "Search by name, barcode or brand",
+      "matchCount": "{n} matching products",
+      "matchCountOne": "1 matching product",
+      "matchCountTwo": "2 matching products",
+      "matchCountFew": "{n} matching products"
     },
     "billing": {
       "trialDaysLeft": "{days} days left in your free trial.",
@@ -4805,7 +4829,8 @@
     "format": {
       "money": "EGP {amount}",
       "thousand": "{n}K",
-      "million": "{n}M"
+      "million": "{n}M",
+      "date": "{day} {month} {year}"
     },
     "onboarding": {
       "seedNote": "Ready-made categories can only be set up from the web version for now. To start with them, finish onboarding on the web instead of here.",
@@ -4833,7 +4858,7 @@
       "connected": "Connected",
       "notConnected": "Not connected",
       "sandbox": "Sandbox",
-      "connectFromWeb": "Connect from the web dashboard: Settings → WhatsApp. Meta sign-in needs a browser.",
+      "connectFromWeb": "Connect from the web dashboard: Settings → WhatsApp.\nMeta sign-in needs a browser.",
       "genericError": "Something went wrong. Please try again.",
       "retry": "Retry"
     },
@@ -4932,11 +4957,6 @@
         "done": "Done"
       },
       "nextTry": "Next try {when}",
-      "ago": {
-        "now": "just now",
-        "minutes": "{n} min ago",
-        "hours": "{n} h ago"
-      },
       "in": {
         "seconds": "in seconds",
         "minutes": "in {n} min"
@@ -5021,7 +5041,8 @@
       "body": "This screen stopped unexpectedly. Your data is safe — you can try again.",
       "tryAgain": "Try again",
       "reported": "The team has been notified automatically",
-      "eventId": "Report ID: {id}"
+      "eventId": "Report ID: {id}",
+      "backHome": "Back to home"
     },
     "legal": {
       "openOnWeb": "Open on the web",
@@ -5035,7 +5056,7 @@
       "consentSuffix": "of TheStoro.",
       "consent": "By creating an account you agree to the {terms} and the {privacy}.",
       "termsLabel": "Terms of Use",
-      "privacyLabel": "Privacy Policy",
+      "privacyLabel": "Privacy Policy",
       "contents": "Contents",
       "tocHint": "Jumps to this clause"
     },
@@ -5048,7 +5069,7 @@
       "privacySub": "How we protect your data, under Law 151/2020",
       "termsSub": "The rules for using the platform and your subscription",
       "website": "Website",
-      "websiteSub": "thestoro.com",
+      "websiteSub": "Official site and help centre",
       "legalHeading": "Legal"
     },
     "receipt": {
@@ -5064,7 +5085,7 @@
       "settingsFallback": "Receipt settings could not be loaded; the default layout was used.",
       "actionsLabel": "Receipt options",
       "settingsFallbackTitle": "Receipt settings unavailable",
-      "settingsFallbackAsk": "The shop’s receipt settings could not be loaded and this device has no saved copy. The receipt would use the default layout with no shop name, phone or footer. Continue anyway?",
+      "settingsFallbackAsk": "The shop's receipt settings could not be loaded and this device has no saved copy. The receipt would use the default layout with no shop name, phone or footer. Continue anyway?",
       "settingsFallbackContinue": "Continue anyway",
       "settingsSaved": "Offline — the last receipt settings saved on this device were used."
     },
@@ -5079,7 +5100,7 @@
       "editBrand": "Edit brand",
       "editAttribute": "Edit attribute",
       "editValue": "Edit value",
-      "categoryInUse": "Can’t delete — {n} products use this category. Move them to another category first.",
+      "categoryInUse": "Can't delete — {n} products use this category. Move them to another category first.",
       "brandInUse": "{n} products use this brand. They keep the name, but it will no longer be offered in pickers.",
       "hasAttributes": "Has attributes",
       "valuesCount": "{n} values",
@@ -5089,16 +5110,16 @@
       "pickCategory": "Choose a category",
       "pickCategoryFirst": "Pick a category above to see its attributes.",
       "requiredLabel": "Required attribute",
-      "requiredHint": "The wizard won’t save a product in this category without it.",
+      "requiredHint": "The wizard won't save a product in this category without it.",
       "deleteAttributeHint": "All its values are deleted too.",
       "saved": "Saved",
       "brandAdded": "Brand added",
       "attributeAdded": "Attribute added",
       "valueAdded": "Value added",
       "genericError": "Something went wrong, try again",
-      "categoriesIntro": "The categories your team picks from when adding a product. The order here is the wizard’s order.",
+      "categoriesIntro": "The categories your team picks from when adding a product. The order here is the wizard's order.",
       "brandsIntro": "The brands offered per category when adding a product.",
-      "attributesIntro": "Each category’s attributes (like type or size) and their values. The wizard shows them in step 2.",
+      "attributesIntro": "Each category's attributes (like type or size) and their values. The wizard shows them in step 2.",
       "valueLabel": "Value name",
       "attributeLabel": "Attribute name",
       "brandNameLabel": "Brand name",
@@ -5124,7 +5145,10 @@
       "categoryCountFew": "{n} categories",
       "productsCountOne": "1 product",
       "productsCountTwo": "{n} products",
-      "productsCountFew": "{n} products"
+      "productsCountFew": "{n} products",
+      "brandCountOne": "1 brand",
+      "brandCountTwo": "2 brands",
+      "brandCountFew": "{n} brands"
     },
     "appLock": {
       "title": "App lock",
@@ -5231,7 +5255,7 @@
     },
     "printing": {
       "title": "Receipt printer",
-      "subtitle": "Pair a Bluetooth thermal printer and print receipts straight from the app",
+      "subtitle": "Pair a Bluetooth thermal printer and print receipts straight from the app.",
       "bluetooth": "Bluetooth",
       "stateUnsupported": "Bluetooth is not available on this device.",
       "statePoweredOff": "Bluetooth is off — turn it on in the device settings",
@@ -5335,7 +5359,7 @@
       "title": "Sales history",
       "subtitle": "Every invoice at this branch, newest first",
       "entryHint": "Past invoices, returns and receipts",
-      "searchPlaceholder": "Search invoice, customer or phone",
+      "searchPlaceholder": "Search by invoice, customer or phone",
       "paymentAll": "All payments",
       "invoices": "Invoices",
       "total": "Sales total",
@@ -5348,7 +5372,8 @@
       "totalsPartial": "Still loading invoices — totals above are partial",
       "lineCountOne": "1 item",
       "lineCountTwo": "{n} items",
-      "lineCountFew": "{n} items"
+      "lineCountFew": "{n} items",
+      "walkIn": "Walk-in"
     },
     "saleDetail": {
       "title": "Invoice details",
@@ -5365,12 +5390,13 @@
       "paid": "Paid",
       "remaining": "Remaining",
       "qtyAtPrice": "{qty} × {price}",
-      "payment": "Payment"
+      "payment": "Payment",
+      "net": "Net"
     },
     "security": {
       "devices": {
         "title": "Signed-in devices",
-        "intro": "Every phone or browser signed into this account. Revoke any one you don’t recognise — it is signed out within minutes.",
+        "intro": "Every phone or browser signed into this account. Revoke any one you don't recognise — it is signed out within minutes.",
         "thisDevice": "This device",
         "unknownDevice": "Unknown device",
         "lastSeen": "Last seen {date}",
@@ -5382,8 +5408,8 @@
         "revokeConfirmTitle": "Revoke this device?",
         "revokeConfirm": "“{name}” will be signed out and will need the password to sign in again.",
         "revoked": "Device signed out",
-        "revokeFailed": "Couldn’t revoke this device. Try again.",
-        "loadFailed": "Couldn’t load your devices.",
+        "revokeFailed": "Couldn't revoke this device. Try again.",
+        "loadFailed": "Couldn't load your devices.",
         "empty": "No devices are signed in right now.",
         "count": "{n} devices",
         "count_one": "1 device",
@@ -5398,12 +5424,16 @@
       "done": "Done"
     },
     "scanner": {
-      "notSupported": "The camera isn’t available on this device — type the code below.",
-      "permissionDenied": "Camera access was denied. Allow it in the device Settings, or type the code below."
+      "notSupported": "The camera isn't available on this device — type the code below.",
+      "permissionDenied": "Camera access was denied. Allow it in the device Settings, or type the code below.",
+      "manualLabelOnly": "Type the code"
     },
     "units": {
       "meters": "{n} m",
       "km": "{n} km"
+    },
+    "languagePill": {
+      "switchTo": "Switch to {lang}"
     }
   }
 }

@@ -645,12 +645,21 @@ function drainSummary(r: DrainResult): string {
   return parts.length ? parts.join(" · ") : t("mobile.sync.result.nothing");
 }
 
-/** Epoch ms → "just now" / "5 min ago" / "2 h ago" / dd/mm/yyyy. No Intl on device. */
+/** Web formatRelative forms, shared with Notifications/Activity (Hermes: no Intl). */
+function relativeUnit(unit: "minutes" | "hours" | "days", n: number): string {
+  const form = n === 1 ? "One" : n === 2 ? "Two" : n >= 3 && n <= 10 ? "Few" : "";
+  return t(`app.activity.relative.${unit}${form}`, { n });
+}
+
+/** Epoch ms → "Now" / "5m ago" / "2h ago" / "3d ago" / dd/mm/yyyy — the same
+ *  strings the Notifications and Activity rows show, so "last synced" reads
+ *  like every other relative time in the app. */
 function ago(ms: number, now: number): string {
   const d = Math.max(0, now - ms);
-  if (d < 60_000) return t("mobile.sync.ago.now");
-  if (d < 3_600_000) return t("mobile.sync.ago.minutes", { n: Math.floor(d / 60_000) });
-  if (d < 86_400_000) return t("mobile.sync.ago.hours", { n: Math.floor(d / 3_600_000) });
+  if (d < 60_000) return t("app.activity.relative.now");
+  if (d < 3_600_000) return relativeUnit("minutes", Math.floor(d / 60_000));
+  if (d < 86_400_000) return relativeUnit("hours", Math.floor(d / 3_600_000));
+  if (d < 86_400_000 * 7) return relativeUnit("days", Math.floor(d / 86_400_000));
   return shortDate(new Date(ms).toISOString());
 }
 
@@ -664,7 +673,9 @@ function inFuture(ms: number, now: number): string | null {
 // ─── styles ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  stats: { flexDirection: "row", gap: spacing.sm, marginBottom: spacing.md },
+  // No marginBottom on the top-level rows: Screen.content's gap (spacing.lg) is
+  // the page rhythm; a margin here stacked on it and stepped 28 → 24 → 16pt.
+  stats: { flexDirection: "row", gap: spacing.sm },
   stat: {
     flex: 1,
     backgroundColor: colors.card,
@@ -687,14 +698,13 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
-    marginBottom: spacing.md,
   },
   bannerWarning: { backgroundColor: colors.warningTint },
   bannerDanger: { backgroundColor: colors.dangerLight },
   bannerText: { flex: 1, fontFamily: fonts.medium, fontSize: 13, ...RTL_TEXT },
-  actions: { flexDirection: "row", gap: spacing.sm, marginBottom: spacing.sm },
+  actions: { flexDirection: "row", gap: spacing.sm },
   grow: { flex: 1 },
-  resultLine: { alignSelf: "flex-start", fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, marginBottom: spacing.md, ...RTL_TEXT },
+  resultLine: { alignSelf: "flex-start", fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },
   section: {
     alignSelf: "flex-start",
     fontFamily: fonts.semibold,

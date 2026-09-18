@@ -1,14 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowCounterClockwiseIcon as ArrowCounterClockwise } from "phosphor-react-native/src/icons/ArrowCounterClockwise";
-import { XIcon as X } from "phosphor-react-native/src/icons/X";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ApiError, catalog, type ListEnvelope, type SaleLine } from "@matgary/api-client";
 
 import { api } from "@/api/client";
-import { isRTL, t } from "@/i18n";
+import { t } from "@/i18n";
 import { Screen } from "@/components/layout/Screen";
 import { Button } from "@/components/ui/Button";
 import { ChevronForward } from "@/components/ui/Chevron";
@@ -17,10 +15,11 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { DateField } from "@/components/ui/DateField";
 import { Field } from "@/components/ui/Field";
 import { SearchField } from "@/components/ui/SearchField";
+import { Sheet } from "@/components/ui/Sheet";
 import { StatCard } from "@/components/ui/StatCard";
 import { money, shortDate } from "@/lib/format";
 import { useSession } from "@/stores/session";
-import { RTL_TEXT, directionStyle } from "@/theme/rtl";
+import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
 
 /**
@@ -167,7 +166,6 @@ function countForm(n: number): string {
 
 export default function ReturnsScreen() {
   const qc = useQueryClient();
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ saleId?: string | string[]; invoiceId?: string | string[] }>();
   const preselectId = (Array.isArray(params.saleId) ? params.saleId[0] : params.saleId) || null;
@@ -421,78 +419,71 @@ export default function ReturnsScreen() {
         </View>
       )}
 
-      <Modal visible={open} animationType="slide" onRequestClose={closeModal}>
-        <View style={[styles.modal, directionStyle(isRTL())]}>
-          {/* Fixed header: the title and a close control that is always on
-              screen. Before, the only way out was the ghost Cancel after every
-              pickable line — off-screen behind seven cards. */}
-          <View style={[styles.modalHeader, { paddingTop: insets.top + spacing.sm }]}>
-            <Text style={styles.modalTitle}>{t("app.sales.returnModal.title")}</Text>
-            <Pressable
-              onPress={closeModal}
-              style={styles.closeBtn}
-              accessibilityRole="button"
-              accessibilityLabel={t("app.common.close")}
-              testID="returns-close"
-            >
-              <X size={22} color={colors.text} />
-            </Pressable>
-          </View>
-          <ScrollView
-            contentContainerStyle={[styles.modalContent, { paddingBottom: insets.bottom + spacing.lg }]}
-            keyboardShouldPersistTaps="handled"
-          >
-            {!line ? (
-              <>
-                {error ? <Text style={styles.err}>{error}</Text> : null}
-                <Text style={styles.meta}>{t("mobile.returns.pickLine")}</Text>
-                <SearchField value={pick} onChangeText={setPick} placeholder={t("mobile.returns.searchPlaceholder")} />
-                {sales.isLoading ? (
-                  <ActivityIndicator color={colors.accent} />
-                ) : sales.isError ? (
-                  <View style={styles.errorBox}>
-                    <Text style={styles.err}>{t("mobile.returns.salesLoadFailed")}</Text>
-                    <Button label={t("app.common.retry")} variant="ghost" onPress={() => void sales.refetch()} />
-                  </View>
-                ) : pickable.length === 0 ? (
-                  <Text style={styles.meta}>{t("mobile.returns.noLines")}</Text>
-                ) : (
-                  pickable.map((l) => (
-                    <Pressable
-                      key={l.id}
-                      style={({ pressed }) => [styles.pick, pressed && styles.pickPressed]}
-                      onPress={() => { setLine(l); setQty("1"); setError(null); }}
-                      testID="returns-pick-row"
-                    >
-                      <View style={styles.pickBody}>
-                        <Text numberOfLines={1} style={styles.pickName}>{l.productName}</Text>
-                        <MetaLine invoice={l.invoiceId} count={l.quantitySold} date={l.saleDate} testID="returns-pick-invoice" />
-                      </View>
-                      <ChevronForward size={14} />
-                    </Pressable>
-                  ))
-                )}
-              </>
+      <Sheet
+        visible={open}
+        onClose={closeModal}
+        title={t("app.sales.returnModal.title")}
+        size="full"
+        testID="returns"
+        bodyStyle={styles.modalContent}
+        primaryAction={
+          line
+            ? {
+                label: t("mobile.returns.submit"),
+                onPress: () => create.mutate(),
+                disabled: !canSubmit,
+                loading: create.isPending,
+                testID: "returns-submit",
+              }
+            : undefined
+        }
+        secondaryAction={{ label: t("app.common.cancel"), onPress: closeModal }}
+      >
+        {!line ? (
+          <>
+            {error ? <Text style={styles.err}>{error}</Text> : null}
+            <Text style={styles.meta}>{t("mobile.returns.pickLine")}</Text>
+            <SearchField value={pick} onChangeText={setPick} placeholder={t("mobile.returns.searchPlaceholder")} />
+            {sales.isLoading ? (
+              <ActivityIndicator color={colors.accent} />
+            ) : sales.isError ? (
+              <View style={styles.errorBox}>
+                <Text style={styles.err}>{t("mobile.returns.salesLoadFailed")}</Text>
+                <Button label={t("app.common.retry")} variant="ghost" onPress={() => void sales.refetch()} />
+              </View>
+            ) : pickable.length === 0 ? (
+              <Text style={styles.meta}>{t("mobile.returns.noLines")}</Text>
             ) : (
-              <>
-                <Pressable style={styles.linkHit} onPress={() => { setLine(null); setError(null); }}>
-                  <Text style={styles.link}>{t("mobile.returns.changeLine")}</Text>
+              pickable.map((l) => (
+                <Pressable
+                  key={l.id}
+                  style={({ pressed }) => [styles.pick, pressed && styles.pickPressed]}
+                  onPress={() => { setLine(l); setQty("1"); setError(null); }}
+                  testID="returns-pick-row"
+                >
+                  <View style={styles.pickBody}>
+                    <Text numberOfLines={1} style={styles.pickName}>{l.productName}</Text>
+                    <MetaLine invoice={l.invoiceId} count={l.quantitySold} date={l.saleDate} testID="returns-pick-invoice" />
+                  </View>
+                  <ChevronForward size={14} />
                 </Pressable>
-                <Text style={styles.pickName} testID="returns-line-name">{line.productName}</Text>
-                <MetaLine invoice={line.invoiceId} count={line.quantitySold} date={line.saleDate} testID="returns-line-invoice" />
-                <Text style={styles.meta}>{t("mobile.returns.maxQty", { n: maxQty })}</Text>
-                <Field label={t("app.sales.returnModal.quantity")} value={qty} onChangeText={setQty} keyboardType="number-pad" editable={maxQty > 0} testID="returns-qty" />
-                <Field label={t("mobile.common.reason")} value={reason} onChangeText={setReason} placeholder={t("mobile.returns.reasonExample")} editable={maxQty > 0} testID="returns-reason" />
-                {error ? <Text style={styles.err} testID="returns-error">{error}</Text> : null}
-                <View testID="returns-submit">
-                  <Button label={t("mobile.returns.submit")} disabled={!canSubmit} loading={create.isPending} onPress={() => create.mutate()} />
-                </View>
-              </>
+              ))
             )}
-            <Button label={t("app.common.cancel")} variant="ghost" onPress={closeModal} />
-          </ScrollView>
-        </View>
-      </Modal>
+          </>
+        ) : (
+          <>
+            <Pressable style={styles.linkHit} onPress={() => { setLine(null); setError(null); }}>
+              <Text style={styles.link}>{t("mobile.returns.changeLine")}</Text>
+            </Pressable>
+            <Text style={styles.pickName} testID="returns-line-name">{line.productName}</Text>
+            <MetaLine invoice={line.invoiceId} count={line.quantitySold} date={line.saleDate} testID="returns-line-invoice" />
+            <Text style={styles.meta}>{t("mobile.returns.maxQty", { n: maxQty })}</Text>
+            <Field label={t("app.sales.returnModal.quantity")} value={qty} onChangeText={setQty} keyboardType="number-pad" editable={maxQty > 0} testID="returns-qty" />
+            <Field label={t("mobile.common.reason")} value={reason} onChangeText={setReason} placeholder={t("mobile.returns.reasonExample")} editable={maxQty > 0} testID="returns-reason" />
+            {error ? <Text style={styles.err} testID="returns-error">{error}</Text> : null}
+          </>
+        )}
+      </Sheet>
     </Screen>
   );
 }
@@ -523,20 +514,12 @@ const styles = StyleSheet.create({
   // the start edge, which under Arabic is the right, like the name above it.
   reason: { alignSelf: "flex-start" },
   errorBox: { alignItems: "center", gap: spacing.sm },
-  modal: { flex: 1, backgroundColor: colors.bg },
-  modalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.sm,
-  },
-  closeBtn: { width: MIN_TOUCH, height: MIN_TOUCH, alignItems: "center", justifyContent: "center", marginEnd: -spacing.sm },
   // Same gutter and card padding as the Returns list behind it.
-  modalContent: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, gap: spacing.md },
-  modalTitle: { fontFamily: fonts.bold, fontSize: 24, color: colors.text, flexShrink: 1, ...RTL_TEXT },
+  modalContent: { gap: spacing.md },
+  // Same surface as `row`: the sale line is one card whether it sits on the
+  // Returns list or in the picker sheet over it.
   pick: {
+    backgroundColor: colors.card,
     padding: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border,
@@ -544,6 +527,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
+    ...elevation.card,
   },
   pickPressed: { backgroundColor: colors.accentLight },
   pickBody: { flex: 1, minWidth: 0, gap: 2 },

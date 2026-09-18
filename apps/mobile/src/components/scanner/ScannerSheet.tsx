@@ -153,13 +153,30 @@ export function ScannerSheet({
     accept(code, "manual");
   };
 
+  // The bottom "Done" is the way OUT, in every mode and every field state:
+  // an empty field closes the sheet exactly like the header X; a typed code is
+  // submitted first (the cashier typed it to use it — dropping it on Done
+  // would be the same as never having typed), then the sheet closes. `accept`
+  // already closed it in "single" mode (finished is set), so close once.
+  const onDone = () => {
+    const code = manual.trim();
+    if (code) {
+      setManual("");
+      accept(code, "manual");
+    }
+    if (finished.current) return;
+    finished.current = true;
+    onClose();
+  };
+
   const granted = permission?.granted === true;
   const cameraOn = visible && granted && available === true;
   // One filled button per state. While the camera works, "Done" is the way
   // out and manual entry is the outline fallback; the moment the cashier
   // starts typing — or the device has no camera at all, where typing is the
   // only path — the submit becomes the filled action and Done steps back.
-  const manualPrimary = manual.trim().length > 0 || (granted && available === false);
+  const manualOnly = granted && available === false;
+  const manualPrimary = manual.trim().length > 0 || manualOnly;
 
   // The camera is mounted in this commit: the decode budget starts here.
   // Closing the sheet before any decode drops the mark, so the next opening
@@ -265,7 +282,11 @@ export function ScannerSheet({
 
         {/* Manual entry + done */}
         <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.lg }]}>
-          <Text style={styles.manualLabel}>{t("app.ui.scanner.manualLabel")}</Text>
+          {/* With no camera the state text above already says "type the code
+              below", so "Or …" has nothing to be an alternative to. */}
+          <Text style={styles.manualLabel}>
+            {t(manualOnly ? "mobile.scanner.manualLabelOnly" : "app.ui.scanner.manualLabel")}
+          </Text>
           <View style={styles.manualRow}>
             <TextInput
               value={manual}
@@ -289,10 +310,11 @@ export function ScannerSheet({
               onPress={submitManual}
             />
           </View>
+          {/* "Cancel" (single mode) discards a typed code; "Done" uses it. */}
           <Button
             label={mode === "single" ? t("app.ui.scanner.cancel") : t("app.receiptDesigner.editor.done")}
             variant={manualPrimary ? "outline" : "primary"}
-            onPress={onClose}
+            onPress={mode === "single" ? onClose : onDone}
           />
         </View>
       </View>

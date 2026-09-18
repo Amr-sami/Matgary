@@ -1,3 +1,4 @@
+import type { ComponentType } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -6,8 +7,10 @@ import {
   type ViewStyle,
 } from "react-native";
 
-import { MIN_TOUCH, colors, fonts, radius } from "@/theme/tokens";
+import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
 import { RTL_TEXT } from "@/theme/rtl";
+
+type PhosphorIcon = ComponentType<{ size?: number; color?: string }>;
 
 interface ButtonProps {
   label: string;
@@ -16,7 +19,17 @@ interface ButtonProps {
   loading?: boolean;
   disabled?: boolean;
   style?: ViewStyle;
+  /**
+   * Leading glyph (a phosphor component, not an element): the button draws it
+   * at 16pt in the label's colour, so it follows the variant and the disabled
+   * state without the caller repeating the colour logic. It is rendered before
+   * the label in a plain row — Yoga mirrors the order under RTL, so the glyph
+   * lands on the reading side in both locales.
+   */
+  icon?: PhosphorIcon;
 }
+
+const ICON_SIZE = 16;
 
 /**
  * The web's hover state has no native equivalent, so `--accent-hover` is
@@ -40,9 +53,15 @@ export function Button({
   loading = false,
   disabled = false,
   style,
+  icon: Icon,
 }: ButtonProps) {
   const isDisabled = disabled || loading;
   const showDisabled = disabled && !loading;
+  const iconColor = showDisabled
+    ? colors.textSecondary
+    : variant === "primary"
+      ? "#FFFFFF"
+      : colors.accent;
 
   return (
     <Pressable
@@ -68,16 +87,19 @@ export function Button({
           color={variant === "primary" ? "#FFFFFF" : colors.accent}
         />
       ) : (
-        <Text
-          numberOfLines={1}
-          style={[
-            styles.label,
-            variant === "primary" ? styles.labelOnAccent : styles.labelAccent,
-            showDisabled && styles.labelDisabled,
-          ]}
-        >
-          {label}
-        </Text>
+        <>
+          {Icon ? <Icon size={ICON_SIZE} color={iconColor} /> : null}
+          <Text
+            numberOfLines={1}
+            style={[
+              styles.label,
+              variant === "primary" ? styles.labelOnAccent : styles.labelAccent,
+              showDisabled && styles.labelDisabled,
+            ]}
+          >
+            {label}
+          </Text>
+        </>
       )}
     </Pressable>
   );
@@ -85,6 +107,10 @@ export function Button({
 
 const styles = StyleSheet.create({
   base: {
+    // A row so an optional leading icon sits beside the label; with no icon a
+    // single centred child renders exactly as the column did.
+    flexDirection: "row",
+    gap: spacing.sm,
     minHeight: 52,
     paddingHorizontal: 20,
     borderRadius: radius.lg,
@@ -101,7 +127,9 @@ const styles = StyleSheet.create({
   loading: { opacity: 0.5 },
   primaryDisabled: { backgroundColor: colors.neutralTint },
   outlineDisabled: { backgroundColor: colors.bg, borderColor: colors.border },
-  label: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 16 },
+  // flexShrink keeps numberOfLines={1} ellipsising inside the row (Yoga's
+  // default shrink is 0, which would let a long label overflow the pill).
+  label: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 16, flexShrink: 1 },
   labelOnAccent: { color: "#FFFFFF" },
   labelAccent: { color: colors.accent },
   labelDisabled: { color: colors.textSecondary },

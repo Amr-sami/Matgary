@@ -10,13 +10,13 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
-import { GlobeIcon as Globe } from "phosphor-react-native/src/icons/Globe";
 import { LightningIcon as Lightning } from "phosphor-react-native/src/icons/Lightning";
 
 import { DottedGround } from "@/components/DottedGround";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
+import { LanguagePill } from "@/components/ui/LanguagePill";
 import { t, useLocale } from "@/i18n";
 import { useSession } from "@/stores/session";
 import { RTL, RTL_TEXT } from "@/theme/rtl";
@@ -44,7 +44,6 @@ export default function LoginScreen() {
   const signIn = useSession((s) => s.signIn);
   const startDemo = useSession((s) => s.startDemo);
   const locale = useLocale((s) => s.locale);
-  const setLocale = useLocale((s) => s.setLocale);
   const signingIn = useSession((s) => s.signingIn);
   const error = useSession((s) => s.signInError);
 
@@ -109,17 +108,7 @@ export default function LoginScreen() {
                 {t("auth.demo.cta")}
               </Text>
             </Pressable>
-            <Pressable
-              style={styles.langToggle}
-              accessibilityRole="button"
-              accessibilityLabel={locale === "ar" ? t("app.shell.language.english") : t("app.shell.language.arabic")}
-              onPress={() => void setLocale(locale === "ar" ? "en" : "ar")}
-            >
-              <Globe size={20} color={colors.textSecondary} />
-              <Text style={styles.langText}>
-                {locale === "ar" ? t("app.shell.language.shortArabic") : t("app.shell.language.shortEnglish")}
-              </Text>
-            </Pressable>
+            <LanguagePill />
           </View>
 
           <View style={styles.brand}>
@@ -216,15 +205,6 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   demoPillText: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 14, color: colors.onAccent },
-  langToggle: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    minHeight: 44,
-    paddingHorizontal: spacing.sm,
-    flexShrink: 0,
-  },
-  langText: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
   brand: { alignItems: "center", marginTop: spacing.xxl * 1.5, marginBottom: spacing.xxl },
   heading: {
     fontFamily: fonts.bold,

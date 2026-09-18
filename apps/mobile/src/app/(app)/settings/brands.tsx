@@ -1,10 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -28,10 +25,12 @@ import { ChevronBack } from "@/components/ui/Chevron";
 import { Chip } from "@/components/ui/Chip";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
+import { Sheet } from "@/components/ui/Sheet";
+import { countLabel } from "@/lib/format";
 import { useSession } from "@/stores/session";
-import { RTL_TEXT, directionStyle } from "@/theme/rtl";
-import { MIN_TOUCH, colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
-import { getLocale, t } from "@/i18n";
+import { RTL_TEXT } from "@/theme/rtl";
+import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
+import { t } from "@/i18n";
 
 /**
  * Port of the web's BrandsEditor ("البراندات" section of settings).
@@ -218,9 +217,9 @@ export default function BrandsSettingsScreen() {
             <View style={{ gap: spacing.sm }}>
               <Text style={styles.countLine}>
                 {filter === ALL
-                  ? t("mobile.catalog.brandCount", { n: brands.length })
+                  ? countLabel("mobile.catalog.brandCount", brands.length)
                   : t("mobile.catalog.brandsForCategory", { category: categoryById.get(filter)?.label ?? "" }) +
-                    ` · ${t("mobile.catalog.brandCount", { n: brands.length })}`}
+                    ` · ${countLabel("mobile.catalog.brandCount", brands.length)}`}
               </Text>
               {brands.map((b) => {
                 const n = countFor(b);
@@ -235,7 +234,7 @@ export default function BrandsSettingsScreen() {
                         <Text style={styles.rowTitle} numberOfLines={1}>{b.name}</Text>
                         <View style={styles.metaRow}>
                           <Text style={styles.meta} numberOfLines={1}>{cat?.label ?? t("mobile.catalog.noCategory")}</Text>
-                          {n !== undefined ? <Badge label={t("mobile.catalog.productsCount", { n })} variant="neutral" /> : null}
+                          {n !== undefined ? <Badge label={countLabel("mobile.catalog.productsCount", n)} variant="neutral" /> : null}
                         </View>
                       </View>
                       {canManage ? (
@@ -257,50 +256,48 @@ export default function BrandsSettingsScreen() {
         </View>
       )}
 
-      <Modal visible={sheet !== null} transparent animationType="slide" onRequestClose={() => setSheet(null)}>
-        {sheet ? (
-          <BrandSheet
-            key={sheet.mode === "edit" ? sheet.brand.id : "add"}
-            categories={categories}
-            initial={
-              sheet.mode === "edit"
-                ? { name: sheet.brand.name, categoryId: sheet.brand.categoryId }
-                : { name: "", categoryId: filter === ALL ? categories[0]?.id ?? null : filter }
-            }
-            title={sheet.mode === "edit" ? t("mobile.catalog.editBrand") : t("app.catalog.brandsAdmin.add")}
-            pending={create.isPending || update.isPending}
-            onClose={() => setSheet(null)}
-            onSubmit={(name, categoryId) => {
-              if (sheet.mode === "add") {
-                create.mutate({ name, categoryId });
-                return;
-              }
-              const prev = sheet.brand;
-              const renamed = name.trim() !== prev.name.trim();
-              const n = renamed ? countFor(prev) ?? 0 : 0;
-              if (n === 0) {
-                update.mutate({ id: prev.id, name, categoryId });
-                return;
-              }
-              // `products.brand` is the NAME, and PATCH /api/brands/[id] only touches the
-              // brands row — no cascade. Renaming a brand that products carry orphans them
-              // exactly like a delete does, so warn with the same count before committing.
-              Alert.alert(
-                t("mobile.catalog.renameBrandTitle"),
-                t("mobile.catalog.renameBrandWarn", { n, old: prev.name }),
-                [
-                  { text: t("app.common.cancel"), style: "cancel" },
-                  {
-                    text: t("app.common.confirm"),
-                    style: "destructive",
-                    onPress: () => update.mutate({ id: prev.id, name, categoryId }),
-                  },
-                ],
-              );
-            }}
-          />
-        ) : null}
-      </Modal>
+      <BrandSheet
+        visible={sheet !== null}
+        seedKey={sheet ? (sheet.mode === "edit" ? sheet.brand.id : "add") : null}
+        categories={categories}
+        initial={
+          sheet?.mode === "edit"
+            ? { name: sheet.brand.name, categoryId: sheet.brand.categoryId }
+            : { name: "", categoryId: filter === ALL ? categories[0]?.id ?? null : filter }
+        }
+        title={sheet?.mode === "edit" ? t("mobile.catalog.editBrand") : t("app.catalog.brandsAdmin.add")}
+        pending={create.isPending || update.isPending}
+        onClose={() => setSheet(null)}
+        onSubmit={(name, categoryId) => {
+          if (!sheet) return;
+          if (sheet.mode === "add") {
+            create.mutate({ name, categoryId });
+            return;
+          }
+          const prev = sheet.brand;
+          const renamed = name.trim() !== prev.name.trim();
+          const n = renamed ? countFor(prev) ?? 0 : 0;
+          if (n === 0) {
+            update.mutate({ id: prev.id, name, categoryId });
+            return;
+          }
+          // `products.brand` is the NAME, and PATCH /api/brands/[id] only touches the
+          // brands row — no cascade. Renaming a brand that products carry orphans them
+          // exactly like a delete does, so warn with the same count before committing.
+          Alert.alert(
+            t("mobile.catalog.renameBrandTitle"),
+            t("mobile.catalog.renameBrandWarn", { n, old: prev.name }),
+            [
+              { text: t("app.common.cancel"), style: "cancel" },
+              {
+                text: t("app.common.confirm"),
+                style: "destructive",
+                onPress: () => update.mutate({ id: prev.id, name, categoryId }),
+              },
+            ],
+          );
+        }}
+      />
     </Screen>
   );
 }
@@ -321,6 +318,8 @@ function IconBtn({ label, disabled, onPress, children }: { label: string; disabl
 }
 
 function BrandSheet({
+  visible,
+  seedKey,
   categories,
   initial,
   title,
@@ -328,6 +327,9 @@ function BrandSheet({
   onClose,
   onSubmit,
 }: {
+  visible: boolean;
+  /** Changes per open (brand id or "add") — re-seeds the fields. */
+  seedKey: string | null;
   categories: Category[];
   initial: { name: string; categoryId: string | null };
   title: string;
@@ -337,46 +339,51 @@ function BrandSheet({
 }) {
   const [name, setName] = useState(initial.name);
   const [categoryId, setCategoryId] = useState<string | null>(initial.categoryId);
+  const { name: seedName, categoryId: seedCategoryId } = initial;
+  useEffect(() => {
+    if (seedKey !== null) {
+      setName(seedName);
+      setCategoryId(seedCategoryId);
+    }
+    // Only re-seed when a sheet OPENS (seedKey flips), not on every parent render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seedKey]);
   const valid = name.trim().length > 0 && name.trim().length <= 80 && !!categoryId;
+  const submit = () => onSubmit(name.trim(), categoryId);
   return (
-    <View style={[styles.overlay, directionStyle(getLocale() === "ar")]}>
-      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel={t("app.common.close")} />
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <View style={styles.sheet}>
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetBody}>
-            <Text style={styles.sheetTitle}>{title}</Text>
-            <Field
-              label={t("mobile.catalog.brandNameLabel")}
-              value={name}
-              onChangeText={setName}
-              placeholder={t("app.catalog.brandsAdmin.newPlaceholder")}
-              autoFocus
-              maxLength={80}
-              returnKeyType="done"
-              onSubmitEditing={() => valid && !pending && onSubmit(name.trim(), categoryId)}
-            />
-            <View>
-              <Text style={styles.label}>{t("app.common.category")}</Text>
-              <View style={styles.chipWrap}>
-                {categories.map((c) => (
-                  <Chip key={c.id} label={c.label} active={categoryId === c.id} onPress={() => setCategoryId(c.id)} />
-                ))}
-              </View>
-            </View>
-            <View style={styles.sheetActions}>
-              <Button label={t("app.common.cancel")} variant="ghost" onPress={onClose} style={{ flex: 1 }} />
-              <Button
-                label={t("app.common.save")}
-                onPress={() => onSubmit(name.trim(), categoryId)}
-                disabled={!valid}
-                loading={pending}
-                style={{ flex: 1 }}
-              />
-            </View>
-          </ScrollView>
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title={title}
+      testID="brand-form"
+      primaryAction={{
+        label: t("app.common.save"),
+        onPress: submit,
+        disabled: !valid,
+        loading: pending,
+        testID: "brand-form-submit",
+      }}
+      secondaryAction={{ label: t("app.common.cancel"), onPress: onClose }}
+    >
+      <Field
+        label={t("mobile.catalog.brandNameLabel")}
+        value={name}
+        onChangeText={setName}
+        placeholder={t("app.catalog.brandsAdmin.newPlaceholder")}
+        autoFocus
+        maxLength={80}
+        returnKeyType="done"
+        onSubmitEditing={() => valid && !pending && submit()}
+      />
+      <View>
+        <Text style={styles.label}>{t("app.common.category")}</Text>
+        <View style={styles.chipWrap}>
+          {categories.map((c) => (
+            <Chip key={c.id} label={c.label} active={categoryId === c.id} onPress={() => setCategoryId(c.id)} />
+          ))}
         </View>
-      </KeyboardAvoidingView>
-    </View>
+      </View>
+    </Sheet>
   );
 }
 
@@ -418,18 +425,5 @@ const styles = StyleSheet.create({
   meta: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
   actions: { flexDirection: "row", alignItems: "center", gap: 0 },
   iconBtn: { width: MIN_TOUCH, height: MIN_TOUCH, alignItems: "center", justifyContent: "center", borderRadius: radius.md },
-  overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: colors.scrim },
-  sheet: {
-    backgroundColor: colors.card,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    maxHeight: "90%",
-    ...elevation.modal,
-  },
-  sheetBody: { padding: spacing.xl, gap: spacing.lg },
-  sheetTitle: { fontFamily: fonts.bold, fontSize: 18, color: colors.text, ...RTL_TEXT },
   label: { fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary, marginBottom: spacing.sm, ...RTL_TEXT },
-  sheetActions: { flexDirection: "row", gap: spacing.md },
 });

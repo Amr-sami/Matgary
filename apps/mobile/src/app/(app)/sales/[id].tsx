@@ -225,16 +225,21 @@ export default function SaleDetailScreen() {
             ) : null}
 
             <View style={styles.totals}>
-              <TotalRow label={t("mobile.saleDetail.subtotal")} value={money(inv.subtotal)} />
+              {/* Subtotal only earns a row when a discount separates it from the
+                  total — otherwise it duplicates the total and names a discount
+                  that does not exist. */}
               {inv.discount > 0 ? (
-                <TotalRow label={t("app.common.discount")} value={negative(inv.discount)} />
+                <>
+                  <TotalRow label={t("mobile.saleDetail.subtotal")} value={money(inv.subtotal)} />
+                  <TotalRow label={t("app.common.discount")} value={negative(inv.discount)} />
+                </>
               ) : null}
               <TotalRow label={t("app.common.total")} value={money(inv.total)} strong />
               {returnedAmount > 0 ? (
                 <TotalRow label={t("app.sales.status.returned")} value={negative(returnedAmount)} danger />
               ) : null}
               {returnedAmount > 0 ? (
-                <TotalRow label={t("app.sales.kpi.netSales")} value={money(inv.netTotal)} strong />
+                <TotalRow label={t("mobile.saleDetail.net")} value={money(inv.netTotal)} strong />
               ) : null}
             </View>
           </Card>

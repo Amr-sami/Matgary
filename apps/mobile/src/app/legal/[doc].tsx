@@ -6,7 +6,8 @@ import * as WebBrowser from "expo-web-browser";
 import { ArrowSquareOutIcon as ArrowSquareOut } from "phosphor-react-native/src/icons/ArrowSquareOut";
 import { dictionaries } from "@matgary/i18n";
 
-import { ChevronBack, ChevronForward } from "@/components/ui/Chevron";
+import { BackLink } from "@/components/ui/BackLink";
+import { ChevronForward } from "@/components/ui/Chevron";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { t, useLocale } from "@/i18n";
 import { RTL, RTL_TEXT } from "@/theme/rtl";
@@ -37,6 +38,27 @@ function isLegalDoc(v: unknown): v is LegalDoc {
 }
 
 /**
+ * `?from=` names the screen that pushed us so the back link can carry the
+ * parent's title like every other sub-screen ("‹ About", "‹ Create account").
+ * A route key, not a translated label: params outlive a live locale switch,
+ * the label is resolved at render.
+ */
+const FROM_LABEL_KEY = {
+  about: "mobile.settings.about",
+  signup: "common.createAccount",
+} as const;
+type LegalFrom = keyof typeof FROM_LABEL_KEY;
+
+function isLegalFrom(v: unknown): v is LegalFrom {
+  return typeof v === "string" && v in FROM_LABEL_KEY;
+}
+
+/** The dictionary bakes "1. " into each clause title; the TOC sets the index in its own column. */
+function untitled(title: string): string {
+  return title.replace(/^\s*\d+\s*[.)]\s*/, "");
+}
+
+/**
  * Splits a body paragraph into display lines. The dictionary bodies are single
  * strings; enumerations inside them are written "(a) …, (b) …" or "1. …".
  * Long bodies read better as one justified paragraph than as forced list
@@ -51,10 +73,12 @@ function paragraphs(body: string): string[] {
 
 export default function LegalScreen() {
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ doc?: string | string[] }>();
+  const params = useLocalSearchParams<{ doc?: string | string[]; from?: string | string[] }>();
   const raw = Array.isArray(params.doc) ? params.doc[0] : params.doc;
+  const from = Array.isArray(params.from) ? params.from[0] : params.from;
   const locale = useLocale((s) => s.locale);
   const rtl = locale === "ar";
+  const parentLabel = isLegalFrom(from) ? t(FROM_LABEL_KEY[from]) : t("app.common.back");
   const [openError, setOpenError] = useState<string | null>(null);
 
   // Table of contents → clause. Each section reports its y inside the scroll
@@ -100,7 +124,7 @@ export default function LegalScreen() {
     return (
       <View style={styles.root}>
         <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
-          <BackRow onPress={goBack} />
+          <BackLink label={parentLabel} onPress={goBack} />
         </View>
         <View style={styles.notFound}>
           <EmptyState
@@ -128,7 +152,7 @@ export default function LegalScreen() {
         ]}
       >
         <View style={styles.header}>
-          <BackRow onPress={goBack} />
+          <BackLink label={parentLabel} onPress={goBack} />
           {/* Tracking + uppercase only in English: letterSpacing pulls Arabic's joins apart. */}
           <Text style={[styles.eyebrow, !rtl && styles.tracked]}>{dict.eyebrow}</Text>
           <Text style={styles.title} accessibilityRole="header">
@@ -155,8 +179,9 @@ export default function LegalScreen() {
               onPress={() => jumpTo(i)}
               style={({ pressed }) => [styles.tocRow, pressed && styles.tocRowPressed]}
             >
+              <Text style={styles.tocIndex}>{i + 1}.</Text>
               <Text style={styles.tocItem} numberOfLines={1}>
-                {s.title}
+                {untitled(s.title)}
               </Text>
               <ChevronForward size={14} color={colors.textSecondary} />
             </Pressable>
@@ -208,29 +233,12 @@ export default function LegalScreen() {
   );
 }
 
-function BackRow({ onPress }: { onPress: () => void }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={t("mobile.legal.back")}
-      onPress={onPress}
-      hitSlop={12}
-      style={styles.back}
-    >
-      <ChevronBack size={16} color={colors.textSecondary} />
-      <Text style={styles.backLabel}>{t("mobile.legal.back")}</Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg, ...RTL },
   scroll: { flex: 1 },
   content: { paddingHorizontal: spacing.lg, gap: spacing.lg },
 
   header: { gap: spacing.xs, paddingHorizontal: 0 },
-  back: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 32, alignSelf: "flex-start" },
-  backLabel: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
   eyebrow: {
     fontFamily: fonts.semibold,
     fontSize: 12,
@@ -238,7 +246,9 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     ...RTL_TEXT,
   },
-  title: { fontFamily: fonts.bold, fontSize: 26, lineHeight: 34, color: colors.text, ...RTL_TEXT },
+  // No lineHeight: Cairo's marks (the hamza on أنت) sit above a 34pt line at
+  // 26pt and were clipped; the natural line, like the home greeting, fits them.
+  title: { fontFamily: fonts.bold, fontSize: 26, color: colors.text, ...RTL_TEXT },
   lead: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 22, color: colors.textSecondary, ...RTL_TEXT },
 
   rule: { height: 1, backgroundColor: colors.border },
@@ -262,10 +272,13 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
   },
   tocRowPressed: { backgroundColor: colors.neutralTint },
+  // Index in its own column, END-aligned ("right" = end under the Fabric swap)
+  // so "1." and "12." share a dot edge and the titles start flush.
+  tocIndex: { minWidth: 24, fontFamily: fonts.medium, fontSize: 13, lineHeight: 20, color: colors.textSecondary, textAlign: "right" },
   tocItem: { flex: 1, fontFamily: fonts.medium, fontSize: 13, lineHeight: 20, color: colors.text, ...RTL_TEXT },
 
   section: { gap: spacing.sm },
-  sectionTitle: { fontFamily: fonts.bold, fontSize: 17, lineHeight: 26, color: colors.text, ...RTL_TEXT },
+  sectionTitle: { fontFamily: fonts.bold, fontSize: 17, lineHeight: 28, color: colors.text, ...RTL_TEXT },
   body: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 26, color: colors.text, ...RTL_TEXT },
 
   webRow: {
