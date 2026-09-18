@@ -177,6 +177,13 @@ const config: ExpoConfig = {
     "expo-secure-store",
     "expo-sqlite",
     "expo-sharing",
+    [
+      "expo-image-picker",
+      {
+        photosPermission: "نحتاج الوصول للصور لإضافة صورة الصنف",
+        cameraPermission: "نحتاج الكاميرا لتصوير الصنف",
+      },
+    ],
     "expo-background-task",
     [
       "expo-notifications",
