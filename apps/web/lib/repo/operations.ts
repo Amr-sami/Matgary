@@ -293,15 +293,17 @@ export interface ListSalesPageResult {
   nextCursor: string | null;
 }
 
-function encodeSaleCursor(row: { saleDate: Date; id: string }): string {
+export function encodeSaleCursor(row: { saleDate: Date; id: string }): string {
   return `${row.saleDate.toISOString()}:${row.id}`;
 }
 
-function decodeSaleCursor(
+export function decodeSaleCursor(
   raw: string | null | undefined,
 ): { saleDate: Date; id: string } | null {
   if (!raw) return null;
-  const i = raw.indexOf(":");
+  // The ISO timestamp itself contains ':' (HH:mm:ss), so split on the LAST
+  // one — sale ids are uuids and never contain a colon.
+  const i = raw.lastIndexOf(":");
   if (i < 0) return null;
   const iso = raw.slice(0, i);
   const id = raw.slice(i + 1);

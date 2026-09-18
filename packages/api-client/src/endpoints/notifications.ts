@@ -160,3 +160,59 @@ export async function sendTestPush(c: ApiClient): Promise<TestPushResult> {
     noBranch: true,
   });
 }
+
+// ---------------------------------------------------------------------------
+// Per-event preferences — GET / PUT /api/notifications/preferences
+// (apps/web/app/api/notifications/preferences/route.ts, doc 06 §8.3).
+// ---------------------------------------------------------------------------
+
+export type NotificationEventType =
+  | "sale.created"
+  | "purchase.received"
+  | "inventory.low_stock"
+  | "payment.deferred_settled"
+  | "leave.requested";
+
+export type DigestMode = "instant" | "digest";
+
+export interface EventPreference {
+  eventType: NotificationEventType;
+  /** Show it in the bell / notification centre. */
+  inApp: boolean;
+  /**
+   * Buzz the phone for it. The server only sends a push when `inApp` is on
+   * too, and never for digest-mode events (dispatch.ts) — the switch is the
+   * user's "show it, don't buzz me" for the rest.
+   */
+  push: boolean;
+  email: boolean;
+  /** Email delivery: per event, or buffered into the daily digest. */
+  digestMode: DigestMode;
+  /** True when nothing is stored — every channel is the role default. */
+  isDefault: boolean;
+}
+
+export interface NotificationPreferences {
+  role: "owner" | "staff";
+  preferences: EventPreference[];
+}
+
+export async function getPreferences(c: ApiClient): Promise<NotificationPreferences> {
+  return c.request<NotificationPreferences>("/api/notifications/preferences", {
+    noBranch: true,
+  });
+}
+
+/** One event's full preference; the server deletes the row when it equals the role default. */
+export type SetEventPreferenceInput = Omit<EventPreference, "isDefault">;
+
+export async function setPreference(
+  c: ApiClient,
+  input: SetEventPreferenceInput,
+): Promise<{ ok: true; isDefault: boolean }> {
+  return c.request<{ ok: true; isDefault: boolean }>("/api/notifications/preferences", {
+    method: "PUT",
+    body: input,
+    noBranch: true,
+  });
+}

@@ -21,7 +21,11 @@ const schema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const r = await requireTenant();
+  // A lapsed owner is EXACTLY who calls this. Cookie sessions get here because
+  // middleware whitelists /api/billing/*; a bearer (mobile) session carries
+  // `sub_ok=false` in its token and resolveSession would 402 before the
+  // handler runs — so the wall must be lifted here, for this route only.
+  const r = await requireTenant({ allowSubscriptionRequired: true });
   if (!r.ok) return r.response;
   // Only owners can subscribe — staff have no business spending the shop's money.
   if (r.ctx.role !== "owner") {

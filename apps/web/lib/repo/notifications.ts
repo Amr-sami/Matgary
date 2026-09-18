@@ -1,6 +1,18 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { withTenant } from "@/lib/db";
-import { notifications } from "@/lib/db/schema";
+import {
+  notificationPreferences,
+  notifications,
+  tenantMembers,
+} from "@/lib/db/schema";
+import {
+  DEFAULT_EVENT_PREFERENCE,
+  NOTIFICATION_EVENT_TYPES,
+  resolvePreference,
+  type DigestMode,
+  type NotificationEventType,
+  type TenantMemberRole,
+} from "@/lib/notifications/event-types";
 import { publishUserNotificationEvent } from "@/lib/notifications/events";
 import { notifyUserDevices, routeForNotification } from "@/lib/push/notify";
 
@@ -225,4 +237,191 @@ export async function markReadByKind(
       );
   });
   void publishUserNotificationEvent(userId);
+}
+
+// ---------------------------------------------------------------------------
+// Per-event notification preferences (GET/PUT /api/notifications/preferences).
+//
+// A `notification_preferences` row exists only when the user has moved at
+// least one channel away from the code default for their role; the
+// dispatcher (lib/notifications/dispatch.ts) treats a missing row as "use
+// DEFAULT_EVENT_PREFERENCE". `push` (migration 0049) is not yet a field of
+// that matrix, so its per-(role, event) default lives here (doc 06 §8.3) and
+// counts towards "matches default". It agrees with what the dispatcher
+// actually does for a missing row — `pref.inApp && pref.digestMode !==
+// "digest" && (stored.push ?? true)` — so the GET never reports push ON for
+// an event the server would never buzz the phone about. TODO: fold `push`
+// into EventPreference / DEFAULT_EVENT_PREFERENCE in event-types.ts and
+// gate dispatch.ts on the stored flag alone (both outside this feature).
+// ---------------------------------------------------------------------------
+
+/** Per-(role, event) push default — doc 06 §8.3. Owner: every event except
+ *  `sale.created` (highest volume; it is on the daily digest). Staff: only
+ *  the events they see in-app by default. */
+export const DEFAULT_PUSH: Record<
+  TenantMemberRole,
+  Record<NotificationEventType, boolean>
+> = {
+  owner: {
+    "sale.created": false,
+    "purchase.received": true,
+    "inventory.low_stock": true,
+    "payment.deferred_settled": true,
+    "leave.requested": true,
+  },
+  staff: {
+    "sale.created": false,
+    "purchase.received": true,
+    "inventory.low_stock": true,
+    "payment.deferred_settled": false,
+    "leave.requested": false,
+  },
+};
+
+export interface EventPreferenceDto {
+  eventType: NotificationEventType;
+  inApp: boolean;
+  /** Phone push for this event; only fires when `inApp` is on and
+   *  `digestMode` is "instant" (dispatch.ts). */
+  push: boolean;
+  email: boolean;
+  digestMode: DigestMode;
+  /** True when no row is stored — every channel is the role default. */
+  isDefault: boolean;
+}
+
+export interface NotificationPreferencesDto {
+  role: TenantMemberRole;
+  preferences: EventPreferenceDto[];
+}
+
+export interface SetEventPreferenceInput {
+  eventType: NotificationEventType;
+  inApp: boolean;
+  /** Omitted (a web client that predates the column) keeps the stored value. */
+  push?: boolean;
+  email: boolean;
+  digestMode: DigestMode;
+}
+
+async function memberRole(
+  tx: Parameters<Parameters<typeof withTenant>[1]>[0],
+  tenantId: string,
+  userId: string,
+): Promise<TenantMemberRole> {
+  const [member] = await tx
+    .select({ role: tenantMembers.role })
+    .from(tenantMembers)
+    .where(
+      and(eq(tenantMembers.tenantId, tenantId), eq(tenantMembers.userId, userId)),
+    )
+    .limit(1);
+  return member?.role === "owner" ? "owner" : "staff";
+}
+
+export async function getNotificationPreferences(
+  tenantId: string,
+  userId: string,
+): Promise<NotificationPreferencesDto> {
+  const [role, stored] = await withTenant(tenantId, async (tx) => {
+    const r = await memberRole(tx, tenantId, userId);
+    const rows = await tx
+      .select({
+        eventType: notificationPreferences.eventType,
+        inApp: notificationPreferences.inApp,
+        push: notificationPreferences.push,
+        email: notificationPreferences.email,
+        digestMode: notificationPreferences.digestMode,
+      })
+      .from(notificationPreferences)
+      .where(
+        and(
+          eq(notificationPreferences.tenantId, tenantId),
+          eq(notificationPreferences.userId, userId),
+        ),
+      );
+    return [r, rows] as const;
+  });
+
+  const storedByEvent = new Map(stored.map((s) => [s.eventType, s]));
+  const preferences = NOTIFICATION_EVENT_TYPES.map((eventType): EventPreferenceDto => {
+    const s = storedByEvent.get(eventType);
+    const resolved = resolvePreference(
+      role,
+      eventType,
+      s
+        ? {
+            inApp: s.inApp,
+            email: s.email,
+            digestMode: s.digestMode === "digest" ? "digest" : "instant",
+          }
+        : null,
+    );
+    return {
+      eventType,
+      inApp: resolved.inApp,
+      push: s?.push ?? DEFAULT_PUSH[role][eventType],
+      email: resolved.email,
+      digestMode: resolved.digestMode,
+      isDefault: !s,
+    };
+  });
+
+  return { role, preferences };
+}
+
+/**
+ * Upsert one event's preference. When every channel equals the role default
+ * the row is DELETED instead — the table stays sparse and "reset to default"
+ * is a natural no-op (the GET then reports `isDefault: true` again).
+ */
+export async function setNotificationPreference(
+  tenantId: string,
+  userId: string,
+  input: SetEventPreferenceInput,
+): Promise<{ isDefault: boolean }> {
+  const { eventType, inApp, email, digestMode } = input;
+  return withTenant(tenantId, async (tx) => {
+    const role = await memberRole(tx, tenantId, userId);
+    const where = and(
+      eq(notificationPreferences.tenantId, tenantId),
+      eq(notificationPreferences.userId, userId),
+      eq(notificationPreferences.eventType, eventType),
+    );
+
+    let push = input.push;
+    if (push === undefined) {
+      const [existing] = await tx
+        .select({ push: notificationPreferences.push })
+        .from(notificationPreferences)
+        .where(where)
+        .limit(1);
+      push = existing?.push ?? DEFAULT_PUSH[role][eventType];
+    }
+
+    const def = DEFAULT_EVENT_PREFERENCE[role][eventType];
+    const matchesDefault =
+      def.inApp === inApp &&
+      def.email === email &&
+      def.digestMode === digestMode &&
+      push === DEFAULT_PUSH[role][eventType];
+
+    if (matchesDefault) {
+      await tx.delete(notificationPreferences).where(where);
+      return { isDefault: true };
+    }
+
+    await tx
+      .insert(notificationPreferences)
+      .values({ tenantId, userId, eventType, inApp, push, email, digestMode })
+      .onConflictDoUpdate({
+        target: [
+          notificationPreferences.tenantId,
+          notificationPreferences.userId,
+          notificationPreferences.eventType,
+        ],
+        set: { inApp, push, email, digestMode, updatedAt: sql`now()` },
+      });
+    return { isDefault: false };
+  });
 }

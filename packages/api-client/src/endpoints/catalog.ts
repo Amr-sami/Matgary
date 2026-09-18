@@ -53,6 +53,196 @@ export async function listCustomers(c: ApiClient): Promise<CustomerSummary[]> {
   return res.data ?? [];
 }
 
+/** One keyset page of /api/v1/customers. `q` matches name or phone. */
+export interface CustomerPage {
+  data: CustomerSummary[];
+  nextCursor: string | null;
+  /**
+   * Count of DISTINCT customers matching `q` across the whole branch. The
+   * route computes it on the first page only (continuation pages carry null),
+   * so a screen reads `pages[0].total` for its header and never `data.length`,
+   * which is just the rows loaded so far.
+   */
+  total: number | null;
+}
+
+/**
+ * Same route, but exposing the cursor so the list can keep paging, and `q`
+ * so search runs in SQL instead of over whatever page happens to be loaded.
+ */
+export async function listCustomersPage(
+  c: ApiClient,
+  opts: { q?: string; cursor?: string | null; limit?: number } = {},
+): Promise<CustomerPage> {
+  const res = await c.request<{
+    data: CustomerSummary[];
+    nextCursor?: string | null;
+    total?: number | null;
+  }>(
+    "/api/v1/customers",
+    {
+      query: {
+        q: opts.q?.trim() || undefined,
+        cursor: opts.cursor ?? undefined,
+        limit: opts.limit,
+      },
+    },
+  );
+  return { data: res.data ?? [], nextCursor: res.nextCursor ?? null, total: res.total ?? null };
+}
+
+// ---- Customer detail -------------------------------------------------------
+//
+// apps/web/lib/repo/customers.ts — LedgerInvoice, serialised. Phones are
+// canonicalised server-side (normalizeEgyptPhone); the client sends whatever
+// the list returned, which already is canonical.
+
+export interface CustomerLedgerLine {
+  saleId: string;
+  productName: string;
+  quantity: number;
+  pricePerUnit: number;
+  lineTotal: number;
+}
+
+export interface CustomerLedgerInvoice {
+  invoiceId: string;
+  saleIds: string[];
+  date: string;
+  total: number;
+  /** Migration 0037: cash collected against this invoice, 0 ≤ x ≤ total. */
+  amountPaid: number;
+  /** total − amountPaid, pre-computed server-side. */
+  balance: number;
+  isPaid: boolean;
+  paidAt: string | null;
+  paymentMethod: string | null;
+  lines: CustomerLedgerLine[];
+}
+
+export interface CustomerLedger {
+  customerName: string | null;
+  customerPhone: string;
+  invoiceCount: number;
+  lifetimeValue: number;
+  outstandingBalance: number;
+  paidBalance: number;
+  firstVisit: string | null;
+  lastVisit: string | null;
+  invoices: CustomerLedgerInvoice[];
+}
+
+export interface CustomerLedgerResponse {
+  data: CustomerLedger;
+  branchId: string;
+  branchName: string;
+}
+
+/**
+ * GET /api/customers/by-phone/[phone]. A 404 means "no invoices for this
+ * customer in the active branch" — a designed state, not a failure — so the
+ * caller decides how to render `null`.
+ */
+export const getCustomerLedger = (c: ApiClient, phone: string) =>
+  c.request<CustomerLedgerResponse>(`/api/customers/by-phone/${encodeURIComponent(phone)}`);
+
+/** Migration 0038 — one row per settle action. */
+export interface CustomerPaymentEvent {
+  id: string;
+  saleId: string;
+  invoiceId: string | null;
+  amount: number;
+  method: string;
+  recordedAt: string;
+  note: string | null;
+  recordedByName: string | null;
+}
+
+export async function listCustomerPayments(
+  c: ApiClient,
+  phone: string,
+): Promise<CustomerPaymentEvent[]> {
+  const res = await c.request<{ data: CustomerPaymentEvent[] }>(
+    `/api/customers/by-phone/${encodeURIComponent(phone)}/payments`,
+  );
+  return res.data ?? [];
+}
+
+/** apps/web/lib/repo/loyalty.ts — getWallet. Zero balances when no row yet. */
+export interface CustomerWallet {
+  customerPhone: string;
+  customerName: string | null;
+  points: number;
+  credit: number;
+  updatedAt: string;
+}
+
+export interface CustomerWalletEvent {
+  id: string;
+  kind: string;
+  pointsDelta: number;
+  creditDelta: number;
+  reason: string | null;
+  createdAt: string;
+}
+
+export interface CustomerWalletResponse {
+  wallet: CustomerWallet;
+  events: CustomerWalletEvent[];
+  branchId: string;
+  branchName: string;
+}
+
+export const getCustomerWallet = (c: ApiClient, phone: string) =>
+  c.request<CustomerWalletResponse>(
+    `/api/customers/by-phone/${encodeURIComponent(phone)}/wallet`,
+  );
+
+/** apps/web/app/api/sales/settle/route.ts — zod enum, closed. */
+export type SettlementMethod = "cash" | "instapay" | "card";
+
+export interface SettleCustomerInput {
+  customerPhone: string;
+  /** Positive; anything above the invoice balance is returned as `overpay`. */
+  amount: number;
+  method: SettlementMethod;
+  /** Omit to apply oldest-first across every unpaid invoice. */
+  invoiceIds?: string[];
+}
+
+/** lib/repo/operations.ts — SettleCustomerPaymentResult. */
+export interface SettleCustomerResult {
+  appliedAmount: number;
+  overpay: number;
+  fullySettledInvoices: number;
+  newBalance: number;
+}
+
+/**
+ * POST /api/sales/settle. Records a (partial) payment against one or more
+ * invoices; cash settlements land on the open cash shift so the Z-report
+ * sees them. Server errors carry a code in `error` (NOTHING_TO_SETTLE, …)
+ * that maps onto app.customers.settle.errors.*.
+ */
+export const settleCustomer = (c: ApiClient, input: SettleCustomerInput) =>
+  c.request<SettleCustomerResult>("/api/sales/settle", { method: "POST", body: input });
+
+export interface MarkAllPaidResult {
+  markedCount: number;
+  markedTotal: number;
+}
+
+/**
+ * POST /api/customers/by-phone/[phone]/mark-all-paid — every unpaid sale for
+ * (active branch, phone) becomes paid, atomically. Idempotent. Requires
+ * `modify_sales`.
+ */
+export const markCustomerAllPaid = (c: ApiClient, phone: string) =>
+  c.request<MarkAllPaidResult>(
+    `/api/customers/by-phone/${encodeURIComponent(phone)}/mark-all-paid`,
+    { method: "POST" },
+  );
+
 // ---------------------------------------------------------------------------
 // Writes.
 //
@@ -215,3 +405,117 @@ export async function findProductByBarcode(
   );
   return { product: res.data?.[0] ?? null, total: res.total ?? 0 };
 }
+
+// ---------------------------------------------------------------------------
+// Suppliers — apps/web/app/api/suppliers/route.ts and /[id]/route.ts.
+// ---------------------------------------------------------------------------
+
+/**
+ * createSchema / patchSchema, which are the same shape except that PATCH makes
+ * `name` optional too. Only `name` is required; the rest are nullable, and the
+ * server coerces "" to null itself, so blank inputs may be sent as-is. `email`
+ * must be a real address when non-empty (zod `.email()`) — otherwise a 400
+ * whose `error` is zod's English message, so the client validates first.
+ */
+export interface SupplierInput {
+  name: string;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  notes?: string | null;
+}
+
+/**
+ * POST /api/suppliers — 201, body `{ id }` only (addSupplier returns the
+ * insert's returning-id). Requires `manage_suppliers` and books against the
+ * active branch (X-Branch-Id); no branch access is a 403 NO_BRANCH_ACCESS.
+ */
+export const createSupplier = (c: ApiClient, input: SupplierInput) =>
+  c.request<{ id: string }>("/api/suppliers", { method: "POST", body: input });
+
+/** PATCH /api/suppliers/[id] — every field optional; answers `{ ok: true }`. */
+export const updateSupplier = (c: ApiClient, id: string, patch: Partial<SupplierInput>) =>
+  c.request<{ ok: true }>(`/api/suppliers/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: patch,
+  });
+
+/**
+ * DELETE /api/suppliers/[id] — `{ ok: true }`, or a 409 whose `error` is an
+ * Arabic sentence when purchase orders / expenses still reference the supplier.
+ */
+export const deleteSupplier = (c: ApiClient, id: string) =>
+  c.request<{ ok: true }>(`/api/suppliers/${encodeURIComponent(id)}`, { method: "DELETE" });
+
+// ---------------------------------------------------------------------------
+// Product detail: stock adjustment, history, and the price/threshold patch.
+// ---------------------------------------------------------------------------
+
+/**
+ * POST /api/products/[id]/adjust — apps/web/app/api/products/[id]/adjust/route.ts.
+ *
+ * The body is EXACTLY `{ delta }` (a signed integer): the schema has no
+ * reason/note field, and an extra key is silently dropped — measured, so no
+ * `note` is offered here. The server clamps at zero (`max(0, qty + delta)`)
+ * and answers the clamped quantity, which is why callers read `newQuantity`
+ * back instead of assuming `qty + delta`. Lands at the ACTIVE branch
+ * (X-Branch-Id); the repo verifies the product belongs to it. Unknown id → 404
+ * with an Arabic message. A delta of 0 still writes a history row, so the UI
+ * must not send one.
+ *
+ * Permission: the route itself only requires a tenant + branch; the web hides
+ * the ± controls behind `manage_inventory`, and the app does the same.
+ */
+export const adjustProductQuantity = (c: ApiClient, id: string, delta: number) =>
+  c.request<{ newQuantity: number }>(`/api/products/${encodeURIComponent(id)}/adjust`, {
+    method: "POST",
+    body: { delta },
+  });
+
+/** One row of product_history — apps/web/lib/repo/catalog.ts listProductHistory(). */
+export interface ProductHistoryEvent {
+  id: string;
+  productId: string;
+  productName: string;
+  type: "created" | "updated" | "restocked" | "decreased" | "sold" | "returned";
+  /** Signed. Absent for `created` / `updated`. */
+  delta?: number;
+  quantityAfter?: number;
+  note?: string;
+  /** ISO datetime. */
+  createdAt: string;
+}
+
+/**
+ * GET /api/products/[id]/history — newest first, `{ data: ProductHistoryEvent[] }`.
+ * Tenant-scoped, not branch-scoped, and an unknown id is an empty list, not a 404.
+ */
+export async function listProductHistory(
+  c: ApiClient,
+  id: string,
+): Promise<ProductHistoryEvent[]> {
+  const res = await c.request<{ data: ProductHistoryEvent[] }>(
+    `/api/products/${encodeURIComponent(id)}/history`,
+  );
+  return res.data ?? [];
+}
+
+/**
+ * apps/web/app/api/products/[id]/route.ts patchSchema — every key optional.
+ * Not `.strict()`, but only what the schema names is sent through; the rest of
+ * the schema (name, brand, sku, tags, supplierId, location, categoryId,
+ * quantity) is deliberately not exposed by the detail screen — stock goes
+ * through `adjustProductQuantity` so a history row is written.
+ */
+export interface UpdateProductInput {
+  price?: number;
+  costPrice?: number | null;
+  lowStockThreshold?: number;
+}
+
+/** PATCH /api/products/[id] — `{ ok: true }`; a failed check is a 400 with the zod message. */
+export const updateProduct = (c: ApiClient, id: string, input: UpdateProductInput) =>
+  c.request<{ ok: true }>(`/api/products/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: input,
+  });

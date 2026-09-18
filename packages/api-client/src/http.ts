@@ -127,6 +127,21 @@ export class ApiClient {
     return this.store.get();
   }
 
+  /**
+   * Re-mint the access token NOW, ignoring expiry. The access token carries
+   * server-side state as claims (`sub_ok` — the SUBSCRIPTION_REQUIRED wall),
+   * and the wall is ANDed with the DB on every route until the token dies
+   * (15 min). A caller that just changed that state (paid via Paymob) uses
+   * this so the very next read sees the new truth instead of the stale claim.
+   * Shares the in-flight dedupe with the proactive/reactive paths, so it can
+   * never present a rotated refresh token twice. No-op without a session.
+   */
+  async forceRefresh(): Promise<void> {
+    const current = await this.store.get();
+    if (!current) return;
+    await this.refresh(current);
+  }
+
   async clearTokens(): Promise<void> {
     await this.store.clear();
   }
