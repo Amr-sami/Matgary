@@ -149,7 +149,10 @@ export const useSession = create<SessionState>((set, get) => ({
    * may have been revoked from another device, and only the server knows.
    */
   async bootstrap() {
-    const tokens = await api.currentTokens();
+    // A keychain that refuses to answer (missing entitlement on a mis-signed
+    // build, a locked device at cold start) must not strand the app on the
+    // splash: treat it as no session and let the user sign in.
+    const tokens = await api.currentTokens().catch(() => null);
     if (!tokens) {
       set({ status: "signedOut", me: null });
       return;
