@@ -1,8 +1,10 @@
-import { useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { type ReactNode, useState } from "react";
+import { Image, Linking, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "expo-router";
-import { Barcode, CheckCircle } from "phosphor-react-native";
+import * as Device from "expo-device";
+import * as ImagePicker from "expo-image-picker";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { Barcode, Camera, CheckCircle, Trash } from "phosphor-react-native";
 import { ApiError, catalog, taxonomy } from "@matgary/api-client";
 
 import { api } from "@/api/client";
@@ -26,29 +28,66 @@ import { t } from "@/i18n";
  * file with a step index so the draft survives the whole flow — the cashier
  * should not lose the name they typed because they went back to fix the brand.
  *
- *   details     name · barcode (scan-first) · category · brand
+ *   details     photo (camera-first) · name · barcode (scan-first) · category
+ *               · brand, with the web's free-text "Other" (page.tsx:96-104)
  *   attributes  one value per category attribute — only when the category
  *               has any, exactly like app/add-product/page.tsx:59-77
  *   price       price · cost · opening stock · low-stock threshold
  *   review      then POST /api/products
  *
- * No photo field: the web's "photo field camera-first" half of the row needs
- * an image picker and none is installed in the dev client (no
- * expo-image-picker). Photos stay a web-side edit for now.
+ * Photo: the other half of row 4 — "photo field camera-first". Take photo /
+ * Choose go through expo-image-picker (quality 0.7, editing on so the cashier
+ * crops on the counter). PREVIEW ONLY for now, and the tile says so: the
+ * backend has nowhere to put a product photo — apps/web's products table has
+ * no image column, POST /api/products' createSchema strips `imageUrl`, and the
+ * only upload route (POST /api/uploads/team) is the team-member photo store,
+ * gated on `manage_team`. Nothing is uploaded from here until the web adds the
+ * column + field + a product-image route gated on `manage_inventory`; wire it
+ * then through an `ApiClient.uploadFile` (shared refresh/dead-session/timeout
+ * handling), never a private fetch. The picked file never leaves the phone.
+ *
+ * `?sku=` (useLocalSearchParams) is the POS "not found → create" hand-off: the
+ * scanned code lands in the barcode field before the cashier types anything.
+ * `?at=` is an optional nonce the sender bumps per push so the same code can
+ * be handed off twice (cleared barcode, or "Add another" then re-scan).
  */
 type StepKey = "details" | "attributes" | "price" | "review";
+
+/** Sentinel for the web's "Other (add a new brand)" option. */
+const OTHER_BRAND = "__other__";
+
+/** The picked photo, local to this phone — see the header note. */
+interface PhotoFile {
+  uri: string;
+}
+
+// Editing on → the cashier crops on the counter and the picker re-encodes the
+// crop as JPEG at `quality`, so the preview is small whatever the library holds.
+const PICKER_OPTIONS: ImagePicker.ImagePickerOptions = {
+  mediaTypes: ["images"],
+  allowsEditing: true,
+  quality: 0.7,
+  exif: false,
+};
 
 export default function AddProductScreen() {
   const router = useRouter();
   const qc = useQueryClient();
+  const { sku, at } = useLocalSearchParams<{ sku?: string | string[]; at?: string | string[] }>();
 
   const [stepIdx, setStepIdx] = useState(0);
   const [name, setName] = useState("");
   const [barcode, setBarcode] = useState("");
   const [scanned, setScanned] = useState(false);
+  const [skuFromPos, setSkuFromPos] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [category, setCategory] = useState<string | null>(null);
+  // A brand id, OTHER_BRAND, or null — the same three states the web's select has.
   const [brand, setBrand] = useState<string | null>(null);
+  const [customBrand, setCustomBrand] = useState("");
+  const [photo, setPhoto] = useState<PhotoFile | null>(null);
+  // Why the tile has no photo yet (denied / no camera); `settings` adds the deep link.
+  const [photoNote, setPhotoNote] = useState<{ text: string; settings?: boolean } | null>(null);
   // attributeId -> attributeValueId, the same shape the web keeps.
   const [attrValues, setAttrValues] = useState<Record<string, string>>({});
   const [price, setPrice] = useState("");
@@ -71,7 +110,11 @@ export default function AddProductScreen() {
   // Brands are scoped to a category on the web; offering all of them would
   // suggest combinations the catalogue does not have.
   const brandsFor = (brands.data ?? []).filter((b) => !category || b.categoryId === category);
-  const brandName = brandsFor.find((b) => b.id === brand)?.name;
+  const brandName = brand === OTHER_BRAND
+    ? (customBrand.trim() || undefined)
+    : brandsFor.find((b) => b.id === brand)?.name;
+  // page.tsx:95 — "Other" without a typed name is not a brand.
+  const brandOk = brand !== OTHER_BRAND || customBrand.trim().length > 0;
   const pickedCategory = categories.data?.find((c) => c.id === category);
   const categoryLabel = pickedCategory?.label;
 
@@ -107,7 +150,7 @@ export default function AddProductScreen() {
   const quantityValid = quantityN !== null && quantityN >= 1;
   const thresholdValid = thresholdN !== null;
 
-  const detailsOk = name.trim().length > 1 && category !== null && !attrsPending && !attrsBlocked;
+  const detailsOk = name.trim().length > 1 && category !== null && brandOk && !attrsPending && !attrsBlocked;
   const attributesOk = attrs.filter((a) => a.required).every((a) => !!attrValues[a.id]);
   const priceOk = priceValid && costValid && quantityValid && thresholdValid;
   const canAdvance = step === "details" ? detailsOk : step === "attributes" ? attributesOk : priceOk;
@@ -125,6 +168,7 @@ export default function AddProductScreen() {
       // Review is only reachable through Next, which requires priceOk, so the
       // parsed values are non-null here; the same numbers the Review rows show.
       const ids = Object.values(attrValues);
+      // No photo field: the backend has none yet (header note).
       const body: catalog.CreateProductInput & { attributeValueIds?: string[] } = {
         name: name.trim(),
         categoryId: category!,
@@ -143,19 +187,109 @@ export default function AddProductScreen() {
       setError(null);
       void qc.invalidateQueries({ queryKey: ["products"] });
       void qc.invalidateQueries({ queryKey: ["dashboard"] });
+      // page.tsx:136-150 — a typed brand is registered for the category so the
+      // next add-product offers it as a chip. Best-effort: POST /api/brands
+      // needs manage_catalog, and the product is already saved with the name.
+      const typed = brand === OTHER_BRAND ? customBrand.trim() : "";
+      if (typed && category) {
+        const known = (brands.data ?? []).some((b) => b.name.toLowerCase() === typed.toLowerCase());
+        if (!known) {
+          void taxonomy.createBrand(api, { name: typed, categoryId: category })
+            .catch(() => {})
+            .then(() => qc.invalidateQueries({ queryKey: ["brands"] }));
+        }
+      }
     },
     onError: (e) => setError(messageFor(e)),
   });
 
-  const resetAll = () => {
-    setStepIdx(0); setName(""); setBarcode(""); setScanned(false); setCategory(null); setBrand(null); setAttrValues({});
+  // State only — safe to call during render (below).
+  const clearDraft = () => {
+    setStepIdx(0); setName(""); setBarcode(""); setScanned(false); setSkuFromPos(false); setCategory(null); setBrand(null);
+    setCustomBrand(""); setAttrValues({}); setPhoto(null); setPhotoNote(null);
     setPrice(""); setCost(""); setQuantity(""); setThreshold("3"); setError(null); setCreated(null);
   };
+
+  // POS hand-off: /add-product?sku=<code>[&at=<nonce>]. Adopted the React way
+  // for a prop that changes — set state during render, keyed on the last push
+  // seen — so each new push from the POS lands once. The tab keeps its draft
+  // between visits: a finished flow is cleared first; a mid-draft one keeps its
+  // name/category and only the barcode is replaced — that is the point.
+  // The params outlive the push (a tab keeps them until the next navigation),
+  // so the key cannot be reset on "Add another" — that would re-adopt the code
+  // of the product just saved. The sender's `at` nonce is what lets the same
+  // code arrive twice; without one, a repeated code is one hand-off.
+  const skuParam = (Array.isArray(sku) ? sku[0] : sku)?.trim() ?? "";
+  const atParam = (Array.isArray(at) ? at[0] : at)?.trim() ?? "";
+  const handoffKey = skuParam ? `${atParam}\n${skuParam}` : "";
+  const [seenHandoff, setSeenHandoff] = useState("");
+  if (handoffKey && handoffKey !== seenHandoff) {
+    setSeenHandoff(handoffKey);
+    if (created) clearDraft();
+    setBarcode(skuParam);
+    setScanned(false);
+    setSkuFromPos(true);
+    setStepIdx(0);
+  }
 
   const pickCategory = (id: string) => {
     setCategory(id);
     setBrand(null);
+    setCustomBrand("");
     setAttrValues({});
+  };
+
+  // ---- photo: camera-first, library second, preview only -------------------
+
+  const acceptPicked = (res: ImagePicker.ImagePickerResult) => {
+    const asset = res.canceled ? null : res.assets?.[0];
+    if (!asset) return;
+    setPhoto({ uri: asset.uri });
+    setPhotoNote(null);
+  };
+
+  const takePhoto = async () => {
+    setPhotoNote(null);
+    // The simulator has no camera; UIImagePickerController refuses the source
+    // type outright, so the tile says so and Choose (sample photos) still works.
+    if (!Device.isDevice) {
+      setPhotoNote({ text: t("mobile.product.cameraUnavailable") });
+      return;
+    }
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) {
+      setPhotoNote({ text: t("mobile.product.cameraDenied"), settings: !perm.canAskAgain });
+      return;
+    }
+    try {
+      acceptPicked(await ImagePicker.launchCameraAsync(PICKER_OPTIONS));
+    } catch {
+      setPhotoNote({ text: t("mobile.product.cameraUnavailable") });
+    }
+  };
+
+  const choosePhoto = async () => {
+    setPhotoNote(null);
+    // iOS presents the library picker out of process — no permission needed
+    // (and asking would prompt for full-library access for nothing). Android
+    // below 13 still needs the read permission.
+    if (Platform.OS === "android") {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        setPhotoNote({ text: t("mobile.product.libraryDenied"), settings: !perm.canAskAgain });
+        return;
+      }
+    }
+    try {
+      acceptPicked(await ImagePicker.launchImageLibraryAsync(PICKER_OPTIONS));
+    } catch {
+      setPhotoNote({ text: t("mobile.product.photoPickFailed") });
+    }
+  };
+
+  const removePhoto = () => {
+    setPhoto(null);
+    setPhotoNote(null);
   };
 
   // A failed save's banner must not follow the cashier back through the steps
@@ -192,8 +326,8 @@ export default function AddProductScreen() {
           </View>
           <Text style={styles.doneName}>{name}</Text>
           <View style={styles.doneActions}>
-            <Button label={t("mobile.product.another")} onPress={resetAll} />
-            <Button label={t("mobile.product.openInInventory")} variant="outline" onPress={() => { resetAll(); router.push("/inventory"); }} />
+            <Button label={t("mobile.product.another")} onPress={clearDraft} />
+            <Button label={t("mobile.product.openInInventory")} variant="outline" onPress={() => { clearDraft(); router.push("/inventory"); }} />
           </View>
         </Card>
       </Screen>
@@ -216,15 +350,24 @@ export default function AddProductScreen() {
       {step === "details" ? (
         <Card>
           <View style={styles.form}>
+            <PhotoTile
+              photo={photo}
+              note={photoNote}
+              onTake={() => void takePhoto()}
+              onChoose={() => void choosePhoto()}
+              onRemove={removePhoto}
+            />
             <Field label={t("app.sales.form.quickAddProduct.name")} value={name} onChangeText={setName} placeholder={t("app.sales.form.quickAddProduct.namePlaceholder")} />
             <View>
               <BarcodeField
                 value={barcode}
-                onChangeText={(v) => { setBarcode(v); setScanned(false); }}
+                onChangeText={(v) => { setBarcode(v); setScanned(false); setSkuFromPos(false); }}
                 onPressScan={() => setScannerOpen(true)}
               />
               {scanned && barcode ? (
                 <Text style={styles.scanNote}>{t("mobile.product.scanFilled", { code: barcode })}</Text>
+              ) : skuFromPos && barcode ? (
+                <Text style={styles.scanNote}>{t("mobile.product.skuFromPos", { code: barcode })}</Text>
               ) : null}
             </View>
             <View>
@@ -272,7 +415,23 @@ export default function AddProductScreen() {
                     <Chip key={b.id} label={b.name} active={brand === b.id}
                       onPress={() => setBrand(brand === b.id ? null : b.id)} />
                   ))}
+                  <Chip
+                    label={t("app.inventory.addProduct.step3.fields.brandOther")}
+                    active={brand === OTHER_BRAND}
+                    onPress={() => setBrand(brand === OTHER_BRAND ? null : OTHER_BRAND)}
+                  />
                 </View>
+                {brand === OTHER_BRAND ? (
+                  <View style={styles.otherBrand}>
+                    <Field
+                      label={t("app.inventory.addProduct.step3.fields.newBrand")}
+                      value={customBrand}
+                      onChangeText={setCustomBrand}
+                      placeholder={t("app.inventory.addProduct.step3.fields.newBrandPlaceholder")}
+                      autoFocus
+                    />
+                  </View>
+                ) : null}
               </View>
             ) : null}
           </View>
@@ -322,6 +481,12 @@ export default function AddProductScreen() {
         </Card>
       ) : (
         <Card title={t("mobile.common.review")}>
+          {photo ? (
+            <View style={styles.reviewPhotoRow}>
+              <Image source={{ uri: photo.uri }} style={styles.reviewThumb} accessibilityLabel={t("mobile.product.a11yPhotoPreview")} />
+              <Text style={styles.reviewPhotoNote} numberOfLines={3}>{t("mobile.product.photoHint")}</Text>
+            </View>
+          ) : null}
           <Row label={t("app.common.name")} value={name} />
           <Row label={t("app.sales.form.quickAddProduct.category")} value={categoryLabel ?? "—"} />
           <Row label={t("app.sales.table.col.brand")} value={brandName ?? "—"} />
@@ -354,7 +519,12 @@ export default function AddProductScreen() {
             style={styles.navBtn}
           />
         ) : (
-          <Button label={t("app.inventory.addProduct.footer.save")} loading={create.isPending} onPress={() => create.mutate()} style={styles.navBtn} />
+          <Button
+            label={t("app.inventory.addProduct.footer.save")}
+            loading={create.isPending}
+            onPress={() => create.mutate()}
+            style={styles.navBtn}
+          />
         )}
       </View>
 
@@ -376,6 +546,84 @@ const STEP_TITLES = (): Record<StepKey, string> => ({
   price: t("mobile.product.priceAndStock"),
   review: t("mobile.common.review"),
 });
+
+/**
+ * The camera-first photo tile. Empty: a dashed box with Take photo (primary)
+ * and Choose. Picked: the preview, the preview-only note, Take photo again and
+ * Remove. `note` is why nothing was picked (denied, no camera) — with an Open
+ * Settings link once iOS stops asking.
+ */
+function PhotoTile({
+  photo,
+  note,
+  onTake,
+  onChoose,
+  onRemove,
+}: {
+  photo: PhotoFile | null;
+  note: { text: string; settings?: boolean } | null;
+  onTake: () => void;
+  onChoose: () => void;
+  onRemove: () => void;
+}) {
+  return (
+    <View>
+      <Text style={styles.label}>{t("mobile.product.photo")}</Text>
+      {photo ? (
+        <View style={styles.photoRow}>
+          <Image source={{ uri: photo.uri }} style={styles.preview} accessibilityLabel={t("mobile.product.a11yPhotoPreview")} />
+          <View style={styles.photoMeta}>
+            <Text style={styles.hintTight}>{t("mobile.product.photoHint")}</Text>
+            <View style={styles.photoActions}>
+              <PhotoAction icon={<Camera size={18} color={colors.accent} />} label={t("mobile.product.takePhoto")} onPress={onTake} />
+              <PhotoAction icon={<Trash size={18} color={colors.danger} />} label={t("mobile.product.removePhoto")} onPress={onRemove} danger />
+            </View>
+          </View>
+        </View>
+      ) : (
+        <View style={styles.photoEmpty}>
+          <Text style={styles.hintTight}>{t("mobile.product.photoHint")}</Text>
+          <View style={styles.photoButtons}>
+            <Button label={t("mobile.product.takePhoto")} onPress={onTake} style={styles.photoBtn} />
+            <Button label={t("mobile.product.choosePhoto")} variant="outline" onPress={onChoose} style={styles.photoBtn} />
+          </View>
+        </View>
+      )}
+      {note ? (
+        <View style={styles.inlineError}>
+          <Text style={styles.inlineErrorText}>{note.text}</Text>
+          {note.settings ? (
+            <Button label={t("mobile.product.openSettings")} variant="ghost" onPress={() => void Linking.openSettings()} />
+          ) : null}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function PhotoAction({
+  icon,
+  label,
+  onPress,
+  danger = false,
+}: {
+  icon: ReactNode;
+  label: string;
+  onPress: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => [styles.photoAction, pressed && styles.photoActionPressed]}
+    >
+      {icon}
+      <Text style={[styles.photoActionText, danger && styles.photoActionDanger]}>{label}</Text>
+    </Pressable>
+  );
+}
 
 /**
  * Field with the barcode glyph as a trailing tap target — the same affordance
@@ -480,7 +728,39 @@ const styles = StyleSheet.create({
   label: { fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary, marginBottom: spacing.sm, ...RTL_TEXT },
   hint: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, marginTop: spacing.sm, marginBottom: spacing.sm, ...RTL_TEXT },
   scanNote: { fontFamily: fonts.medium, fontSize: 13, color: colors.successStrong, marginTop: spacing.sm, ...RTL_TEXT },
+  hintTight: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  otherBrand: { marginTop: spacing.md },
+  photoEmpty: {
+    gap: spacing.md,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    backgroundColor: colors.neutralTint,
+  },
+  photoButtons: { flexDirection: "row", gap: spacing.sm },
+  photoBtn: { flex: 1 },
+  photoRow: { flexDirection: "row", gap: spacing.md, alignItems: "flex-start" },
+  preview: { width: 96, height: 96, borderRadius: radius.lg, backgroundColor: colors.neutralTint },
+  photoMeta: { flex: 1, gap: spacing.sm, minHeight: 96, justifyContent: "center" },
+  photoActions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  photoAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    minHeight: MIN_TOUCH,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.full,
+    backgroundColor: colors.accentLight,
+  },
+  photoActionPressed: { opacity: 0.7 },
+  photoActionText: { fontFamily: fonts.medium, fontSize: 13, color: colors.accent },
+  photoActionDanger: { color: colors.danger },
+  reviewPhotoRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
+  reviewThumb: { width: 56, height: 56, borderRadius: radius.md, backgroundColor: colors.neutralTint },
+  reviewPhotoNote: { flexShrink: 1, fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },
   inlineError: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm, marginTop: spacing.sm },
   inlineErrorText: { flexShrink: 1, fontFamily: fonts.medium, fontSize: 13, color: colors.danger, ...RTL_TEXT },
   fieldError: { fontFamily: fonts.medium, fontSize: 13, color: colors.danger, marginTop: spacing.sm, ...RTL_TEXT },

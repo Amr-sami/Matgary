@@ -50,19 +50,19 @@ import { t } from "@/i18n";
  * that the money and stock movement are gone for good (§6.6).
  *
  * A failed sale has a THIRD action, Edit (§2.2.4 / doc 06 §6.3 defect 4):
- * the cart route caches every 4xx domain refusal under the Idempotency-Key
- * for 24h, so after restocking, Retry under the same key still answers
- * INSUFFICIENT_STOCK. Edit loads the row back into the cart under a fresh
- * invoice id (the server never booked the original, so it cannot double-post)
- * and discards the row, keeping its audit copy. For those cached codes Retry
- * is hidden — offering a button that cannot work is worse than none.
+ * a domain refusal is answered the same way for the same body, so Retry is
+ * a no-op for those codes. Edit loads the row back into the cart under a
+ * fresh invoice id (the server never booked the original, so it cannot
+ * double-post) and discards the row, keeping its audit copy. For those codes
+ * Retry is hidden — offering a button that cannot work is worse than none.
  *
- * INSUFFICIENT_STOCK gets the §6.5 resolution hint instead: the customer
- * already left with the goods. The spec'd "Sell anyway" action (re-submit
- * with allowOversell under a derived key — see offline/sales.ts sellAnyway)
- * is rendered only when SELL_ANYWAY_ENABLED is on, i.e. once the cart route
- * accepts the flag (server S7); until then the card offers Edit and Discard
- * and the hint promises nothing the server would refuse. PRODUCT_NOT_FOUND
+ * INSUFFICIENT_STOCK gets the §6.5 resolution sheet instead: the customer
+ * already left with the goods. "Sell anyway" (S7) re-submits the SAME key
+ * with `allowOversell: true` — see offline/sales.ts sellAnyway; the route
+ * caches 2xx only, so the corrected retry succeeds, the product floors at 0
+ * and a discrepancy row is logged. Once the row lands `done`, the local
+ * delta cache invalidates ["products"] so stock re-reads from the server.
+ * The action is gated by SELL_ANYWAY_ENABLED (canSellAnyway). PRODUCT_NOT_FOUND
  * offers Edit (re-map the line) and Discard, with a hint saying why.
  *
  * DEV BUILDS ONLY: a "Simulate offline" switch at the bottom (offline/
@@ -172,9 +172,9 @@ export default function SyncScreen() {
         onPress: () => {
           setBusyId(item.id);
           const p = sellAnyway(sale);
-          if (!p) {
+          if (typeof p === "string") {
             setBusyId(null);
-            Alert.alert(t("mobile.sync.sellAnyway"), t("mobile.sync.discardBusy"));
+            Alert.alert(t("mobile.sync.sellAnyway"), t(p === "signed-out" ? "mobile.sync.signedOut" : "mobile.sync.discardBusy"));
             return;
           }
           void p.then(setLastResult).finally(() => setBusyId(null));
@@ -412,8 +412,8 @@ function OutboxCard({
   const showRetry = !!onRetry && mode !== "edit";
   const showEdit = !!onEdit && status === "failed";
   const showSellAnyway = !!onSellAnyway && status === "failed";
-  // The short-stock hint is keyed on the refusal, not on the action: it reads
-  // Edit / Discard while SELL_ANYWAY_ENABLED is off (see offline/sales.ts).
+  // The short-stock hint is keyed on the refusal, not on the action (the
+  // action itself is gated by canSellAnyway in the parent — see offline/sales.ts).
   const shortStock = isOversellRefusal(item);
   const productGone = status === "failed" && item.lastErrorCode === "PRODUCT_NOT_FOUND";
   const customer = [sale.customerName, sale.customerPhone].filter(Boolean).join(" · ");

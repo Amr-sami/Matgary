@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -10,7 +10,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { useIsFocused } from "expo-router";
+import { useFocusEffect, useIsFocused } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, catalog } from "@matgary/api-client";
 
@@ -98,20 +98,23 @@ export default function TasksScreen() {
   const done = rows.filter((task) => task.status === "done");
 
   // Doc 02 §1.1 row 14: this screen drives the bottom-nav badge — by clearing
-  // it. Web parity (components/tasks/TasksTab.tsx): opening the tasks page
-  // marks every task assigned to me as seen, then the unread count re-fetches
-  // to zero. Gated on the badge being lit so an idle visit is not a write per
-  // focus, and keyed on the count so a task assigned while this screen stays
-  // in front is cleared the moment the bar's poll reports it.
-  const focused = useIsFocused();
-  const tasksUnread = useBadges((s) => s.tasksUnread);
-  useEffect(() => {
-    if (!focused || tasksUnread === 0) return;
+  // it. Web parity (components/tasks/TasksTab.tsx:80): opening the tasks page
+  // POSTs /api/tasks/seen (idempotent, requireTenant-only), then the badge
+  // store drops to zero at once and everything under ["tasks"] — the list and
+  // the bar's unread-count poll — re-fetches. Not gated on the store: the
+  // count is 0 until the bar's first fetch answers, and a visit made before
+  // that (or offline) must still count as "seen" the moment we are online.
+  const markSeen = useCallback(() => {
     let cancelled = false;
     (async () => {
       try {
         await api.request<{ ok: true }>("/api/tasks/seen", { method: "POST" });
-        if (!cancelled) await queryClient.invalidateQueries({ queryKey: UNREAD_TASKS_KEY });
+        // The server has marked them; the badge is wrong until it says so —
+        // even if the user already left. Same seam the bar writes through,
+        // so the two never disagree.
+        queryClient.setQueryData(UNREAD_TASKS_KEY, { count: 0 });
+        useBadges.getState().setTasksUnread(0);
+        if (!cancelled) await queryClient.invalidateQueries({ queryKey: ["tasks"] });
       } catch {
         // Best-effort, as on the web: the badge simply stays until the next visit.
       }
@@ -119,7 +122,23 @@ export default function TasksScreen() {
     return () => {
       cancelled = true;
     };
-  }, [focused, tasksUnread, queryClient]);
+  }, [queryClient]);
+  // Every focus — this screen stays mounted under the Tabs navigator, so a
+  // plain mount effect would fire once per session.
+  useFocusEffect(markSeen);
+  // A task assigned while this screen stays in front: the bar's poll lights
+  // the badge, and it is cleared the moment it does rather than on re-focus.
+  // Only a 0 → n step counts — the focus run above already covers a badge
+  // that was lit on arrival, and our own reset (n → 0) must not post again.
+  const focused = useIsFocused();
+  const tasksUnread = useBadges((s) => s.tasksUnread);
+  const prevUnread = useRef(tasksUnread);
+  useEffect(() => {
+    const prev = prevUnread.current;
+    prevUnread.current = tasksUnread;
+    if (!focused || tasksUnread === 0 || prev !== 0) return;
+    return markSeen();
+  }, [focused, tasksUnread, markSeen]);
 
   return (
     <Screen

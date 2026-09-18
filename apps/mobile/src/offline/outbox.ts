@@ -377,6 +377,46 @@ export function discard(id: string): boolean {
   return true;
 }
 
+/**
+ * Swap a `failed` (or backed-off) row's payload IN PLACE and requeue it under
+ * the same id and Idempotency-Key — one SQLite transaction, so at no point
+ * is the sale absent from the outbox (§6.6 "a sale must never disappear":
+ * a discard-then-enqueue pair leaves a crash window in which the row exists
+ * only as its audit copy). The pre-swap row is written to meta
+ * `discard:<id>` first, merged with `annotate`, so support can still see
+ * what was originally rung up. Refuses rows that are mid-send or gone. Does
+ * NOT drain — call retry(id) afterwards.
+ */
+export function replacePayload(id: string, payload: unknown, annotate: Record<string, unknown> = {}): boolean {
+  init();
+  const scope = tenantScope();
+  if (!scope) return false;
+  const db = getDb();
+  const row = db.select().from(outbox).where(and(eq(outbox.id, id), scope)).get();
+  if (!row || row.status === "sending") return false;
+  const now = Date.now();
+  getSqlite().withTransactionSync(() => {
+    writeMeta(`discard:${id}`, JSON.stringify({ ...row, replacedAt: now, ...annotate }));
+    db.update(outbox)
+      .set({
+        payload: JSON.stringify(payload ?? null),
+        status: "queued",
+        attempts: 0,
+        nextAttemptAt: 0,
+        leaseExpiresAt: null,
+        lastError: null,
+        lastErrorCode: null,
+        lastErrorText: null,
+        actionable: 0,
+        updatedAt: now,
+      })
+      .where(eq(outbox.id, id))
+      .run();
+  });
+  publish();
+  return true;
+}
+
 // ─── the drain ───────────────────────────────────────────────────────────────
 
 /**

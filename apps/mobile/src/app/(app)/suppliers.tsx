@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -12,7 +13,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { PencilSimple } from "phosphor-react-native";
+import { PencilSimple, Trash } from "phosphor-react-native";
 import { ApiError, catalog, type Supplier } from "@matgary/api-client";
 
 import { api } from "@/api/client";
@@ -75,6 +76,39 @@ export default function SuppliersScreen() {
   // null = closed, "new" = create sheet, a Supplier = edit sheet for that row.
   const [sheet, setSheet] = useState<"new" | Supplier | null>(null);
 
+  // DELETE answers 409 with an Arabic sentence in `error` when purchase
+  // orders / expenses still reference the supplier; errorMessage() shows
+  // that verbatim and maps every other failure to a translated line.
+  const remove = useMutation({
+    mutationFn: (id: string) => catalog.deleteSupplier(api, id),
+    onSuccess: (_data, id) => {
+      void queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      void queryClient.removeQueries({ queryKey: ["supplier", id] });
+    },
+    onError: (err) => {
+      Alert.alert(
+        t("app.suppliers.list.deleteTitle"),
+        errorMessage(err, t("app.suppliers.list.toast.deleteFailed")),
+      );
+    },
+  });
+
+  const confirmDelete = (s: Supplier) => {
+    if (remove.isPending) return;
+    Alert.alert(
+      t("app.suppliers.list.deleteDialog.title"),
+      t("app.suppliers.list.deleteDialog.message", { name: s.name }),
+      [
+        { text: t("app.common.cancel"), style: "cancel" },
+        {
+          text: t("app.suppliers.list.deleteDialog.confirm"),
+          style: "destructive",
+          onPress: () => remove.mutate(s.id),
+        },
+      ],
+    );
+  };
+
   const rows = q.data ?? [];
   const owed = rows.reduce((s, r) => s + Math.max(r.balance, 0), 0);
 
@@ -135,15 +169,37 @@ export default function SuppliersScreen() {
                   <Badge label={t("mobile.suppliers.noBalance")} variant="success" />
                 )}
                 {canManage ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`${t("app.suppliers.list.editTitle")} ${s.name}`}
-                    hitSlop={8}
-                    onPress={() => setSheet(s)}
-                    style={({ pressed }) => [styles.editBtn, pressed && styles.editBtnPressed]}
-                  >
-                    <PencilSimple size={18} color={colors.textSecondary} />
-                  </Pressable>
+                  <>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`${t("app.suppliers.list.editTitle")} ${s.name}`}
+                      hitSlop={8}
+                      onPress={() => setSheet(s)}
+                      style={({ pressed }) => [styles.editBtn, pressed && styles.editBtnPressed]}
+                    >
+                      <PencilSimple size={18} color={colors.textSecondary} />
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`${t("app.suppliers.list.deleteTitle")} ${s.name}`}
+                      accessibilityState={{ disabled: remove.isPending }}
+                      disabled={remove.isPending}
+                      hitSlop={8}
+                      onPress={() => confirmDelete(s)}
+                      style={({ pressed }) => [
+                        styles.editBtn,
+                        styles.deleteBtn,
+                        pressed && styles.editBtnPressed,
+                        remove.isPending && remove.variables === s.id && styles.editBtnBusy,
+                      ]}
+                    >
+                      {remove.isPending && remove.variables === s.id ? (
+                        <ActivityIndicator size="small" color={colors.danger} />
+                      ) : (
+                        <Trash size={18} color={colors.danger} />
+                      )}
+                    </Pressable>
+                  </>
                 ) : null}
               </View>
               {s.phone ? <Text style={styles.meta}>{s.phone}</Text> : null}
@@ -385,10 +441,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: radius.md,
-    // Pull the icon into the card's padding so the row's text keeps its width.
-    marginEnd: -spacing.sm,
   },
+  // Only the trailing button pulls into the card's padding so the row's text
+  // keeps its width; on Edit the negative margin would eat the head row's gap
+  // and let the two hitSlops overlap.
+  deleteBtn: { marginEnd: -spacing.sm },
   editBtnPressed: { backgroundColor: colors.accentLight },
+  editBtnBusy: { opacity: 0.6 },
   refreshFailed: {
     padding: spacing.md,
     borderRadius: radius.lg,

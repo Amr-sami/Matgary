@@ -1,0 +1,131 @@
+# Purchase order — build a draft PO through the four-step sheet and see it land
+# in the list.
+#
+# Purchases tab (it is one of the seven bottom-tab items, not a More row) →
+# "New purchase order" → step 1: pick the first supplier → Next → step 2:
+# search the catalogue and add the first match → Next → step 3: Save as
+# draft → step 4: the done card names the supplier and "1 item"; its supplier
+# name is copied → Close → the newest row in the list (the API sorts by
+# order date, newest first) carries that supplier, "1 item" and the draft
+# badge. Signs in first when the app is on the login screen. Ends on the
+# dashboard.
+#
+# Elements are addressed by testID (po-*); the Button / SearchField
+# primitives take no testID, so those sit on a wrapper View — a tap on the
+# wrapper lands on the control's centre. The search term must match a seeded
+# product's name / brand / SKU / barcode (the seed carries two Casio watches).
+appId: com.thestoro.app
+env:
+  PO_SEARCH: "Casio"
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      text: "المزيد|More|تسجيل الدخول|Sign in"
+    timeout: 45000
+- runFlow:
+    when:
+      visible:
+        id: "login-identifier"
+    file: login.yaml
+
+# Purchases tab → New purchase order.
+- tapOn:
+    text: "المشتريات|Purchases"
+- extendedWaitUntil:
+    visible:
+      id: "po-new-order"
+    timeout: 30000
+- tapOn:
+    id: "po-new-order"
+
+# Step 1 — supplier: the first row, then Next.
+- extendedWaitUntil:
+    visible:
+      id: "po-supplier-row"
+    timeout: 30000
+- assertVisible:
+    text: "خطوة 1 من 4|Step 1 of 4"
+- tapOn:
+    id: "po-supplier-row"
+    index: 0
+- tapOn:
+    id: "po-supplier-next"
+
+# Step 2 — lines: search, add the first match, then Next.
+- extendedWaitUntil:
+    visible:
+      id: "po-product-search"
+    timeout: 30000
+- assertVisible:
+    text: "خطوة 2 من 4|Step 2 of 4"
+- tapOn:
+    id: "po-product-search"
+- inputText: ${PO_SEARCH}
+- extendedWaitUntil:
+    visible:
+      id: "po-product-match"
+    timeout: 30000
+- tapOn:
+    id: "po-product-match"
+    index: 0
+- extendedWaitUntil:
+    visible:
+      id: "po-line"
+    timeout: 15000
+- assertVisible:
+    text: "1 صنف · .*|1 items · .*"
+- tapOn:
+    id: "po-lines-next"
+
+# Step 3 — review → Save as draft.
+- extendedWaitUntil:
+    visible:
+      id: "po-submit"
+    timeout: 30000
+- assertVisible:
+    text: "خطوة 3 من 4|Step 3 of 4"
+- tapOn:
+    id: "po-submit"
+
+# Step 4 — done: the reference card. Keep the supplier name for the list check.
+- extendedWaitUntil:
+    visible:
+      id: "po-done-ref"
+    timeout: 45000
+- assertVisible:
+    text: "تم إنشاء أمر الشراء|Purchase order created"
+- assertVisible:
+    id: "po-done-ref"
+    text: "أمر شراء رقم [0-9A-F]{8}|Order #[0-9A-F]{8}"
+- assertVisible:
+    id: "po-done-summary"
+    text: "1 صنف · .*|1 items · .*"
+- copyTextFrom:
+    id: "po-done-supplier"
+- tapOn:
+    id: "po-done-close"
+
+# The list: the newest row is the order just created.
+- extendedWaitUntil:
+    visible:
+      id: "po-row"
+    timeout: 30000
+- assertVisible:
+    id: "po-row-supplier"
+    index: 0
+    text: ${maestro.copiedText}
+- assertVisible:
+    id: "po-row-meta"
+    index: 0
+    text: "1 صنف · .*|1 items · .*"
+- assertVisible:
+    text: "مسودة|Draft"
+
+# Back to the dashboard. The dev client may dock a LogBox toast over the tab
+# bar — clear it first, otherwise the tab tap opens LogBox.
+- runFlow: helpers/dismiss-logbox.yaml
+- tapOn:
+    text: "لوحة|Home"
+- assertVisible:
+    text: "أهلاً، .+|Welcome back, .+"

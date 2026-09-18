@@ -103,7 +103,7 @@ export default function LoginScreen() {
               disabled={signingIn}
               onPress={() => void startDemo()}
             >
-              <Lightning size={16} color="#FFFFFF" weight="fill" />
+              <Lightning size={16} color={colors.onAccent} weight="fill" />
               <Text numberOfLines={1} style={styles.demoPillText}>
                 {t("auth.demo.cta")}
               </Text>
@@ -111,11 +111,13 @@ export default function LoginScreen() {
             <Pressable
               style={styles.langToggle}
               accessibilityRole="button"
-              accessibilityLabel={locale === "ar" ? "English" : t("app.shell.language.arabic")}
+              accessibilityLabel={locale === "ar" ? t("app.shell.language.english") : t("app.shell.language.arabic")}
               onPress={() => void setLocale(locale === "ar" ? "en" : "ar")}
             >
               <Globe size={20} color={colors.textSecondary} />
-              <Text style={styles.langText}>{locale === "ar" ? "ع" : "EN"}</Text>
+              <Text style={styles.langText}>
+                {locale === "ar" ? t("app.shell.language.shortArabic") : t("app.shell.language.shortEnglish")}
+              </Text>
             </Pressable>
           </View>
 
@@ -212,7 +214,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     flexShrink: 1,
   },
-  demoPillText: { fontFamily: fonts.bold, fontSize: 14, color: "#FFFFFF" },
+  demoPillText: { fontFamily: fonts.bold, fontSize: 14, color: colors.onAccent },
   langToggle: {
     flexDirection: "row",
     alignItems: "center",

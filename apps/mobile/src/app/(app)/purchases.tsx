@@ -1,22 +1,22 @@
-import { useMemo, useState } from "react";
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Minus, Plus, Receipt, Wallet, Package } from "phosphor-react-native";
-import { ApiError, catalog } from "@matgary/api-client";
+import { Package, Receipt, Trash, Wallet } from "phosphor-react-native";
+import { catalog } from "@matgary/api-client";
 
 import { api } from "@/api/client";
-import { isRTL, t } from "@/i18n";
+import { t } from "@/i18n";
 import { Screen } from "@/components/layout/Screen";
+import { PoBuilderSheet, describeError } from "@/components/purchases/PoBuilderSheet";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Chip } from "@/components/ui/Chip";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { Field } from "@/components/ui/Field";
-import { SearchField } from "@/components/ui/SearchField";
+import { Segmented } from "@/components/ui/Segmented";
 import { StatCard } from "@/components/ui/StatCard";
 import { money, shortDate } from "@/lib/format";
-import { RTL_TEXT, directionStyle } from "@/theme/rtl";
-import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
+import { useSession } from "@/stores/session";
+import { RTL_TEXT } from "@/theme/rtl";
+import { MIN_TOUCH, colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
 
 /** Arabic labels + badge variant per PO status, matching the web's Badge use. */
 const STATUS = (): Record<string, { label: string; variant: "accent" | "success" | "lowstock" | "neutral" }> => ({
@@ -26,52 +26,110 @@ const STATUS = (): Record<string, { label: string; variant: "accent" | "success"
   cancelled: { label: t("app.purchasesStatus.cancelled"), variant: "lowstock" },
 });
 
-/** Port of app__purchases.png — PO list with totals and payment state. */
-type Draft = { productId: string; productName: string; quantity: number; unitCost: number };
+type Filter = "all" | "draft" | "received" | "cancelled";
+const FILTERS = (): { key: Filter; label: string }[] => [
+  { key: "all", label: t("app.purchases.filters.all") },
+  { key: "draft", label: t("app.purchases.filters.drafts") },
+  { key: "received", label: t("app.purchases.filters.received") },
+  { key: "cancelled", label: t("app.purchases.filters.cancelled") },
+];
 
+type Action = "receive" | "cancel" | "delete";
+
+/**
+ * Port of app__purchases.png — PO cards with totals and payment state (doc 02
+ * §1.1 row 7, RECOMPOSE). The builder is the split-out PoBuilderSheet; the
+ * receive / cancel / delete actions are the web's exactly: whole-order
+ * receive with updateCost:true behind a confirm, and all three offered only
+ * on drafts (the web's `o.status === "draft"` block — the server would also
+ * delete a cancelled order, but the page being ported does not offer it).
+ * Everything that writes is gated on `manage_purchases`, the way the web's
+ * `can(principal, "manage_purchases")` hides its buttons.
+ */
 export default function PurchasesScreen() {
   const qc = useQueryClient();
+  const me = useSession((s) => s.me);
+  const perms = new Set(me?.permissions ?? []);
+  // The web's can(): owners bypass, staff need the permission.
+  const canManage = !!me && (me.isOwner || perms.has("manage_purchases"));
+  // POST /api/suppliers is gated on manage_suppliers, not on manage_purchases;
+  // the builder hides its inline "new supplier" otherwise.
+  const canCreateSupplier = !!me && (me.isOwner || perms.has("manage_suppliers"));
+
   const pos = useQuery({
     queryKey: ["purchase-orders"],
     queryFn: () => catalog.listPurchaseOrders(api),
   });
-  const suppliers = useQuery({ queryKey: ["suppliers"], queryFn: () => catalog.listSuppliers(api) });
-  const products = useQuery({ queryKey: ["products"], queryFn: () => catalog.listProducts(api) });
 
-  const [open, setOpen] = useState(false);
-  const [supplierId, setSupplierId] = useState<string | null>(null);
-  const [q, setQ] = useState("");
-  const [items, setItems] = useState<Draft[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<Filter>("all");
+  const [builderOpen, setBuilderOpen] = useState(false);
+  const [notice, setNotice] = useState<{ text: string; tone: "success" | "error" } | null>(null);
 
-  const matches = useMemo(() => {
-    const t = q.trim().toLowerCase();
-    if (!t) return [];
-    return (products.data ?? []).filter((p) => p.name.toLowerCase().includes(t)).slice(0, 6);
-  }, [products.data, q]);
+  useEffect(() => {
+    if (!notice) return;
+    const id = setTimeout(() => setNotice(null), 3500);
+    return () => clearTimeout(id);
+  }, [notice]);
 
-  const addItem = (p: { id: string; name: string; costPrice: number }) => {
-    setItems((cur) => cur.some((i) => i.productId === p.id)
-      ? cur.map((i) => i.productId === p.id ? { ...i, quantity: i.quantity + 1 } : i)
-      : [...cur, { productId: p.id, productName: p.name, quantity: 1, unitCost: p.costPrice }]);
-    setQ("");
-  };
-  const bump = (id: string, d: number) =>
-    setItems((cur) => cur.map((i) => i.productId === id ? { ...i, quantity: i.quantity + d } : i).filter((i) => i.quantity > 0));
-
-  const draftTotal = items.reduce((s, i) => s + i.quantity * i.unitCost, 0);
-
-  const create = useMutation({
-    mutationFn: () => catalog.createPurchaseOrder(api, { supplierId: supplierId!, items }),
-    onSuccess: () => {
-      setOpen(false); setSupplierId(null); setItems([]); setError(null);
+  const act = useMutation({
+    mutationFn: ({ kind, id }: { kind: Action; id: string }) =>
+      kind === "receive"
+        ? catalog.receivePurchaseOrder(api, id, { updateCost: true })
+        : kind === "cancel"
+          ? catalog.cancelPurchaseOrder(api, id)
+          : catalog.deletePurchaseOrder(api, id),
+    onSuccess: (_res, { kind }) => {
+      setNotice({
+        text: t(
+          kind === "receive"
+            ? "app.purchases.toast.receiveSuccess"
+            : kind === "cancel"
+              ? "app.purchases.toast.cancelSuccess"
+              : "app.purchases.toast.deleteSuccess",
+        ),
+        tone: "success",
+      });
       void qc.invalidateQueries({ queryKey: ["purchase-orders"] });
+      void qc.invalidateQueries({ queryKey: ["suppliers"] });
+      if (kind === "receive") void qc.invalidateQueries({ queryKey: ["products"] });
     },
-    onError: (e) => setError(e instanceof ApiError && e.kind === "offline" ? t("mobile.common.offline") : t("mobile.purchases.createFailed")),
+    onError: (e, { kind }) => {
+      const fallback = t(
+        kind === "receive"
+          ? "app.purchases.toast.receiveFailed"
+          : kind === "cancel"
+            ? "app.purchases.toast.cancelFailed"
+            : "app.purchases.toast.deleteFailed",
+      );
+      setNotice({ text: describeError(e, fallback), tone: "error" });
+    },
+    // "Receive now" runs this while the builder is still on its done step (see
+    // PoBuilderSheet's onReceiveNow); either outcome lands the user back on
+    // the list, where the notice above is visible. A no-op from the rows.
+    onSettled: () => setBuilderOpen(false),
   });
-  const canSubmit = supplierId !== null && items.length > 0 && !create.isPending;
+
+  /** The web's ConfirmDialog, as the native alert; same title/message/confirm strings. */
+  const confirm = (kind: Action, id: string) => {
+    Alert.alert(
+      t(`app.purchases.actions.${kind}.title`),
+      t(`app.purchases.actions.${kind}.message`),
+      [
+        { text: t("app.purchases.builder.cancel"), style: "cancel" },
+        {
+          text: t(`app.purchases.actions.${kind}.confirm`),
+          style: kind === "receive" ? "default" : "destructive",
+          onPress: () => act.mutate({ kind, id }),
+        },
+      ],
+    );
+  };
 
   const orders = pos.data ?? [];
+  const shown = useMemo(
+    () => (filter === "all" ? orders : orders.filter((o) => o.status === filter)),
+    [orders, filter],
+  );
 
   const stats = useMemo(() => {
     const total = orders.reduce((s, o) => s + o.total, 0);
@@ -99,71 +157,95 @@ export default function PurchasesScreen() {
         <View style={styles.spacer} />
       </View>
 
-      <Button label={t("app.purchases.newOrder")} onPress={() => setOpen(true)} />
-
-      <Modal visible={open} animationType="slide" onRequestClose={() => setOpen(false)}>
-        <View style={[styles.modal, directionStyle(isRTL())]}>
-          <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
-            <Text style={styles.modalTitle}>{t("app.purchases.newOrder")}</Text>
-
-            <Text style={styles.meta}>{t("app.suppliers.detail.title")}</Text>
-            <View style={styles.chipRow}>
-              {(suppliers.data ?? []).map((sp) => (
-                <Chip key={sp.id} label={sp.name} active={supplierId === sp.id} onPress={() => setSupplierId(sp.id)} />
-              ))}
-            </View>
-
-            <Text style={styles.meta}>{t("app.activityLabels.fields.lines")}</Text>
-            <SearchField value={q} onChangeText={setQ} placeholder={t("mobile.purchases.searchProduct")} />
-            {matches.map((p) => (
-              <Pressable key={p.id} style={styles.pick} onPress={() => addItem(p)}>
-                <Text numberOfLines={1} style={styles.supplier}>{p.name}</Text>
-                <Text style={styles.meta}>{t("mobile.purchases.cost", { amount: money(p.costPrice) })}</Text>
-              </Pressable>
-            ))}
-            {items.map((i) => (
-              <View key={i.productId} style={styles.draftRow}>
-                <Text numberOfLines={1} style={[styles.supplier, { flex: 1 }]}>{i.productName}</Text>
-                <Pressable style={styles.qtyBtn} onPress={() => bump(i.productId, -1)}><Minus size={14} color={colors.accent} weight="bold" /></Pressable>
-                <Text style={styles.qty}>{i.quantity}</Text>
-                <Pressable style={styles.qtyBtn} onPress={() => bump(i.productId, 1)}><Plus size={14} color={colors.accent} weight="bold" /></Pressable>
-                <Text style={styles.total}>{money(i.quantity * i.unitCost)}</Text>
-              </View>
-            ))}
-            {items.length ? <Text style={styles.total}>{t("mobile.purchases.total", { amount: money(draftTotal) })}</Text> : null}
-
-            {error ? <Text style={styles.err}>{error}</Text> : null}
-            <Button label={t("mobile.purchases.create")} disabled={!canSubmit} loading={create.isPending} onPress={() => create.mutate()} />
-            <Button label={t("app.purchases.row.cancel")} variant="ghost" onPress={() => setOpen(false)} />
-          </ScrollView>
+      {canManage ? (
+        <View testID="po-new-order">
+          <Button label={t("app.purchases.newOrder")} onPress={() => setBuilderOpen(true)} />
         </View>
-      </Modal>
+      ) : null}
+
+      {notice ? (
+        <View style={[styles.notice, notice.tone === "error" ? styles.noticeError : styles.noticeSuccess]}>
+          <Text style={[styles.noticeText, notice.tone === "error" ? styles.noticeTextError : styles.noticeTextSuccess]}>
+            {notice.text}
+          </Text>
+        </View>
+      ) : null}
+
+      <PoBuilderSheet
+        visible={builderOpen}
+        canCreateSupplier={canCreateSupplier}
+        onClose={() => setBuilderOpen(false)}
+        onCreated={() => void qc.invalidateQueries({ queryKey: ["purchase-orders"] })}
+        onReceiveNow={(id) => confirm("receive", id)}
+        receiving={act.isPending && act.variables?.kind === "receive"}
+      />
+
+      <Segmented items={FILTERS()} value={filter} onChange={setFilter} />
 
       {pos.isLoading ? (
         <ActivityIndicator color={colors.accent} />
-      ) : orders.length === 0 ? (
-        <EmptyState title={t("mobile.purchases.empty")} hint={t("mobile.purchases.emptyHint")} />
+      ) : pos.isError ? (
+        <EmptyState title={describeError(pos.error, t("mobile.common.serverError"))} />
+      ) : shown.length === 0 ? (
+        <EmptyState
+          title={orders.length === 0 ? t("mobile.purchases.empty") : t("app.purchases.emptyFiltered")}
+          hint={orders.length === 0 ? t("mobile.purchases.emptyHint") : undefined}
+        />
       ) : (
         <View style={styles.list}>
-          {orders.map((o) => {
+          {shown.map((o) => {
             const s = STATUS()[o.status] ?? { label: o.status, variant: "neutral" as const };
             const due = o.total - o.paidAmount;
+            const busy = act.isPending && act.variables?.id === o.id;
             return (
-              <View key={o.id} style={styles.row}>
+              <View key={o.id} style={styles.row} testID="po-row">
                 <View style={styles.rowHead}>
-                  <Text numberOfLines={1} style={styles.supplier}>
+                  <Text numberOfLines={1} style={styles.supplier} testID="po-row-supplier">
                     {o.supplierName}
                   </Text>
                   <Badge label={s.label} variant={s.variant} />
                 </View>
                 <View style={styles.rowMeta}>
-                  <Text style={styles.total}>{money(o.total)}</Text>
-                  <Text style={styles.meta}>
+                  <Text style={styles.total} testID="po-row-total">{money(o.total)}</Text>
+                  <Text style={styles.meta} testID="po-row-meta">
                     {t("mobile.purchases.orderMeta", { n: o.itemCount, date: shortDate(o.orderDate) })}
                   </Text>
                 </View>
-                {due > 0 ? (
+                {o.status === "received" && o.receivedDate ? (
+                  <Text style={styles.meta}>{t("app.purchases.row.received", { date: shortDate(o.receivedDate) })}</Text>
+                ) : null}
+                {o.status === "received" && due > 0 ? (
                   <Text style={styles.due}>{t("mobile.purchases.remaining", { amount: money(due) })}</Text>
+                ) : null}
+                {o.notes ? <Text numberOfLines={2} style={styles.meta}>{o.notes}</Text> : null}
+
+                {canManage && o.status === "draft" ? (
+                  <View style={styles.actions}>
+                    <Button
+                      label={t("app.purchases.row.receive")}
+                      onPress={() => confirm("receive", o.id)}
+                      disabled={busy}
+                      loading={busy && act.variables?.kind === "receive"}
+                      style={styles.actionBtn}
+                    />
+                    <Button
+                      label={t("app.purchases.row.cancel")}
+                      variant="outline"
+                      onPress={() => confirm("cancel", o.id)}
+                      disabled={busy}
+                      style={styles.actionBtn}
+                    />
+                    <Pressable
+                      onPress={() => confirm("delete", o.id)}
+                      disabled={busy}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel={t("app.purchases.row.deleteTitle")}
+                      style={styles.iconBtn}
+                    >
+                      <Trash size={20} color={colors.danger} />
+                    </Pressable>
+                  </View>
                 ) : null}
               </View>
             );
@@ -188,18 +270,26 @@ const styles = StyleSheet.create({
     ...elevation.card,
   },
   rowHead: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  supplier: { flexShrink: 1, fontFamily: fonts.semibold, fontSize: 15, color: colors.text, ...RTL_TEXT },
+  supplier: { flex: 1, fontFamily: fonts.semibold, fontSize: 15, color: colors.text, ...RTL_TEXT },
   rowMeta: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   total: { fontFamily: fonts.bold, fontSize: 16, color: colors.text, fontVariant: ["tabular-nums"] },
   meta: { flexShrink: 1, fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },
   due: { fontFamily: fonts.medium, fontSize: 13, color: colors.danger, ...RTL_TEXT },
-  modal: { flex: 1, backgroundColor: colors.bg },
-  modalContent: { padding: spacing.xl, paddingTop: 60, gap: spacing.md },
-  modalTitle: { fontFamily: fonts.bold, fontSize: 24, color: colors.text, ...RTL_TEXT },
-  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  pick: { padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, gap: 2 },
-  draftRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
-  qtyBtn: { width: 32, height: 32, borderRadius: radius.md, borderWidth: 1, borderColor: colors.accent, alignItems: "center", justifyContent: "center" },
-  qty: { minWidth: 24, textAlign: "center", fontFamily: fonts.bold, fontSize: 14, color: colors.text },
-  err: { fontFamily: fonts.medium, fontSize: 14, color: colors.danger, textAlign: "center" },
+  actions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  actionBtn: { flex: 1 },
+  iconBtn: { width: MIN_TOUCH, height: MIN_TOUCH, alignItems: "center", justifyContent: "center" },
+  notice: { padding: spacing.md, borderRadius: radius.md, borderWidth: 1 },
+  noticeSuccess: { backgroundColor: colors.successLight, borderColor: colors.success },
+  noticeError: { backgroundColor: colors.dangerLight, borderColor: colors.danger },
+  noticeText: { fontFamily: fonts.medium, fontSize: 13, ...RTL_TEXT },
+  noticeTextSuccess: { color: colors.successStrong },
+  noticeTextError: { color: colors.danger },
 });

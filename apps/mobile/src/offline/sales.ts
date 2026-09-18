@@ -18,9 +18,10 @@ import { calcLineDiscount, computeCartTotals, type DiscountType } from "@matgary
 import { api } from "@/api/client";
 import { classifyOutcome, discard, enqueue, hasHandler, registerHandler, retry, type DrainResult, type OutboxItem } from "@/offline";
 import { isSimulatedOffline } from "@/offline/dev-offline";
-import { derivedRetryKey, mintInvoiceId } from "@/offline/invoice-id";
-import { get as getRow, readMeta, writeMeta } from "@/offline/outbox";
+import { mintInvoiceId } from "@/offline/invoice-id";
+import { get as getRow, readMeta, replacePayload, writeMeta } from "@/offline/outbox";
 import { useCart, type CartLine } from "@/stores/cart";
+import { useSession } from "@/stores/session";
 
 export const SALE_KIND = "sale";
 
@@ -40,16 +41,12 @@ export type SalePayload = salesApi.CartSaleBody & {
   names?: Record<string, string>;
   catalogUpdatedAt?: Record<string, string>;
   /**
-   * §6.5 / S7 "sell anyway": book the sale even though stock is short, drive
-   * the quantity to the floor and write a stock-discrepancy audit row. Sent
-   * on the wire inside `options`. NOTE: the cart route's zod schema does not
-   * declare it yet (S7/S13 server work is still open), so today the server
-   * STRIPS it and re-checks stock — every re-submit, under the original key
-   * or a derived one, comes back INSUFFICIENT_STOCK (verified live). The
-   * client contract is final; the ACTION stays hidden behind
-   * SELL_ANYWAY_ENABLED until the server lights the flag up.
+   * §6.5 / S7 "sell anyway": `options.allowOversell: true` books the sale
+   * even though stock is short — the server drives the quantity to the floor
+   * and writes a stock-discrepancy audit row (product_history). Sent on the
+   * wire inside `options`; the cart route's zod schema accepts it (S7).
    */
-  options: salesApi.CartOptions & { allowOversell?: boolean };
+  options: salesApi.CartOptions;
 };
 export type SaleOutboxItem = OutboxItem<SalePayload, salesApi.CartSaleResult>;
 
@@ -117,11 +114,12 @@ export function enqueueSale(
 // ─── triage (sync screen) ────────────────────────────────────────────────────
 
 /**
- * Domain refusals the cart route CACHES under the Idempotency-Key for 24h
- * (apps/web/app/api/sales/cart/route.ts catch → rememberResponse for every
- * 4xx domain error). Replaying the same key returns the same refusal even
- * after the shelf was restocked, so "Retry" is a guaranteed no-op for these;
- * the only way forward is Edit → a fresh invoice id (§2.2.4 / doc 06 §6.3).
+ * Domain refusals for which a plain "Retry" is pointless: the cart route
+ * re-evaluates the same body and refuses it the same way (since S7 the
+ * route caches 2xx ONLY, so the key itself is not poisoned — a retry under
+ * the same key with a corrected body CAN succeed; that is what sellAnyway
+ * does). The way forward is Edit → fix the cart (§2.2.4 / doc 06 §6.3), or
+ * Sell anyway for INSUFFICIENT_STOCK (§6.5).
  */
 export const CACHED_REFUSAL_CODES = new Set(["INSUFFICIENT_STOCK", "PRODUCT_NOT_FOUND", "PRODUCT_WRONG_BRANCH", "CART_EMPTY"]);
 
@@ -131,11 +129,11 @@ export const CACHED_REFUSAL_CODES = new Set(["INSUFFICIENT_STOCK", "PRODUCT_NOT_
  *    branch mismatch — that 409 is answered before the cache and never
  *    stored), so the ORIGINAL key must be replayed to dedupe (§6.6).
  *  - "rekey": the route's own 500 (`{error:"INTERNAL"}`) means the sale was
- *    rolled back and NOT booked — but the route caches that 500 under the key
- *    too, so a same-key retry receives the cached failure all day. A new
- *    invoice id is the only retry that can succeed, and cannot double-post.
- *  - "edit": a cached domain refusal — retrying cannot help; the cashier must
- *    fix the cart (see CACHED_REFUSAL_CODES).
+ *    rolled back and NOT booked. Since S7 the route no longer caches
+ *    failures, so a same-key retry would also work; re-keying is kept as the
+ *    belt-and-braces path (it cannot double-post either).
+ *  - "edit": a domain refusal — retrying the same body cannot help; the
+ *    cashier must fix the cart (see CACHED_REFUSAL_CODES).
  */
 export type SaleRetryMode = "same-key" | "rekey" | "edit";
 
@@ -159,19 +157,14 @@ export { mintInvoiceId };
 export const OVERSELL_CODES: ReadonlySet<string> = new Set(["INSUFFICIENT_STOCK"]);
 
 /**
- * Feature flag for the §6.5 "Sell anyway" ACTION. The client side is
- * complete (sellAnyway below), but the server is not: apps/web/app/api/
- * sales/cart/route.ts declares no `allowOversell` in its zod options
- * (z.object strips it) and recordCartSale re-checks stock, so today every
- * re-submit — original key, `-r1`, `-r2` … — answers INSUFFICIENT_STOCK
- * (verified live against :3003). Offering a button whose promise the server
- * refuses is worse than none, so the action is not rendered and the
- * INSUFFICIENT_STOCK hint offers Edit / Discard only. When S7 lands
- * (route accepts the flag, floors stock, writes the discrepancy row) flip
- * this to true AND restore the sell-anyway wording of
- * `mobile.sync.oversellHint` in both dictionaries.
+ * Feature flag for the §6.5 "Sell anyway" ACTION. S7 landed server-side:
+ * apps/web/app/api/sales/cart/route.ts accepts `options.allowOversell`,
+ * recordCartSale floors the stock at 0 and appends a discrepancy row to
+ * product_history, and the route caches 2xx only — so a same-key retry with
+ * the flag succeeds (verified live against :3003). Kept as a constant so the
+ * action can be switched off in one place if the server ever regresses.
  */
-export const SELL_ANYWAY_ENABLED: boolean = false;
+export const SELL_ANYWAY_ENABLED: boolean = true;
 
 /** A failed sale the server refused for short stock — the §6.5 case, whether or not the action is offered. */
 export function isOversellRefusal(item: OutboxItem): boolean {
@@ -183,40 +176,36 @@ export function canSellAnyway(item: OutboxItem): boolean {
 }
 
 /**
- * "Sell anyway": re-submit the refused sale with `allowOversell: true`.
+ * "Sell anyway": re-submit the refused sale with `allowOversell: true` under
+ * the SAME Idempotency-Key (S7). The route caches 2xx only, so the key is
+ * clean after a refusal and the server evaluates the corrected body afresh;
+ * and if the original DID land (a lost 201), the same key replays the cached
+ * receipt instead of booking twice (§6.6). The invoice id and key never
+ * change, so the receipt the customer holds matches the server record.
  *
- * WHY A DERIVED KEY. The cart route caches every 4xx domain refusal under
- * the Idempotency-Key for 24h (route.ts catch → rememberResponse), and the
- * cache check runs BEFORE the body is read — verified live: a replay of the
- * original key with `allowOversell:true` in the body still answers the cached
- * INSUFFICIENT_STOCK. So the replay goes out under `<invoiceId>-r1` (then
- * `-r2` …), which the server evaluates afresh. It cannot double-post: a 4xx
- * means the original was never booked. The invoice id inside the body keeps
- * the ORIGINAL value, so the receipt the customer holds still matches the
- * server record; only the key (and the outbox row id) carry the suffix.
- *
- * ORDER MATTERS (§6.6 "a sale must never disappear"): the replacement row is
- * enqueued FIRST — its id is `sale_<key>`, distinct from the original's — and
- * the original is discarded (audit copy annotated `soldAnywayAs`) only once
- * the replacement is durably in the table. enqueue() can throw
- * (INVALID_IDEMPOTENCY_KEY, or NOT_SIGNED_IN when the session flipped under a
- * 401 while the sheet was open); discarding first would leave the sale as a
- * meta `discard:<id>` copy no screen lists. Returns the drain result, or null
- * when the row is mid-send (nothing is written then).
+ * The row is swapped IN PLACE (outbox.replacePayload): its pre-swap copy is
+ * written to meta `discard:<id>` (annotated `soldAnywayAs` / `allowOversell`)
+ * and the payload, status and attempts are rewritten in the SAME SQLite
+ * transaction — the sale is never absent from the outbox, not even across a
+ * crash between two writes (§6.6 "a sale must never disappear"). Refuses
+ * with a reason instead of writing anything when the row is mid-send (or
+ * gone) or nobody is signed in — the two need different copy on screen.
  */
-export function sellAnyway(item: SaleOutboxItem): Promise<DrainResult> | null {
-  if (isMidSend(item.id)) return null;
-  const invoiceId = item.payload.options?.invoiceId ?? item.idempotencyKey;
-  const key = derivedRetryKey(invoiceId, item.idempotencyKey);
+export type SellAnywayRefusal = "mid-send" | "signed-out";
+
+export function sellAnyway(item: SaleOutboxItem): Promise<DrainResult> | SellAnywayRefusal {
+  if (!useSession.getState().me) return "signed-out";
+  if (isMidSend(item.id)) return "mid-send";
+  const key = item.idempotencyKey;
+  const invoiceId = item.payload.options?.invoiceId ?? key;
   const payload: SalePayload = {
     lines: item.payload.lines,
     options: { ...item.payload.options, invoiceId, allowOversell: true },
     ...sidecarOf(item.payload),
   };
   ensureSaleHandler();
-  enqueue(SALE_KIND, payload, key);
-  discardSale(item.id, "oversell", { soldAnywayAs: key, allowOversell: true });
-  return retry(`${SALE_KIND}_${key}`);
+  if (!replacePayload(item.id, payload, { reason: "oversell", soldAnywayAs: key, allowOversell: true })) return "mid-send";
+  return retry(item.id);
 }
 
 /** True when the row is being sent right now (or is gone) — nothing may replace it then. */
@@ -229,8 +218,11 @@ function isMidSend(id: string): boolean {
  * Retry a failed sale the way its failure allows (saleRetryMode). A re-key
  * enqueues the same body under a fresh invoice id / Idempotency-Key FIRST
  * and only then discards the old row (its audit copy survives under meta
- * `discard:<id>`, annotated with the new invoice id) — see sellAnyway for
- * why that order. A row that is mid-send is retried under its own key
+ * `discard:<id>`, annotated with the new invoice id) — enqueue first so
+ * the sale is never absent from the outbox between the two writes (§6.6);
+ * a fresh key cannot collide, which is what makes that order possible
+ * (sellAnyway keeps the key and so swaps in place instead). A row that is
+ * mid-send is retried under its own key
  * instead. Returns the drain result either way.
  */
 export function retrySale(item: SaleOutboxItem): Promise<DrainResult> {
@@ -298,7 +290,7 @@ export function loadSaleIntoCart(
     };
   });
   const o = item.payload.options ?? {};
-  // Discard first — the opposite order from sellAnyway/retrySale, on purpose:
+  // Discard first — the opposite order from retrySale, on purpose:
   // the target here is the in-memory cart store (a plain setState that cannot
   // throw), so nothing can be lost between the two steps, whereas loading the
   // cart BEFORE a discard that then refuses (row mid-send) would leave the

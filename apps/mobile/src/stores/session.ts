@@ -4,7 +4,7 @@ import { createMMKV } from "react-native-mmkv";
 import { ApiError, auth, me as meApi, type MeResponse } from "@matgary/api-client";
 
 import { api, deviceMeta, onSessionLost, setActiveBranchId } from "@/api/client";
-import { t } from "@/i18n";
+import { getLocale, t } from "@/i18n";
 import { getInstallId } from "@/auth/installId";
 import { useCart } from "@/stores/cart";
 
@@ -221,6 +221,9 @@ export const useSession = create<SessionState>((set, get) => ({
     set({ signingIn: true, signInError: null });
     try {
       await auth.startDemo(api, {
+        // The route seeds the ephemeral owner's language from this; without
+        // it the trial store answers in Arabic to an English-mode app.
+        locale: getLocale(),
         platform: deviceMeta.platform,
         appVersion: deviceMeta.appVersion,
         installId: await getInstallId(),
