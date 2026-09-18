@@ -294,6 +294,7 @@ const styles = StyleSheet.create({
   head: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
   name: { flexShrink: 1, fontFamily: fonts.semibold, fontSize: 15, color: colors.text, ...RTL_TEXT },
   amount: {
+    ...RTL_TEXT,
     fontFamily: fonts.bold,
     fontSize: 15,
     color: colors.danger,
@@ -301,7 +302,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   meta: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  date: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary },
+  date: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary },
 
   overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.45)" },
   sheet: {

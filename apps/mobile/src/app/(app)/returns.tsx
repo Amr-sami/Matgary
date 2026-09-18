@@ -478,7 +478,7 @@ const styles = StyleSheet.create({
   },
   head: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
   name: { flexShrink: 1, fontFamily: fonts.semibold, fontSize: 15, color: colors.text, ...RTL_TEXT },
-  amount: { fontFamily: fonts.bold, fontSize: 15, color: colors.danger, fontVariant: ["tabular-nums"] },
+  amount: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 15, color: colors.danger, fontVariant: ["tabular-nums"] },
   meta: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },
   // Wraps rather than clips when the invoice id is long on a narrow phone.
   metaRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: spacing.xs },

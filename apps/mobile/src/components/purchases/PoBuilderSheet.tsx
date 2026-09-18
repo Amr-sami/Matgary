@@ -878,7 +878,7 @@ const styles = StyleSheet.create({
     color: colors.text,
     ...RTL_TEXT,
   },
-  lineTotal: { fontFamily: fonts.bold, fontSize: 15, color: colors.text, fontVariant: ["tabular-nums"] },
+  lineTotal: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 15, color: colors.text, fontVariant: ["tabular-nums"] },
   reviewCard: {
     gap: spacing.sm,
     padding: spacing.md,
@@ -896,9 +896,9 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
-  grandTotal: { fontFamily: fonts.bold, fontSize: 18, color: colors.text, fontVariant: ["tabular-nums"] },
+  grandTotal: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 18, color: colors.text, fontVariant: ["tabular-nums"] },
   doneContent: { alignItems: "center", justifyContent: "center", flexGrow: 1, gap: spacing.sm },
   doneTitle: { fontFamily: fonts.bold, fontSize: 22, color: colors.text, marginTop: spacing.md, ...RTL_TEXT },
-  doneRef: { fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary, fontVariant: ["tabular-nums"] },
+  doneRef: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary, fontVariant: ["tabular-nums"] },
   doneHint: { marginTop: spacing.md, paddingHorizontal: spacing.lg, textAlign: "center" },
 });

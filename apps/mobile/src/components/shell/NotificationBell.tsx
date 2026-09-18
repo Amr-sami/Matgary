@@ -16,6 +16,7 @@ import { api } from "@/api/client";
 import { t } from "@/i18n";
 import { useSession } from "@/stores/session";
 import { MIN_TOUCH, colors, fonts, radius } from "@/theme/tokens";
+import { RTL_TEXT } from "@/theme/rtl";
 
 /**
  * Port of apps/web/components/notifications/NotificationBell.tsx — the file
@@ -271,6 +272,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   badgeText: {
+    ...RTL_TEXT,
     fontFamily: fonts.bold,
     fontSize: 10,
     lineHeight: 12,

@@ -7,6 +7,7 @@ import {
 } from "react-native";
 
 import { MIN_TOUCH, colors, fonts, radius } from "@/theme/tokens";
+import { RTL_TEXT } from "@/theme/rtl";
 
 interface ButtonProps {
   label: string;
@@ -88,7 +89,7 @@ const styles = StyleSheet.create({
   ghost: { backgroundColor: "transparent", minHeight: MIN_TOUCH },
   nonPrimaryPressed: { backgroundColor: colors.accentLight },
   disabled: { opacity: 0.5 },
-  label: { fontFamily: fonts.bold, fontSize: 16 },
+  label: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 16 },
   labelOnAccent: { color: "#FFFFFF" },
   labelAccent: { color: colors.accent },
 });

@@ -413,7 +413,7 @@ const styles = StyleSheet.create({
   // ABOVE the title instead of below it.
   header: { gap: spacing.xs },
   back: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 32 },
-  backLabel: { fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
+  backLabel: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
   titleRow: {
     flexDirection: "row",
     alignItems: "center",

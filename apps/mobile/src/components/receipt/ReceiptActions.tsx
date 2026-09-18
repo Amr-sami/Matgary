@@ -17,6 +17,7 @@ import {
 } from "@/receipt/share";
 import { PrintToPrinterAction } from "@/printing/PrintToPrinterAction";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
+import { RTL_TEXT } from "@/theme/rtl";
 
 type Busy = "share" | "print" | null;
 
@@ -220,10 +221,10 @@ const styles = StyleSheet.create({
   },
   actionPressed: { backgroundColor: colors.accentLight },
   actionDisabled: { opacity: 0.5 },
-  actionLabel: { fontFamily: fonts.medium, fontSize: 14, color: colors.accent, flexShrink: 1 },
+  actionLabel: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.accent, flexShrink: 1 },
   widthRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
-  widthLabel: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, flexShrink: 1 },
+  widthLabel: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, flexShrink: 1 },
   widthPicker: { width: 150 },
-  error: { fontFamily: fonts.regular, fontSize: 13, color: colors.danger },
-  notice: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary },
+  error: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 13, color: colors.danger },
+  notice: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary },
 });

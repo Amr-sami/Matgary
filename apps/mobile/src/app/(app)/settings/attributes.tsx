@@ -560,7 +560,7 @@ function NameSheet({
 const styles = StyleSheet.create({
   header: { gap: spacing.sm, marginBottom: spacing.lg },
   back: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-start", minHeight: MIN_TOUCH },
-  backLabel: { fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
+  backLabel: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
   titleRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md },
   title: { fontFamily: fonts.bold, fontSize: 24, color: colors.text, ...RTL_TEXT },
   subtitle: { fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary, marginTop: 4, ...RTL_TEXT },

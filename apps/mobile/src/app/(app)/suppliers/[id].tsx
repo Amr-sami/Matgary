@@ -483,7 +483,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   metaItem: { flexDirection: "row", alignItems: "center", gap: spacing.xs, flexShrink: 1 },
-  meta: { flexShrink: 1, fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary },
+  meta: { ...RTL_TEXT, flexShrink: 1, fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary },
   editButton: { marginTop: spacing.lg },
 
   figureLabel: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
@@ -530,6 +530,7 @@ const styles = StyleSheet.create({
   rowTitle: { flexShrink: 1, fontFamily: fonts.medium, fontSize: 15, color: colors.text, ...RTL_TEXT },
   rowDate: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
   rowAmount: {
+    ...RTL_TEXT,
     flexShrink: 0,
     fontFamily: fonts.bold,
     fontSize: 16,
@@ -537,6 +538,7 @@ const styles = StyleSheet.create({
     fontVariant: ["tabular-nums"],
   },
   rowAmountPaid: {
+    ...RTL_TEXT,
     flexShrink: 0,
     fontFamily: fonts.bold,
     fontSize: 16,

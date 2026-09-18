@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
+import { RTL_TEXT } from "@/theme/rtl";
 
 /**
  * The tab strip at the top of Insights: a bordered container with the active
@@ -68,7 +69,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
   },
   itemActive: { backgroundColor: colors.card, ...elevation.card },
-  label: { fontFamily: fonts.medium, fontSize: 14 },
-  labelActive: { color: colors.text, fontFamily: fonts.semibold },
+  label: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14 },
+  labelActive: { ...RTL_TEXT, color: colors.text, fontFamily: fonts.semibold },
   labelInactive: { color: colors.textSecondary },
 });

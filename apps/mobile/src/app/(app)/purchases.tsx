@@ -275,7 +275,7 @@ const styles = StyleSheet.create({
   rowHead: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   supplier: { flex: 1, fontFamily: fonts.semibold, fontSize: 15, color: colors.text, ...RTL_TEXT },
   rowMeta: { flexDirection: "row", alignItems: "center", gap: spacing.md },
-  total: { fontFamily: fonts.bold, fontSize: 16, color: colors.text, fontVariant: ["tabular-nums"] },
+  total: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 16, color: colors.text, fontVariant: ["tabular-nums"] },
   meta: { flexShrink: 1, fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },
   due: { fontFamily: fonts.medium, fontSize: 13, color: colors.danger, ...RTL_TEXT },
   actions: {

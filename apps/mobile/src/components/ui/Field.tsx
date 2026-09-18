@@ -101,5 +101,5 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   inputLtr: { writingDirection: "ltr", textAlign: "left" },
-  eye: { fontSize: 18, color: colors.textSecondary },
+  eye: { ...RTL_TEXT, fontSize: 18, color: colors.textSecondary },
 });

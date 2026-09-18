@@ -409,7 +409,7 @@ function ToggleRow({
 const styles = StyleSheet.create({
   header: { gap: spacing.xs },
   back: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 32 },
-  backLabel: { fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
+  backLabel: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
   title: { fontFamily: fonts.bold, fontSize: 26, color: colors.text, ...RTL_TEXT },
   subtitle: {
     fontFamily: fonts.regular,
@@ -474,6 +474,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
   },
   selectValue: {
+    ...RTL_TEXT,
     fontFamily: fonts.regular,
     fontSize: 16,
     color: colors.text,
@@ -533,7 +534,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     flexShrink: 0,
   },
-  removeLabel: { fontFamily: fonts.medium, fontSize: 13, color: colors.danger },
+  removeLabel: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 13, color: colors.danger },
 
   branchChips: {
     flexDirection: "row",

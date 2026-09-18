@@ -441,7 +441,7 @@ const styles = StyleSheet.create({
   rowMain: { flex: 1, gap: spacing.xs },
   rowTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
   invoice: { flexShrink: 1, fontFamily: fonts.semibold, fontSize: 15, color: colors.text, ...RTL_TEXT },
-  total: { fontFamily: fonts.bold, fontSize: 16, color: colors.text, fontVariant: ["tabular-nums"] },
+  total: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 16, color: colors.text, fontVariant: ["tabular-nums"] },
   totalReturned: { color: colors.textSecondary, textDecorationLine: "line-through" },
   meta: { alignSelf: "flex-start", fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },
   badges: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs },
@@ -455,5 +455,5 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xl,
   },
   retry: { alignSelf: "center", minHeight: MIN_TOUCH, justifyContent: "center", paddingHorizontal: spacing.lg },
-  retryText: { fontFamily: fonts.semibold, fontSize: 15, color: colors.accent },
+  retryText: { ...RTL_TEXT, fontFamily: fonts.semibold, fontSize: 15, color: colors.accent },
 });

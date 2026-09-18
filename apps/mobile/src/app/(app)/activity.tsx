@@ -507,7 +507,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     backgroundColor: colors.card,
   },
-  selectValue: { flexShrink: 1, fontFamily: fonts.regular, fontSize: 15, color: colors.text },
+  selectValue: { ...RTL_TEXT, flexShrink: 1, fontFamily: fonts.regular, fontSize: 15, color: colors.text },
   overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.45)" },
   sheet: {
     backgroundColor: colors.card,
@@ -540,7 +540,7 @@ const styles = StyleSheet.create({
   },
   optionActive: { backgroundColor: colors.accentLight },
   optionText: { flexShrink: 1, fontFamily: fonts.regular, fontSize: 15, color: colors.text, ...RTL_TEXT },
-  optionTextActive: { fontFamily: fonts.semibold, color: colors.accent },
+  optionTextActive: { ...RTL_TEXT, fontFamily: fonts.semibold, color: colors.accent },
 
   errorBox: {
     backgroundColor: colors.dangerLight,
@@ -577,14 +577,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
   },
-  pillText: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary },
+  pillText: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary },
   action: { fontFamily: fonts.semibold, fontSize: 15, color: colors.text, ...RTL_TEXT },
-  entity: { fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary, flexShrink: 1 },
+  entity: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary, flexShrink: 1 },
   rowMeta: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" },
-  meta: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary },
+  meta: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary },
   details: { marginTop: spacing.xs, gap: 2 },
   detail: { flexDirection: "row", alignItems: "baseline", gap: spacing.sm },
-  detailLabel: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary },
-  detailValue: { fontFamily: fonts.medium, fontSize: 12, color: colors.text, flexShrink: 1 },
+  detailLabel: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary },
+  detailValue: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 12, color: colors.text, flexShrink: 1 },
   footer: { paddingVertical: spacing.xl, alignItems: "center" },
 });

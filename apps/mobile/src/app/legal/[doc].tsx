@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
 
   header: { gap: spacing.xs, paddingHorizontal: 0 },
   back: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 32, alignSelf: "flex-start" },
-  backLabel: { fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
+  backLabel: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
   eyebrow: {
     fontFamily: fonts.semibold,
     fontSize: 12,

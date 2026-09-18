@@ -748,8 +748,8 @@ const styles = StyleSheet.create({
     marginBottom: -1,
   },
   tabActive: { borderBottomColor: colors.accent },
-  tabLabel: { fontFamily: fonts.medium, fontSize: 16 },
-  tabLabelActive: { color: colors.accent, fontFamily: fonts.semibold },
+  tabLabel: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 16 },
+  tabLabelActive: { ...RTL_TEXT, color: colors.accent, fontFamily: fonts.semibold },
   tabLabelInactive: { color: colors.textSecondary },
 
   centered: {
@@ -803,12 +803,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  avatarText: { fontFamily: fonts.semibold, fontSize: 16, color: colors.accent },
+  avatarText: { ...RTL_TEXT, fontFamily: fonts.semibold, fontSize: 16, color: colors.accent },
   rowBody: { flex: 1, gap: 2 },
   rowTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
   rowTitle: { flex: 1, fontFamily: fonts.medium, fontSize: 15, color: colors.text, ...RTL_TEXT },
-  rowTitleUnread: { fontFamily: fonts.semibold },
-  rowTime: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary },
+  rowTitleUnread: { ...RTL_TEXT, fontFamily: fonts.semibold },
+  rowTime: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary },
   rowPreview: { flex: 1, fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },
   rowPreviewUnread: { color: colors.text },
   unreadDot: {
@@ -820,7 +820,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  unreadText: { fontFamily: fonts.semibold, fontSize: 11, color: colors.card },
+  unreadText: { ...RTL_TEXT, fontFamily: fonts.semibold, fontSize: 11, color: colors.card },
 
   threadHeader: {
     flexDirection: "row",
@@ -840,7 +840,7 @@ const styles = StyleSheet.create({
   threadSubClosed: { color: colors.warningStrong },
   threadSubError: { color: colors.danger },
   archiveBtn: { minHeight: MIN_TOUCH, justifyContent: "center", paddingHorizontal: spacing.sm },
-  archiveText: { fontFamily: fonts.medium, fontSize: 14, color: colors.accent },
+  archiveText: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.accent },
 
   threadContent: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, flexGrow: 1 },
   loadOlder: {
@@ -850,7 +850,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.lg,
   },
-  loadOlderText: { fontFamily: fonts.medium, fontSize: 13, color: colors.accent },
+  loadOlderText: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 13, color: colors.accent },
 
   bubbleWrap: { flexDirection: "row", marginVertical: 3 },
   bubbleWrapIn: { justifyContent: "flex-start" },
@@ -867,8 +867,8 @@ const styles = StyleSheet.create({
   bubbleFailed: { backgroundColor: colors.dangerLight },
   bubbleText: { fontFamily: fonts.regular, fontSize: 15, color: colors.text, ...RTL_TEXT },
   bubbleMeta: { flexDirection: "row", justifyContent: "flex-end", alignItems: "center", gap: spacing.xs },
-  bubbleTime: { fontFamily: fonts.regular, fontSize: 11, color: colors.textSecondary },
-  bubbleStatus: { fontFamily: fonts.regular, fontSize: 11, color: colors.textSecondary },
+  bubbleTime: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 11, color: colors.textSecondary },
+  bubbleStatus: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 11, color: colors.textSecondary },
   bubbleStatusFailed: { color: colors.danger },
   failureReason: { fontFamily: fonts.regular, fontSize: 12, color: colors.danger, ...RTL_TEXT },
 

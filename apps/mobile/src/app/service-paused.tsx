@@ -12,6 +12,7 @@ import { t } from "@/i18n";
 import { useBlocked } from "@/stores/blocked";
 import { messageFor, useSession } from "@/stores/session";
 import { colors, fonts, radius, spacing } from "@/theme/tokens";
+import { RTL_TEXT } from "@/theme/rtl";
 
 /**
  * Landing place for `403 TENANT_SUSPENDED` (doc 02 §1.1 row 26). Port of
@@ -212,6 +213,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.neutralTint,
   },
   reasonLabel: {
+    ...RTL_TEXT,
     fontFamily: fonts.semibold,
     fontSize: 11,
     letterSpacing: 0.6,
@@ -219,6 +221,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   reasonText: {
+    ...RTL_TEXT,
     fontFamily: fonts.regular,
     fontSize: 14,
     lineHeight: 22,

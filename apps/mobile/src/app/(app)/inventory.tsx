@@ -319,7 +319,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     backgroundColor: colors.accent,
   },
-  ctaText: { fontFamily: fonts.bold, fontSize: 16, color: "#FFFFFF" },
+  ctaText: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 16, color: "#FFFFFF" },
   chipRowWrap: { overflow: "hidden" },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   count: { fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary, ...RTL_TEXT },
@@ -341,6 +341,6 @@ const styles = StyleSheet.create({
   rowHead: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   name: { flexShrink: 1, fontFamily: fonts.semibold, fontSize: 15, color: colors.text, ...RTL_TEXT },
   rowMeta: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  price: { fontFamily: fonts.bold, fontSize: 15, color: colors.text, fontVariant: ["tabular-nums"] },
-  brand: { flexShrink: 1, fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary },
+  price: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 15, color: colors.text, fontVariant: ["tabular-nums"] },
+  brand: { ...RTL_TEXT, flexShrink: 1, fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary },
 });

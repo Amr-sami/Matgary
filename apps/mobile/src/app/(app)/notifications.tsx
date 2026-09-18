@@ -341,7 +341,7 @@ const styles = StyleSheet.create({
     paddingStart: 4,
   },
   backPressed: { backgroundColor: colors.neutralTint },
-  backLabel: { fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
+  backLabel: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
   titleRow: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -361,7 +361,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   markAllPressed: { backgroundColor: colors.accentLight },
-  markAllLabel: { fontFamily: fonts.medium, fontSize: 13, color: colors.accent },
+  markAllLabel: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 13, color: colors.accent },
   notice: {
     fontFamily: fonts.medium,
     fontSize: 13,
@@ -418,9 +418,9 @@ const styles = StyleSheet.create({
   },
   rowBody: { flex: 1, gap: 2, alignItems: "flex-start" },
   rowTitle: { fontFamily: fonts.medium, fontSize: 15, color: colors.text, ...RTL_TEXT },
-  rowTitleUnread: { fontFamily: fonts.semibold },
+  rowTitleUnread: { ...RTL_TEXT, fontFamily: fonts.semibold },
   rowText: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },
-  rowTime: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  rowTime: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, marginTop: 2 },
   dot: {
     width: 8,
     height: 8,

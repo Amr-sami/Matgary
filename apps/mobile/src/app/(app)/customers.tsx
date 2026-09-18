@@ -438,6 +438,7 @@ const styles = StyleSheet.create({
   head: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
   name: { flexShrink: 1, minWidth: 0, fontFamily: fonts.semibold, fontSize: 15, color: colors.text, ...RTL_TEXT },
   owed: {
+    ...RTL_TEXT,
     flexShrink: 0,
     fontFamily: fonts.bold,
     fontSize: 15,

@@ -185,7 +185,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   avatarOwner: { backgroundColor: colors.accent },
-  initial: { fontFamily: fonts.bold, fontSize: 18, color: colors.accent },
+  initial: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 18, color: colors.accent },
   initialOwner: { color: colors.card },
   body: { flex: 1, minWidth: 0, gap: 2 },
   name: { fontFamily: fonts.semibold, fontSize: 15, color: colors.text, ...RTL_TEXT },

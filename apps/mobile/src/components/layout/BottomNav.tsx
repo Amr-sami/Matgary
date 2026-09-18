@@ -14,6 +14,7 @@ import { api } from "@/api/client";
 import { UNREAD_TASKS_KEY, badgeText, useBadges } from "@/stores/badges";
 import { useSession } from "@/stores/session";
 import { colors, fonts, radius, spacing } from "@/theme/tokens";
+import { RTL_TEXT } from "@/theme/rtl";
 import { t } from "@/i18n";
 
 /**
@@ -170,7 +171,7 @@ const styles = StyleSheet.create({
     // Digits in a pill: the count is a number, not a sentence.
     writingDirection: "ltr",
   },
-  label: { fontFamily: fonts.medium, fontSize: 10 },
+  label: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 10 },
   underline: {
     height: 2,
     width: 24,

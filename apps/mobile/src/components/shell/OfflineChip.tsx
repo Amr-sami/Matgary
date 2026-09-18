@@ -10,6 +10,7 @@ import { t } from "@/i18n";
 import { useOffline } from "@/stores/offline";
 import { useSession } from "@/stores/session";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
+import { RTL_TEXT } from "@/theme/rtl";
 
 /**
  * Header chip for the offline engine. Renders nothing in the happy case
@@ -90,6 +91,7 @@ const styles = StyleSheet.create({
   },
   pressed: { opacity: 0.7 },
   label: {
+    ...RTL_TEXT,
     fontFamily: fonts.semibold,
     fontSize: 12,
     lineHeight: 16,

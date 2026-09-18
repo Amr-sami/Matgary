@@ -22,7 +22,7 @@ import { DottedGround } from "@/components/DottedGround";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
-import { RTL } from "@/theme/rtl";
+import { RTL, RTL_TEXT } from "@/theme/rtl";
 import { colors, fonts, radius, spacing } from "@/theme/tokens";
 
 /**
@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     flexShrink: 1,
   },
-  demoPillText: { fontFamily: fonts.bold, fontSize: 14, color: colors.onAccent },
+  demoPillText: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 14, color: colors.onAccent },
   demoError: { marginTop: spacing.md },
   langToggle: {
     flexDirection: "row",
@@ -343,7 +343,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     flexShrink: 0,
   },
-  langText: { fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
+  langText: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
   centre: { flex: 1, justifyContent: "center" },
   brand: { alignItems: "center", marginBottom: spacing.xxl },
   heading: {
@@ -393,5 +393,5 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   back: { alignItems: "center", minHeight: 44, justifyContent: "center" },
-  backText: { fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary },
+  backText: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary },
 });

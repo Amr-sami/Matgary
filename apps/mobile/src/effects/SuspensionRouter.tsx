@@ -9,7 +9,7 @@ import type { MeResponse } from "@matgary/api-client";
 import { t, useLocale } from "@/i18n";
 import { type BlockedCode, useBlocked } from "@/stores/blocked";
 import { useSession } from "@/stores/session";
-import { directionStyle } from "@/theme/rtl";
+import { directionStyle, RTL_TEXT } from "@/theme/rtl";
 import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
 
 /**
@@ -222,6 +222,7 @@ const styles = StyleSheet.create({
     ...elevation.dropdown,
   },
   text: {
+    ...RTL_TEXT,
     flex: 1,
     fontFamily: fonts.medium,
     fontSize: 14,

@@ -36,7 +36,7 @@ import {
 
 import { getLocale, t } from "@/i18n";
 import { setPerfReporter } from "@/observability/perf";
-import { directionStyle } from "@/theme/rtl";
+import { directionStyle, RTL_TEXT } from "@/theme/rtl";
 import { colors, fonts, MIN_TOUCH, radius, spacing } from "@/theme/tokens";
 
 // ---------------------------------------------------------------------------
@@ -478,6 +478,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   devMessage: {
+    ...RTL_TEXT,
     fontFamily: fonts.regular,
     fontSize: 12,
     color: colors.danger,
@@ -501,6 +502,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accentPressed,
   },
   buttonLabel: {
+    ...RTL_TEXT,
     fontFamily: fonts.semibold,
     fontSize: 15,
     color: colors.bg,

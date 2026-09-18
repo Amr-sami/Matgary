@@ -41,6 +41,7 @@ import {
 } from "@/lib/geo";
 import { useSession } from "@/stores/session";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
+import { RTL_TEXT } from "@/theme/rtl";
 
 /**
  * Geofenced self check-in — doc 02 §3.2, promoted from the web's dashboard
@@ -773,7 +774,7 @@ export default function AttendanceScreen() {
 
 const styles = StyleSheet.create({
   card: { marginTop: spacing.md, gap: spacing.sm },
-  cardTitle: { fontFamily: fonts.semibold, fontSize: 15, color: colors.text },
+  cardTitle: { ...RTL_TEXT, fontFamily: fonts.semibold, fontSize: 15, color: colors.text },
   rowBetween: {
     flexDirection: "row",
     alignItems: "center",
@@ -783,15 +784,16 @@ const styles = StyleSheet.create({
   rowGap: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   flex: { flex: 1 },
   spinner: { alignSelf: "flex-start", marginVertical: spacing.sm },
-  statusHeadline: { fontFamily: fonts.bold, fontSize: 20, color: colors.text },
-  body: { fontFamily: fonts.regular, fontSize: 14, color: colors.text, lineHeight: 22 },
-  muted: { fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary },
-  mutedSmall: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary },
-  okText: { fontFamily: fonts.medium, fontSize: 14, color: colors.successStrong },
-  errText: { fontFamily: fonts.medium, fontSize: 14, color: colors.danger },
-  warnText: { fontFamily: fonts.regular, fontSize: 13, color: colors.warningStrong, lineHeight: 20 },
+  statusHeadline: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 20, color: colors.text },
+  body: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 14, color: colors.text, lineHeight: 22 },
+  muted: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary },
+  mutedSmall: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary },
+  okText: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.successStrong },
+  errText: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.danger },
+  warnText: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 13, color: colors.warningStrong, lineHeight: 20 },
   bigBtn: { marginTop: spacing.lg, minHeight: MIN_TOUCH + 12 },
   underBtn: {
+    ...RTL_TEXT,
     fontFamily: fonts.regular,
     fontSize: 12,
     color: colors.textSecondary,
@@ -818,7 +820,7 @@ const styles = StyleSheet.create({
   },
   fenceInside: { backgroundColor: colors.successLight, borderColor: colors.success },
   fenceOutside: { backgroundColor: colors.dangerLight, borderColor: colors.danger },
-  fenceText: { fontFamily: fonts.semibold, fontSize: 14, lineHeight: 21 },
+  fenceText: { ...RTL_TEXT, fontFamily: fonts.semibold, fontSize: 14, lineHeight: 21 },
   warnBox: {
     flexDirection: "row",
     alignItems: "center",
@@ -833,7 +835,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginTop: spacing.xs,
   },
-  coords: { fontFamily: fonts.regular, fontSize: 11, color: colors.textSecondary },
+  coords: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 11, color: colors.textSecondary },
   notice: {
     flexDirection: "row",
     alignItems: "center",
@@ -852,8 +854,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   shiftBorder: { borderTopWidth: 1, borderTopColor: colors.border },
-  shiftDay: { fontFamily: fonts.semibold, fontSize: 13, color: colors.text, minWidth: 78 },
+  shiftDay: { ...RTL_TEXT, fontFamily: fonts.semibold, fontSize: 13, color: colors.text, minWidth: 78 },
   shiftTimes: { flex: 1, gap: 2 },
-  shiftTime: { fontFamily: fonts.regular, fontSize: 13, color: colors.text },
-  shiftDuration: { fontFamily: fonts.medium, fontSize: 12, color: colors.textSecondary },
+  shiftTime: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 13, color: colors.text },
+  shiftDuration: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 12, color: colors.textSecondary },
 });

@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
 import { t, useLocale } from "@/i18n";
 import { useSession } from "@/stores/session";
-import { RTL } from "@/theme/rtl";
+import { RTL, RTL_TEXT } from "@/theme/rtl";
 import { colors, fonts, radius, spacing } from "@/theme/tokens";
 
 /**
@@ -215,7 +215,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     flexShrink: 1,
   },
-  demoPillText: { fontFamily: fonts.bold, fontSize: 14, color: colors.onAccent },
+  demoPillText: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 14, color: colors.onAccent },
   langToggle: {
     flexDirection: "row",
     alignItems: "center",
@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     flexShrink: 0,
   },
-  langText: { fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
+  langText: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
   brand: { alignItems: "center", marginTop: spacing.xxl * 1.5, marginBottom: spacing.xxl },
   heading: {
     fontFamily: fonts.bold,
@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   forgot: { alignItems: "center", minHeight: 44, justifyContent: "center" },
-  forgotText: { fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary },
+  forgotText: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary },
   rule: {
     height: 1,
     backgroundColor: colors.border,

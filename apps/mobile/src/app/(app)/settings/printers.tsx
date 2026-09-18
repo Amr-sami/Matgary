@@ -304,7 +304,7 @@ function SavedRow({
 const styles = StyleSheet.create({
   header: { gap: 4, alignItems: "flex-start", marginBottom: spacing.md },
   back: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 32 },
-  backLabel: { fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
+  backLabel: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
   title: { fontFamily: fonts.bold, fontSize: 26, color: colors.text, ...RTL_TEXT },
   subtitle: { fontFamily: fonts.regular, fontSize: 15, color: colors.textSecondary, ...RTL_TEXT },
   hint: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT, marginBottom: spacing.sm },
@@ -323,7 +323,7 @@ const styles = StyleSheet.create({
   },
   foundBody: { flex: 1, gap: 2 },
   foundName: { fontFamily: fonts.medium, fontSize: 15, color: colors.text, ...RTL_TEXT },
-  foundMeta: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary },
+  foundMeta: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary },
   savedRow: {
     gap: spacing.xs,
     padding: spacing.md,
@@ -349,7 +349,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
   },
   actionPressed: { backgroundColor: colors.accentLight },
-  actionText: { fontFamily: fonts.medium, fontSize: 13, color: colors.accent },
+  actionText: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 13, color: colors.accent },
   disabled: { opacity: 0.5 },
   error: { fontFamily: fonts.regular, fontSize: 13, color: colors.danger, marginTop: spacing.sm, ...RTL_TEXT },
   notice: { fontFamily: fonts.regular, fontSize: 12, color: colors.successStrong, marginTop: spacing.sm, ...RTL_TEXT },

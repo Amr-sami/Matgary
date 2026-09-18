@@ -251,7 +251,7 @@ function Group({ heading, rows }: { heading: string; rows: Row[] }) {
 const styles = StyleSheet.create({
   header: { gap: spacing.xs },
   back: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 32, alignSelf: "flex-start" },
-  backLabel: { fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
+  backLabel: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
   title: { fontFamily: fonts.bold, fontSize: 26, color: colors.text, ...RTL_TEXT },
 
   identity: {

@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
   rowText: { flexShrink: 1, minWidth: 0, gap: 6 },
   name: { fontFamily: fonts.medium, fontSize: 14, color: colors.text, ...RTL_TEXT },
   meta: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  brand: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, flexShrink: 1 },
+  brand: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, flexShrink: 1 },
   allGood: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  allGoodText: { fontFamily: fonts.medium, fontSize: 15, color: colors.success },
+  allGoodText: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 15, color: colors.success },
 });

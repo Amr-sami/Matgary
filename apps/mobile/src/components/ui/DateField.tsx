@@ -253,6 +253,7 @@ const styles = StyleSheet.create({
   boxPressed: { backgroundColor: colors.neutralTint },
   boxDisabled: { opacity: 0.5 },
   value: {
+    ...RTL_TEXT,
     flex: 1,
     fontFamily: fonts.regular,
     fontSize: 16,

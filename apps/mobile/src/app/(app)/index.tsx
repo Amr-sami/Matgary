@@ -274,7 +274,7 @@ const styles = StyleSheet.create({
   sub: { fontFamily: fonts.regular, fontSize: 15, color: colors.textSecondary, ...RTL_TEXT },
   grid: { gap: spacing.lg },
   gridRow: { flexDirection: "row", gap: spacing.lg },
-  error: { fontFamily: fonts.medium, fontSize: 14, color: colors.danger },
+  error: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.danger },
   stale: { fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },
 
   // Recent sales — same surface as StockAlerts / Card so the two tiles read
@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
   // hitSlop alone cannot reach 44pt here: RN clips slop to the parent's
   // bounds, and the header row is only one line of text tall.
   viewAllHit: { minHeight: MIN_TOUCH, justifyContent: "center" },
-  viewAll: { fontFamily: fonts.medium, fontSize: 14, color: colors.accent },
+  viewAll: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.accent },
   empty: {
     fontFamily: fonts.regular,
     fontSize: 14,
@@ -321,5 +321,5 @@ const styles = StyleSheet.create({
   customerWalkIn: { color: colors.textSecondary },
   rowMeta: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
   rowEnd: { alignItems: "flex-end", gap: 4 },
-  total: { fontFamily: fonts.bold, fontSize: 15, color: colors.text },
+  total: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 15, color: colors.text },
 });

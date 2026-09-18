@@ -738,7 +738,7 @@ export default function SecurityScreen() {
 const styles = StyleSheet.create({
   header: { gap: spacing.xs },
   back: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 32 },
-  backLabel: { fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
+  backLabel: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
   titleRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   title: {
     flex: 1,
@@ -780,7 +780,7 @@ const styles = StyleSheet.create({
 
   body: { fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary, lineHeight: 24, ...RTL_TEXT },
   bodyStrong: { fontFamily: fonts.semibold, fontSize: 14, color: colors.text, lineHeight: 24, ...RTL_TEXT },
-  bodyOn: { fontFamily: fonts.semibold, fontSize: 14, color: colors.successStrong },
+  bodyOn: { ...RTL_TEXT, fontFamily: fonts.semibold, fontSize: 14, color: colors.successStrong },
   hint: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, lineHeight: 20, ...RTL_TEXT },
   dangerTitle: { fontFamily: fonts.semibold, fontSize: 14, color: colors.danger, marginBottom: spacing.sm, ...RTL_TEXT },
   dangerCard: { borderColor: colors.dangerLight },
@@ -827,7 +827,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   revokePressed: { backgroundColor: colors.dangerLight },
-  revokeLabel: { fontFamily: fonts.semibold, fontSize: 13, color: colors.danger },
+  revokeLabel: { ...RTL_TEXT, fontFamily: fonts.semibold, fontSize: 13, color: colors.danger },
 
   // Latin, machine-readable strings: left-to-right and on the platform's
   // default face, because Cairo has no monospace cut.

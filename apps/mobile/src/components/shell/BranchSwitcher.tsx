@@ -19,7 +19,7 @@ import { ApiError, type BranchSummary } from "@matgary/api-client";
 
 import { t, useLocale } from "@/i18n";
 import { useSession } from "@/stores/session";
-import { directionStyle } from "@/theme/rtl";
+import { directionStyle, RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
 
 /** How long the chip wears its "switched to X" face before reverting. */
@@ -280,7 +280,7 @@ const styles = StyleSheet.create({
   chipPressed: { backgroundColor: colors.accentLight },
   chipConfirmed: { borderColor: colors.successStrong, backgroundColor: colors.successLight },
   chipInner: { flexDirection: "row", alignItems: "center", gap: spacing.xs + 2 },
-  chipText: { fontFamily: fonts.semibold, fontSize: 13, color: colors.text, flexShrink: 1 },
+  chipText: { ...RTL_TEXT, fontFamily: fonts.semibold, fontSize: 13, color: colors.text, flexShrink: 1 },
   chipTextConfirmed: { color: colors.successStrong },
 
   overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: colors.scrim },
@@ -303,8 +303,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   sheetHeader: { paddingHorizontal: spacing.xl, gap: spacing.xs, marginBottom: spacing.md },
-  sheetTitle: { fontFamily: fonts.bold, fontSize: 18, color: colors.accent },
-  sheetHint: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, lineHeight: 20 },
+  sheetTitle: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 18, color: colors.accent },
+  sheetHint: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, lineHeight: 20 },
 
   list: { paddingHorizontal: spacing.md, gap: spacing.xs },
   row: {
@@ -330,12 +330,13 @@ const styles = StyleSheet.create({
   },
   rowIconActive: { backgroundColor: colors.bg },
   rowBody: { flex: 1, gap: 2 },
-  rowName: { fontFamily: fonts.medium, fontSize: 15, color: colors.text },
-  rowNameActive: { fontFamily: fonts.bold, color: colors.accent },
-  rowMeta: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary },
+  rowName: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 15, color: colors.text },
+  rowNameActive: { ...RTL_TEXT, fontFamily: fonts.bold, color: colors.accent },
+  rowMeta: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary },
   rowTrailing: { width: 24, alignItems: "center", justifyContent: "center" },
 
   status: {
+    ...RTL_TEXT,
     fontFamily: fonts.regular,
     fontSize: 13,
     color: colors.textSecondary,
@@ -349,5 +350,5 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: colors.dangerLight,
   },
-  errorText: { fontFamily: fonts.medium, fontSize: 13, color: colors.danger },
+  errorText: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 13, color: colors.danger },
 });

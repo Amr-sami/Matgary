@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { useSession } from "@/stores/session";
 import { colors, fonts, radius, spacing } from "@/theme/tokens";
+import { RTL_TEXT } from "@/theme/rtl";
 import { isRTL, t } from "@/i18n";
 
 /**
@@ -267,7 +268,7 @@ const styles = StyleSheet.create({
 
   header: { gap: spacing.xs },
   back: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 32 },
-  backLabel: { fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
+  backLabel: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
 
   // Fills whatever the header leaves, so the card floats mid-fold as in the
   // capture. When the keyboard is up the scroll view's keyboard inset takes
@@ -298,7 +299,7 @@ const styles = StyleSheet.create({
   // Yoga resolves flex-start against the inherited direction: right edge in
   // Arabic, left edge in English. No textAlign involved.
   labelRow: { alignItems: "flex-start" },
-  label: { fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
+  label: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
   input: {
     minHeight: 52,
     paddingHorizontal: 16,
@@ -328,7 +329,7 @@ const styles = StyleSheet.create({
   },
   messageError: { backgroundColor: colors.dangerLight },
   messageSuccess: { backgroundColor: colors.successLight },
-  messageText: { fontFamily: fonts.medium, fontSize: 13 },
+  messageText: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 13 },
   messageErrorText: { color: colors.danger },
   messageSuccessText: { color: colors.successStrong },
 });

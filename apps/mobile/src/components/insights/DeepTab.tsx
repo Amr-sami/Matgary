@@ -794,18 +794,18 @@ const styles = StyleSheet.create({
   bar: { flex: 1, borderTopLeftRadius: 2, borderTopRightRadius: 2 },
   stack: { flex: 1, flexDirection: "column-reverse", alignItems: "stretch" },
   axis: { flexDirection: "row", justifyContent: "space-between", marginTop: spacing.xs },
-  axisText: { fontFamily: fonts.regular, fontSize: 11, color: colors.textSecondary, fontVariant: ["tabular-nums"] },
+  axisText: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 11, color: colors.textSecondary, fontVariant: ["tabular-nums"] },
 
   legend: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: spacing.md, marginTop: spacing.md },
   legendItem: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
-  legendText: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary },
+  legendText: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary },
   dot: { width: 10, height: 10, borderRadius: radius.full },
   ramp: { width: 14, height: 14, borderRadius: 3 },
 
   peak: { fontFamily: fonts.medium, fontSize: 13, color: colors.text, marginBottom: spacing.md, ...RTL_TEXT },
   heat: { gap: 2 },
   heatRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
-  heatDay: { width: 44, fontFamily: fonts.regular, fontSize: 11, color: colors.textSecondary },
+  heatDay: { ...RTL_TEXT, width: 44, fontFamily: fonts.regular, fontSize: 11, color: colors.textSecondary },
   heatDaySpacer: { width: 44 },
   heatCells: { flex: 1, flexDirection: "row", gap: 1 },
   heatCell: { flex: 1, aspectRatio: 1, borderRadius: 2 },
@@ -813,7 +813,7 @@ const styles = StyleSheet.create({
   // View + flex-end (not textAlign: "right"): Yoga resolves flex-end against
   // the inherited `direction`, so the digits hug the row edge in both locales.
   heatTotal: { width: 44, alignItems: "flex-end" },
-  heatTotalText: { fontFamily: fonts.regular, fontSize: 10, color: colors.textSecondary, fontVariant: ["tabular-nums"] },
+  heatTotalText: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 10, color: colors.textSecondary, fontVariant: ["tabular-nums"] },
   heatTotalSpacer: { width: 44 },
   heatHeader: { marginBottom: spacing.xs },
   heatFooter: { marginTop: spacing.xs },
@@ -821,14 +821,14 @@ const styles = StyleSheet.create({
   list: { gap: spacing.sm },
   methodRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, minHeight: 28 },
   methodName: { flex: 1, fontFamily: fonts.medium, fontSize: 14, color: colors.text, ...RTL_TEXT },
-  methodShare: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, fontVariant: ["tabular-nums"] },
+  methodShare: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, fontVariant: ["tabular-nums"] },
   methodValue: { minWidth: 90, alignItems: "flex-end" },
-  methodValueText: { fontFamily: fonts.semibold, fontSize: 14, color: colors.text, fontVariant: ["tabular-nums"] },
+  methodValueText: { ...RTL_TEXT, fontFamily: fonts.semibold, fontSize: 14, color: colors.text, fontVariant: ["tabular-nums"] },
 
   rowCard: { gap: spacing.sm, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
   rowHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
   rowTitle: { flex: 1, fontFamily: fonts.semibold, fontSize: 15, color: colors.text, ...RTL_TEXT },
-  rowValue: { fontFamily: fonts.bold, fontSize: 15, color: colors.text, fontVariant: ["tabular-nums"] },
+  rowValue: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 15, color: colors.text, fontVariant: ["tabular-nums"] },
   track: { height: 6, borderRadius: radius.full, backgroundColor: colors.neutralTint, overflow: "hidden" },
   fill: { height: "100%", borderRadius: radius.full, backgroundColor: colors.accent },
   metricGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.xs },
@@ -837,7 +837,7 @@ const styles = StyleSheet.create({
 
   viewing: { gap: 2, paddingBottom: spacing.md, marginBottom: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border },
   change: { alignSelf: "flex-start", minHeight: MIN_TOUCH, justifyContent: "center" },
-  changeText: { fontFamily: fonts.semibold, fontSize: 14, color: colors.accent },
+  changeText: { ...RTL_TEXT, fontFamily: fonts.semibold, fontSize: 14, color: colors.accent },
   hit: {
     flexDirection: "row",
     alignItems: "center",

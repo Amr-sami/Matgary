@@ -153,7 +153,7 @@ const styles = StyleSheet.create({
   trendDown: { backgroundColor: colors.dangerLight },
   // #27AE60 measures 2.87:1 on white and fails AA as text; successStrong is
   // 4.72:1. The saturated green stays for fills and icons only.
-  trendText: { fontFamily: fonts.medium, fontSize: 12, fontVariant: ["tabular-nums"] },
+  trendText: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 12, fontVariant: ["tabular-nums"] },
   trendTextUp: { color: colors.successStrong },
   trendTextDown: { color: colors.danger },
 });

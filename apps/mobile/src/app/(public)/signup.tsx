@@ -549,7 +549,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     flexShrink: 1,
   },
-  demoPillText: { fontFamily: fonts.bold, fontSize: 14, color: colors.onAccent },
+  demoPillText: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 14, color: colors.onAccent },
   demoError: { marginTop: spacing.md },
   langToggle: {
     flexDirection: "row",
@@ -559,7 +559,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     flexShrink: 0,
   },
-  langText: { fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
+  langText: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
   brand: { alignItems: "center", marginTop: spacing.xxl * 1.5, marginBottom: spacing.xxl },
   heading: {
     fontFamily: fonts.bold,
@@ -596,7 +596,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     ...RTL_TEXT,
   },
-  hintStrong: { fontFamily: fonts.medium, color: colors.text },
+  hintStrong: { ...RTL_TEXT, fontFamily: fonts.medium, color: colors.text },
   // #27AE60 is only 2.87:1 on white and fails AA as text — tokens.ts §success.
   hintOk: { color: colors.successStrong },
   hintBad: { color: colors.danger },
@@ -623,6 +623,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
   },
   consentEmphasis: {
+    ...RTL_TEXT,
     fontFamily: fonts.semibold,
     color: colors.text,
   },
@@ -644,6 +645,7 @@ const styles = StyleSheet.create({
   },
   consentLinkPressed: { backgroundColor: colors.neutralTint },
   consentLinkLabel: {
+    ...RTL_TEXT,
     fontFamily: fonts.semibold,
     fontSize: 13,
     color: colors.accent,

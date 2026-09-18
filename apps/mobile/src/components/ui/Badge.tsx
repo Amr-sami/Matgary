@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from "react-native";
 
 import { colors, fonts, radius } from "@/theme/tokens";
+import { RTL_TEXT } from "@/theme/rtl";
 
 /**
  * Port of the web's Badge. Measured pairs from doc 03 §2:
@@ -38,5 +39,5 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     flexShrink: 0,
   },
-  text: { fontFamily: fonts.medium, fontSize: 12 },
+  text: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 12 },
 });

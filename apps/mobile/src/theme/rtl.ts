@@ -16,7 +16,16 @@ import type { TextStyle, ViewStyle } from "react-native";
  */
 export const RTL: ViewStyle = {}; // resolved at runtime — see useDirection()
 
-export const RTL_TEXT: TextStyle = {};
+/**
+ * "Start" alignment for every Text. Fabric on iOS only sets a paragraph
+ * alignment when textAlign is given; otherwise TextKit's *natural* alignment
+ * follows the DEVICE locale (an en-US phone left-aligns Arabic). And under an
+ * RTL Yoga layout Fabric swaps left<->right (RCTAttributedTextUtils.mm), so
+ * `left` renders at the reading start in both locales: right in Arabic, left
+ * in English. Spread this into every text style; use textAlign:"center" or
+ * `textAlign:"right"` (= end) only on purpose.
+ */
+export const RTL_TEXT: TextStyle = { textAlign: "left" };
 
 /** The one place direction is decided. Use on the root, and on Modals (own native root). */
 export function directionStyle(rtl: boolean): ViewStyle {

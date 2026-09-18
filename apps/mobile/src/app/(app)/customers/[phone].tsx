@@ -665,15 +665,16 @@ const styles = StyleSheet.create({
   headMain: { flex: 1, minWidth: 0, gap: 4 },
   name: { fontFamily: fonts.bold, fontSize: 20, color: colors.text, ...RTL_TEXT },
   phoneRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
-  meta: { flexShrink: 1, fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary },
+  meta: { ...RTL_TEXT, flexShrink: 1, fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary },
   // A phone starts with "+", which an RTL paragraph pushes to the end
   // ("201…+"). Pin the paragraph direction; the row still flows RTL.
   ltr: { writingDirection: "ltr" },
   branch: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
 
   debtBlock: { alignItems: "flex-start", flexShrink: 0, gap: 2 },
-  debtLabel: { fontFamily: fonts.regular, fontSize: 11, color: colors.textSecondary },
+  debtLabel: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 11, color: colors.textSecondary },
   debtValue: {
+    ...RTL_TEXT,
     fontFamily: fonts.bold,
     fontSize: 22,
     color: colors.warningStrong,
@@ -735,22 +736,25 @@ const styles = StyleSheet.create({
   invoiceHead: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md },
   invoiceMain: { flex: 1, minWidth: 0, gap: 4 },
   invoiceIdRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" },
-  invoiceId: { flexShrink: 1, fontFamily: fonts.medium, fontSize: 14, color: colors.text },
+  invoiceId: { ...RTL_TEXT, flexShrink: 1, fontFamily: fonts.medium, fontSize: 14, color: colors.text },
   invoiceMeta: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
   invoiceTotals: { alignItems: "flex-start", flexShrink: 0, gap: 2 },
   invoiceTotal: {
+    ...RTL_TEXT,
     fontFamily: fonts.bold,
     fontSize: 17,
     color: colors.text,
     fontVariant: ["tabular-nums"],
   },
   paidLine: {
+    ...RTL_TEXT,
     fontFamily: fonts.regular,
     fontSize: 11,
     color: colors.successStrong,
     fontVariant: ["tabular-nums"],
   },
   dueLine: {
+    ...RTL_TEXT,
     fontFamily: fonts.semibold,
     fontSize: 11,
     color: colors.warningStrong,
@@ -764,6 +768,7 @@ const styles = StyleSheet.create({
   lineRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   lineName: { flex: 1, minWidth: 0, fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
   lineTotal: {
+    ...RTL_TEXT,
     flexShrink: 0,
     fontFamily: fonts.regular,
     fontSize: 12,
@@ -781,9 +786,10 @@ const styles = StyleSheet.create({
   timelineTitle: { fontFamily: fonts.regular, fontSize: 11, color: colors.textSecondary, ...RTL_TEXT },
   eventRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   eventMain: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  eventDate: { flexShrink: 0, fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary },
+  eventDate: { ...RTL_TEXT, flexShrink: 0, fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary },
   eventBy: { flexShrink: 1, fontFamily: fonts.regular, fontSize: 11, color: colors.textSecondary, ...RTL_TEXT },
   eventAmount: {
+    ...RTL_TEXT,
     flexShrink: 0,
     fontFamily: fonts.bold,
     fontSize: 13,

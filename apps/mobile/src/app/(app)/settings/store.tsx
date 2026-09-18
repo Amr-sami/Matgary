@@ -419,7 +419,7 @@ export default function StoreSettingsScreen() {
 const styles = StyleSheet.create({
   header: { gap: spacing.xs },
   back: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 32 },
-  backLabel: { fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
+  backLabel: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
   titleRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   title: { fontFamily: fonts.bold, fontSize: 26, color: colors.text, ...RTL_TEXT },
   subtitle: { fontFamily: fonts.regular, fontSize: 15, color: colors.textSecondary, ...RTL_TEXT },
@@ -468,7 +468,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   logoBtnPressed: { opacity: 0.7 },
-  logoBtnText: { fontFamily: fonts.medium, fontSize: 13, color: colors.accent },
+  logoBtnText: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 13, color: colors.accent },
   logoMsg: { fontFamily: fonts.regular, fontSize: 13, color: colors.success, marginTop: spacing.xs, ...RTL_TEXT },
   logoMsgError: { color: colors.danger },
   logoRow: { flexDirection: "row", alignItems: "center", gap: spacing.lg },
@@ -484,7 +484,7 @@ const styles = StyleSheet.create({
   },
   enableBody: { flex: 1, minWidth: 0, gap: 4 },
   switchWrap: { alignItems: "center", gap: 2, flexShrink: 0 },
-  switchLabel: { fontFamily: fonts.medium, fontSize: 12, color: colors.textSecondary },
+  switchLabel: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 12, color: colors.textSecondary },
 
   example: {
     backgroundColor: colors.accentLight,
@@ -510,7 +510,7 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
   },
   dirtyText: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
-  dirtyTextActive: { color: colors.warningStrong, fontFamily: fonts.medium },
+  dirtyTextActive: { ...RTL_TEXT, color: colors.warningStrong, fontFamily: fonts.medium },
   dirtyTextError: { color: colors.danger },
   saveButtons: { flexDirection: "row", justifyContent: "flex-end", gap: spacing.sm, minHeight: MIN_TOUCH },
 });

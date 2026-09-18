@@ -13,6 +13,7 @@ import { t } from "@/i18n";
 import { receiptQrPayload, type ReceiptSale } from "@/receipt/html";
 import { loadReceiptSettings } from "@/receipt/share";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
+import { RTL_TEXT } from "@/theme/rtl";
 
 import { printTicket, printerErrorKey } from "./print";
 import { TicketRasterizer, type RasterizerHandle } from "./rasterize";
@@ -117,10 +118,10 @@ const styles = StyleSheet.create({
   pressed: { backgroundColor: colors.accentLight },
   disabled: { opacity: 0.5 },
   labels: { flexShrink: 1, alignItems: "flex-start" },
-  label: { fontFamily: fonts.medium, fontSize: 14, color: colors.accent },
-  sub: { fontFamily: fonts.regular, fontSize: 11, color: colors.textSecondary },
+  label: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.accent },
+  sub: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 11, color: colors.textSecondary },
   // sits inside the wrapping action row — take the whole line
-  msg: { flexBasis: "100%", fontFamily: fonts.regular, fontSize: 12 },
+  msg: { ...RTL_TEXT, flexBasis: "100%", fontFamily: fonts.regular, fontSize: 12 },
   error: { color: colors.danger },
   notice: { color: colors.textSecondary },
 });

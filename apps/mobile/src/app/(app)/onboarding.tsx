@@ -584,6 +584,7 @@ const styles = StyleSheet.create({
     ...RTL_TEXT,
   },
   tipLink: {
+    ...RTL_TEXT,
     fontFamily: fonts.semibold,
     color: colors.accent,
     textDecorationLine: "underline",
@@ -617,11 +618,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
   },
   tourTextBtnLabel: {
+    ...RTL_TEXT,
     fontFamily: fonts.medium,
     fontSize: 14,
     color: colors.accent,
   },
   tourCounter: {
+    ...RTL_TEXT,
     fontFamily: fonts.medium,
     fontSize: 13,
     color: colors.textSecondary,
@@ -663,6 +666,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
   },
   tourTagText: {
+    ...RTL_TEXT,
     fontFamily: fonts.semibold,
     fontSize: 12,
     color: colors.accent,
