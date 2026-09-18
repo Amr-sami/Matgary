@@ -127,7 +127,8 @@ export default function SupplierDetailPage({
         {/* Breadcrumb */}
         <nav className="text-sm text-text-secondary flex items-center gap-1">
           <Link href="/suppliers" className="hover:text-accent">{dict.app.suppliers.list.heading}</Link>
-          <ChevronRight className="w-4 h-4" />
+          {/* A breadcrumb separator points INTO the child — flip it under RTL. */}
+          <ChevronRight className="w-4 h-4 rtl:rotate-180" />
           <span className="text-text-primary" dir="auto">{supplier.name}</span>
         </nav>
 
