@@ -3,7 +3,8 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import NetInfo from "@react-native-community/netinfo";
+import { QueryClient, QueryClientProvider, onlineManager } from "@tanstack/react-query";
 import {
   Cairo_400Regular,
   Cairo_500Medium,
@@ -31,9 +32,21 @@ const queryClient = new QueryClient({
       // ApiError kind rather than globally here.
       retry: false,
       staleTime: 30_000,
+      // Doc 06 §5.4: a query always TRIES its fetch, signal or not (the
+      // client answers instantly with an ApiError of kind "offline"), and a
+      // failure keeps the hydrated snapshot as `data` next to the `error` —
+      // screens render the last good answer and say how old it is.
+      networkMode: "offlineFirst",
     },
   },
 });
+
+// TanStack has no idea about connectivity on native unless told: bound to
+// NetInfo, `refetchOnReconnect` and paused fetches resume when the signal
+// returns. Same definition of "online" as <OfflineDrainer/>.
+onlineManager.setEventListener((setOnline) =>
+  NetInfo.addEventListener((state) => setOnline(Boolean(state.isConnected) && state.isInternetReachable !== false)),
+);
 
 initSentry();
 

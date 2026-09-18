@@ -4,6 +4,7 @@ import * as Application from "expo-application";
 import { ApiClient, type ApiError } from "@matgary/api-client";
 
 import { secureTokenStore } from "@/auth/tokenStore";
+import { useBlocked } from "@/stores/blocked";
 
 /**
  * Resolving the dev API host is the single most common "why won't it connect"
@@ -69,6 +70,11 @@ export const api = new ApiClient({
   tokens: secureTokenStore,
   getBranchId: () => activeBranchId,
   onSessionLost: (error) => sessionLostHandler?.(error),
+  // The four walls (suspended / unpaid / must-change-password / no permission)
+  // land in a store, and <SuspensionRouter/> does the navigating. Imported
+  // directly — unlike the session store, blocked.ts imports nothing from here,
+  // so there is no cycle to break.
+  onBlocked: (code, error) => useBlocked.getState().raise(code, error.message),
 });
 
 /** Display-only metadata, shown in the user's session list. */

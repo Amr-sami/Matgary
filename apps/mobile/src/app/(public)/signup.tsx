@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -24,7 +24,7 @@ import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
 import { RTL, RTL_TEXT } from "@/theme/rtl";
-import { colors, fonts, radius, spacing } from "@/theme/tokens";
+import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
 
 /**
  * Native port of public__signup.png.
@@ -401,6 +401,50 @@ export default function SignupScreen() {
             </View>
           )}
 
+          {/* Consent footer — App Store 5.1.1 / Play User Data both want the
+              legal documents linked where the account is created. The two
+              documents render natively at /legal/[doc], which sits outside
+              the (public) guard so it is reachable before login.
+
+              The sentence is ONE dictionary template with {terms}/{privacy}
+              placeholders so each locale keeps its own word order and
+              typography (Arabic "و" attaches to the next word). The document
+              names are emphasised in place; the tappable links sit beneath as
+              full-height rows, because a nested <Text onPress> is only as
+              tall as its glyphs — well under MIN_TOUCH. */}
+          <Text style={styles.consent} accessibilityRole="text">
+            {renderTemplate(t("mobile.legal.consent"), {
+              terms: (
+                <Text key="terms" style={styles.consentEmphasis}>
+                  {t("mobile.legal.termsLabel")}
+                </Text>
+              ),
+              privacy: (
+                <Text key="privacy" style={styles.consentEmphasis}>
+                  {t("mobile.legal.privacyLabel")}
+                </Text>
+              ),
+            })}
+          </Text>
+          <View style={styles.consentLinks}>
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel={t("mobile.legal.termsLabel")}
+              onPress={() => router.push("/legal/terms")}
+              style={({ pressed }) => [styles.consentLink, pressed && styles.consentLinkPressed]}
+            >
+              <Text style={styles.consentLinkLabel}>{t("mobile.legal.termsLabel")}</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel={t("mobile.legal.privacyLabel")}
+              onPress={() => router.push("/legal/privacy")}
+              style={({ pressed }) => [styles.consentLink, pressed && styles.consentLinkPressed]}
+            >
+              <Text style={styles.consentLinkLabel}>{t("mobile.legal.privacyLabel")}</Text>
+            </Pressable>
+          </View>
+
           <View style={styles.rule} />
 
           <Text style={styles.noAccount}>{T().haveAccountQ}</Text>
@@ -409,6 +453,20 @@ export default function SignupScreen() {
       </KeyboardAvoidingView>
     </View>
   );
+}
+
+/**
+ * Splits a dictionary template on its `{name}` placeholders and drops the
+ * matching node in each slot, so a sentence can carry inline elements without
+ * the code hard-wiring word order. Unknown placeholders echo back verbatim,
+ * mirroring `interpolate()` in @matgary/i18n.
+ */
+function renderTemplate(template: string, slots: Record<string, ReactNode>): ReactNode[] {
+  return template.split(/(\{\w+\})/).map((part, i) => {
+    const m = /^\{(\w+)\}$/.exec(part);
+    if (!m) return part;
+    return m[1] in slots ? slots[m[1]] : <Text key={i}>{part}</Text>;
+  });
 }
 
 /** Field codes from lib/auth/create-account.ts, in the shopkeeper's language. */
@@ -520,6 +578,41 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.danger,
     textAlign: "center",
+  },
+  consent: {
+    fontFamily: fonts.regular,
+    fontSize: 12,
+    lineHeight: 20,
+    color: colors.textSecondary,
+    textAlign: "center",
+    marginTop: spacing.lg,
+    paddingHorizontal: spacing.sm,
+  },
+  consentEmphasis: {
+    fontFamily: fonts.semibold,
+    color: colors.text,
+  },
+  consentLinks: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  consentLink: {
+    minHeight: MIN_TOUCH,
+    justifyContent: "center",
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+  },
+  consentLinkPressed: { backgroundColor: colors.neutralTint },
+  consentLinkLabel: {
+    fontFamily: fonts.semibold,
+    fontSize: 13,
+    color: colors.accent,
   },
   rule: {
     height: 1,

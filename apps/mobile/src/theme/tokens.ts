@@ -21,6 +21,8 @@ export const colors = {
   /** Web hover. On native this is the PRESSED state. */
   accentPressed: "#0E02B5",
   accentLight: "#E7E6FC",
+  /** Text and glyphs sitting on an accent-filled surface (FAB, primary button). */
+  onAccent: "#FFFFFF",
 
   danger: "#C0392B",
   dangerLight: "#FDEAEA",
@@ -40,6 +42,9 @@ export const colors = {
 
   /** Every card, input and chip border. Warm, not neutral grey. */
   border: "#E8E4DC",
+
+  /** Dimmed page behind a bottom sheet or dialog. */
+  scrim: "rgba(0,0,0,0.45)",
 } as const;
 
 export const radius = {

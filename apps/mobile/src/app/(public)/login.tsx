@@ -129,6 +129,7 @@ export default function LoginScreen() {
           <View style={styles.form}>
             <Field
               label={t("auth.login.identifierLabel")}
+              testID="login-identifier"
               placeholder={t("auth.login.identifierPlaceholder")}
               value={identifier}
               onChangeText={setIdentifier}
@@ -143,6 +144,7 @@ export default function LoginScreen() {
 
             <Field
               label={t("auth.login.passwordLabel")}
+              testID="login-password"
               value={password}
               onChangeText={setPassword}
               secure

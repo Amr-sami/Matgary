@@ -19,6 +19,7 @@ import { ApiError, dashboard as dashboardApi } from "@matgary/api-client";
 import { api } from "@/api/client";
 import { HeaderAccessories } from "@/components/shell/HeaderAccessories";
 import { money } from "@/lib/format";
+import { useSnapshotAge } from "@/offline/hydrate";
 import { StockAlerts } from "@/components/dashboard/StockAlerts";
 import { StatCard } from "@/components/ui/StatCard";
 import { useSession } from "@/stores/session";
@@ -38,11 +39,19 @@ export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const me = useSession((s) => s.me);
   const activeBranchId = me?.branch.id ?? null;
+  // Same rule as web Greeting.tsx: the owner is greeted by the shop, staff by
+  // their own name. `tenant.name` is what the web reads as `settings.shopName`.
+  const greetingName =
+    (me?.isOwner ? me.tenant.name?.trim() || me.user.name : me?.user.name) ?? "";
 
   const { data, error, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ["dashboard", activeBranchId],
     queryFn: () => dashboardApi.getDashboard(api),
   });
+  // Offline the refetch fails at once (retry: false) but the hydrated
+  // snapshot stays in `data`: it is shown, with its age, never hidden
+  // behind the error (doc 06 §6.2 — staleness is said, not concealed).
+  const snapshotAge = useSnapshotAge();
 
   // The web formats through Intl; doc 06 §4.3 requires a deterministic
   // formatter on device, because Hermes ships a trimmed ICU and the same
@@ -62,18 +71,25 @@ export default function DashboardScreen() {
       >
         <HeaderAccessories />
         <View style={styles.header}>
-          <Text style={styles.greeting}>{t("app.dashboard.greeting", { name: me?.tenant.name ?? "" })}</Text>
+          <Text style={styles.greeting}>{t("app.dashboard.greeting", { name: greetingName })}</Text>
           <Text style={styles.sub}>{t(me?.isOwner ? "app.dashboard.greetingOwner" : "app.dashboard.greetingStaff")}</Text>
         </View>
 
         {isLoading ? (
           <ActivityIndicator color={colors.accent} style={{ marginTop: spacing.xxl }} />
-        ) : error ? (
+        ) : error && !data ? (
           <Text style={styles.error}>
             {error instanceof ApiError ? error.message : t("app.activity.errors.loadFailed")}
           </Text>
         ) : data ? (
           <>
+            {error ? (
+              <Text style={styles.stale}>
+                {snapshotAge === null
+                  ? t("mobile.offline.staleDataUnknownAge")
+                  : t("mobile.offline.staleData", { ago: formatAge(snapshotAge) })}
+              </Text>
+            ) : null}
             <View style={styles.grid}>
               <View style={styles.gridRow}>
                 <StatCard
@@ -114,6 +130,16 @@ export default function DashboardScreen() {
   );
 }
 
+/** Seconds → "just now" / "{n}m ago" / "{n}h ago" / "{n}d ago", through the dictionary (no Intl on device). */
+function formatAge(seconds: number): string {
+  if (seconds < 60) return t("mobile.offline.ageNow");
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return t("mobile.offline.ageMinutes", { n: minutes });
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return t("mobile.offline.ageHours", { n: hours });
+  return t("mobile.offline.ageDays", { n: Math.floor(hours / 24) });
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg, ...RTL },
   scroll: { flex: 1 },
@@ -128,4 +154,5 @@ const styles = StyleSheet.create({
   grid: { gap: spacing.lg },
   gridRow: { flexDirection: "row", gap: spacing.lg },
   error: { fontFamily: fonts.medium, fontSize: 14, color: colors.danger },
+  stale: { fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },
 });

@@ -47,41 +47,48 @@ export function StatCard({
           <Text style={styles.title} numberOfLines={2}>
             {title}
           </Text>
-          {/* A money figure must never split from its currency — this is the
-              defect the web shipped and had to be measured to fix. */}
-          <Text
-            style={styles.value}
-            numberOfLines={1}
-            // Shrink rather than ellipsize: "EGP 575,2…" is a wrong number,
-            // and English currency is wider than Arabic in the same 2-up card.
-            adjustsFontSizeToFit
-            minimumFontScale={0.7}
-          >
-            {value}
-          </Text>
-
-          {trendPercent !== null && trendPercent !== undefined ? (
-            <View style={[styles.trend, up ? styles.trendUp : styles.trendDown]}>
-              {up ? (
-                <TrendUp size={13} color={colors.successStrong} />
-              ) : (
-                <TrendDown size={13} color={colors.danger} />
-              )}
-              <Text
-                numberOfLines={1}
-                style={[styles.trendText, up ? styles.trendTextUp : styles.trendTextDown]}
-              >
-                {up ? "+" : ""}
-                {trendPercent.toFixed(1)}%
-              </Text>
-            </View>
-          ) : null}
-
-          {subtitle ? (
-            <Text style={styles.subtitle} numberOfLines={2}>
-              {subtitle}
+          {/* Value (+ trend, caption) is one group pinned to the card's
+              bottom. Cards in a row stretch to the tallest sibling, so when
+              one label wraps to two lines ("Returns this month") the
+              neighbour's value drops to the same baseline instead of
+              floating a line higher. Single-line rows are unchanged. */}
+          <View style={styles.figures}>
+            {/* A money figure must never split from its currency — this is the
+                defect the web shipped and had to be measured to fix. */}
+            <Text
+              style={styles.value}
+              numberOfLines={1}
+              // Shrink rather than ellipsize: "EGP 575,2…" is a wrong number,
+              // and English currency is wider than Arabic in the same 2-up card.
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+            >
+              {value}
             </Text>
-          ) : null}
+
+            {trendPercent !== null && trendPercent !== undefined ? (
+              <View style={[styles.trend, up ? styles.trendUp : styles.trendDown]}>
+                {up ? (
+                  <TrendUp size={13} color={colors.successStrong} />
+                ) : (
+                  <TrendDown size={13} color={colors.danger} />
+                )}
+                <Text
+                  numberOfLines={1}
+                  style={[styles.trendText, up ? styles.trendTextUp : styles.trendTextDown]}
+                >
+                  {up ? "+" : ""}
+                  {trendPercent.toFixed(1)}%
+                </Text>
+              </View>
+            ) : null}
+
+            {subtitle ? (
+              <Text style={styles.subtitle} numberOfLines={2}>
+                {subtitle}
+              </Text>
+            ) : null}
+          </View>
         </View>
         <Icon size={24} color={colors[color]} />
       </View>
@@ -100,18 +107,26 @@ const styles = StyleSheet.create({
     ...elevation.card,
   },
   row: {
+    // flexGrow (basis auto, not flex: 1) — fills the card when a sibling in
+    // the same row made it taller, stays content-sized when it stands alone.
+    flexGrow: 1,
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: spacing.sm,
   },
-  text: { flexShrink: 1, minWidth: 0 },
+  text: {
+    flexShrink: 1,
+    minWidth: 0,
+    alignSelf: "stretch",
+    justifyContent: "space-between",
+  },
+  figures: { marginTop: 4 },
   title: { fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary, ...RTL_TEXT },
   value: {
     fontFamily: fonts.bold,
     fontSize: 20,
     color: colors.text,
-    marginTop: 4,
     fontVariant: ["tabular-nums"],
     ...RTL_TEXT,
   },

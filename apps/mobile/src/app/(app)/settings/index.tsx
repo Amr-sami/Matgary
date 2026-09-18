@@ -104,7 +104,7 @@ export default function SettingsScreen() {
       key: "store",
       route: "/settings/store",
       icon: Storefront,
-      title: t("app.settingsPage.shopInfo.heading"),
+      title: t("app.settingsPage.shopInfo.section"),
       hint: t("mobile.settings.storeSub"),
       ownerOnly: true,
     },
@@ -221,7 +221,7 @@ export default function SettingsScreen() {
 
           if (tile.soon) {
             return (
-              <View key={tile.key} style={[styles.tile, styles.tileSoon]}>
+              <View key={tile.key} style={[styles.tile, styles.tileSoon]} testID={`settings-tile-${tile.key}`}>
                 {body}
               </View>
             );
@@ -231,6 +231,7 @@ export default function SettingsScreen() {
             <Pressable
               key={tile.key}
               accessibilityRole="button"
+              testID={`settings-tile-${tile.key}`}
               onPress={() => router.push(tile.route as never)}
               style={({ pressed }) => [styles.tile, pressed && styles.tilePressed]}
             >

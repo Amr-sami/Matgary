@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   ActivityIndicator,
+  Linking,
   Pressable,
   StyleSheet,
   Switch,
@@ -10,12 +11,17 @@ import {
 import { useRouter } from "expo-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 
+import { notifications } from "@matgary/api-client";
+
 import { api } from "@/api/client";
+import { forgetRegistration } from "@/effects/PushRegistrar";
 import { Screen } from "@/components/layout/Screen";
+import { Button } from "@/components/ui/Button";
 import { ChevronBack } from "@/components/ui/Chevron";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { Segmented } from "@/components/ui/Segmented";
+import { usePush, type PushStatus } from "@/stores/push";
 import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
 import { t } from "@/i18n";
@@ -211,7 +217,144 @@ export default function NotificationSettingsScreen() {
           );
         })
       )}
+
+      <ThisDeviceCard onNotice={setNotice} />
     </Screen>
+  );
+}
+
+/** Badge variant + copy for each push status (src/stores/push.ts). */
+const PUSH_STATUS = (): Record<
+  PushStatus,
+  { label: string; hint: string | null; variant: "success" | "lowstock" | "outofstock" | "neutral" }
+> => ({
+  idle: { label: t("mobile.push.status.idle"), hint: null, variant: "neutral" },
+  granted: { label: t("mobile.push.status.granted"), hint: null, variant: "success" },
+  denied: { label: t("mobile.push.status.denied"), hint: t("mobile.push.deniedHint"), variant: "outofstock" },
+  unsupported: {
+    label: t("mobile.push.status.unsupported"),
+    hint: t("mobile.push.unsupportedHint"),
+    variant: "neutral",
+  },
+  noProjectId: {
+    label: t("mobile.push.status.noProjectId"),
+    hint: t("mobile.push.noProjectIdDetail"),
+    variant: "lowstock",
+  },
+  error: { label: t("mobile.push.status.error"), hint: null, variant: "outofstock" },
+});
+
+/**
+ * "This device" — the one card the web cannot have. Reads what
+ * <PushRegistrar/> recorded in the push store and offers the two fixes a user
+ * can actually apply: the OS settings page when permission was denied, and a
+ * server-side test push once a token is registered.
+ */
+function ThisDeviceCard({
+  onNotice,
+}: {
+  onNotice: (n: { tone: "ok" | "err"; text: string } | null) => void;
+}) {
+  const push = usePush();
+  const meta = PUSH_STATUS()[push.status];
+
+  // HTTP 200 is not delivery: the route answers 200 with `sent: 0` when every
+  // Expo ticket failed, and `disabled > 0` means it pruned a token — ours, if
+  // our ticket errored — so MMKV must forget it or postToken() short-circuits
+  // on "already registered" forever and this device silently never re-POSTs.
+  const test = useMutation({
+    mutationFn: () => notifications.sendTestPush(api),
+    onSuccess: (r) => {
+      const mine = r.tickets.find((tk) => tk.to === push.token) ?? r.tickets[0];
+      const pruned = r.disabled > 0 && (!mine || mine.status === "error");
+      if (pruned) {
+        forgetRegistration();
+        push.retry(); // re-mint + re-POST now, not on the next foreground
+      }
+      if (r.sent > 0) {
+        onNotice({ tone: "ok", text: t("mobile.push.testSent") });
+        return;
+      }
+      const error = mine?.error ?? r.tickets.find((tk) => tk.error)?.error ?? r.status;
+      onNotice({
+        tone: "err",
+        text: pruned
+          ? `${t("mobile.push.testFailedDetail", { error })} ${t("mobile.push.testReregistering")}`
+          : t("mobile.push.testFailedDetail", { error }),
+      });
+    },
+    onError: () => onNotice({ tone: "err", text: t("mobile.push.testFailed") }),
+  });
+
+  const canTest = push.status === "granted" && push.registered;
+  const canRetry =
+    push.status === "error" || (push.status === "granted" && !push.registered);
+
+  return (
+    <Card>
+      <View style={styles.eventHead}>
+        <Text numberOfLines={1} style={styles.eventTitle}>
+          {t("mobile.push.thisDevice")}
+        </Text>
+        <Badge label={meta.label} variant={meta.variant} />
+      </View>
+      <Text style={styles.eventHint}>{t("mobile.push.intro")}</Text>
+
+      <View style={styles.divider} />
+
+      <View style={styles.toggleRow}>
+        <Text numberOfLines={1} style={styles.toggleLabel}>
+          {t("mobile.push.status.label")}
+        </Text>
+        <Text numberOfLines={1} style={styles.deviceValue}>
+          {meta.label}
+        </Text>
+      </View>
+      {push.status === "granted" ? (
+        <View style={styles.toggleRow}>
+          <Text numberOfLines={1} style={styles.toggleLabel}>
+            {t("mobile.push.registration")}
+          </Text>
+          <Text numberOfLines={1} style={styles.deviceValue}>
+            {push.registered ? t("mobile.push.registered") : t("mobile.push.notRegistered")}
+          </Text>
+        </View>
+      ) : null}
+      {meta.hint ? <Text style={styles.eventHint}>{meta.hint}</Text> : null}
+      {push.error && (push.status === "error" || !push.registered) ? (
+        <Text style={[styles.eventHint, styles.deviceError]} numberOfLines={3}>
+          {push.error}
+        </Text>
+      ) : null}
+
+      <View style={styles.deviceActions}>
+        {push.status === "denied" ? (
+          <Button
+            label={t("mobile.push.openSettings")}
+            variant="outline"
+            onPress={() => {
+              Linking.openSettings().catch(() => {
+                onNotice({ tone: "err", text: t("mobile.push.openSettingsFailed") });
+              });
+            }}
+          />
+        ) : null}
+        {canRetry ? (
+          <Button
+            label={t("mobile.push.retry")}
+            variant="outline"
+            onPress={() => push.retry()}
+          />
+        ) : null}
+        {canTest ? (
+          <Button
+            label={t("mobile.push.sendTest")}
+            loading={test.isPending}
+            onPress={() => test.mutate()}
+          />
+        ) : null}
+      </View>
+    </Card>
   );
 }
 
@@ -294,4 +437,13 @@ const styles = StyleSheet.create({
     ...RTL_TEXT,
   },
   disabled: { opacity: 0.5 },
+
+  deviceValue: {
+    fontFamily: fonts.medium,
+    fontSize: 14,
+    color: colors.text,
+    flexShrink: 1,
+  },
+  deviceError: { color: colors.danger },
+  deviceActions: { gap: spacing.sm, marginTop: spacing.md },
 });
