@@ -5,6 +5,7 @@ import { tenants } from "@/lib/db/schema";
 import { materializeDueRecurringExpenses } from "@/lib/repo/operations";
 import { rateLimit } from "@/lib/ratelimit";
 import { logActivity } from "@/lib/repo/activity";
+import { clientIp } from "@/lib/request-ip";
 
 // Periodic sweep that spawns any due recurring-expense child rows for every
 // tenant. Designed to be poked by an external scheduler (the docker-compose
@@ -26,14 +27,6 @@ export const dynamic = "force-dynamic";
 
 const RATE_LIMIT = 6;
 const RATE_WINDOW_SEC = 60 * 60;
-
-function clientIp(req: NextRequest): string {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]!.trim();
-  const real = req.headers.get("x-real-ip");
-  if (real) return real.trim();
-  return "unknown";
-}
 
 function bearerToken(req: NextRequest): string | null {
   const auth = req.headers.get("authorization") ?? "";

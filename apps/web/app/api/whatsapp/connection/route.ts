@@ -5,13 +5,13 @@
 // is *never* returned — only metadata.
 
 import { NextResponse } from "next/server";
-import { requireTenantWithBranch } from "@/lib/api/auth-helpers";
+import { requirePermissionWithBranch } from "@/lib/api/auth-helpers";
 import { getActiveConnection } from "@/lib/whatsapp/connections";
 
 export const runtime = "nodejs";
 
 export async function GET() {
-  const auth = await requireTenantWithBranch();
+  const auth = await requirePermissionWithBranch("manage_whatsapp");
   if (!auth.ok) return auth.response;
 
   const conn = await getActiveConnection(auth.ctx.tenantId, auth.ctx.branchId);

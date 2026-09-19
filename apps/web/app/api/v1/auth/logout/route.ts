@@ -8,6 +8,7 @@ import { pushTokens } from "@/lib/db/schema";
 import { isExpoPushToken } from "@/lib/push/expo-push";
 import { rateLimit } from "@/lib/ratelimit";
 import { hashRefreshToken } from "@/lib/api/native-token";
+import { clientIp } from "@/lib/request-ip";
 
 // Sign out ONE device.
 //
@@ -36,12 +37,6 @@ const bodySchema = z.object({
   // an Expo token is simply ignored below.
   pushToken: z.unknown().optional(),
 });
-
-function clientIp(h: Headers): string {
-  const xff = h.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]!.trim();
-  return h.get("x-real-ip")?.trim() ?? "unknown";
-}
 
 export async function POST(req: Request) {
   const h = await headers();

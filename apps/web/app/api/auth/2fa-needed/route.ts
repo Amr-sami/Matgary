@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { rateLimit } from "@/lib/ratelimit";
+import { clientIp } from "@/lib/request-ip";
 
 const schema = z.object({
   email: z.string().min(3).max(200),
@@ -33,10 +34,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ needsTotp: false });
   }
   const h = await headers();
-  const ip =
-    h.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    h.get("x-real-ip")?.trim() ??
-    "unknown";
+  const ip = clientIp(h);
   const rl = await rateLimit("auth.2fa_needed", ip, {
     limit: RL_LIMIT,
     windowSec: RL_WINDOW_SEC,

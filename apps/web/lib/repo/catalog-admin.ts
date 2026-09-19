@@ -59,31 +59,38 @@ export interface UpdateCategoryInput {
   hasAttributes?: boolean;
 }
 
+// Every by-id mutator below returns whether a row matched, so the [id]
+// routes can answer 404 NOT_FOUND without a lookup of their own (C20 class).
+// An empty patch still has to say whether the row exists, hence the select.
+
 export async function updateCategory(
   tenantId: string,
   id: string,
   patch: UpdateCategoryInput,
-): Promise<void> {
-  await withTenant(tenantId, async (tx) => {
+): Promise<boolean> {
+  const found = await withTenant(tenantId, async (tx) => {
     const set: Record<string, unknown> = {};
     if (patch.label !== undefined) set.label = patch.label;
     if (patch.icon !== undefined) set.icon = patch.icon;
     if (patch.position !== undefined) set.position = patch.position;
     if (patch.hasAttributes !== undefined) set.hasAttributes = patch.hasAttributes;
-    if (Object.keys(set).length === 0) return;
-    await tx
-      .update(categories)
-      .set(set)
-      .where(and(eq(categories.tenantId, tenantId), eq(categories.id, id)));
+    const where = and(eq(categories.tenantId, tenantId), eq(categories.id, id));
+    if (Object.keys(set).length === 0) {
+      const [row] = await tx.select({ id: categories.id }).from(categories).where(where).limit(1);
+      return Boolean(row);
+    }
+    const rows = await tx.update(categories).set(set).where(where).returning({ id: categories.id });
+    return rows.length > 0;
   });
-  await bustCatalogCache(tenantId);
+  if (found) await bustCatalogCache(tenantId);
+  return found;
 }
 
 export async function deleteCategory(
   tenantId: string,
   id: string,
-): Promise<void> {
-  await withTenant(tenantId, async (tx) => {
+): Promise<boolean> {
+  const found = await withTenant(tenantId, async (tx) => {
     const [{ value }] = await tx
       .select({ value: count() })
       .from(products)
@@ -93,11 +100,14 @@ export async function deleteCategory(
         `Cannot delete: ${value} منتج يستخدم هذا القسم`,
       );
     }
-    await tx
+    const rows = await tx
       .delete(categories)
-      .where(and(eq(categories.tenantId, tenantId), eq(categories.id, id)));
+      .where(and(eq(categories.tenantId, tenantId), eq(categories.id, id)))
+      .returning({ id: categories.id });
+    return rows.length > 0;
   });
-  await bustCatalogCache(tenantId);
+  if (found) await bustCatalogCache(tenantId);
+  return found;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -147,28 +157,37 @@ export async function updateAttribute(
   tenantId: string,
   id: string,
   patch: { label?: string; position?: number; required?: boolean },
-): Promise<void> {
-  await withTenant(tenantId, async (tx) => {
+): Promise<boolean> {
+  const found = await withTenant(tenantId, async (tx) => {
     const set: Record<string, unknown> = {};
     if (patch.label !== undefined) set.label = patch.label;
     if (patch.position !== undefined) set.position = patch.position;
     if (patch.required !== undefined) set.required = patch.required;
-    if (Object.keys(set).length === 0) return;
-    await tx
+    const where = and(eq(categoryAttributes.tenantId, tenantId), eq(categoryAttributes.id, id));
+    if (Object.keys(set).length === 0) {
+      const [row] = await tx
+        .select({ id: categoryAttributes.id })
+        .from(categoryAttributes)
+        .where(where)
+        .limit(1);
+      return Boolean(row);
+    }
+    const rows = await tx
       .update(categoryAttributes)
       .set(set)
-      .where(
-        and(eq(categoryAttributes.tenantId, tenantId), eq(categoryAttributes.id, id)),
-      );
+      .where(where)
+      .returning({ id: categoryAttributes.id });
+    return rows.length > 0;
   });
-  await bustCatalogCache(tenantId);
+  if (found) await bustCatalogCache(tenantId);
+  return found;
 }
 
 export async function deleteAttribute(
   tenantId: string,
   id: string,
-): Promise<void> {
-  await withTenant(tenantId, async (tx) => {
+): Promise<boolean> {
+  const found = await withTenant(tenantId, async (tx) => {
     const [attr] = await tx
       .select({ categoryId: categoryAttributes.categoryId })
       .from(categoryAttributes)
@@ -176,7 +195,7 @@ export async function deleteAttribute(
         and(eq(categoryAttributes.tenantId, tenantId), eq(categoryAttributes.id, id)),
       )
       .limit(1);
-    if (!attr) return;
+    if (!attr) return false;
 
     await tx
       .delete(categoryAttributes)
@@ -203,8 +222,10 @@ export async function deleteAttribute(
           and(eq(categories.tenantId, tenantId), eq(categories.id, attr.categoryId)),
         );
     }
+    return true;
   });
-  await bustCatalogCache(tenantId);
+  if (found) await bustCatalogCache(tenantId);
+  return found;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -239,40 +260,52 @@ export async function updateAttributeValue(
   tenantId: string,
   id: string,
   patch: { label?: string; position?: number },
-): Promise<void> {
-  await withTenant(tenantId, async (tx) => {
+): Promise<boolean> {
+  const found = await withTenant(tenantId, async (tx) => {
     const set: Record<string, unknown> = {};
     if (patch.label !== undefined) set.label = patch.label;
     if (patch.position !== undefined) set.position = patch.position;
-    if (Object.keys(set).length === 0) return;
-    await tx
+    const where = and(
+      eq(categoryAttributeValues.tenantId, tenantId),
+      eq(categoryAttributeValues.id, id),
+    );
+    if (Object.keys(set).length === 0) {
+      const [row] = await tx
+        .select({ id: categoryAttributeValues.id })
+        .from(categoryAttributeValues)
+        .where(where)
+        .limit(1);
+      return Boolean(row);
+    }
+    const rows = await tx
       .update(categoryAttributeValues)
       .set(set)
-      .where(
-        and(
-          eq(categoryAttributeValues.tenantId, tenantId),
-          eq(categoryAttributeValues.id, id),
-        ),
-      );
+      .where(where)
+      .returning({ id: categoryAttributeValues.id });
+    return rows.length > 0;
   });
-  await bustCatalogCache(tenantId);
+  if (found) await bustCatalogCache(tenantId);
+  return found;
 }
 
 export async function deleteAttributeValue(
   tenantId: string,
   id: string,
-): Promise<void> {
-  await withTenant(tenantId, async (tx) => {
-    await tx
+): Promise<boolean> {
+  const found = await withTenant(tenantId, async (tx) => {
+    const rows = await tx
       .delete(categoryAttributeValues)
       .where(
         and(
           eq(categoryAttributeValues.tenantId, tenantId),
           eq(categoryAttributeValues.id, id),
         ),
-      );
+      )
+      .returning({ id: categoryAttributeValues.id });
+    return rows.length > 0;
   });
-  await bustCatalogCache(tenantId);
+  if (found) await bustCatalogCache(tenantId);
+  return found;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -305,29 +338,35 @@ export async function addBrand(
   return result;
 }
 
-export async function deleteBrand(tenantId: string, id: string): Promise<void> {
-  await withTenant(tenantId, async (tx) => {
-    await tx
+export async function deleteBrand(tenantId: string, id: string): Promise<boolean> {
+  const found = await withTenant(tenantId, async (tx) => {
+    const rows = await tx
       .delete(brands)
-      .where(and(eq(brands.tenantId, tenantId), eq(brands.id, id)));
+      .where(and(eq(brands.tenantId, tenantId), eq(brands.id, id)))
+      .returning({ id: brands.id });
+    return rows.length > 0;
   });
-  await bustCatalogCache(tenantId);
+  if (found) await bustCatalogCache(tenantId);
+  return found;
 }
 
 export async function updateBrand(
   tenantId: string,
   id: string,
   patch: { name?: string; categoryId?: string | null },
-): Promise<void> {
-  await withTenant(tenantId, async (tx) => {
+): Promise<boolean> {
+  const found = await withTenant(tenantId, async (tx) => {
     const set: Record<string, unknown> = {};
     if (patch.name !== undefined) set.name = patch.name;
     if (patch.categoryId !== undefined) set.categoryId = patch.categoryId;
-    if (Object.keys(set).length === 0) return;
-    await tx
-      .update(brands)
-      .set(set)
-      .where(and(eq(brands.tenantId, tenantId), eq(brands.id, id)));
+    const where = and(eq(brands.tenantId, tenantId), eq(brands.id, id));
+    if (Object.keys(set).length === 0) {
+      const [row] = await tx.select({ id: brands.id }).from(brands).where(where).limit(1);
+      return Boolean(row);
+    }
+    const rows = await tx.update(brands).set(set).where(where).returning({ id: brands.id });
+    return rows.length > 0;
   });
-  await bustCatalogCache(tenantId);
+  if (found) await bustCatalogCache(tenantId);
+  return found;
 }

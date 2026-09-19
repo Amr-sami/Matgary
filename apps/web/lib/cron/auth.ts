@@ -14,14 +14,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { rateLimit } from "@/lib/ratelimit";
+import { clientIp } from "@/lib/request-ip";
 
-export function clientIp(req: NextRequest): string {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]!.trim();
-  const real = req.headers.get("x-real-ip");
-  if (real) return real.trim();
-  return "unknown";
-}
+// Re-exported so existing cron callers keep their import; the trust order
+// (cf-connecting-ip / last x-forwarded-for hop / x-real-ip) lives in one place.
+export { clientIp };
 
 function bearerToken(req: NextRequest): string | null {
   const auth = req.headers.get("authorization") ?? "";

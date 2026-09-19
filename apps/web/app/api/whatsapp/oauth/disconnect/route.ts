@@ -7,7 +7,7 @@
 // our send routes will refuse without an active connection regardless.
 
 import { NextResponse } from "next/server";
-import { requireTenantWithBranch } from "@/lib/api/auth-helpers";
+import { requirePermissionWithBranch } from "@/lib/api/auth-helpers";
 import {
   getActiveConnectionToken,
   markDisconnected,
@@ -21,7 +21,7 @@ import { logger } from "@/lib/logger";
 export const runtime = "nodejs";
 
 export async function POST() {
-  const auth = await requireTenantWithBranch();
+  const auth = await requirePermissionWithBranch("manage_whatsapp");
   if (!auth.ok) return auth.response;
 
   const active = await getActiveConnectionToken(

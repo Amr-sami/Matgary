@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 
 import { cleanupIdleDemoClones } from "@/lib/demo/clone-tenant";
 import { rateLimit } from "@/lib/ratelimit";
+import { clientIp } from "@/lib/request-ip";
 
 // Sweep ephemeral demo tenants that nobody's touched for the idle window.
 // Visitors who close the tab without clicking "خروج" would otherwise leave
@@ -21,14 +22,6 @@ const RATE_WINDOW_SEC = 60 * 60;
 const DEFAULT_IDLE_MINUTES = 60;
 const MIN_IDLE_MINUTES = 5;
 const MAX_IDLE_MINUTES = 24 * 60;
-
-function clientIp(req: NextRequest): string {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]!.trim();
-  const real = req.headers.get("x-real-ip");
-  if (real) return real.trim();
-  return "unknown";
-}
 
 function bearerToken(req: NextRequest): string | null {
   const auth = req.headers.get("authorization") ?? "";

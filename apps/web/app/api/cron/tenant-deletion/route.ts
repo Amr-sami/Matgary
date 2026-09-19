@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { executePendingDeletions } from "@/lib/repo/tenant-deletion";
 import { rateLimit } from "@/lib/ratelimit";
+import { clientIp } from "@/lib/request-ip";
 
 // H12 — daily sweep that hard-deletes any tenant past its
 // deletion_scheduled_at. Same security envelope as the other cron routes:
@@ -38,10 +39,7 @@ export async function POST(req: NextRequest) {
   const m = /^Bearer\s+(.+)$/i.exec(auth.trim());
   if (!m || !constantTimeMatch(m[1]!.trim(), secret)) return unauthorized();
 
-  const ip =
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    req.headers.get("x-real-ip")?.trim() ??
-    "unknown";
+  const ip = clientIp(req);
   const rl = await rateLimit("cron.tenant_deletion", ip, {
     limit: CRON_RL_LIMIT,
     windowSec: CRON_RL_WINDOW_SEC,

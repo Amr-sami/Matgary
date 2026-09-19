@@ -8,7 +8,7 @@
 
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { requireTenantWithBranch } from "@/lib/api/auth-helpers";
+import { requirePermissionWithBranch } from "@/lib/api/auth-helpers";
 import {
   buildOAuthAuthorizeUrl,
   readMetaConfig,
@@ -24,7 +24,7 @@ import { logger } from "@/lib/logger";
 export const runtime = "nodejs";
 
 export async function GET() {
-  const auth = await requireTenantWithBranch();
+  const auth = await requirePermissionWithBranch("manage_whatsapp");
   if (!auth.ok) return auth.response;
 
   const cfg = readMetaConfig();

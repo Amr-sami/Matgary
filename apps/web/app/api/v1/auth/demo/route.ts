@@ -9,6 +9,7 @@ import { users } from "@/lib/db/schema";
 import { rateLimit } from "@/lib/ratelimit";
 import { createDemoClone, findDemoTemplate } from "@/lib/demo/clone-tenant";
 import { mintNativeSession } from "@/lib/api/native-session";
+import { clientIp } from "@/lib/request-ip";
 
 // The trial store, for a native client.
 //
@@ -37,12 +38,6 @@ const bodySchema = z
     installId: z.string().max(120).optional(),
   })
   .optional();
-
-function clientIp(h: Headers): string {
-  const xff = h.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]!.trim();
-  return h.get("x-real-ip")?.trim() ?? "unknown";
-}
 
 export async function POST(req: Request) {
   const h = await headers();

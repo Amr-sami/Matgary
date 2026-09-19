@@ -15,6 +15,7 @@ import {
   type EventPayloadMap,
 } from "@/lib/notifications/dispatch";
 import { isNotificationEventType } from "@/lib/notifications/event-types";
+import { clientIp } from "@/lib/request-ip";
 
 // Daily digest cron. Drains `notification_digest_queue` — every row is a
 // buffered event a user opted to receive as an end-of-day summary instead of
@@ -33,14 +34,6 @@ const RATE_WINDOW_SEC = 60 * 60;
 // Cap the batch so a backlog doesn't blow the request timeout — the cron
 // re-runs shortly enough that draining across two ticks is fine.
 const MAX_ROWS_PER_RUN = 5000;
-
-function clientIp(req: NextRequest): string {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]!.trim();
-  const real = req.headers.get("x-real-ip");
-  if (real) return real.trim();
-  return "unknown";
-}
 
 function bearerToken(req: NextRequest): string | null {
   const auth = req.headers.get("authorization") ?? "";

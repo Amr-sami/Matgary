@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import {
+  requirePermissionWithBranch,
   requireTenant,
-  requireTenantWithBranch,
 } from "@/lib/api/auth-helpers";
 import { listAttributesForCategory } from "@/lib/repo/catalog";
 import { addAttribute } from "@/lib/repo/catalog-admin";
@@ -33,7 +33,7 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const r = await requireTenantWithBranch();
+  const r = await requirePermissionWithBranch("manage_catalog");
   if (!r.ok) return r.response;
   const { id } = await params;
   const body = await req.json().catch(() => null);

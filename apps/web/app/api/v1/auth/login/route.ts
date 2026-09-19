@@ -9,6 +9,7 @@ import { users } from "@/lib/db/schema";
 import { normalizeIdentifier } from "@/lib/auth";
 import { rateLimit } from "@/lib/ratelimit";
 import { mintNativeSession } from "@/lib/api/native-session";
+import { clientIp } from "@/lib/request-ip";
 
 // Native sign-in. One POST, one JSON response — no CSRF pre-flight, no
 // redirect, no cookie.
@@ -37,12 +38,6 @@ const bodySchema = z.object({
   /** Stable per install, so a reinstall replaces its old row. */
   installId: z.string().max(120).optional(),
 });
-
-function clientIp(h: Headers): string {
-  const xff = h.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]!.trim();
-  return h.get("x-real-ip")?.trim() ?? "unknown";
-}
 
 export async function POST(req: Request) {
   const h = await headers();

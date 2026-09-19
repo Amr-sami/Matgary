@@ -205,8 +205,9 @@ export async function addExpense(
   return result;
 }
 
-export async function deleteExpense(tenantId: string, id: string): Promise<void> {
-  await withTenant(tenantId, async (tx) => {
+/** Deletes the expense (restoring any supplier balance); false when no row matched. */
+export async function deleteExpense(tenantId: string, id: string): Promise<boolean> {
+  const found = await withTenant(tenantId, async (tx) => {
     const [existing] = await tx
       .select({
         amount: expensesTable.amount,
@@ -215,8 +216,9 @@ export async function deleteExpense(tenantId: string, id: string): Promise<void>
       .from(expensesTable)
       .where(and(eq(expensesTable.tenantId, tenantId), eq(expensesTable.id, id)))
       .limit(1);
+    if (!existing) return false;
 
-    if (existing?.supplierId) {
+    if (existing.supplierId) {
       await tx.execute(sql`
         update suppliers
         set balance = (balance)::numeric + ${existing.amount}::numeric,
@@ -228,6 +230,8 @@ export async function deleteExpense(tenantId: string, id: string): Promise<void>
     await tx
       .delete(expensesTable)
       .where(and(eq(expensesTable.tenantId, tenantId), eq(expensesTable.id, id)));
+    return true;
   });
-  await bustInsightsCache(tenantId);
+  if (found) await bustInsightsCache(tenantId);
+  return found;
 }

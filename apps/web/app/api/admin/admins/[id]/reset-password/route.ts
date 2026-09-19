@@ -1,15 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requirePermission } from "@/lib/admin/permissions";
 import { AdminMgmtError, resetAdminPassword } from "@/lib/admin/admins";
+import { clientIpOrNull } from "@/lib/request-ip";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function clientIp(req: NextRequest): string | null {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]!.trim();
-  return req.headers.get("x-real-ip");
-}
 
 export async function POST(
   req: NextRequest,
@@ -22,7 +17,7 @@ export async function POST(
     const { tempPassword } = await resetAdminPassword(
       r.session.adminId,
       id,
-      { ip: clientIp(req), userAgent: req.headers.get("user-agent") },
+      { ip: clientIpOrNull(req), userAgent: req.headers.get("user-agent") },
     );
     return NextResponse.json({ tempPassword });
   } catch (err) {

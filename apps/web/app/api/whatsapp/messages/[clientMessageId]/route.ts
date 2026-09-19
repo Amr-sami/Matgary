@@ -6,7 +6,7 @@
 // reads even if a clientMessageId leaks.
 
 import { NextResponse } from "next/server";
-import { requireTenantWithBranch } from "@/lib/api/auth-helpers";
+import { requirePermissionWithBranch } from "@/lib/api/auth-helpers";
 import { getMessageByClientId } from "@/lib/whatsapp/messages";
 
 export const runtime = "nodejs";
@@ -15,7 +15,9 @@ export async function GET(
   _req: Request,
   ctx: { params: Promise<{ clientMessageId: string }> },
 ) {
-  const auth = await requireTenantWithBranch();
+  // Status of a message the till just sent — same gate as the send routes
+  // (record_sales, doc 14 §3.1 C5).
+  const auth = await requirePermissionWithBranch("record_sales");
   if (!auth.ok) return auth.response;
 
   const { clientMessageId } = await ctx.params;

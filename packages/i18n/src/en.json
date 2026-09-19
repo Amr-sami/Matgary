@@ -2166,6 +2166,7 @@
       "save": "Save settings",
       "dirty": "You have unsaved changes",
       "clean": "No changes",
+      "viewOnly": "View only — saving settings and managing the WhatsApp connection need the store-settings permission",
       "toast": {
         "saveSuccess": "Settings saved",
         "saveFailed": "Save failed",

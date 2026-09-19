@@ -123,6 +123,12 @@ services:
       DATABASE_URL: postgres://matgary:matgary@postgres:5432/matgary
       APP_DATABASE_URL: postgres://matgary_app:matgary_app@postgres:5432/matgary
       REDIS_URL: redis://redis:6379
+      UPLOADS_DIR: /repo/uploads
+    volumes:
+      # Mirrors docker-compose.prod.yml: uploads outlive `--build`. Only
+      # meaningful for an image built from this Dockerfile (WORKDIR /repo);
+      # an older /app-layout image ignores the mount harmlessly.
+      - matgary_uploads:/repo/uploads
     ports:
       - "3000:3000"
 
@@ -193,3 +199,4 @@ services:
 
 volumes:
   matgary_pg_data:
+  matgary_uploads:

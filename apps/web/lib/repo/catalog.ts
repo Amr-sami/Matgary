@@ -511,18 +511,18 @@ export async function addProduct(
   });
 }
 
-export async function deleteProduct(tenantId: string, id: string): Promise<void> {
-  const oldImage = await withTenant(tenantId, async (tx) => {
+/** Deletes the product; false when no row matched (the route answers 404). */
+export async function deleteProduct(tenantId: string, id: string): Promise<boolean> {
+  const deleted = await withTenant(tenantId, async (tx) => {
     const [row] = await tx
-      .select({ imageUrl: products.imageUrl })
-      .from(products)
-      .where(and(eq(products.tenantId, tenantId), eq(products.id, id)));
-    await tx
       .delete(products)
-      .where(and(eq(products.tenantId, tenantId), eq(products.id, id)));
-    return row?.imageUrl ?? null;
+      .where(and(eq(products.tenantId, tenantId), eq(products.id, id)))
+      .returning({ imageUrl: products.imageUrl });
+    return row ?? null;
   });
-  await discardProductImage(tenantId, oldImage);
+  if (!deleted) return false;
+  await discardProductImage(tenantId, deleted.imageUrl ?? null);
+  return true;
 }
 
 const IMAGE_URL_PREFIX = "/api/uploads/product-image/";
@@ -564,12 +564,16 @@ export interface UpdateProductInput {
   categoryId?: string;
 }
 
+/**
+ * Applies the patch; false when no row matched (the route answers 404 — the
+ * `before` select below is the lookup, so callers need none of their own).
+ */
 export async function updateProduct(
   tenantId: string,
   id: string,
   patch: UpdateProductInput,
-): Promise<void> {
-  const replacedImage = await withTenant(tenantId, async (tx) => {
+): Promise<boolean> {
+  const result = await withTenant(tenantId, async (tx) => {
     const set: Record<string, unknown> = { updatedAt: new Date() };
     if (patch.name !== undefined) set.name = patch.name;
     if (patch.brand !== undefined) set.brand = patch.brand;
@@ -618,11 +622,15 @@ export async function updateProduct(
       });
     }
     // The previous file, once the row no longer references it.
-    return patch.imageUrl !== undefined && before.imageUrl && before.imageUrl !== patch.imageUrl
-      ? before.imageUrl
-      : null;
+    const replacedImage =
+      patch.imageUrl !== undefined && before.imageUrl && before.imageUrl !== patch.imageUrl
+        ? before.imageUrl
+        : null;
+    return { replacedImage };
   });
-  await discardProductImage(tenantId, replacedImage);
+  if (!result) return false;
+  await discardProductImage(tenantId, result.replacedImage);
+  return true;
 }
 
 export async function bulkUpdateProducts(

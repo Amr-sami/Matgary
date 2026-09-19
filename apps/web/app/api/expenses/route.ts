@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { and, eq } from "drizzle-orm";
-import {
-  requireTenant,
-  requireTenantWithBranch,
-} from "@/lib/api/auth-helpers";
-import { requirePermissionWithBranch } from "@/lib/api/auth-helpers";
+import { requirePermissionAudited, requirePermissionWithBranch } from "@/lib/api/auth-helpers";
 import { resolveBranchFilter } from "@/lib/api/branch-context";
 import { resolveSinceWindow } from "@/lib/api/list-window";
 import { addExpense, listExpenses } from "@/lib/repo/operations";
@@ -15,7 +11,11 @@ import { branches } from "@/lib/db/schema";
 import { checkTenantRateLimit } from "@/lib/api/tenant-rate-limit";
 
 export async function GET(req: NextRequest) {
-  const r = await requireTenant();
+  // `view_expenses` — both clients hide the screen without it (web
+  // Sidebar.tsx, mobile more.tsx); the API said 200 with real rows to any
+  // member (doc 14 §3.1 C5). Audited rather than hard so an uncurated legacy
+  // staff row is logged, not locked out, until PERMISSION_ENFORCE_WRITES=1.
+  const r = await requirePermissionAudited("view_expenses");
   if (!r.ok) return r.response;
   const filter = await resolveBranchFilter(
     r.ctx,

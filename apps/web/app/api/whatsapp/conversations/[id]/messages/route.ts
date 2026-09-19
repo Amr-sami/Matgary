@@ -4,7 +4,7 @@
 // created_at. Used by the inbox thread view (Phase 5+).
 
 import { NextResponse, type NextRequest } from "next/server";
-import { requireTenantWithBranch } from "@/lib/api/auth-helpers";
+import { requirePermissionWithBranch } from "@/lib/api/auth-helpers";
 import { listMessages } from "@/lib/whatsapp/conversations";
 
 export const runtime = "nodejs";
@@ -13,7 +13,7 @@ export async function GET(
   req: NextRequest,
   ctx: { params: Promise<{ id: string }> },
 ) {
-  const auth = await requireTenantWithBranch();
+  const auth = await requirePermissionWithBranch("manage_whatsapp");
   if (!auth.ok) return auth.response;
   const { id } = await ctx.params;
 

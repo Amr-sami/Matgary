@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { rateLimit } from "@/lib/ratelimit";
+import { clientIp as requestIp } from "@/lib/request-ip";
 
 // Public endpoint: returns whether an email is currently free or already
 // registered. Used by the signup form for live availability feedback so
@@ -22,12 +23,7 @@ const RL_LIMIT = 60;
 const RL_WINDOW_SEC = 60;
 
 async function clientIp(): Promise<string> {
-  const h = await headers();
-  return (
-    h.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    h.get("x-real-ip")?.trim() ??
-    "unknown"
-  );
+  return requestIp(await headers());
 }
 
 export async function GET(req: NextRequest) {

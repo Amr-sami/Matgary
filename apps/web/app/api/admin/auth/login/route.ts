@@ -11,6 +11,7 @@ import {
 } from "@/lib/admin/session";
 import { gateLoginAttempt } from "@/lib/admin/rate-limit";
 import { logAuditEvent } from "@/lib/admin/audit";
+import { clientIp } from "@/lib/request-ip";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,14 +20,6 @@ const schema = z.object({
   email: z.string().email().max(200),
   password: z.string().min(1).max(200),
 });
-
-function clientIp(req: NextRequest): string {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]!.trim();
-  const real = req.headers.get("x-real-ip");
-  if (real) return real.trim();
-  return "unknown";
-}
 
 // Identical generic response for "no such email" and "wrong password". Never
 // leak which is which — that would let an attacker enumerate admins.

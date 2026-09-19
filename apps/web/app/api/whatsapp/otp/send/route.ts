@@ -16,7 +16,7 @@
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireTenantWithBranch } from "@/lib/api/auth-helpers";
+import { requirePermissionWithBranch } from "@/lib/api/auth-helpers";
 import { rateLimit } from "@/lib/ratelimit";
 import { sendOutboundTemplate } from "@/lib/whatsapp/outbound";
 import { normalizePhone } from "@/lib/settings";
@@ -35,7 +35,10 @@ const schema = z.object({
 });
 
 export async function POST(req: Request) {
-  const auth = await requireTenantWithBranch();
+  // No POS caller and, per the header above, an abuse vector: only
+  // `manage_whatsapp` may fan OTPs out from the store's number (doc 14 §3.1
+  // C5). Audit mode until PERMISSION_ENFORCE_WRITES=1.
+  const auth = await requirePermissionWithBranch("manage_whatsapp");
   if (!auth.ok) return auth.response;
 
   let raw: unknown;

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireTenantWithBranch } from "@/lib/api/auth-helpers";
+import { requirePermissionWithBranch } from "@/lib/api/auth-helpers";
 import { addAttributeValue } from "@/lib/repo/catalog-admin";
 
 const schema = z.object({
@@ -17,7 +17,7 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const r = await requireTenantWithBranch();
+  const r = await requirePermissionWithBranch("manage_catalog");
   if (!r.ok) return r.response;
   const { id } = await params;
   const body = await req.json().catch(() => null);

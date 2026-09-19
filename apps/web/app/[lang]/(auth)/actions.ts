@@ -1,5 +1,6 @@
 "use server";
 
+import { clientIp as requestIp } from "@/lib/request-ip";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { redirect } from "next/navigation";
@@ -11,7 +12,6 @@ import { signIn, signOut, auth } from "@/lib/auth";
 import {
   completeOnboarding,
   parseOnboardingInput,
-  type OnboardingErrorCode,
   type OnboardingResult,
 } from "@/lib/onboarding/complete";
 import { logActivity } from "@/lib/repo/activity";
@@ -29,10 +29,7 @@ const SIGNUP_LIMIT = 5;
 const SIGNUP_WINDOW_SEC = 60 * 60;
 
 async function clientIp(): Promise<string> {
-  const h = await headers();
-  const xff = h.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]!.trim();
-  return h.get("x-real-ip")?.trim() ?? "unknown";
+  return requestIp(await headers());
 }
 
 // Middleware writes x-locale to every authenticated request based on the
@@ -47,7 +44,13 @@ async function activeLocale(): Promise<Locale> {
 // All Zod messages here are stable IDENTIFIERS, not user-facing strings.
 // The action returns a discriminated `code` and the client maps it to a
 // localized message via the dictionary. Server stays locale-agnostic.
-export type { SignupErrorCode, SignupField };
+//
+// No `export type { … }` re-exports from this file: it is a "use server"
+// module, and Turbopack's production build lists every re-exported name as
+// a Server Action reference — the type-only ones then fail with "Export X
+// doesn't exist in target module" (next build, not next dev). Clients import
+// SignupErrorCode / SignupField from lib/auth/create-account and the
+// onboarding types from lib/onboarding/complete directly.
 
 export type SignupResult =
   | { ok: true }
@@ -127,8 +130,8 @@ export async function loginAction(formData: FormData): Promise<LoginResult> {
 }
 
 // Schema, codes and the DB work live in lib/onboarding/complete.ts, shared
-// with POST /api/v1/onboarding/complete (the native app's transport).
-export type { OnboardingErrorCode, OnboardingResult };
+// with POST /api/v1/onboarding/complete (the native app's transport); the
+// types are imported from there (see the note above signupAction).
 
 // Snapshot of the tenant the wizard pre-fills from. Returned by
 // `getOnboardingDefaults()` so the page can render the values the user

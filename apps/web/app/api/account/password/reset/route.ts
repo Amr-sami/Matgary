@@ -3,6 +3,7 @@ import { z } from "zod";
 import { headers } from "next/headers";
 import { consumeResetToken } from "@/lib/repo/password-reset";
 import { rateLimit } from "@/lib/ratelimit";
+import { clientIp as requestIp } from "@/lib/request-ip";
 
 const schema = z.object({
   token: z.string().min(32).max(256),
@@ -15,12 +16,7 @@ const RESET_LIMIT = 20;
 const RESET_WINDOW_SEC = 60 * 60;
 
 async function clientIp(): Promise<string> {
-  const h = await headers();
-  return (
-    h.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    h.get("x-real-ip")?.trim() ??
-    "unknown"
-  );
+  return requestIp(await headers());
 }
 
 export async function POST(req: NextRequest) {

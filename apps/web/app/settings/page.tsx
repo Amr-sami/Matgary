@@ -32,6 +32,7 @@ import {
   type ShopSettings,
 } from "@/lib/settings";
 import { sendViaGreenApi, sendViaWhatsAppCloud } from "@/lib/whatsapp";
+import { can } from "@/lib/permissions";
 import { CategoriesEditor } from "@/components/settings/CategoriesEditor";
 import { BrandsEditor } from "@/components/settings/BrandsEditor";
 import { ReceiptDesigner } from "@/components/settings/ReceiptDesigner";
@@ -172,6 +173,15 @@ function SettingsPageInner() {
   const t = dict.app.settingsPage;
   const { data: session } = useSession();
   const isOwner = session?.user?.role === "owner";
+  // Server parity (doc 14 §3.1 C3/C5): the page is reachable with
+  // `view_settings`, but PATCH /api/settings and the WhatsApp connection /
+  // template routes need `manage_whatsapp`. A view-only member gets disabled
+  // controls and a hint instead of a 403 toast on Save, or a raw
+  // {"error":"Forbidden"} page from the OAuth redirect.
+  const principal = session?.user
+    ? { role: session.user.role, permissions: session.user.permissions }
+    : null;
+  const canManage = can(principal, "manage_whatsapp");
   const { branches: accessibleBranches } = useBranches();
   const branchCount = accessibleBranches.length;
   const { settings, loading, refresh: refreshLocalSettings } = useShopSettings();
@@ -290,6 +300,7 @@ function SettingsPageInner() {
   }, [searchParams, router]);
 
   const handleConnect = () => {
+    if (!canManage) return;
     window.location.href = "/api/whatsapp/oauth/start";
   };
 
@@ -736,12 +747,14 @@ function SettingsPageInner() {
             <Input
               label={t.greenApi.instanceLabel}
               value={draft.greenApiInstanceId}
+              disabled={!canManage}
               onChange={(e) => update("greenApiInstanceId", e.target.value)}
               placeholder="7107606136"
             />
             <Input
               label={t.greenApi.tokenLabel}
               value={draft.greenApiToken}
+              disabled={!canManage}
               onChange={(e) => update("greenApiToken", e.target.value)}
               type="password"
               placeholder={t.greenApi.tokenPlaceholder}
@@ -750,6 +763,7 @@ function SettingsPageInner() {
           <Input
             label={t.greenApi.urlLabel}
             value={draft.greenApiUrl}
+            disabled={!canManage}
             onChange={(e) => update("greenApiUrl", e.target.value)}
             placeholder="https://7107.api.greenapi.com"
           />
@@ -868,6 +882,7 @@ function SettingsPageInner() {
                         return (
                           <Button
                             onClick={handleConnect}
+                            disabled={!canManage}
                             className="!py-1 !text-[11px]"
                             variant="secondary"
                           >
@@ -880,6 +895,7 @@ function SettingsPageInner() {
                           <Button
                             onClick={handleHealthCheck}
                             loading={healthChecking}
+                            disabled={!canManage}
                             className="!py-1 !text-[11px]"
                             variant="secondary"
                           >
@@ -895,6 +911,7 @@ function SettingsPageInner() {
                 <Button
                   onClick={handleHealthCheck}
                   loading={healthChecking}
+                  disabled={!canManage}
                   className="!py-1.5 !text-xs"
                   variant="secondary"
                 >
@@ -902,6 +919,7 @@ function SettingsPageInner() {
                 </Button>
                 <Button
                   onClick={handleConnect}
+                  disabled={!canManage}
                   className="!py-1.5 !text-xs"
                   variant="secondary"
                 >
@@ -910,6 +928,7 @@ function SettingsPageInner() {
                 <Button
                   onClick={handleDisconnect}
                   loading={disconnecting}
+                  disabled={!canManage}
                   variant="ghost"
                   className="!py-1.5 !text-xs text-error"
                 >
@@ -924,7 +943,7 @@ function SettingsPageInner() {
                 {t.cloudApi.connectIntro}
               </p>
               <div className="flex flex-wrap gap-2">
-                <Button onClick={handleConnect} className="!py-2">
+                <Button onClick={handleConnect} disabled={!canManage} className="!py-2">
                   {t.cloudApi.connectButton}
                 </Button>
                 <button
@@ -1049,6 +1068,7 @@ function SettingsPageInner() {
             <Input
               label={t.cloudApi.phoneIdLabel}
               value={draft.whatsappCloudPhoneId}
+              disabled={!canManage}
               onChange={(e) =>
                 update("whatsappCloudPhoneId", e.target.value)
               }
@@ -1057,6 +1077,7 @@ function SettingsPageInner() {
             <Input
               label={t.cloudApi.tokenLabel}
               value={draft.whatsappCloudToken}
+              disabled={!canManage}
               onChange={(e) =>
                 update("whatsappCloudToken", e.target.value)
               }
@@ -1067,6 +1088,7 @@ function SettingsPageInner() {
           <Input
             label={t.cloudApi.businessIdLabel}
             value={draft.whatsappCloudBusinessId}
+            disabled={!canManage}
             onChange={(e) =>
               update("whatsappCloudBusinessId", e.target.value)
             }
@@ -1120,7 +1142,7 @@ function SettingsPageInner() {
               <Button
                 onClick={handleSyncTemplates}
                 loading={templatesSyncing}
-                disabled={!isOwner}
+                disabled={!canManage}
                 className="!py-1.5 !text-xs whitespace-nowrap"
                 variant="secondary"
               >
@@ -1348,7 +1370,9 @@ function SettingsPageInner() {
         </div>
 
         <div className="flex items-center justify-between gap-3">
-          {dirty ? (
+          {!canManage ? (
+            <p className="text-xs text-text-secondary">{t.viewOnly}</p>
+          ) : dirty ? (
             <p className="text-xs text-text-secondary">{t.dirty}</p>
           ) : (
             <p className="text-xs text-text-secondary">{t.clean}</p>
@@ -1356,7 +1380,7 @@ function SettingsPageInner() {
           <Button
             onClick={handleSave}
             loading={busy}
-            disabled={!dirty || busy}
+            disabled={!dirty || busy || !canManage}
             className="flex items-center gap-2"
           >
             <Save className="w-4 h-4" />

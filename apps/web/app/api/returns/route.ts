@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireTenant } from "@/lib/api/auth-helpers";
 import { requirePermissionAudited } from "@/lib/api/auth-helpers";
 import { resolveBranchFilter } from "@/lib/api/branch-context";
 import { resolveSinceWindow } from "@/lib/api/list-window";
 import { listReturns, recordReturn } from "@/lib/repo/operations";
 
 export async function GET(req: NextRequest) {
-  const r = await requireTenant();
+  // `view_returns` — both clients hide the screen without it; the API said
+  // 200 with real rows to any member (doc 14 §3.1 C5). Audited, like the
+  // POST below, until PERMISSION_ENFORCE_WRITES=1.
+  const r = await requirePermissionAudited("view_returns");
   if (!r.ok) return r.response;
   const filter = await resolveBranchFilter(
     r.ctx,

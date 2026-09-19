@@ -5,6 +5,7 @@ import {
   TenantActionError,
   suspendTenant,
 } from "@/lib/admin/tenant-actions";
+import { clientIpOrNull } from "@/lib/request-ip";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,12 +13,6 @@ export const dynamic = "force-dynamic";
 const schema = z.object({
   reason: z.string().min(1).max(500),
 });
-
-function clientIp(req: NextRequest): string | null {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]!.trim();
-  return req.headers.get("x-real-ip");
-}
 
 export async function POST(
   req: NextRequest,
@@ -38,7 +33,7 @@ export async function POST(
 
   try {
     await suspendTenant(r.session.adminId, id, parsed.data.reason, {
-      ip: clientIp(req),
+      ip: clientIpOrNull(req),
       userAgent: req.headers.get("user-agent"),
     });
     return NextResponse.json({ ok: true });

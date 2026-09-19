@@ -2,15 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requirePermission } from "@/lib/admin/permissions";
 import { BroadcastError, patchBroadcast } from "@/lib/admin/broadcasts";
+import { clientIpOrNull } from "@/lib/request-ip";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function clientIp(req: NextRequest): string | null {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]!.trim();
-  return req.headers.get("x-real-ip");
-}
 
 const schema = z.object({
   // Same as POST: allow empty strings; mirror logic runs pre-Zod.
@@ -79,7 +74,7 @@ export async function PATCH(
               ? new Date(parsed.data.endsAt)
               : null,
       },
-      { ip: clientIp(req), userAgent: req.headers.get("user-agent") },
+      { ip: clientIpOrNull(req), userAgent: req.headers.get("user-agent") },
     );
     return NextResponse.json({ ok: true });
   } catch (err) {

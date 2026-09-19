@@ -15,6 +15,7 @@ import {
   mintRefreshToken,
   signAccessToken,
 } from "@/lib/api/native-token";
+import { clientIp } from "@/lib/request-ip";
 
 // Native token refresh, with ROTATION + REUSE DETECTION.
 //
@@ -63,12 +64,6 @@ interface DeviceRow {
   token_version: number;
   revoked: boolean;
   expired: boolean;
-}
-
-function clientIp(h: Headers): string {
-  const xff = h.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]!.trim();
-  return h.get("x-real-ip")?.trim() ?? "unknown";
 }
 
 export async function POST(req: Request) {

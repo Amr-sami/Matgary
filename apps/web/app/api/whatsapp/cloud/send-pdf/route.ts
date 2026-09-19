@@ -8,7 +8,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { type PdfInvoiceData } from "@/lib/pdfReceipt";
-import { requireTenantWithBranch } from "@/lib/api/auth-helpers";
+import { requirePermissionWithBranch } from "@/lib/api/auth-helpers";
 import { rateLimit } from "@/lib/ratelimit";
 import { sendOutboundDocument } from "@/lib/whatsapp/outbound";
 
@@ -24,7 +24,12 @@ const schema = z.object({
 });
 
 export async function POST(req: Request) {
-  const auth = await requireTenantWithBranch();
+  // Whoever may ring a sale (POST /api/sales, /api/sales/cart) may send its
+  // receipt: the web POS calls this from the cashier's till. A deliberate
+  // deviation from doc 14 §3.1 C5's "every /api/whatsapp/* write ->
+  // manage_whatsapp", which would break receipt sending for every default
+  // staff row. Audit mode until PERMISSION_ENFORCE_WRITES=1.
+  const auth = await requirePermissionWithBranch("record_sales");
   if (!auth.ok) return auth.response;
 
   const limit = await rateLimit("wa.send", auth.ctx.tenantId, {

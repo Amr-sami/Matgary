@@ -7,6 +7,7 @@ import { cookies, headers } from "next/headers";
 import { adminSessions, admins } from "@/lib/db/schema";
 import { getAdminDb } from "./db";
 import { ADMIN_SESSION_COOKIE } from "./cookie";
+import { clientIpOrNull } from "@/lib/request-ip";
 // Re-exported so existing route imports stay valid. Edge code that needs only
 // the constant should import from `./cookie` directly.
 export { ADMIN_SESSION_COOKIE };
@@ -126,14 +127,9 @@ export async function revokeAllSessionsForAdmin(adminId: string): Promise<void> 
   await db.delete(adminSessions).where(eq(adminSessions.adminId, adminId));
 }
 
-/** Best-effort IP extraction. Same heuristics as the cron helper. */
+/** Best-effort IP extraction — the shared lib/request-ip trust order. */
 export async function readRequestIp(): Promise<string | null> {
-  const h = await headers();
-  const xff = h.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]!.trim();
-  const real = h.get("x-real-ip");
-  if (real) return real.trim();
-  return null;
+  return clientIpOrNull(await headers());
 }
 
 export async function readUserAgent(): Promise<string | null> {

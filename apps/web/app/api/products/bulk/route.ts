@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireTenant } from "@/lib/api/auth-helpers";
+import { requirePermissionWithBranch } from "@/lib/api/auth-helpers";
 import { bulkDeleteProducts, bulkUpdateProducts } from "@/lib/repo/catalog";
 
 const patchSchema = z.object({
@@ -20,7 +20,10 @@ const patchSchema = z.object({
 });
 
 export async function PATCH(req: NextRequest) {
-  const r = await requireTenant();
+  // Same gate as POST /api/products and PATCH /api/products/[id]
+  // (manage_inventory), audit mode until PERMISSION_ENFORCE_WRITES=1
+  // (doc 14 §3.1 C5).
+  const r = await requirePermissionWithBranch("manage_inventory");
   if (!r.ok) return r.response;
   const body = await req.json().catch(() => null);
   const parsed = patchSchema.safeParse(body);
@@ -34,7 +37,8 @@ export async function PATCH(req: NextRequest) {
 const deleteSchema = z.object({ ids: z.array(z.string().uuid()).min(1) });
 
 export async function DELETE(req: NextRequest) {
-  const r = await requireTenant();
+  // Same gate as DELETE /api/products/[id] (doc 14 §3.1 C5).
+  const r = await requirePermissionWithBranch("manage_inventory");
   if (!r.ok) return r.response;
   const body = await req.json().catch(() => null);
   const parsed = deleteSchema.safeParse(body);

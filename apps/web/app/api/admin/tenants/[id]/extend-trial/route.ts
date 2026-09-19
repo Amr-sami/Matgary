@@ -5,6 +5,7 @@ import {
   TenantActionError,
   extendTrial,
 } from "@/lib/admin/tenant-actions";
+import { clientIpOrNull } from "@/lib/request-ip";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,12 +14,6 @@ const schema = z.object({
   days: z.number().int().min(1).max(90),
   reason: z.string().max(500).nullable().optional(),
 });
-
-function clientIp(req: NextRequest): string | null {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]!.trim();
-  return req.headers.get("x-real-ip");
-}
 
 export async function POST(
   req: NextRequest,
@@ -45,7 +40,7 @@ export async function POST(
       parsed.data.days,
       parsed.data.reason ?? null,
       {
-        ip: clientIp(req),
+        ip: clientIpOrNull(req),
         userAgent: req.headers.get("user-agent"),
       },
     );

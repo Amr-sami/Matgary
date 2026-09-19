@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { pruneActivityAllTenants } from "@/lib/repo/activity";
 import { rateLimit } from "@/lib/ratelimit";
+import { clientIp } from "@/lib/request-ip";
 
 // Daily retention sweep for activity_logs. The audit table is otherwise
 // append-only and grows forever; without partitioning, we just delete rows
@@ -23,14 +24,6 @@ export const dynamic = "force-dynamic";
 const RATE_LIMIT = 6;
 const RATE_WINDOW_SEC = 60 * 60;
 const DEFAULT_RETENTION_DAYS = 730;
-
-function clientIp(req: NextRequest): string {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]!.trim();
-  const real = req.headers.get("x-real-ip");
-  if (real) return real.trim();
-  return "unknown";
-}
 
 function bearerToken(req: NextRequest): string | null {
   const auth = req.headers.get("authorization") ?? "";

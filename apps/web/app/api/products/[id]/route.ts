@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requirePermissionAudited, requireTenant } from "@/lib/api/auth-helpers";
+import { requirePermissionAudited } from "@/lib/api/auth-helpers";
 import { deleteProduct, updateProduct } from "@/lib/repo/catalog";
 import { logActivity } from "@/lib/repo/activity";
 
@@ -21,6 +21,14 @@ const patchSchema = z.object({
   imageUrl: z.string().max(500).regex(/^\/api\/uploads\/product-image\/[A-Za-z0-9\-]+\/products\/[A-Za-z0-9\-]+\.(jpg|png|webp)$/).nullable().optional(),
 });
 
+// C20 — a non-uuid id made Postgres refuse the `id = $2` cast → 500, and an
+// unknown uuid was a silent `200 {ok:true}` (plus a phantom product.update /
+// product.delete activity row). The uuid gate answers the first without a
+// query; updateProduct / deleteProduct already select the row they touch and
+// report whether it existed, so the second is a 404 with no extra lookup.
+const idSchema = z.string().uuid();
+const notFound = () => NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -31,6 +39,7 @@ export async function PATCH(
   const r = await requirePermissionAudited("manage_inventory");
   if (!r.ok) return r.response;
   const { id } = await params;
+  if (!idSchema.safeParse(id).success) return notFound();
   const body = await req.json().catch(() => null);
   const parsed = patchSchema.safeParse(body);
   if (!parsed.success) {
@@ -43,7 +52,7 @@ export async function PATCH(
     // Shape is checked by zod; the tenant segment must be the caller's own.
     return NextResponse.json({ error: "رابط الصورة غير صالح" }, { status: 400 });
   }
-  await updateProduct(r.ctx.tenantId, id, parsed.data);
+  if (!(await updateProduct(r.ctx.tenantId, id, parsed.data))) return notFound();
   logActivity({
     tenantId: r.ctx.tenantId,
     actorUserId: r.ctx.userId,
@@ -61,10 +70,12 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const r = await requireTenant();
+  // Same gate as PATCH above and POST /api/products (doc 14 §3.1 C5).
+  const r = await requirePermissionAudited("manage_inventory");
   if (!r.ok) return r.response;
   const { id } = await params;
-  await deleteProduct(r.ctx.tenantId, id);
+  if (!idSchema.safeParse(id).success) return notFound();
+  if (!(await deleteProduct(r.ctx.tenantId, id))) return notFound();
   logActivity({
     tenantId: r.ctx.tenantId,
     actorUserId: r.ctx.userId,

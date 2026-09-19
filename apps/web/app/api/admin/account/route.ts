@@ -6,6 +6,7 @@ import { getAdminDb } from "@/lib/admin/db";
 import { requireAdmin } from "@/lib/admin/permissions";
 import { logAuditEvent } from "@/lib/admin/audit";
 import { comparePassword } from "@/lib/admin/auth";
+import { clientIp } from "@/lib/request-ip";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,14 +38,6 @@ const patchSchema = z.object({
   email: z.string().email().max(200).optional(),
   currentPassword: z.string().min(1).max(200).optional(),
 });
-
-function clientIp(req: NextRequest): string {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]!.trim();
-  const real = req.headers.get("x-real-ip");
-  if (real) return real.trim();
-  return "unknown";
-}
 
 export async function PATCH(req: NextRequest) {
   const r = await requireAdmin();

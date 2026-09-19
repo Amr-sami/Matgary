@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireTenantWithBranch } from "@/lib/api/auth-helpers";
+import { requirePermissionWithBranch } from "@/lib/api/auth-helpers";
 import {
   settleCustomerPayment,
   SettlementError,
@@ -25,7 +25,10 @@ const schema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const r = await requireTenantWithBranch();
+  // Same gate as POST /api/sales and /api/sales/cart: taking a customer's
+  // debt payment at the till is recording a sale (doc 14 §3.1 C4). Audit
+  // mode until PERMISSION_ENFORCE_WRITES=1.
+  const r = await requirePermissionWithBranch("record_sales");
   if (!r.ok) return r.response;
 
   const body = await req.json().catch(() => null);

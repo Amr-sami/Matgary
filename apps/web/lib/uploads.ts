@@ -1,6 +1,12 @@
 // File storage for sensitive user uploads (employee photos, ID scans, etc.)
 //
-// Layout: <repo>/uploads/<tenantId>/<uuid>.<ext>
+// Layout: <UPLOADS_DIR>/<tenantId>/<uuid>.<ext>
+// UPLOADS_DIR defaults to <cwd>/uploads — apps/web/uploads under `next dev`,
+// /repo/uploads in the production image, where the Dockerfile runner stage
+// pre-creates it owned by the runtime user and docker-compose.prod.yml mounts
+// the matgary_uploads named volume on it (launch-readiness §3.1 C1). Set it
+// explicitly to put the files anywhere else; a relative value resolves
+// against cwd.
 // The leading <tenantId> segment lets the serving route authorize by checking
 // that the requester belongs to that tenant — no DB lookup needed for ACL.
 // Files are NOT under /public; reaching them must go through /api/uploads/*
@@ -10,7 +16,29 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
 
-const UPLOADS_ROOT = path.join(process.cwd(), "uploads");
+/**
+ * Absolute root every tenant directory lives under. Read per call rather than
+ * frozen at import so UPLOADS_DIR is honoured whenever it is set (tests set it
+ * after the module loads) and so the container path is explicit, not inferred
+ * from wherever `node apps/web/server.js` happens to be launched.
+ *
+ * The turbopackIgnore comments matter: `next build` traces every path that
+ * reaches an fs call to decide what the standalone output must carry. A path
+ * rooted in an env var is unbounded, and Turbopack then traces the WHOLE
+ * project into .next/standalone ("Encountered unexpected file in NFT list",
+ * with next.config.ts reached through this file). Uploads are runtime data,
+ * never build assets, so tracing is switched off on EVERY path expression
+ * the root flows through before an fs call — the root itself, the tenant
+ * dir, the file join in saveTenantUpload and the resolve in
+ * resolveTenantUpload — not only where the env var is read: an un-annotated
+ * join/resolve of an ignored value is analysed afresh and re-widens to "any
+ * file under the project".
+ */
+export function getUploadsRoot(): string {
+  const configured = process.env.UPLOADS_DIR?.trim();
+  if (configured) return path.resolve(/*turbopackIgnore: true*/ configured);
+  return path.join(process.cwd(), "uploads");
+}
 
 const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
 const EXT_BY_MIME: Record<string, string> = {
@@ -80,9 +108,9 @@ export async function saveTenantUpload(
   const ext = EXT_BY_MIME[file.mime];
   const id = crypto.randomUUID();
   const filename = `${id}.${ext}`;
-  const dir = path.join(UPLOADS_ROOT, tenantId);
+  const dir = path.join(/*turbopackIgnore: true*/ getUploadsRoot(), tenantId);
   await fs.mkdir(dir, { recursive: true });
-  await fs.writeFile(path.join(dir, filename), file.buffer);
+  await fs.writeFile(path.join(/*turbopackIgnore: true*/ dir, filename), file.buffer);
 
   return {
     relativePath: `${tenantId}/${filename}`,
@@ -102,8 +130,8 @@ export function resolveTenantUpload(
 ): string | null {
   // Strip any leading slashes so `/<tenant>/x.jpg` and `<tenant>/x.jpg` both work.
   const cleaned = relativePath.replace(/^\/+/, "");
-  const tenantDir = path.join(UPLOADS_ROOT, tenantId);
-  const absolute = path.resolve(tenantDir, path.relative(tenantId, cleaned));
+  const tenantDir = path.join(/*turbopackIgnore: true*/ getUploadsRoot(), tenantId);
+  const absolute = path.resolve(/*turbopackIgnore: true*/ tenantDir, path.relative(tenantId, cleaned));
   // Must be inside tenantDir.
   if (!absolute.startsWith(tenantDir + path.sep) && absolute !== tenantDir) {
     return null;

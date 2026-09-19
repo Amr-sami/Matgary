@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
-import { signupAction, type SignupErrorCode, type SignupField } from "../actions";
+import { signupAction } from "../actions";
+import type { SignupErrorCode, SignupField } from "@/lib/auth/create-account";
 
 // Suggest a store handle from the email's local part.
 function suggestHandle(email: string): string {

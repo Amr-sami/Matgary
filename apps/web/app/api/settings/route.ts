@@ -1,18 +1,67 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireTenantWithBranch } from "@/lib/api/auth-helpers";
+import {
+  requirePermissionWithBranch,
+  requireTenantWithBranch,
+} from "@/lib/api/auth-helpers";
 import { SETTINGS_CACHE, cacheHeaders } from "@/lib/api/cache-headers";
-import { getShopSettings, saveShopSettings } from "@/lib/repo/settings";
+import { can } from "@/lib/permissions";
+import {
+  TOKEN_PLACEHOLDER,
+  getShopSettings,
+  saveShopSettings,
+  type ShopSettingsDto,
+} from "@/lib/repo/settings";
 import { logActivity } from "@/lib/repo/activity";
 
 // Multi-store: settings are per (tenant, branch). Reads + writes are scoped
 // to the active branch from the cookie context, so each branch shows its
 // own header/logo/WhatsApp credentials/message template independently.
 
+/**
+ * WhatsApp credential fields — only a caller with `manage_whatsapp` sees
+ * their values (doc 14 §3.1 C3). The tokens are already masked to
+ * TOKEN_PLACEHOLDER by the repo; the instance / phone-number / business ids
+ * are the other half of the credential pair and get the same treatment here.
+ *
+ * Masked to the placeholder rather than blanked: the web POS decides whether
+ * a server-side sender is configured from the TRUTHINESS of these fields
+ * (`components/sales/SaleForm.tsx` — `!!settings.greenApiInstanceId &&
+ * !!settings.greenApiToken`), so a cashier must still see "configured" or
+ * every till silently falls back to the wa.me popup. The placeholder leaks
+ * exactly one bit (set / not set), keeps the DTO shape for every client that
+ * types `data` as ShopSettingsDto, and is the value the repo's write cycle
+ * treats as "no change" (`saveShopSettings`), so a draft that round-trips
+ * through this GET cannot overwrite a credential.
+ */
+const WHATSAPP_CREDENTIAL_KEYS = [
+  "greenApiInstanceId",
+  "greenApiToken",
+  "greenApiUrl",
+  "whatsappCloudPhoneId",
+  "whatsappCloudToken",
+  "whatsappCloudBusinessId",
+] as const satisfies readonly (keyof ShopSettingsDto)[];
+
+function stripWhatsAppCredentials(data: ShopSettingsDto): ShopSettingsDto {
+  const out = { ...data };
+  for (const k of WHATSAPP_CREDENTIAL_KEYS) out[k] = data[k] ? TOKEN_PLACEHOLDER : "";
+  return out;
+}
+
+// GET stays open to every member of the tenant: the receipt (shop name,
+// phone, logo, block order, footer, loyalty flags) is rendered by the POS on
+// both clients — `components/sales/Receipt.tsx`, `SaleForm.tsx`,
+// `apps/mobile/src/receipt/share.ts` — and cashiers hold neither
+// `view_settings` nor `manage_whatsapp` (DEFAULT_STAFF_PERMISSIONS). Gating
+// the read on `view_settings` would break receipt printing for every default
+// staff row, which is why doc 14 §3.1 C3 says "return the receipt fields
+// under any-member and hide only the secrets". The secrets are the gate.
 export async function GET() {
   const r = await requireTenantWithBranch();
   if (!r.ok) return r.response;
-  const data = await getShopSettings(r.ctx.tenantId, r.ctx.branchId);
+  const full = await getShopSettings(r.ctx.tenantId, r.ctx.branchId);
+  const data = can(r.ctx, "manage_whatsapp") ? full : stripWhatsAppCredentials(full);
   return NextResponse.json(
     { data, branchId: r.ctx.branchId },
     { headers: cacheHeaders(SETTINGS_CACHE) },
@@ -69,12 +118,28 @@ const patchSchema = z.object({
 });
 
 export async function PATCH(req: NextRequest) {
-  const r = await requireTenantWithBranch();
+  // `manage_whatsapp` is the "shop settings + WhatsApp creds" permission
+  // (lib/permissions.ts) — the same one the web /whatsapp page and the
+  // mobile Settings tiles check. Branch-aware twin of requirePermissionAudited:
+  // audit mode until PERMISSION_ENFORCE_WRITES=1, then 403.
+  const r = await requirePermissionWithBranch("manage_whatsapp");
   if (!r.ok) return r.response;
   const body = await req.json().catch(() => null);
   const parsed = patchSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+  }
+  // Defence in depth, independent of PERMISSION_ENFORCE_WRITES: in audit
+  // mode the gate above logs and lets the request through, and the web
+  // /settings page (reachable with `view_settings`) saves its ENTIRE draft —
+  // which, after the GET masking above, carries placeholders / blanks for
+  // the six credential fields. Left in, an empty string would null the stored
+  // token (`saveShopSettings`: "empty string -> clear stored credential") and
+  // a placeholder would be written as the instance / phone id. So a caller
+  // without `manage_whatsapp` may change the receipt, loyalty and shop fields
+  // the page shows, but never the credentials.
+  if (!can(r.ctx, "manage_whatsapp")) {
+    for (const k of WHATSAPP_CREDENTIAL_KEYS) delete parsed.data[k];
   }
   // receiptBlockOrder is widened to string[] by the zod schema (so it can
   // accept "custom:<id>" entries without enumerating them); the repo

@@ -1279,12 +1279,13 @@ export async function voidSale(tenantId: string, saleId: string): Promise<void> 
   await bustInsightsCache(tenantId);
 }
 
-export async function markSalePaid(tenantId: string, saleId: string): Promise<void> {
-  await withTenant(tenantId, async (tx) => {
+/** Marks one sale paid; false when no row matched (the route answers 404). */
+export async function markSalePaid(tenantId: string, saleId: string): Promise<boolean> {
+  return withTenant(tenantId, async (tx) => {
     // Bring amount_paid up to total_price so the receivables aggregator
     // agrees with the is_paid flag. Without this, "mark paid" leaves an
     // amount_paid=0 row that the customer page still flags as owed.
-    await tx.execute(sql`
+    const rows = (await tx.execute(sql`
       UPDATE sales
          SET is_paid           = true,
              paid_at           = now(),
@@ -1292,16 +1293,22 @@ export async function markSalePaid(tenantId: string, saleId: string): Promise<vo
              partial_paid_at   = NULL
        WHERE tenant_id = ${tenantId}
          AND id        = ${saleId}
-    `);
+      RETURNING id
+    `)) as unknown as Array<{ id: string }>;
+    return rows.length > 0;
   });
 }
 
+/**
+ * Marks every sale on one invoice paid; false when the invoice id matched no
+ * row (the route answers 404 — before, an unknown id was a silent 200).
+ */
 export async function markInvoicePaid(
   tenantId: string,
   invoiceId: string,
-): Promise<void> {
-  await withTenant(tenantId, async (tx) => {
-    await tx.execute(sql`
+): Promise<boolean> {
+  return withTenant(tenantId, async (tx) => {
+    const rows = (await tx.execute(sql`
       UPDATE sales
          SET is_paid           = true,
              paid_at           = now(),
@@ -1309,7 +1316,9 @@ export async function markInvoicePaid(
              partial_paid_at   = NULL
        WHERE tenant_id  = ${tenantId}
          AND invoice_id = ${invoiceId}
-    `);
+      RETURNING id
+    `)) as unknown as Array<{ id: string }>;
+    return rows.length > 0;
   });
 }
 

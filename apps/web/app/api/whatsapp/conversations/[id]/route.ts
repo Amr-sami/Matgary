@@ -7,7 +7,7 @@
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireTenantWithBranch } from "@/lib/api/auth-helpers";
+import { requirePermissionWithBranch } from "@/lib/api/auth-helpers";
 import {
   getConversationById,
   markRead,
@@ -20,7 +20,7 @@ export async function GET(
   _req: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
-  const auth = await requireTenantWithBranch();
+  const auth = await requirePermissionWithBranch("manage_whatsapp");
   if (!auth.ok) return auth.response;
   const { id } = await ctx.params;
 
@@ -59,7 +59,7 @@ export async function PATCH(
   req: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
-  const auth = await requireTenantWithBranch();
+  const auth = await requirePermissionWithBranch("manage_whatsapp");
   if (!auth.ok) return auth.response;
   const { id } = await ctx.params;
 

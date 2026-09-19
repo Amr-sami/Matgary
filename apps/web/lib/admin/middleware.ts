@@ -3,6 +3,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { ADMIN_SESSION_COOKIE } from "./cookie";
+import { clientIp } from "@/lib/request-ip";
 
 const ALLOWLIST = parseAllowlist(process.env.ADMIN_IP_ALLOWLIST);
 const BYPASS_USER_HEADER_TAG = process.env.ADMIN_IP_ALLOWLIST_BYPASS_USER || null;
@@ -54,13 +55,10 @@ export function hardNotFound(): NextResponse {
 // ─── helpers ─────────────────────────────────────────────────────────────
 
 function extractIp(req: NextRequest): string {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]!.trim();
-  const real = req.headers.get("x-real-ip");
-  if (real) return real.trim();
-  // Next.js exposes the parsed IP for runtime engines that surface it.
-  // Fall through to a placeholder so the allowlist still does its job.
-  return "unknown";
+  // Shared trust order (cf-connecting-ip under TRUST_CLOUDFLARE=1, then the
+  // proxy-appended x-forwarded-for hop, then x-real-ip). Falls through to a
+  // placeholder so the allowlist still does its job.
+  return clientIp(req);
 }
 
 function parseAllowlist(raw: string | undefined): string[] | null {

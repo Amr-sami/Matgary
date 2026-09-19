@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requirePermission } from "@/lib/admin/permissions";
 import { PlanActionError, patchPlan } from "@/lib/admin/plans";
+import { clientIpOrNull } from "@/lib/request-ip";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,12 +18,6 @@ const schema = z.object({
   featuresEn: z.array(z.string().min(1).max(200)).max(15).optional(),
   sortOrder: z.number().int().min(0).max(999).optional(),
 });
-
-function clientIp(req: NextRequest): string | null {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]!.trim();
-  return req.headers.get("x-real-ip");
-}
 
 export async function PATCH(
   req: NextRequest,
@@ -45,7 +40,7 @@ export async function PATCH(
       key,
       patch: parsed.data,
       ifMatch: req.headers.get("if-match"),
-      meta: { ip: clientIp(req), userAgent: req.headers.get("user-agent") },
+      meta: { ip: clientIpOrNull(req), userAgent: req.headers.get("user-agent") },
     });
     return NextResponse.json({ plan: updated });
   } catch (err) {

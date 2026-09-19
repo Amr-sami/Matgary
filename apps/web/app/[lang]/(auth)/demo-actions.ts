@@ -1,5 +1,6 @@
 "use server";
 
+import { clientIp as requestIp } from "@/lib/request-ip";
 import { randomBytes, randomUUID } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { headers } from "next/headers";
@@ -18,10 +19,7 @@ const DEMO_LIMIT = 10;
 const DEMO_WINDOW_SEC = 60 * 60;
 
 async function clientIp(): Promise<string> {
-  const h = await headers();
-  const xff = h.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]!.trim();
-  return h.get("x-real-ip")?.trim() ?? "unknown";
+  return requestIp(await headers());
 }
 
 async function activeLocale(): Promise<Locale> {

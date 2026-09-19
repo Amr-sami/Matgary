@@ -6,15 +6,10 @@ import {
   deleteAdmin,
   patchAdmin,
 } from "@/lib/admin/admins";
+import { clientIpOrNull } from "@/lib/request-ip";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function clientIp(req: NextRequest): string | null {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]!.trim();
-  return req.headers.get("x-real-ip");
-}
 
 const patchSchema = z.object({
   displayName: z.string().min(1).max(80).optional(),
@@ -39,7 +34,7 @@ export async function PATCH(
   }
   try {
     await patchAdmin(r.session.adminId, id, parsed.data, {
-      ip: clientIp(req),
+      ip: clientIpOrNull(req),
       userAgent: req.headers.get("user-agent"),
     });
     return NextResponse.json({ ok: true });
@@ -60,7 +55,7 @@ export async function DELETE(
   const { id } = await params;
   try {
     await deleteAdmin(r.session.adminId, id, {
-      ip: clientIp(req),
+      ip: clientIpOrNull(req),
       userAgent: req.headers.get("user-agent"),
     });
     return NextResponse.json({ ok: true });

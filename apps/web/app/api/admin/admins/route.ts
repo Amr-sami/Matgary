@@ -2,15 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requirePermission } from "@/lib/admin/permissions";
 import { AdminMgmtError, addAdmin, listAdmins } from "@/lib/admin/admins";
+import { clientIpOrNull } from "@/lib/request-ip";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function clientIp(req: NextRequest): string | null {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]!.trim();
-  return req.headers.get("x-real-ip");
-}
 
 export async function GET() {
   const r = await requirePermission("admin.manage");
@@ -40,7 +35,7 @@ export async function POST(req: NextRequest) {
     const created = await addAdmin(
       r.session.adminId,
       parsed.data,
-      { ip: clientIp(req), userAgent: req.headers.get("user-agent") },
+      { ip: clientIpOrNull(req), userAgent: req.headers.get("user-agent") },
     );
     return NextResponse.json(
       { id: created.id, tempPassword: created.tempPassword },

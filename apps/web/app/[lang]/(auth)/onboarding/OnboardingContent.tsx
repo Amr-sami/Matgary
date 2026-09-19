@@ -21,10 +21,8 @@ import {
   Users,
   Wallet,
 } from "@/lib/icons";
-import {
-  completeOnboardingAction,
-  type OnboardingErrorCode,
-} from "../actions";
+import { completeOnboardingAction } from "../actions";
+import type { OnboardingErrorCode } from "@/lib/onboarding/complete";
 
 import { TIP_HREFS, type OnboardingPreset as Preset } from "./tip-hrefs";
 

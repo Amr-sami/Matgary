@@ -7,6 +7,7 @@ import { sendMail } from "@/lib/mailer";
 import { rateLimit } from "@/lib/ratelimit";
 import { buildPasswordResetEmail } from "@/lib/mail/password-reset";
 import { appOrigin } from "@/lib/url-safe";
+import { clientIp as requestIp } from "@/lib/request-ip";
 
 const schema = z.object({
   email: z.string().email().max(200),
@@ -31,12 +32,7 @@ function hashEmail(email: string): string {
 }
 
 async function clientIp(): Promise<string> {
-  const h = await headers();
-  return (
-    h.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    h.get("x-real-ip")?.trim() ??
-    "unknown"
-  );
+  return requestIp(await headers());
 }
 
 export async function POST(req: NextRequest) {

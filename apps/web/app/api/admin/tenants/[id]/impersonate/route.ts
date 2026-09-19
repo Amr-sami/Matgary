@@ -5,15 +5,10 @@ import {
   prepareImpersonation,
 } from "@/lib/admin/impersonation";
 import { logAuditEvent } from "@/lib/admin/audit";
+import { clientIpOrNull } from "@/lib/request-ip";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function clientIp(req: NextRequest): string | null {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]!.trim();
-  return req.headers.get("x-real-ip");
-}
 
 export async function POST(
   req: NextRequest,
@@ -34,7 +29,7 @@ export async function POST(
       action: "impersonate.start",
       targetKind: "tenant",
       targetId: id,
-      ip: clientIp(req),
+      ip: clientIpOrNull(req),
       userAgent: req.headers.get("user-agent"),
       before: null,
       after: {

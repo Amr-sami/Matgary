@@ -5,6 +5,7 @@ import { z } from "zod";
 import { rateLimit } from "@/lib/ratelimit";
 import { createAccount } from "@/lib/auth/create-account";
 import { mintNativeSession } from "@/lib/api/native-session";
+import { clientIp } from "@/lib/request-ip";
 
 // Signup, for a native client.
 //
@@ -30,12 +31,6 @@ const bodySchema = z.object({
   appVersion: z.string().max(40).optional(),
   installId: z.string().max(120).optional(),
 });
-
-function clientIp(h: Headers): string {
-  const xff = h.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]!.trim();
-  return h.get("x-real-ip")?.trim() ?? "unknown";
-}
 
 /** Field-level codes map to 422 so a form can highlight the input; the rest are 409/429. */
 function statusFor(code: string): number {

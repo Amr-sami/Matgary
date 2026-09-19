@@ -5,7 +5,7 @@
 // Graph. Phase 3+ will run this on a schedule via BullMQ.
 
 import { NextResponse } from "next/server";
-import { requireTenantWithBranch } from "@/lib/api/auth-helpers";
+import { requirePermissionWithBranch } from "@/lib/api/auth-helpers";
 import { rateLimit } from "@/lib/ratelimit";
 import { runHealthCheck } from "@/lib/whatsapp/health";
 
@@ -15,7 +15,7 @@ const HEALTH_LIMIT = 4; // 4 runs / 30s window per branch — generous for human
 const HEALTH_WINDOW_SEC = 30;
 
 export async function POST() {
-  const auth = await requireTenantWithBranch();
+  const auth = await requirePermissionWithBranch("manage_whatsapp");
   if (!auth.ok) return auth.response;
 
   const limit = await rateLimit(

@@ -4,7 +4,7 @@
 // Defaults exclude stale rows.
 
 import { NextResponse, type NextRequest } from "next/server";
-import { requireTenantWithBranch } from "@/lib/api/auth-helpers";
+import { requirePermissionWithBranch } from "@/lib/api/auth-helpers";
 import {
   listTemplates,
   type TemplateCategory,
@@ -14,7 +14,7 @@ import {
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
-  const auth = await requireTenantWithBranch();
+  const auth = await requirePermissionWithBranch("manage_whatsapp");
   if (!auth.ok) return auth.response;
 
   const url = new URL(req.url);

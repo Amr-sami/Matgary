@@ -13,6 +13,7 @@ import {
 import { revokeAllSessionsForAdmin, ADMIN_SESSION_COOKIE, createSession } from "@/lib/admin/session";
 import { requireAdmin } from "@/lib/admin/permissions";
 import { logAuditEvent } from "@/lib/admin/audit";
+import { clientIp } from "@/lib/request-ip";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,14 +22,6 @@ const schema = z.object({
   currentPassword: z.string().min(1).max(200),
   newPassword: z.string().min(1).max(200),
 });
-
-function clientIp(req: NextRequest): string {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]!.trim();
-  const real = req.headers.get("x-real-ip");
-  if (real) return real.trim();
-  return "unknown";
-}
 
 export async function POST(req: NextRequest) {
   const r = await requireAdmin();

@@ -13,6 +13,7 @@ import { cacheBustPrefix, cacheRemember, globalKey } from "./cache";
 import { rateLimit, rateLimitConsume } from "./ratelimit";
 import { findRecoveryCodeIndex, verifyTotp } from "./totp";
 import { logger } from "./logger";
+import { UNKNOWN_IP, clientIp } from "@/lib/request-ip";
 
 // Login limits — both must pass. The IP guard slows credential-stuffing from
 // a single host; the email guard slows targeted attacks. Numbers are tight
@@ -35,12 +36,7 @@ const TOTP_WINDOW_SEC = 15 * 60;
 // a generic "wrong password or code" message.
 
 function clientIpFromRequest(req: Request | undefined): string {
-  if (!req) return "unknown";
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]!.trim();
-  const real = req.headers.get("x-real-ip");
-  if (real) return real.trim();
-  return "unknown";
+  return req ? clientIp(req) : UNKNOWN_IP;
 }
 
 // 60s: short enough that a permission change is felt almost immediately,
