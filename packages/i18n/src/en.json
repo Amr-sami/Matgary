@@ -5216,7 +5216,8 @@
         "notAvailableRetry": "Authentication is not available right now — try again, or use the device passcode from the prompt"
       },
       "signedOutOfflineTitle": "Signed out on this device",
-      "signedOutOfflineBody": "The server could not be reached, so the session will be closed there once you are back online."
+      "signedOutOfflineBody": "The server could not be reached, so the session will be closed there once you are back online.",
+      "introAndroid": "Ask for your fingerprint, face unlock or the device PIN when opening the app or coming back to it. It only covers the screen — your session, cart and locally saved sales stay as they are."
     },
     "push": {
       "thisDevice": "This device",
@@ -5324,7 +5325,8 @@
       "codeTableEpson": "Epson numbering (37)",
       "codeTableXprinter": "Xprinter numbering (22)",
       "codeTableHint": "Cheap printers number their code tables differently. If Arabic comes out as garbage in printer-font mode, pick the other numbering and send a test print.",
-      "scanTitle": "Add a printer"
+      "scanTitle": "Add a printer",
+      "classicNoteAndroid": "If your printer does not show up, make sure it is on and paired in the phone's Bluetooth settings, or print from the web app."
     },
     "calendar": {
       "month": {

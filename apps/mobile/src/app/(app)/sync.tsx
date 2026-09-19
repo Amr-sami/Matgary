@@ -362,7 +362,8 @@ function DevTools() {
         <Switch
           value={simulate}
           onValueChange={setSimulate}
-          trackColor={{ true: colors.warningStrong, false: colors.border }}
+          thumbColor={Platform.OS === "android" ? colors.card : undefined}
+          trackColor={{ true: colors.warningStrong, false: Platform.OS === "android" ? colors.switchTrackOff : colors.border }}
           accessibilityLabel={t("mobile.sync.dev.simulateOffline")}
           testID="sync-simulate-offline"
         />

@@ -72,7 +72,10 @@ export function ToggleRow({ label, hint, value, onValueChange, disabled, busy, t
             value={value}
             onValueChange={onValueChange}
             disabled={disabled}
-            trackColor={{ true: colors.accent, false: colors.border }}
+            // Android: white thumb (Material's default is the theme teal) and a
+            // darker OFF track so the switch stays visible on a white card.
+            thumbColor={Platform.OS === "android" ? colors.card : undefined}
+            trackColor={{ true: colors.accent, false: Platform.OS === "android" ? colors.switchTrackOff : colors.border }}
             accessibilityLabel={label}
             accessibilityHint={hint}
             style={[GLASS_SWITCH ? styles.frame : undefined, rtl ? styles.mirror : undefined]}

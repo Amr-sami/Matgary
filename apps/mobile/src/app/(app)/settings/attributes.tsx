@@ -7,8 +7,7 @@ import {
   StyleSheet,
   Switch,
   Text,
-  View,
-} from "react-native";
+  View, Platform } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, taxonomy } from "@matgary/api-client";
 import { CaretDownIcon as CaretDown } from "phosphor-react-native/src/icons/CaretDown";
@@ -542,7 +541,8 @@ function NameSheet({
           <Switch
             value={req}
             onValueChange={setReq}
-            trackColor={{ true: colors.accent, false: colors.border }}
+            thumbColor={Platform.OS === "android" ? colors.card : undefined}
+            trackColor={{ true: colors.accent, false: Platform.OS === "android" ? colors.switchTrackOff : colors.border }}
             accessibilityLabel={t("mobile.catalog.requiredLabel")}
           />
         </View>

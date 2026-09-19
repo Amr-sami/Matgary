@@ -140,13 +140,15 @@ export function Sheet({
       transparent
       animationType="slide"
       statusBarTranslucent
+      navigationBarTranslucent
       onRequestClose={onRequestClose ?? onClose}
     >
       <View style={[styles.root, directionStyle(rtl)]}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={styles.kav}
-        >
+        {/* Android: a translucent-status-bar Modal window never resizes for the
+            keyboard (adjustResize is ignored), so the footer sat under the IME
+            (Pixel 7 review, categories sheet). Padding by the keyboard height
+            keeps the pinned CTAs visible on both platforms. */}
+        <KeyboardAvoidingView behavior="padding" style={styles.kav}>
           <Pressable
             style={StyleSheet.absoluteFill}
             onPress={closeOnBackdrop ? onClose : undefined}
@@ -212,7 +214,7 @@ export function Sheet({
                     {primaryAction ? (
                       // Button takes no testID; the app's convention is a
                       // wrapping View, which Maestro taps at its centre.
-                      <View testID={primaryAction.testID}>
+                      <View testID={primaryAction.testID} collapsable={false}>
                         <Button
                           label={primaryAction.label}
                           onPress={primaryAction.onPress}
@@ -223,7 +225,14 @@ export function Sheet({
                       </View>
                     ) : null}
                     {secondaryAction ? (
-                      <View testID={secondaryAction.testID}>
+                      // Default id `${testID}-cancel`: with the header X hidden this is the
+                      // sheet's dismiss control, so flows need a stable handle for it.
+                      // collapsable={false}: Android flattens a layout-only View and its
+                      // testID with it.
+                      <View
+                        testID={secondaryAction.testID ?? (testID ? `${testID}-cancel` : undefined)}
+                        collapsable={false}
+                      >
                         <Button
                           label={secondaryAction.label}
                           variant="outline"

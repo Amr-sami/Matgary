@@ -42,6 +42,11 @@ export const colors = {
 
   /** Every card, input and chip border. Warm, not neutral grey. */
   border: "#E8E4DC",
+  /**
+   * Android Switch OFF track. Material draws its thumb near-white, so on `border`
+   * the OFF state vanished (Pixel 7 review); iOS keeps `border`.
+   */
+  switchTrackOff: "#C9C4BB",
 
   /** Dimmed page behind a bottom sheet or dialog. */
   scrim: "rgba(0,0,0,0.45)",

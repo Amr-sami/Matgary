@@ -166,7 +166,7 @@ export default function AppLockSettingsScreen() {
       <SettingsHeader
         parentLabel={t("app.settingsPage.title")}
         title={t("mobile.appLock.title")}
-        subtitle={t("mobile.appLock.intro")}
+        subtitle={t(Platform.OS === "ios" ? "mobile.appLock.intro" : "mobile.appLock.introAndroid")}
         fallback="/settings"
       />
 

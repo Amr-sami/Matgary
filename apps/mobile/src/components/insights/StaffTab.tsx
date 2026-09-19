@@ -145,7 +145,9 @@ export function StaffTab({ range, from, to }: { range: InsightsRange; from?: str
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.stat}>
-      <Text style={styles.statLabel}>{label}</Text>
+      {/* Fixed two-line label box: on 360dp "الموظفون النشطون" wraps while its
+          siblings do not, which pushed its value a line below theirs. */}
+      <Text numberOfLines={2} style={styles.statLabel}>{label}</Text>
       <Text numberOfLines={1} style={styles.statValue}>{value}</Text>
     </View>
   );
@@ -168,10 +170,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  stat: { flex: 1, gap: 2 },
+  stat: { flex: 1, gap: 2, justifyContent: "flex-end" },
   // Same hairline DeepTab's compare card and the overview trend card put between their three stats.
   statDivider: { width: 1, alignSelf: "stretch", backgroundColor: colors.border },
-  statLabel: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
+  statLabel: { fontFamily: fonts.regular, fontSize: 12, lineHeight: 16, color: colors.textSecondary, ...RTL_TEXT },
   statValue: { fontFamily: fonts.bold, fontSize: 15, color: colors.text, fontVariant: ["tabular-nums"], ...RTL_TEXT },
 
   list: { gap: spacing.md },

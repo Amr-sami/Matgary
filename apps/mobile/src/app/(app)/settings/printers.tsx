@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { BluetoothIcon as Bluetooth } from "phosphor-react-native/src/icons/Bluetooth";
 import { BluetoothSlashIcon as BluetoothSlash } from "phosphor-react-native/src/icons/BluetoothSlash";
 import { BluetoothXIcon as BluetoothX } from "phosphor-react-native/src/icons/BluetoothX";
@@ -121,7 +121,7 @@ export default function PrintersSettingsScreen() {
             style={styles.hintBeforeButton}
           />
         ) : null}
-        <Text style={styles.hint}>{t("mobile.printing.classicNote")}</Text>
+        <Text style={styles.hint}>{t(Platform.OS === "ios" ? "mobile.printing.classicNote" : "mobile.printing.classicNoteAndroid")}</Text>
       </Card>
 
       <Card title={t("mobile.printing.scanTitle")}>
