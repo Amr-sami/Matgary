@@ -123,10 +123,24 @@ export function OfflineDrainer() {
     if (!__DEV__) return;
     return useDevOffline.subscribe((s, prev) => {
       if (s.simulate === prev.simulate) return;
-      const isOnline = netOnline.current && !s.simulate;
-      useOffline.getState().set({ online: isOnline });
-      prevOnline.current = isOnline;
-      if (isOnline) void drainNow("reconnect");
+      const apply = (reachable: boolean) => {
+        netOnline.current = reachable;
+        const isOnline = reachable && !s.simulate;
+        useOffline.getState().set({ online: isOnline });
+        prevOnline.current = isOnline;
+        if (isOnline) void drainNow("reconnect");
+      };
+      if (s.simulate) {
+        apply(netOnline.current);
+        return;
+      }
+      // Lifting the switch: re-ask NetInfo instead of trusting its last event.
+      // On the simulator that event can be a transient `isInternetReachable:
+      // false` with no follow-up, which left the app offline until a relaunch
+      // (e2e offline-sale, 2026-09-19). `fetch()` answers with the live state.
+      NetInfo.fetch()
+        .then((state) => apply(Boolean(state.isConnected) && state.isInternetReachable !== false))
+        .catch(() => apply(netOnline.current));
     });
   }, []);
 
@@ -146,7 +160,23 @@ export function OfflineDrainer() {
   // Foreground.
   useEffect(() => {
     const sub = AppState.addEventListener("change", (next) => {
-      if (next === "active") void drainNow("foreground");
+      if (next !== "active") return;
+      // A missed NetInfo event while backgrounded would leave `online` stale
+      // (and the reconnect drain unfired); re-read the live state on return.
+      if (!useOffline.getState().online && !(__DEV__ && useDevOffline.getState().simulate)) {
+        NetInfo.fetch()
+          .then((state) => {
+            const reachable = Boolean(state.isConnected) && state.isInternetReachable !== false;
+            netOnline.current = reachable;
+            if (reachable) {
+              useOffline.getState().set({ online: true });
+              prevOnline.current = true;
+              void drainNow("reconnect");
+            }
+          })
+          .catch(() => undefined);
+      }
+      void drainNow("foreground");
     });
     return () => sub.remove();
   }, []);
