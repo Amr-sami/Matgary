@@ -4823,7 +4823,7 @@
     "auth": {
       "unexpected": "Something went wrong",
       "badCredentials": "Incorrect email or password",
-      "totpRequired": "This account requires a verification code",
+      "totpRequired": "This account uses two-factor authentication, which the app does not support yet. Sign in on thestoro.com and turn it off under Security, or wait for the next app update.",
       "requestFailed": "Couldn't complete the request",
       "signInFailed": "Couldn't sign in"
     },
@@ -5418,7 +5418,8 @@
         "count_few": "{n} devices",
         "count_other": "{n} devices"
       },
-      "signOutEverywhereConfirm": "Every device will be signed out, including this one. You will have to log in again."
+      "signOutEverywhereConfirm": "Every device will be signed out, including this one. You will have to log in again.",
+      "twoFactorOnWeb": "Two-factor authentication is set up from your account settings on thestoro.com. The app will support it in an upcoming update."
     },
     "dateField": {
       "placeholder": "Pick a date",

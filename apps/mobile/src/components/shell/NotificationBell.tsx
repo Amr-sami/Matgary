@@ -163,7 +163,7 @@ const ROUTE_GATE: Record<string, string | null | ((me: MeResponse) => boolean)> 
   tasks: null,
   attendance: null,
   notifications: null,
-  sync: "create_sale",
+  sync: "record_sales",
   customers: "view_customers",
   expenses: "view_expenses",
   suppliers: "view_suppliers",

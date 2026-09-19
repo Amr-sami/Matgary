@@ -1,5 +1,5 @@
-import { useEffect, type ComponentType } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useState, type ComponentType } from "react";
+import { Keyboard, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { ChartBarIcon as ChartBar } from "phosphor-react-native/src/icons/ChartBar";
@@ -97,6 +97,20 @@ export function BottomNav({ state, navigation }: TabBarProps) {
   useEffect(() => () => useBadges.getState().reset(), []);
   const tasksUnread = useBadges((s) => s.tasksUnread);
 
+  // Android resizes the window for the keyboard (adjustResize) and this custom
+  // bar does not get tabBarHideOnKeyboard, so it sat half-clipped above the
+  // IME. iOS lets the keyboard cover it, which reads fine.
+  const [keyboardShown, setKeyboardShown] = useState(false);
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    const show = Keyboard.addListener("keyboardDidShow", () => setKeyboardShown(true));
+    const hide = Keyboard.addListener("keyboardDidHide", () => setKeyboardShown(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
   const items = ITEMS();
   const visible = items.filter((i) => !i.requires || allowed.has(i.requires));
 
@@ -113,6 +127,8 @@ export function BottomNav({ state, navigation }: TabBarProps) {
   const barRoutes = new Set(items.map((i) => i.route));
   const section = currentRoute?.split("/")[0] ?? "";
   const activeRoute = barRoutes.has(section) ? section : "more";
+
+  if (keyboardShown) return null;
 
   return (
     <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>

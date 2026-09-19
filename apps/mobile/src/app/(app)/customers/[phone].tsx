@@ -268,8 +268,9 @@ export default function CustomerDetailScreen() {
                 {ledger.customerPhone ? (
                   <View style={styles.phoneRow}>
                     <Phone size={14} color={colors.textSecondary} />
+                    {/* LRI…PDI: writingDirection is iOS-only; Android would trail the plus. */}
                     <Text numberOfLines={1} style={[styles.meta, styles.ltr]}>
-                      {ledger.customerPhone}
+                      {`\u2066${ledger.customerPhone}\u2069`}
                     </Text>
                   </View>
                 ) : null}

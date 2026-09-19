@@ -70,6 +70,8 @@ export function SearchField({
         returnKeyType="search"
         placeholder={placeholder}
         placeholderTextColor={colors.textSecondary}
+        cursorColor={colors.accent}
+        selectionHandleColor={colors.accent}
         style={[styles.input, rtl ? styles.inputRtl : styles.inputLtr]}
         autoCapitalize="none"
         autoCorrect={false}

@@ -478,7 +478,9 @@ export default function ReturnsScreen() {
             <Text style={styles.pickName} testID="returns-line-name">{line.productName}</Text>
             <MetaLine invoice={line.invoiceId} count={line.quantitySold} date={line.saleDate} testID="returns-line-invoice" />
             <Text style={styles.meta}>{t("mobile.returns.maxQty", { n: maxQty })}</Text>
-            <Field label={t("app.sales.returnModal.quantity")} value={qty} onChangeText={setQty} keyboardType="number-pad" editable={maxQty > 0} testID="returns-qty" />
+            {/* selectTextOnFocus: the field is start-aligned, so a tap in its empty area
+                landed the caret before the digit and a backspace deleted nothing. */}
+            <Field label={t("app.sales.returnModal.quantity")} value={qty} onChangeText={setQty} keyboardType="number-pad" selectTextOnFocus editable={maxQty > 0} testID="returns-qty" />
             <Field label={t("mobile.common.reason")} value={reason} onChangeText={setReason} placeholder={t("mobile.returns.reasonExample")} editable={maxQty > 0} testID="returns-reason" />
             {error ? <Text style={styles.err} testID="returns-error">{error}</Text> : null}
           </>

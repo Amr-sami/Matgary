@@ -38,7 +38,7 @@ const ITEMS = () =>
   ([
   { route: "/tasks", label: t("app.shell.secondary.tasks"), icon: ListChecks, requires: "view_dashboard" },
   { route: "/attendance", label: t("mobile.attendance.title"), icon: MapPinArea, requires: null },
-  { route: "/sync", label: t("mobile.sync.title"), icon: CloudArrowUp, requires: "create_sale" },
+  { route: "/sync", label: t("mobile.sync.title"), icon: CloudArrowUp, requires: "record_sales" },
   { route: "/notifications", label: t("mobile.notifications.title"), icon: Bell, requires: null },
   { route: "/customers", label: t("app.shell.secondary.customers"), icon: Users, requires: "view_customers" },
   { route: "/expenses", label: t("app.shell.secondary.expenses"), icon: Wallet, requires: "view_expenses" },

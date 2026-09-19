@@ -91,6 +91,8 @@ export function Field({ label, secure = false, ltr = false, adornment, ...props 
             props.onBlur?.(e);
           }}
           placeholderTextColor={colors.textSecondary}
+          cursorColor={colors.accent}
+          selectionHandleColor={colors.accent}
           style={[
             styles.input,
             rtl ? styles.inputRtl : styles.inputLtr,

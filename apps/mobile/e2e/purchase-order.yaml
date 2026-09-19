@@ -75,7 +75,7 @@ env:
       id: "po-line"
     timeout: 15000
 - assertVisible:
-    text: "1 صنف · .*|1 items · .*"
+    text: "صنف واحد · .*|1 item · .*"
 - tapOn:
     id: "po-lines-next"
 
@@ -101,7 +101,7 @@ env:
     text: "أمر شراء رقم [0-9A-F]{8}|Order #[0-9A-F]{8}"
 - assertVisible:
     id: "po-done-summary"
-    text: "1 صنف · .*|1 items · .*"
+    text: "صنف واحد · .*|1 item · .*"
 - copyTextFrom:
     id: "po-done-supplier"
 - tapOn:
@@ -119,7 +119,7 @@ env:
 - assertVisible:
     id: "po-row-meta"
     index: 0
-    text: "1 صنف · .*|1 items · .*"
+    text: "صنف واحد · .*|1 item · .*"
 - assertVisible:
     text: "مسودة|Draft"
 

@@ -75,17 +75,24 @@ env:
     text: "الحد الأقصى: [1-9][0-9]*|Maximum: [1-9][0-9]*"
 
 # Quantity 1, a reason, submit.
-- tapOn:
+# The picker seeds the quantity with 1 (setQty("1") on pick): assert it rather
+# than retyping it. Typing there is a trap on this build: the number-pad
+# squeezes the sheet, the pinned footer (Submit / Cancel) then covers the reason
+# field — XCTest still reports the covered frame, so a tap at its centre lands
+# on Cancel and closes the sheet — and a backspace erase in the start-aligned
+# field deletes nothing (the caret lands before the digit; "1" became "11").
+- assertVisible:
     id: "returns-qty"
-- eraseText: 10
-- inputText: "1"
+    text: "1"
 - tapOn:
     id: "returns-reason"
 - inputText: ${REASON}
-# Dismiss the keyboard by tapping static text (the modal's ScrollView has
-# keyboardShouldPersistTaps="handled", so a tap on a plain Text closes it).
+# Dismiss the keyboard by tapping static text inside the sheet's ScrollView
+# (keyboardShouldPersistTaps="handled" — a tap on a plain Text closes it). The
+# product name sits at the top of the body, so it stays clear of the footer
+# while the keyboard is up; the "Maximum" line further down does not.
 - tapOn:
-    text: "الحد الأقصى: [1-9][0-9]*|Maximum: [1-9][0-9]*"
+    id: "returns-line-name"
 - scrollUntilVisible:
     element:
       id: "returns-submit"

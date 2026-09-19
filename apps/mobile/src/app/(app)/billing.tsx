@@ -10,17 +10,14 @@ import { api } from "@/api/client";
 import { Screen } from "@/components/layout/Screen";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { ChevronForward } from "@/components/ui/Chevron";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { money, shortDate } from "@/lib/format";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
-import { getLocale, t, useLocale } from "@/i18n";
+import { getLocale, t } from "@/i18n";
 
 type Plan = meApi.BillingPlan;
-
-const WEB_ORIGIN = "https://thestoro.com";
 
 /**
  * Plan copy is API DATA (platform_plans, edited at /admin/plans), not
@@ -90,7 +87,6 @@ function checkoutErrorText(e: unknown): string {
 export default function BillingScreen() {
   const isOwner = useSession((s) => s.me?.isOwner ?? false);
   const refreshMe = useSession((s) => s.refreshMe);
-  const locale = useLocale((s) => s.locale);
   const [notice, setNotice] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
   /** Set once a checkout tab was opened this visit — gates the foreground refetch. */
   const checkoutOpened = useRef(false);
@@ -166,21 +162,6 @@ export default function BillingScreen() {
     },
     onError: (e) => setNotice({ tone: "err", text: checkoutErrorText(e) }),
   });
-
-  async function openWebBilling() {
-    setNotice(null);
-    try {
-      await WebBrowser.openBrowserAsync(`${WEB_ORIGIN}/${locale}/billing`, {
-        presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
-        dismissButtonStyle: "close",
-      });
-      // The sheet resolves on dismiss here (iOS) — whatever changed on the
-      // web is worth a re-read, and a re-minted token lifts a cleared wall.
-      void settleCheckoutReturn();
-    } catch {
-      setNotice({ tone: "err", text: t("mobile.billing.openFailed") });
-    }
-  }
 
   if (!isOwner) {
     return (
@@ -281,14 +262,10 @@ export default function BillingScreen() {
       ) : null}
 
       {PURCHASE_PATH === "web" ? (
+        // iOS App Review 3.1.1: no link or button that leads to purchasing
+        // outside the app — the card only states where the subscription lives.
         <Card style={styles.manageCard}>
-          <Pressable
-            accessibilityRole="link"
-            accessibilityLabel={t("mobile.billing.manageOnWeb")}
-            accessibilityHint={t("mobile.billing.manageOnWebHint")}
-            onPress={() => void openWebBilling()}
-            style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-          >
+          <View style={styles.row} accessible accessibilityRole="text">
             <View style={styles.rowIcon}>
               <Globe size={20} color={colors.accent} />
             </View>
@@ -298,8 +275,7 @@ export default function BillingScreen() {
                 {t("mobile.billing.manageOnWebHint")}
               </Text>
             </View>
-            <ChevronForward size={16} color={colors.textSecondary} />
-          </Pressable>
+          </View>
         </Card>
       ) : null}
 
@@ -421,7 +397,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     borderRadius: radius.md,
   },
-  rowPressed: { backgroundColor: colors.neutralTint },
   rowIcon: {
     width: 36,
     height: 36,

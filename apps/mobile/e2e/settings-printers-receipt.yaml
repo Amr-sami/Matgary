@@ -63,11 +63,10 @@ appId: com.thestoro.app
       - assertVisible:
           text: "(?s)البلوتوث غير متاح على هذا الجهاز.*|(?s)Bluetooth is not available on this device.*"
 
-# Back to Settings via the breadcrumb (the printers page's back row is the
-# Settings title), then Receipt.
+# Back to Settings via the shared BackLink (components/ui/BackLink.tsx,
+# testID back-link, label "رجوع|Back"), then Receipt.
 - tapOn:
-    text: "الإعدادات|Settings"
-    index: 0
+    id: "back-link"
 # The stack keeps Settings mounted with its scroll offset, so the Language tile
 # at the top is off-screen here; any settings tile proves we are back.
 - extendedWaitUntil:
@@ -123,8 +122,7 @@ appId: com.thestoro.app
     id: "receipt-preview"
 # Back out without saving so the store's real setting is untouched.
 - tapOn:
-    text: "الإعدادات|Settings"
-    index: 0
+    id: "back-link"
 - extendedWaitUntil:
     visible:
       id: "settings-tile-.*"
