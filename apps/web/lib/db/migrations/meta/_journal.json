@@ -1,0 +1,391 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1777804627134,
+      "tag": "0000_chunky_living_mummy",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1777804628000,
+      "tag": "0001_shop_settings_rls",
+      "breakpoints": false
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777806181436,
+      "tag": "0002_chemical_amphibian",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1777806182000,
+      "tag": "0003_catalog_rls_and_constraints",
+      "breakpoints": false
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1777806183000,
+      "tag": "0004_rls_nullif_guard",
+      "breakpoints": false
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1777807597818,
+      "tag": "0005_flashy_lenny_balinger",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1777806184000,
+      "tag": "0006_operations_rls_and_constraints",
+      "breakpoints": false
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1777814928093,
+      "tag": "0007_volatile_shaman",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1777814929000,
+      "tag": "0008_attendance_payroll",
+      "breakpoints": false
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1777814930000,
+      "tag": "0009_suppliers_and_purchases",
+      "breakpoints": false
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1777814931000,
+      "tag": "0010_employee_details",
+      "breakpoints": false
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1777814932000,
+      "tag": "0011_tier3_features",
+      "breakpoints": false
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1778166784160,
+      "tag": "0012_silly_namorita",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1778174831422,
+      "tag": "0013_absurd_warpath",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1778800000000,
+      "tag": "0014_multi_branch",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1778900000000,
+      "tag": "0015_multi_store_isolation",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1779000000000,
+      "tag": "0016_customer_loyalty",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1779100000000,
+      "tag": "0017_receipt_customisation",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1779200000000,
+      "tag": "0018_whatsapp_cloud_api",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1779300000000,
+      "tag": "0019_wa_connections",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1779400000000,
+      "tag": "0020_wa_connections_health",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1779500000000,
+      "tag": "0021_wa_webhook_events_and_messages",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1779600000000,
+      "tag": "0022_wa_conversations_and_contacts",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1779700000000,
+      "tag": "0023_wa_templates",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1779800000000,
+      "tag": "0024_shop_settings_receipt_template",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1779900000000,
+      "tag": "0025_purchase_payments",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1780000000000,
+      "tag": "0026_user_totp",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1780100000000,
+      "tag": "0027_user_token_version",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1780200000000,
+      "tag": "0028_tenant_deletion",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1780300000000,
+      "tag": "0029_receipt_designer",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1780400000000,
+      "tag": "0030_receipt_custom_blocks",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1780500000000,
+      "tag": "0031_user_locale",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1780600000000,
+      "tag": "0032_cash_shifts",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1780700000000,
+      "tag": "0033_daily_digest",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1780800000000,
+      "tag": "0034_platform_admin",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1780900000000,
+      "tag": "0035_admin_audit_fk_set_null",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1781000000000,
+      "tag": "0036_admin_audit_search",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1781100000000,
+      "tag": "0037_sales_partial_payments",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1781200000000,
+      "tag": "0038_sale_payments",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1781300000000,
+      "tag": "0039_pg_stat_statements",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1781400000000,
+      "tag": "0040_po_items_category",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1781500000000,
+      "tag": "0041_heal_paid_amount_drift",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1781600000000,
+      "tag": "0042_strip_dead_receipt_link_placeholder",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1781700000000,
+      "tag": "0043_demo_tenants",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1781800000000,
+      "tag": "0044_notification_preferences",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1781900000000,
+      "tag": "0045_notification_digest_queue",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1781900100000,
+      "tag": "0046_auth_devices",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1781900200000,
+      "tag": "0047_normalise_customer_phones",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1781900300000,
+      "tag": "0048_push_tokens",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1781900400000,
+      "tag": "0049_push_receipts",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1781900500000,
+      "tag": "0050_stock_discrepancies",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1781900600000,
+      "tag": "0051_product_image_url",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1781900700000,
+      "tag": "0052_auth_devices_token_version",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1781900800000,
+      "tag": "0053_products_norm_sku_idx",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1781900900000,
+      "tag": "0054_sales_idempotency_key",
+      "breakpoints": true
+    }
+  ]
+}

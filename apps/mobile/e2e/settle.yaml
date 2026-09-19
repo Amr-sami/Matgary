@@ -1,0 +1,137 @@
+# CP-05 — Settle one invoice of the first debtor, and watch the balance drop.
+#
+# More → Customers → the "Owing" segment → the first row (the list ranks
+# debtors by outstanding balance) → the customer's outstanding figure is
+# copied → the first settleable invoice card (unpaid, has an INV- id) opens
+# the settle sheet, amount prefilled with that invoice's remaining balance →
+# Record payment → the card stops being settleable → the outstanding figure no longer
+# reads the copied value: it dropped, or the debt block disappeared because
+# it reached zero. Signs in first when the app is on the login screen. Ends
+# on the dashboard.
+#
+# The customers list takes no testIDs; each row is one accessibility element
+# ("Customer: <name>" — the badge and figures inside are not exposed), so the
+# first debtor is the first such label after the Owing filter. On the detail screen elements are addressed by testID
+# (customer-*, settle-*). Each run settles one invoice, so the seeded debtors
+# are consumed run by run; the assertion holds for whoever is first.
+appId: com.thestoro.app
+---
+- launchApp
+- runFlow: helpers/dev-launcher.yaml
+- extendedWaitUntil:
+    visible:
+      text: "المزيد|More|تسجيل الدخول|Sign in"
+    timeout: 45000
+- runFlow:
+    when:
+      visible:
+        id: "login-identifier"
+    file: login.yaml
+
+# More → Customers → Owing → first debtor.
+- runFlow: helpers/dismiss-logbox.yaml
+- tapOn:
+    text: "المزيد|More"
+- scrollUntilVisible:
+    element:
+      text: "العملاء|Customers"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    text: "العملاء|Customers"
+- extendedWaitUntil:
+    visible:
+      text: "عليهم حساب|Owing"
+    timeout: 30000
+- tapOn:
+    text: "عليهم حساب|Owing"
+- extendedWaitUntil:
+    visible:
+      text: "ملف العميل .*|Customer: .*"
+    timeout: 30000
+- tapOn:
+    text: "ملف العميل .*|Customer: .*"
+    index: 0
+
+# The ledger: remember the outstanding figure.
+- extendedWaitUntil:
+    visible:
+      id: "customer-outstanding"
+    timeout: 30000
+- assertVisible:
+    text: "المتبقي على العميل|Owed by customer"
+- copyTextFrom:
+    id: "customer-outstanding"
+- evalScript: ${output.before = maestro.copiedText}
+
+# First settleable invoice → the sheet, prefilled with its remaining balance.
+# The card is one accessibility element ("INV-…, <badge>, <meta>, …"); its
+# invoice number is lifted out of that label for the paid assertion below.
+- scrollUntilVisible:
+    element:
+      id: "customer-invoice-settleable"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- copyTextFrom:
+    id: "customer-invoice-settleable"
+    index: 0
+- evalScript: ${output.inv = (maestro.copiedText.match(/INV-[A-Z0-9]+/) || [""])[0]}
+- assertTrue: ${output.inv.length > 4}
+- tapOn:
+    id: "customer-invoice-settleable"
+    index: 0
+- extendedWaitUntil:
+    visible:
+      id: "settle-amount"
+    timeout: 15000
+- assertVisible:
+    text: "تسجيل دفعة من عميل|Record customer payment"
+- assertVisible:
+    id: "settle-amount"
+    text: "[1-9][0-9]*(\\.[0-9]+)?"
+- tapOn:
+    id: "settle-submit"
+
+# Recorded: the sheet closes, and that invoice's card is no longer settleable
+# (the notice at the top of the screen is off-view here and fades in 4s, so
+# the card is the assertion), then back at the top the outstanding figure no
+# longer reads the copied value.
+#
+# The paid state is asserted through the card's testID, not its accessibility
+# text: the card is customer-invoice-settleable while it has a balance and
+# customer-invoice once paid (customers/[phone].tsx), and both platforms flip
+# the id. The merged "INV-…, Paid, …" label only exists on iOS — on Android
+# the row keeps its stale "Record a payment on INV-…" label after the
+# settleable props drop (RN does not clear a removed accessibilityLabel), so
+# a text match on the paid badge never lands there. Both labels still carry
+# the invoice number, which ties the id to our invoice.
+- extendedWaitUntil:
+    notVisible:
+      id: "settle-amount"
+    timeout: 45000
+- extendedWaitUntil:
+    visible:
+      id: "customer-invoice"
+      text: "(?s).*${output.inv}.*"
+    timeout: 45000
+- assertNotVisible:
+    id: "customer-invoice-settleable"
+    text: "(?s).*${output.inv}.*"
+- scrollUntilVisible:
+    element:
+      text: "المتبقي على العميل|Owed by customer|محفظة العميل|Customer wallet"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- assertNotVisible:
+    id: "customer-outstanding"
+    text: ${output.before}
+
+# Back to the dashboard.
+- runFlow: helpers/dismiss-logbox.yaml
+- tapOn:
+    text: "الرئيسية|Home"
+- assertVisible:
+    text: "أهلاً، .+|Welcome back, .+"

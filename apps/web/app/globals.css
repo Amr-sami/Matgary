@@ -1,0 +1,720 @@
+@import "tailwindcss";
+
+:root {
+  --bg-main: #FFFFFF;
+  --bg-card: #FFFFFF;
+  --bg-sidebar: #1C1C1E;
+  --text-primary: #1A1A1A;
+  --text-secondary: #6B6B6B;
+  --text-sidebar: #E8E8E8;
+  --accent: #1203E3;
+  --accent-hover: #0E02B5;
+  --accent-light: #E7E6FC;
+  --danger: #C0392B;
+  --danger-light: #FDEAEA;
+  --success: #27AE60;
+  --success-light: #EAFAF1;
+  /* AA-safe green for TEXT. --success is 2.87:1 on white and 2.66:1 on
+     --success-light; both fail. Use --success for fills, this for type. */
+  --success-strong: #1E8449;
+  --border: #E8E4DC;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04);
+}
+
+@theme inline {
+  --color-bg-main: var(--bg-main);
+  --color-bg-card: var(--bg-card);
+  --color-bg-sidebar: var(--bg-sidebar);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-sidebar: var(--text-sidebar);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-light: var(--accent-light);
+  --color-danger: var(--danger);
+  --color-danger-light: var(--danger-light);
+  --color-success: var(--success);
+  --color-success-light: var(--success-light);
+  --color-success-strong: var(--success-strong);
+  --color-border: var(--border);
+  --font-arabic: var(--font-cairo), sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* `dir` attribute drives direction now (set per-locale in the root layout). */
+
+body {
+  font-family: var(--font-cairo), sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  background: var(--bg-main);
+}
+
+.font-display {
+  font-family: var(--font-display), var(--font-cairo), sans-serif;
+  font-feature-settings: "ss01", "kern";
+}
+
+.font-catchy {
+  font-family: var(--font-catchy), var(--font-display), var(--font-cairo), sans-serif;
+}
+
+h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+
+h2 {
+  font-size: 1.375rem;
+  font-weight: 600;
+}
+
+h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+input,
+select,
+textarea {
+  font-family: var(--font-cairo), sans-serif;
+  text-align: start;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-main);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+
+/* ─── App splash ─── */
+/* Rendered in the body of the root layout so the browser paints it the
+ * instant the SSR HTML arrives — before React hydrates, before
+ * useBranches / useSettings race for the active store name. Masks the
+ * entire hydration cascade behind a calm white card; once `window.load`
+ * fires (all assets in, scripts evaluated, React done) an inline script
+ * in the layout body adds `.app-splash--hidden` and the splash fades
+ * out, revealing a fully-settled UI underneath. */
+@keyframes app-splash-breathe {
+  0%, 100% {
+    opacity: 0.55;
+    transform: scale(0.94);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
+#app-splash {
+  position: fixed;
+  inset: 0;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  transition: opacity 380ms ease-out, visibility 380ms ease-out;
+}
+
+#app-splash .app-splash__brand {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: #1203e3;
+  animation: app-splash-breathe 1.6s ease-in-out infinite;
+  transform-origin: center;
+}
+
+#app-splash .app-splash__ar {
+  font-family: var(--font-cairo), system-ui, sans-serif;
+  font-weight: 800;
+  font-size: 3rem;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+
+#app-splash .app-splash__en {
+  font-family: var(--font-cairo), system-ui, sans-serif;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.25em;
+  font-size: 0.75rem;
+  line-height: 1;
+  opacity: 0.85;
+}
+
+#app-splash .app-splash__png {
+  width: 320px;
+  height: 80px;
+  object-fit: cover;
+  display: block;
+}
+
+#app-splash.app-splash--hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #app-splash .app-splash__brand {
+    animation: none;
+  }
+  #app-splash {
+    transition-duration: 0ms;
+  }
+}
+
+/* ─── Broadcast banner motion ─── */
+@keyframes broadcast-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes broadcast-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(192, 57, 43, 0.45);
+  }
+  60% {
+    box-shadow: 0 0 0 6px rgba(192, 57, 43, 0);
+  }
+}
+
+.broadcast-banner {
+  animation: broadcast-slide-in 200ms ease-out both;
+}
+
+.broadcast-critical-pulse {
+  animation: broadcast-pulse 2.4s ease-out infinite;
+}
+
+/* Animated brand-blue gradient border — sweeps a soft accent highlight
+   around the perimeter on a slow loop. Uses the @property + double-
+   background-clip trick so we render a real gradient on the border ring
+   itself (no JS, no extra DOM nodes). The faint warm `--border` segment
+   keeps the rest of the perimeter visually consistent with the app's
+   default card border. */
+@property --broadcast-border-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes broadcast-border-rotate {
+  to {
+    --broadcast-border-angle: 360deg;
+  }
+}
+
+.broadcast-glow {
+  position: relative;
+  background-color: #ffffff;
+  background-image:
+    linear-gradient(#ffffff, #ffffff),
+    conic-gradient(
+      from var(--broadcast-border-angle),
+      #e8e4dc 0deg,
+      #e8e4dc 250deg,
+      #6759ff 290deg,
+      #1203e3 320deg,
+      #6759ff 350deg,
+      #e8e4dc 360deg
+    );
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  border: 1.5px solid transparent;
+  animation: broadcast-border-rotate 5s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .broadcast-banner,
+  .broadcast-critical-pulse,
+  .broadcast-glow {
+    animation: none;
+  }
+}
+
+/* ─── Receipt Styles (hidden on screen) ─── */
+.print-receipt-container {
+  display: none;
+}
+
+/* ─── Print Styles ─── */
+@media print {
+  /* Use visibility to hide everything but the receipt */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Show only the receipt and its content */
+  .print-receipt-container,
+  .print-receipt-container * {
+    visibility: visible;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .print-receipt-container {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 72mm;
+    margin: 0 auto;
+    padding: 0;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  @page {
+    /* Default to a thermal-receipt-friendly page size so Chrome's print
+       dialog and the printer driver agree on dimensions. 80mm is the
+       common ESC/POS roll width; height auto so receipts of different
+       lengths print on a single continuous strip. Browsers that don't
+       respect `size` (older Safari) still inherit the zero margins and
+       the receipt's own 72mm content width keeps everything in-bounds. */
+    size: 80mm auto;
+    margin: 0;
+  }
+
+  .receipt {
+    width: 72mm;
+    margin: 0 auto;
+    padding: 4mm 3mm;
+    font-family: 'Consolas', 'Courier New', 'Menlo', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #000;
+    background: #fff;
+    direction: ltr;
+    visibility: visible !important;
+    page-break-after: always;
+    break-after: page;
+    font-weight: 700;
+  }
+
+  .receipt-logo {
+    display: block;
+    width: 32mm;
+    height: auto;
+    max-height: 32mm;
+    object-fit: contain;
+    margin: 0 auto 4px;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  .receipt-logo--hidden { display: none; }
+  .receipt-logo--small  { width: 18mm; max-height: 18mm; }
+  .receipt-logo--medium { width: 32mm; max-height: 32mm; }
+  .receipt-logo--large  { width: 46mm; max-height: 46mm; }
+
+  .receipt-footer {
+    text-align: center;
+    font-size: 11px;
+    margin: 4px 0;
+    font-family: var(--font-cairo), 'Arial', sans-serif;
+    direction: rtl;
+    white-space: pre-wrap;
+    line-height: 1.5;
+  }
+
+  /* Owner-defined custom block. Alignment + direction come from inline
+     style + dir=auto on the element itself, so this rule is just sizing. */
+  .receipt-custom-block {
+    font-size: 11px;
+    margin: 4px 0;
+    font-family: var(--font-cairo), 'Arial', sans-serif;
+    line-height: 1.5;
+  }
+
+  .receipt-slogan {
+    text-align: center;
+    font-size: 12px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin: 2px 0 2px;
+    font-weight: 700;
+  }
+
+  .receipt-qr-hint {
+    text-align: center;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    margin: 2px 0;
+    font-weight: 700;
+  }
+
+  .no-print { display: none !important; }
+
+  .receipt-contact {
+    text-align: center;
+    font-size: 11px;
+    margin: 1px 0;
+    letter-spacing: 0.3px;
+  }
+
+  .receipt-contact-ar {
+    text-align: center;
+    font-size: 11px;
+    margin: 1px 0 4px;
+    font-family: var(--font-cairo), 'Arial', sans-serif;
+    direction: rtl;
+  }
+
+  .receipt-title {
+    text-align: center;
+    font-size: 20px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    margin: 4px 0 6px;
+    text-transform: uppercase;
+  }
+
+  .receipt-divider {
+    /* Hide the dash text content and render as a solid horizontal line */
+    font-size: 0;
+    color: transparent;
+    line-height: 0;
+    margin: 4px 0;
+    border-top: 1px solid #000;
+    height: 0;
+    overflow: hidden;
+  }
+
+  .receipt-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 1px 0;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .receipt-items {
+    margin: 2px 0;
+  }
+
+  .receipt-item-main {
+    font-weight: 700;
+  }
+
+  .receipt-item-name {
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .receipt-item-price {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .receipt-item-sub {
+    font-size: 12px;
+    padding-left: 6px;
+    color: #000;
+  }
+
+  .receipt-total-row {
+    font-size: 15px;
+    font-weight: 900;
+    letter-spacing: 0.5px;
+    padding: 2px 0;
+  }
+
+  .receipt-thankyou {
+    text-align: center;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin: 4px 0 2px;
+    text-transform: uppercase;
+  }
+
+  .receipt-thankyou-ar {
+    text-align: center;
+    font-size: 12px;
+    font-family: var(--font-cairo), 'Arial', sans-serif;
+    margin-bottom: 4px;
+    direction: rtl;
+  }
+
+  .receipt-eta-notice {
+    text-align: center;
+    font-size: 8px;
+    font-family: var(--font-cairo), 'Arial', sans-serif;
+    margin: 2px 0;
+    direction: rtl;
+    color: #555;
+    line-height: 1.4;
+  }
+
+  .receipt-qr {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 6px auto 2px;
+  }
+
+  .receipt-qr-img {
+    width: 20mm;
+    height: 20mm;
+    image-rendering: pixelated;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .receipt-barcode-text {
+    text-align: center;
+    font-size: 12px;
+    letter-spacing: 2px;
+    margin-top: 2px;
+  }
+
+  .receipt-page-break {
+    break-before: page;
+    page-break-before: always;
+  }
+}
+
+/* ─── Receipt preview (on-screen inside Print Options modal) ─── */
+.receipt-preview .receipt {
+  font-family: 'Consolas', 'Courier New', 'Menlo', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #000;
+  background: #fff;
+  direction: ltr;
+  padding: 4mm 3mm;
+  font-weight: 700;
+}
+
+.receipt-preview .receipt-logo {
+  display: block;
+  width: 110px;
+  height: auto;
+  max-height: 110px;
+  object-fit: contain;
+  margin: 0 auto 6px;
+}
+.receipt-preview .receipt-logo--hidden { display: none; }
+.receipt-preview .receipt-logo--small  { width: 64px;  max-height: 64px; }
+.receipt-preview .receipt-logo--medium { width: 110px; max-height: 110px; }
+.receipt-preview .receipt-logo--large  { width: 150px; max-height: 150px; }
+
+.receipt-preview .receipt-footer {
+  text-align: center;
+  font-size: 11px;
+  margin: 6px 0;
+  font-family: var(--font-cairo), 'Arial', sans-serif;
+  direction: rtl;
+  white-space: pre-wrap;
+  line-height: 1.6;
+  color: #000;
+}
+
+.receipt-preview .receipt-qr-hint {
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  margin: 2px 0;
+  font-weight: 700;
+}
+
+.receipt-preview .receipt-slogan {
+  text-align: center;
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin: 2px 0 2px;
+  font-weight: 700;
+}
+
+.receipt-preview .receipt-contact {
+  text-align: center;
+  font-size: 11px;
+  margin: 1px 0;
+  letter-spacing: 0.3px;
+}
+
+.receipt-preview .receipt-contact-ar {
+  text-align: center;
+  font-size: 11px;
+  margin: 1px 0 4px;
+  font-family: var(--font-cairo), 'Arial', sans-serif;
+  direction: rtl;
+}
+
+.receipt-preview .receipt-title {
+  text-align: center;
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  margin: 4px 0 6px;
+  text-transform: uppercase;
+}
+
+.receipt-preview .receipt-divider {
+  font-size: 0;
+  color: transparent;
+  line-height: 0;
+  margin: 4px 0;
+  border-top: 1px solid #000;
+  height: 0;
+  overflow: hidden;
+}
+
+.receipt-preview .receipt-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 1px 0;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.receipt-preview .receipt-item-main {
+  font-weight: 700;
+}
+
+.receipt-preview .receipt-item-name {
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.receipt-preview .receipt-item-sub {
+  font-size: 12px;
+  padding-left: 6px;
+}
+
+.receipt-preview .receipt-total-row {
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  padding: 2px 0;
+}
+
+.receipt-preview .receipt-thankyou {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  margin: 4px 0 2px;
+  text-transform: uppercase;
+}
+
+.receipt-preview .receipt-thankyou-ar {
+  text-align: center;
+  font-size: 12px;
+  font-family: var(--font-cairo), 'Arial', sans-serif;
+  margin-bottom: 4px;
+  direction: rtl;
+}
+
+.receipt-preview .receipt-qr {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 6px auto 2px;
+}
+
+.receipt-preview .receipt-qr-img {
+  width: 75px;
+  height: 75px;
+  image-rendering: pixelated;
+}
+
+.receipt-preview .receipt-barcode-text {
+  text-align: center;
+  font-size: 12px;
+  letter-spacing: 2px;
+  margin-top: 2px;
+}
+
+/* ─── Onboarding tour (step 4) ─── */
+@keyframes tour-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Parallax depth: image moves a longer distance (28px) over a longer
+ * duration (720ms) than the title/body (14px / 480ms). The bigger delta
+ * is what sells the depth illusion — like the image is "behind" the
+ * text plane. Subtle scale + blur on enter give it the in-focus feel. */
+@keyframes tour-parallax-in {
+  from {
+    opacity: 0;
+    transform: translateY(28px) scale(1.03);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes tour-float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.tour-slide__visual {
+  animation: tour-parallax-in 720ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.tour-slide__visual-inner {
+  animation: tour-float 3.4s ease-in-out infinite;
+}
+
+/* Text enters faster + a shorter distance so it appears to sit "in front"
+ * of the image. Slight stagger between title and body for rhythm. */
+.tour-slide__title {
+  animation: tour-fade-up 480ms cubic-bezier(0.22, 1, 0.36, 1) 160ms both;
+}
+
+.tour-slide__body {
+  animation: tour-fade-up 480ms cubic-bezier(0.22, 1, 0.36, 1) 260ms both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tour-slide__visual,
+  .tour-slide__visual-inner,
+  .tour-slide__title,
+  .tour-slide__body {
+    animation: none;
+  }
+}

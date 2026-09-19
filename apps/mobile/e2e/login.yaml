@@ -1,0 +1,93 @@
+# Login — from any state to a signed-in dashboard.
+#
+# Runs against the dev client (com.thestoro.app) on the simulator, backend on
+# :3003. The app persists both the session and the locale, so this flow first
+# signs out if a session is live, then normalises the locale to Arabic (the
+# product default) via the login screen's language pill, then signs in with
+# the seeded owner and asserts the dashboard greeting.
+#
+# Selectors: testIDs first (login-identifier / login-password / language-pill
+# come from app/(public)/login.tsx and components/ui/LanguagePill.tsx); text
+# only for the tab label and the sign-out row, as "x|y" regexes matched against
+# the whole string so the flow runs whichever locale the app was left in.
+#
+# Dev builds prefill the credentials (EXPO_PUBLIC_DEV_IDENTIFIER in .env) and
+# a previous run may have left a partial value, so each field is tapped and
+# erased twice (eraseText is capped per call) before typing — the login is
+# real, not a prefilled submit.
+appId: com.thestoro.app
+---
+- launchApp
+# Dev-client launcher guard (waits for launcher-or-app, taps through the launcher).
+- runFlow: helpers/dev-launcher.yaml
+
+- extendedWaitUntil:
+    visible:
+      text: "المزيد|More|تسجيل الدخول|Sign in"
+    timeout: 45000
+
+# Already signed in → More → Sign out (the sign-out row lives on More, at the bottom).
+- runFlow:
+    when:
+      visible:
+        text: "المزيد|More"
+    commands:
+      - tapOn:
+          text: "المزيد|More"
+          # A tab press right after a cold launch is occasionally dropped
+          # while the shell hydrates; retry when the screen did not change.
+          retryTapIfNoChange: true
+      - scrollUntilVisible:
+          element:
+            text: "تسجيل الخروج|Sign out"
+          direction: DOWN
+          centerElement: true
+          timeout: 20000
+      - tapOn:
+          text: "تسجيل الخروج|Sign out"
+
+- extendedWaitUntil:
+    visible:
+      id: "login-identifier"
+    timeout: 30000
+
+# Locale left in English by a previous run → the login form is in English.
+# The pill toggles to the other language; wait for the Arabic screen title.
+- runFlow:
+    when:
+      visible:
+        text: "Sign in"
+    commands:
+      - tapOn:
+          id: "language-pill"
+      - extendedWaitUntil:
+          visible:
+            text: "تسجيل الدخول"
+          timeout: 15000
+
+- tapOn:
+    id: "login-identifier"
+- eraseText: 120
+- eraseText: 120
+- inputText: "amr@matgary.local"
+
+- tapOn:
+    id: "login-password"
+- eraseText: 120
+- eraseText: 120
+- inputText: "Test1234!"
+
+# Submit from the keyboard: the password field's return key is "go" and is
+# wired to signIn. The primary button sits under the keyboard at this point
+# (its centre is below the keyboard's top edge), so tapping it lands on the
+# keyboard; the return key is the path a person actually uses here.
+- pressKey: Enter
+
+- extendedWaitUntil:
+    visible:
+      text: "أهلاً، .+"
+    timeout: 45000
+- assertVisible:
+    text: "أهلاً، متجر عمرو"
+- assertVisible:
+    text: "المزيد"

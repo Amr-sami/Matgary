@@ -1,0 +1,132 @@
+# CP-03 — Take a return on a recent sale, and see it land in the list.
+#
+# More → Returns → "Record return" → the picker lists recent, not-yet-returned
+# sale lines (newest first — the one pos-sale.yaml just rang) → tap the first
+# → the selected line's invoice number is copied → quantity stays at 1
+# (every POS sale here is a single unit; the field caps at the line's
+# quantity) → a reason (required) → Record → the modal closes, the lists
+# refetch, and a row carrying that invoice number is in the returns list.
+# Signs in first when the app is on the login screen. Ends on the dashboard.
+#
+# Elements are addressed by testID (returns-*); Button takes no testID, so the
+# two buttons sit on a wrapper View. A sale line can be returned ONCE
+# (recordReturn overwrites returnedQuantity), so each run consumes one recent
+# sale — run pos-sale.yaml first to top the list up.
+appId: com.thestoro.app
+env:
+  REASON: "e2e — عيب في المنتج"
+---
+- launchApp
+- runFlow: helpers/dev-launcher.yaml
+- extendedWaitUntil:
+    visible:
+      text: "المزيد|More|تسجيل الدخول|Sign in"
+    timeout: 45000
+- runFlow:
+    when:
+      visible:
+        id: "login-identifier"
+    file: login.yaml
+
+# More → Returns.
+- runFlow: helpers/dismiss-logbox.yaml
+- tapOn:
+    text: "المزيد|More"
+- scrollUntilVisible:
+    element:
+      text: "المرتجعات|Returns"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    text: "المرتجعات|Returns"
+- extendedWaitUntil:
+    visible:
+      id: "returns-take"
+    timeout: 30000
+- assertVisible:
+    text: "مرتجعات الشهر|This month's returns"
+
+# Open the picker and take the newest returnable line.
+- tapOn:
+    id: "returns-take"
+- extendedWaitUntil:
+    visible:
+      id: "returns-pick-row"
+    timeout: 30000
+- assertVisible:
+    text: "اختر البند من آخر المبيعات:|Pick the item from recent sales:"
+- tapOn:
+    id: "returns-pick-row"
+    index: 0
+
+# The selected line: keep its invoice number for the list assertion.
+- extendedWaitUntil:
+    visible:
+      id: "returns-line-invoice"
+    timeout: 15000
+- assertVisible:
+    id: "returns-line-invoice"
+    text: "INV-.*"
+- copyTextFrom:
+    id: "returns-line-invoice"
+- evalScript: ${output.invoice = maestro.copiedText}
+- assertVisible:
+    text: "الحد الأقصى: [1-9][0-9]*|Maximum: [1-9][0-9]*"
+
+# Quantity 1, a reason, submit.
+# The picker seeds the quantity with 1 (setQty("1") on pick): assert it rather
+# than retyping it. Typing there is a trap on this build: the number-pad
+# squeezes the sheet, the pinned footer (Submit / Cancel) then covers the reason
+# field — XCTest still reports the covered frame, so a tap at its centre lands
+# on Cancel and closes the sheet — and a backspace erase in the start-aligned
+# field deletes nothing (the caret lands before the digit; "1" became "11").
+- assertVisible:
+    id: "returns-qty"
+    text: "1"
+- tapOn:
+    id: "returns-reason"
+- inputText: ${REASON}
+# Dismiss the keyboard by tapping static text inside the sheet's ScrollView
+# (keyboardShouldPersistTaps="handled" — a tap on a plain Text closes it). The
+# product name sits at the top of the body, so it stays clear of the footer
+# while the keyboard is up; the "Maximum" line further down does not.
+- tapOn:
+    id: "returns-line-name"
+- scrollUntilVisible:
+    element:
+      id: "returns-submit"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: "returns-submit"
+
+# The modal closes (the picker is gone) and the list carries the new row.
+- extendedWaitUntil:
+    notVisible:
+      id: "returns-submit"
+    timeout: 45000
+- extendedWaitUntil:
+    visible:
+      id: "returns-take"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "returns-row-invoice"
+      text: ${output.invoice}
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertVisible:
+    id: "returns-row-invoice"
+    text: ${output.invoice}
+- assertVisible:
+    text: ${REASON}
+
+# Back to the dashboard.
+- runFlow: helpers/dismiss-logbox.yaml
+- tapOn:
+    text: "الرئيسية|Home"
+- assertVisible:
+    text: "أهلاً، .+|Welcome back, .+"

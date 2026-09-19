@@ -1,0 +1,81 @@
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import {
+  requireTenant,
+  requireTenantWithBranch,
+} from "@/lib/api/auth-helpers";
+import { requirePermissionWithBranch } from "@/lib/api/auth-helpers";
+import { resolveBranchFilter } from "@/lib/api/branch-context";
+import { addProduct, listProducts } from "@/lib/repo/catalog";
+import { logActivity } from "@/lib/repo/activity";
+import { checkTenantRateLimit } from "@/lib/api/tenant-rate-limit";
+
+export async function GET(req: NextRequest) {
+  const r = await requireTenant();
+  if (!r.ok) return r.response;
+
+  const filter = await resolveBranchFilter(
+    r.ctx,
+    req.nextUrl.searchParams.get("branchId"),
+  );
+  if (!filter.ok) {
+    return NextResponse.json({ error: filter.error }, { status: filter.status });
+  }
+
+  const data = await listProducts(r.ctx.tenantId, filter.branchId);
+  // Intentionally NOT cached: product.quantity decrements on every sale
+  // so any browser-side cache would show stale stock numbers across the
+  // app within seconds of a sale being recorded.
+  return NextResponse.json({ data, branchId: filter.branchId });
+}
+
+const createSchema = z.object({
+  name: z.string().min(1).max(200),
+  categoryId: z.string().uuid(),
+  brand: z.string().max(80).optional(),
+  quantity: z.number().int().min(0),
+  price: z.number().min(0),
+  costPrice: z.number().min(0).optional(),
+  lowStockThreshold: z.number().int().min(0).default(3),
+  sku: z.string().max(80).optional(),
+  tags: z.array(z.string().max(40)).optional(),
+  supplier: z.string().max(120).optional(),
+  supplierId: z.string().uuid().nullable().optional(),
+  location: z.string().max(120).optional(),
+  /** Relative URL minted by POST /api/uploads/product-image. */
+  imageUrl: z.string().max(500).regex(/^\/api\/uploads\/product-image\/[A-Za-z0-9\-]+\/products\/[A-Za-z0-9\-]+\.(jpg|png|webp)$/).nullable().optional(),
+  attributeValueIds: z.array(z.string().uuid()).optional(),
+});
+
+export async function POST(req: NextRequest) {
+  const r = await requirePermissionWithBranch("manage_inventory");
+  if (!r.ok) return r.response;
+  const rl = await checkTenantRateLimit(r.ctx.tenantId, "write.default");
+  if (!rl.ok) return rl.response;
+  const body = await req.json().catch(() => null);
+  const parsed = createSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+  }
+  if (
+    parsed.data.imageUrl &&
+    !parsed.data.imageUrl.startsWith(`/api/uploads/product-image/${r.ctx.tenantId}/products/`)
+  ) {
+    // Shape is checked by zod; the tenant segment must be the caller's own.
+    return NextResponse.json({ error: "رابط الصورة غير صالح" }, { status: 400 });
+  }
+  // Multi-store: the product is born at the active branch and stays there.
+  const { id } = await addProduct(r.ctx.tenantId, r.ctx.branchId, parsed.data);
+  logActivity({
+    tenantId: r.ctx.tenantId,
+    actorUserId: r.ctx.userId,
+    action: "product.create",
+    category: "product",
+    entityType: "product",
+    entityId: id,
+    entityLabel: parsed.data.name,
+    branchId: r.ctx.branchId,
+    metadata: { quantity: parsed.data.quantity, price: parsed.data.price },
+  });
+  return NextResponse.json({ id }, { status: 201 });
+}

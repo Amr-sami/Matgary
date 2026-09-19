@@ -1,0 +1,1 @@
+First release of TheStoro: barcode register, live inventory, Bluetooth receipts, customers, expenses, team and attendance — all synced with your account on thestoro.com.

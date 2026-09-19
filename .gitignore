@@ -2,6 +2,8 @@
 
 # dependencies
 /node_modules
+apps/*/node_modules/
+packages/*/node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -41,7 +43,6 @@ yarn-error.log*
 !.env.example
 
 # legacy / leftover from earlier work
-/apps
 /infra/data
 /public/startissue.png
 
@@ -64,3 +65,28 @@ docker-compose.override.yml
 # Playwright shared-owner storage state — provisioned per dev box
 tests/e2e/.auth/
 tests/perf/.cookies/
+
+# --- Not part of Matgary. Unrelated projects that landed here because this
+# --- is the default working directory. Ignored so 'git add -A' can never
+# --- commit them (several contain live .env files). Added 2026-09-13.
+/Sites/
+/TASFIYA/
+/_kit_ref/
+/cfd-session-backup-*/
+/finrer project/
+/finrer project rust/
+/finrer_rust_handoff.zip
+/gh-task-*
+/kayfa revamp/
+/kayfa-rollback/
+/lbx-rl-tasks-iso-*/
+/molhem/
+/silver-repos/
+/tasfiya.zip
+/tasfiya_PROGRESS.md
+/tasfiya_phases/
+/veroLegal-V1/
+
+# Mobile port working docs (screenshots, specs, design system). Local only.
+/mobile-dev-docs/
+apps/web/uploads/

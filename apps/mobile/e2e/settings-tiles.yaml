@@ -1,0 +1,102 @@
+# Settings hub — the new tiles are present: store, categories, printers,
+# app lock, about. Tiles are addressed by testID (settings-tile-<key>) and
+# their visible title. Each tile is an accessibility-merged button whose label
+# is "title, badge, hint" as one string, so titles match as "(?s)title.*".
+# The store tile's title key (app.settingsPage.shopInfo.heading) is missing
+# from the dictionaries and renders as the raw key, so it is asserted on its
+# hint instead.
+# Signs in first when the app is on the login screen. Ends on the dashboard.
+appId: com.thestoro.app
+---
+- launchApp
+- runFlow: helpers/dev-launcher.yaml
+- extendedWaitUntil:
+    visible:
+      text: "المزيد|More|تسجيل الدخول|Sign in"
+    timeout: 45000
+- runFlow:
+    when:
+      visible:
+        id: "login-identifier"
+    file: login.yaml
+
+- tapOn:
+    text: "المزيد|More"
+- scrollUntilVisible:
+    element:
+      text: "الإعدادات|Settings"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    text: "الإعدادات|Settings"
+- extendedWaitUntil:
+    visible:
+      text: "اللغة|Language"
+    timeout: 30000
+
+# store
+- scrollUntilVisible:
+    element:
+      id: "settings-tile-store"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    id: "settings-tile-store"
+- assertVisible:
+    text: "(?s).*اسم المتجر والعنوان والهاتف وبيانات الفاتورة.*|(?s).*Store name, address, phone and invoice details.*"
+
+# categories
+- scrollUntilVisible:
+    element:
+      id: "settings-tile-categories"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    id: "settings-tile-categories"
+- assertVisible:
+    text: "(?s)الأقسام.*|(?s)Categories.*"
+
+# printers
+- scrollUntilVisible:
+    element:
+      id: "settings-tile-printers"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    id: "settings-tile-printers"
+- assertVisible:
+    text: "(?s)الطابعات.*|(?s)Printers.*"
+
+# app lock
+- scrollUntilVisible:
+    element:
+      id: "settings-tile-app-lock"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    id: "settings-tile-app-lock"
+- assertVisible:
+    text: "(?s)قفل التطبيق.*|(?s)App lock.*"
+
+# about
+- scrollUntilVisible:
+    element:
+      id: "settings-tile-about"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    id: "settings-tile-about"
+- assertVisible:
+    text: "(?s)عن التطبيق.*|(?s)About.*"
+
+# Back to the dashboard.
+- tapOn:
+    text: "الرئيسية|Home"
+- assertVisible:
+    text: "أهلاً، .+|Welcome back, .+"

@@ -1,0 +1,51 @@
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { requirePermissionAudited } from "@/lib/api/auth-helpers";
+import { resolveBranchFilter } from "@/lib/api/branch-context";
+import { resolveSinceWindow } from "@/lib/api/list-window";
+import { listReturns, recordReturn } from "@/lib/repo/operations";
+
+export async function GET(req: NextRequest) {
+  // `view_returns` — both clients hide the screen without it; the API said
+  // 200 with real rows to any member (doc 14 §3.1 C5). Audited, like the
+  // POST below, until PERMISSION_ENFORCE_WRITES=1.
+  const r = await requirePermissionAudited("view_returns");
+  if (!r.ok) return r.response;
+  const filter = await resolveBranchFilter(
+    r.ctx,
+    req.nextUrl.searchParams.get("branchId"),
+  );
+  if (!filter.ok) {
+    return NextResponse.json({ error: filter.error }, { status: filter.status });
+  }
+  // Default: last 60 days. ?all=1 for full history.
+  const since = resolveSinceWindow(req, { defaultDays: 60 });
+  const data = await listReturns(r.ctx.tenantId, filter.branchId, since);
+  return NextResponse.json({ data, branchId: filter.branchId });
+}
+
+const schema = z.object({
+  saleId: z.string().uuid(),
+  productId: z.string().uuid(),
+  returnedQuantity: z.number().int().min(1),
+  reason: z.string().max(500),
+});
+
+export async function POST(req: NextRequest) {
+  const r = await requirePermissionAudited("manage_returns");
+  if (!r.ok) return r.response;
+  const body = await req.json().catch(() => null);
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+  }
+  try {
+    const result = await recordReturn(r.ctx.tenantId, parsed.data);
+    return NextResponse.json(result, { status: 201 });
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "خطأ" },
+      { status: 400 },
+    );
+  }
+}

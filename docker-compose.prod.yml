@@ -101,7 +101,7 @@ services:
       postgres:
         condition: service_healthy
     env_file:
-      - .env
+      - ./apps/web/.env
     environment:
       NODE_ENV: production
       # All four must be rewritten, not just DATABASE_URL. migrate.ts only uses
@@ -129,7 +129,7 @@ services:
       redis:
         condition: service_healthy
     env_file:
-      - .env
+      - ./apps/web/.env
     environment:
       NODE_ENV: production
       HOSTNAME: 0.0.0.0
@@ -143,6 +143,15 @@ services:
       APP_DATABASE_URL: postgres://matgary_app:${APP_DB_PASSWORD}@postgres:5432/matgary
       ADMIN_DATABASE_URL: postgres://matgary_admin:${ADMIN_DB_PASSWORD}@postgres:5432/matgary
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      # Pinned next to the mount below so the two cannot drift; the image's
+      # ENV already says the same (Dockerfile runner stage).
+      UPLOADS_DIR: /repo/uploads
+    volumes:
+      # Product / team photos and receipt logos (lib/uploads.ts). A named
+      # volume so they survive `up -d --build`; the Dockerfile pre-creates
+      # /repo/uploads owned by nextjs, and a named volume copies that
+      # ownership on first mount, so the app can write here as uid 1001.
+      - matgary_uploads:/repo/uploads
     ports:
       - "127.0.0.1:3000:3000"
     healthcheck:
@@ -175,7 +184,14 @@ services:
       ACTIVITY_CLEANUP_CRON: "30 3 * * *"
       TENANT_DELETION_CRON: "0 3 * * *"
       ADMIN_SESSION_CLEANUP_CRON: "*/15 * * * *"
-      DIGEST_TICK_CRON: "*/30 * * * *"
+      # Also the push-receipts poller: digest-tick/route.ts ends with
+      # drainPushReceipts() (apps/web/lib/push/receipts.ts). A receipt is asked
+      # for RECEIPT_DELAY_MS = 15 min after the ticket, so a 15-min tick bounds
+      # dead-token detection at ~30 min. Digests stay idempotent (digest_runs
+      # unique index). "*/15" lands at most 5 pokes in any sliding hour
+      # (:00,:15,:30,:45,:00 at the boundary — lib/ratelimit's window slides,
+      # it does not reset), still under the route's 6/h per-IP bucket.
+      DIGEST_TICK_CRON: "*/15 * * * *"
       DEMO_CLEANUP_CRON: "15 4 * * *"
       # Drains notification_digest_queue. Its query takes every row where
       # sent_at IS NULL with no age filter, so the cron interval IS the digest
@@ -203,6 +219,11 @@ services:
           | sed "s|^|[cron $$label] |"
         WRAPPER
         chmod 700 /usr/local/bin/poke-cron.sh
+        # Every line below is authenticated by CRON_SECRET: poke-cron.sh sends
+        # it as "Authorization: Bearer <CRON_SECRET>" and each /api/cron/* route
+        # compares it constant-time (apps/web/lib/cron/auth.ts guardCronRequest;
+        # recurring-expenses keeps its own copy). One line per directory in
+        # apps/web/app/api/cron — a route missing here never runs in prod.
         {
           echo "$$RECURRING_EXPENSES_CRON /usr/local/bin/poke-cron.sh /api/cron/recurring-expenses recurring-expenses >> /var/log/cron.log 2>&1"
           echo "$$ACTIVITY_CLEANUP_CRON /usr/local/bin/poke-cron.sh /api/cron/activity-log-cleanup activity-cleanup >> /var/log/cron.log 2>&1"
@@ -238,6 +259,11 @@ services:
       - ./infra/restore.sh:/usr/local/bin/restore.sh:ro
       - ./backups:/backups
       - ./logs/backup:/var/log
+      # Read-only view of the uploads volume. backup.sh does not tar it on
+      # the nightly schedule (see the note there); the mount is here so a
+      # manual snapshot / restore drill can reach the files without exec-ing
+      # into the app container.
+      - matgary_uploads:/uploads:ro
     entrypoint:
       - sh
       - -c
@@ -253,3 +279,4 @@ services:
 volumes:
   matgary_pg_data:
   matgary_redis_data:
+  matgary_uploads:

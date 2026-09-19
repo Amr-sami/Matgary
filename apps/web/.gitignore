@@ -1,0 +1,31 @@
+# Next.js build output.
+#
+# This file went missing in the monorepo move (the repo root's .gitignore still
+# carries a blanket "/apps" line instead). Its absence is not cosmetic:
+# Tailwind v4's automatic source detection roots at this package and excludes
+# whatever the .gitignore files at or below that root exclude. With no local
+# .gitignore, it walked .next/ and extracted "utility candidates" out of the
+# binary Turbopack cache — emitting a class like
+#   .pb-[calc(env(j\1 \11 -...\1 )+1rem)]
+# which then failed the CSS parser and 500'd every request. Turbopack cached
+# the broken output, Tailwind rescanned it, and the loop sustained itself
+# across cache wipes.
+# Package-local deps. npm workspaces hoist almost everything to the repo
+# root, but vitest and friends still write caches here.
+/node_modules/
+
+/.next/
+/out/
+/build/
+
+# Test + tooling output
+/coverage/
+/playwright-report/
+/test-results/
+/blob-report/
+/playwright/.cache/
+
+# Vercel / TS
+/.vercel
+*.tsbuildinfo
+next-env.d.ts

@@ -1,0 +1,304 @@
+import { and, eq, inArray, sql } from "drizzle-orm";
+import { withTenant } from "@/lib/db";
+import { sales, salePayments } from "@/lib/db/schema";
+
+// Customer ledger — read + mutate side. Customers are derived from
+// sales.customer_phone (no separate customers table), so the "ledger"
+// is a per-phone aggregate over the sales table for the active branch.
+//
+// Multi-store: scoped to one branch on purpose. Owner switching branches
+// via the topbar sees the same customer's separate debt at each branch
+// — matches the rest of the multi-store model where every read is
+// branch-scoped.
+
+export interface LedgerInvoice {
+  /** Invoice id (groups multi-line carts). Falls back to sale id when
+   *  the sale wasn't part of an invoice. */
+  invoiceId: string;
+  saleIds: string[];
+  date: Date;
+  total: number;
+  /** Migration 0037: amount actually collected against this invoice.
+   *  Sum of `amount_paid` across the invoice's lines. For legacy fully-
+   *  paid rows it equals `total`; for partial-paid آجل rows it's
+   *  whatever the customer has handed over so far. */
+  amountPaid: number;
+  /** Outstanding balance = total − amountPaid. Surfaced so the UI doesn't
+   *  have to do the subtraction in three places. */
+  balance: number;
+  isPaid: boolean;
+  paidAt: Date | null;
+  paymentMethod: string | null;
+  /** Per-line summary for receipt-style display. */
+  lines: Array<{
+    saleId: string;
+    productName: string;
+    quantity: number;
+    pricePerUnit: number;
+    lineTotal: number;
+  }>;
+}
+
+export interface CustomerLedger {
+  customerName: string | null;
+  customerPhone: string;
+  invoiceCount: number;
+  lifetimeValue: number;
+  outstandingBalance: number;
+  paidBalance: number;
+  firstVisit: Date | null;
+  lastVisit: Date | null;
+  invoices: LedgerInvoice[];
+}
+
+/**
+ * Pull every sale for one (branch, customer phone) and roll it up into
+ * the ledger shape the detail page renders. Returns null when the
+ * customer has zero non-returned sales at the active branch.
+ */
+/**
+ * Every shape a given Egyptian number may already be stored in.
+ *
+ * `sales.customer_phone` is NOT consistently normalised, because two writers
+ * disagree: POST /api/sales/cart runs the number through normalizeEgyptPhone
+ * and stores E.164 ("+201001234008"), while the older POST /api/sales stores
+ * whatever the client sent — in practice the local form ("01001234008"). On the
+ * seeded store that is 3 rows E.164 against 106 local.
+ *
+ * The read path normalises to E.164 and matched on equality, so it could only
+ * ever find the rows the cart route wrote — every other customer 404'd from
+ * their own detail page, on web and mobile alike.
+ *
+ * Matching the variants fixes the existing data without a migration and keeps
+ * working after one. The real repair is to normalise on write in /api/sales too
+ * and backfill; until then this is what makes the ledger reachable.
+ */
+function phoneVariants(normalised: string): string[] {
+  const variants = new Set<string>([normalised]);
+  // "+201001234008" -> "01001234008"
+  variants.add(normalised.replace(/^\+20/, "0"));
+  // "+201001234008" -> "201001234008"
+  variants.add(normalised.replace(/^\+/, ""));
+  return [...variants];
+}
+
+export async function getCustomerLedger(
+  tenantId: string,
+  branchId: string,
+  customerPhone: string,
+): Promise<CustomerLedger | null> {
+  return withTenant(tenantId, async (tx) => {
+    const rows = await tx
+      .select()
+      .from(sales)
+      .where(
+        and(
+          eq(sales.tenantId, tenantId),
+          eq(sales.branchId, branchId),
+          inArray(sales.customerPhone, phoneVariants(customerPhone)),
+          eq(sales.isReturned, false),
+        ),
+      )
+      .orderBy(sql`${sales.saleDate} desc`);
+
+    if (rows.length === 0) return null;
+
+    // Group sales rows by invoiceId (or fallback to sale id when null).
+    // Each invoice tracks BOTH total and amountPaid so partial-paid آجل
+    // rows show the right balance per invoice instead of being treated
+    // as fully unpaid (pre-Migration-0037 behaviour).
+    type Acc = {
+      invoiceId: string;
+      saleIds: string[];
+      date: Date;
+      total: number;
+      amountPaid: number;
+      isPaid: boolean;
+      paidAt: Date | null;
+      paymentMethod: string | null;
+      lines: LedgerInvoice["lines"];
+    };
+    const byInvoice = new Map<string, Acc>();
+    for (const r of rows) {
+      const id = r.invoiceId ?? r.id;
+      const existing = byInvoice.get(id);
+      const lineTotal = Number(r.totalPrice);
+      const linePaid = Number(r.amountPaid ?? 0);
+      const line = {
+        saleId: r.id,
+        productName: r.productName,
+        quantity: r.quantitySold,
+        pricePerUnit: Number(r.pricePerUnit),
+        lineTotal,
+      };
+      if (existing) {
+        existing.saleIds.push(r.id);
+        existing.total += lineTotal;
+        existing.amountPaid += linePaid;
+        // An invoice is "paid" only if every line is paid; one unpaid
+        // line keeps the whole invoice outstanding.
+        if (!r.isPaid) existing.isPaid = false;
+        existing.lines.push(line);
+        // Prefer the latest paidAt across the lines.
+        if (r.paidAt && (!existing.paidAt || r.paidAt > existing.paidAt)) {
+          existing.paidAt = r.paidAt;
+        }
+      } else {
+        byInvoice.set(id, {
+          invoiceId: id,
+          saleIds: [r.id],
+          date: r.saleDate,
+          total: lineTotal,
+          amountPaid: linePaid,
+          isPaid: r.isPaid,
+          paidAt: r.paidAt,
+          paymentMethod: r.paymentMethod,
+          lines: [line],
+        });
+      }
+    }
+
+    const invoices: LedgerInvoice[] = Array.from(byInvoice.values())
+      .map((acc) => ({
+        ...acc,
+        balance: Math.max(0, acc.total - acc.amountPaid),
+      }))
+      .sort((a, b) => b.date.getTime() - a.date.getTime());
+
+    // Receivables math: lifetimeValue is the total spent (counts both paid
+    // and unpaid portions of every invoice). paidBalance is the actual
+    // cash collected. outstandingBalance is what's still owed. The three
+    // sum invariantly: paidBalance + outstandingBalance === lifetimeValue.
+    let lifetimeValue = 0;
+    let outstandingBalance = 0;
+    let paidBalance = 0;
+    for (const inv of invoices) {
+      lifetimeValue += inv.total;
+      outstandingBalance += inv.balance;
+      paidBalance += inv.amountPaid;
+    }
+
+    return {
+      customerName: rows[0].customerName,
+      customerPhone,
+      invoiceCount: invoices.length,
+      lifetimeValue,
+      outstandingBalance,
+      paidBalance,
+      firstVisit: invoices[invoices.length - 1]?.date ?? null,
+      lastVisit: invoices[0]?.date ?? null,
+      invoices,
+    };
+  });
+}
+
+export type SettlementMethod = "cash" | "instapay" | "card";
+
+export interface MarkCustomerAllPaidActor {
+  recordedByUserId: string;
+  /** Method to stamp on each generated sale_payments row. Defaults to
+   *  'cash' since the most common manual-settle flow is cash collected
+   *  at the counter. */
+  method?: SettlementMethod;
+}
+
+/**
+ * Atomically mark every unpaid sale belonging to (branch, customer phone)
+ * as paid. Migration 0037: amount_paid is bumped to total_price too so
+ * the receivables aggregator on the customers page agrees with is_paid.
+ * Migration 0038: every row touched also gets a sale_payments event for
+ * the delta it collected, so the customer detail page shows a real
+ * payment history.
+ *
+ * Returns the number of sales updated AND the actual cash collected
+ * (which can be LESS than totalPrice when some rows were already partly
+ * paid — the toast then reads the correct "collected X" figure).
+ */
+export async function markCustomerAllPaid(
+  tenantId: string,
+  branchId: string,
+  customerPhone: string,
+  actor: MarkCustomerAllPaidActor,
+): Promise<{ markedCount: number; markedTotal: number }> {
+  const method: SettlementMethod = actor.method ?? "cash";
+  return withTenant(tenantId, async (tx) => {
+    // Read first so we know the unpaid balance per row — that's what the
+    // owner just collected, not the gross totalPrice (some rows might
+    // already have a partial payment recorded against them).
+    const rows = await tx
+      .select({
+        id: sales.id,
+        totalPrice: sales.totalPrice,
+        amountPaid: sales.amountPaid,
+        invoiceId: sales.invoiceId,
+      })
+      .from(sales)
+      .where(
+        and(
+          eq(sales.tenantId, tenantId),
+          eq(sales.branchId, branchId),
+          inArray(sales.customerPhone, phoneVariants(customerPhone)),
+          eq(sales.isReturned, false),
+          eq(sales.isPaid, false),
+        ),
+      );
+    if (rows.length === 0) return { markedCount: 0, markedTotal: 0 };
+
+    const now = new Date();
+    const ids = rows.map((r) => r.id);
+
+    // Bump amount_paid to total_price AND flip the boolean in one shot.
+    // Kept as raw SQL so amount_paid can copy total_price in the same
+    // statement.
+    //
+    // `paid_at = now()`, NOT `${now}`: a bare value in a raw sql`` template
+    // has no column encoder, so a JS Date reaches postgres.js untouched —
+    // and drizzle's postgres-js driver swaps the timestamptz serializer for
+    // the identity function, so the socket writer is handed a Date object
+    // and throws ERR_INVALID_ARG_TYPE (every "mark all paid" was a 500).
+    // Typed column writes (`tx.insert(...).values({ recordedAt: now })`
+    // below) are safe: the column's mapToDriverValue stringifies first.
+    //
+    // WHERE by the ids just read, so the rows flipped here are exactly the
+    // rows that get a payment event below. The SELECT matches every stored
+    // phone shape (phoneVariants); an equality on the E.164 form alone left
+    // legacy local-form rows unpaid while still recording a payment for
+    // them. tenant_id stays as the RLS belt-and-braces.
+    await tx.execute(sql`
+      UPDATE sales
+         SET amount_paid     = CAST(total_price AS numeric(14,2)),
+             is_paid         = true,
+             paid_at         = now(),
+             partial_paid_at = NULL
+       WHERE tenant_id = ${tenantId}
+         AND id IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})
+         AND is_paid   = false
+    `);
+
+    // One payment event per row touched, recording the actual delta
+    // collected (not the gross totalPrice).
+    let markedTotal = 0;
+    const eventRows: typeof salePayments.$inferInsert[] = [];
+    for (const r of rows) {
+      const delta = Math.max(
+        0,
+        Number(r.totalPrice) - Number(r.amountPaid ?? 0),
+      );
+      if (delta <= 0) continue;
+      markedTotal += delta;
+      eventRows.push({
+        tenantId,
+        saleId: r.id,
+        amount: String(delta),
+        method,
+        recordedAt: now,
+        recordedByUserId: actor.recordedByUserId,
+      });
+    }
+    if (eventRows.length > 0) {
+      await tx.insert(salePayments).values(eventRows);
+    }
+
+    return { markedCount: rows.length, markedTotal };
+  });
+}

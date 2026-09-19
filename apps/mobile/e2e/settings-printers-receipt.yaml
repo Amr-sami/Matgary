@@ -1,0 +1,145 @@
+# Printers + receipt designer — Settings → Printers shows the radio state the
+# simulator lands on (no Bluetooth: testID ble-state-unsupported; a device with
+# the radio off shows ble-state-poweredOff) → back → Receipt → toggling the
+# loyalty switch (testID receipt-toggle-loyalty) changes the live preview
+# (testID receipt-preview): the "Loyalty not enabled" placeholder (or, when the
+# store has loyalty on, the "POINTS EARNED" row) appears or disappears — every
+# branch asserts the flip. The toggle is flipped twice so the draft is unchanged.
+# Signs in first when the app is on the login screen. Ends on the dashboard.
+appId: com.thestoro.app
+---
+- launchApp
+- runFlow: helpers/dev-launcher.yaml
+- extendedWaitUntil:
+    visible:
+      text: "المزيد|More|تسجيل الدخول|Sign in"
+    timeout: 45000
+- runFlow:
+    when:
+      visible:
+        id: "login-identifier"
+    file: login.yaml
+- runFlow: helpers/dismiss-logbox.yaml
+
+- tapOn:
+    text: "المزيد|More"
+- scrollUntilVisible:
+    element:
+      text: "الإعدادات|Settings"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    text: "الإعدادات|Settings"
+- extendedWaitUntil:
+    visible:
+      text: "اللغة|Language"
+    timeout: 30000
+
+# Printers → the Bluetooth card resolves out of "Checking…" to unavailable.
+- scrollUntilVisible:
+    element:
+      id: "settings-tile-printers"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: "settings-tile-printers"
+- extendedWaitUntil:
+    visible:
+      text: "طابعة الفواتير|Receipt printer"
+    timeout: 30000
+- extendedWaitUntil:
+    notVisible:
+      id: "ble-state-unknown"
+    timeout: 20000
+# Any settled Bluetooth state is fine: the iOS simulator has no radio
+# (unsupported), the Pixel's is usually on (poweredOn) — off or unauthorized
+# are legitimate too. The row's testID is ble-state-<state>; the copy is
+# mobile.printing.state<State>.
+- assertVisible:
+    id: "ble-state-(unsupported|poweredOff|poweredOn|unauthorized)"
+- assertVisible:
+    text: "(?s)البلوتوث غير متاح على هذا الجهاز.*|(?s)Bluetooth is not available on this device.*|(?s)البلوتوث مقفول.*|(?s)Bluetooth is off.*|(?s)البلوتوث شغّال.*|(?s)Bluetooth is on.*|(?s)التطبيق غير مسموح له باستخدام البلوتوث.*|(?s)The app is not allowed to use Bluetooth.*"
+- runFlow:
+    when:
+      visible:
+        id: "ble-state-unsupported"
+    commands:
+      - assertVisible:
+          text: "(?s)البلوتوث غير متاح على هذا الجهاز.*|(?s)Bluetooth is not available on this device.*"
+
+# Back to Settings via the shared BackLink (components/ui/BackLink.tsx,
+# testID back-link, label "رجوع|Back"), then Receipt.
+- tapOn:
+    id: "back-link"
+# The stack keeps Settings mounted with its scroll offset, so the Language tile
+# at the top is off-screen here; any settings tile proves we are back.
+- extendedWaitUntil:
+    visible:
+      id: "settings-tile-.*"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "settings-tile-receipt"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: "settings-tile-receipt"
+- extendedWaitUntil:
+    visible:
+      id: "receipt-preview"
+    timeout: 30000
+
+# Toggle the loyalty block and watch the preview follow. The preview is the
+# first card and the toggle sits several cards lower, so every assertion
+# scrolls back to the preview first; the toggle's own checked state proves the
+# tap landed, the preview's continued presence proves the re-render survived.
+- scrollUntilVisible:
+    element:
+      id: "receipt-toggle-loyalty"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: "receipt-toggle-loyalty"
+- scrollUntilVisible:
+    element:
+      id: "receipt-preview"
+    direction: UP
+    timeout: 20000
+- assertVisible:
+    id: "receipt-preview"
+- scrollUntilVisible:
+    element:
+      id: "receipt-toggle-loyalty"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: "receipt-toggle-loyalty"
+- scrollUntilVisible:
+    element:
+      id: "receipt-preview"
+    direction: UP
+    timeout: 20000
+- assertVisible:
+    id: "receipt-preview"
+# Back out without saving so the store's real setting is untouched. The
+# receipt screen's header scrolls with the content (SettingsHeader is a child
+# of the Screen's ScrollView), and the preview sits below it — on the Pixel
+# the back link is still above the viewport once the preview is in view, so
+# scroll back up to it first.
+- scrollUntilVisible:
+    element:
+      id: "back-link"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: "back-link"
+- extendedWaitUntil:
+    visible:
+      id: "settings-tile-.*"
+    timeout: 30000

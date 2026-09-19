@@ -1,0 +1,143 @@
+# CP-07 — Switch the active branch from the dashboard chip, and back.
+#
+# The header chip (components/shell/BranchSwitcher.tsx) names the active
+# branch; it only renders when /me hands the session more than one branch
+# (the seeded tenant has two: the primary and فرع المعادي). Tap → a sheet
+# lists the branches → pick another → the chip wears "Switched to X" for
+# ~2 s → then reads the new name.
+#
+# The flow copies the chip's label, opens the sheet and taps the first option
+# that is NOT the current one, asserts the confirmation
+# and the changed label, RELAUNCHES the app and asserts the choice survived
+# the restart (switchBranch persists it), then opens the sheet once more and
+# taps the option named by the copied label, so the app is left on the branch
+# it started on. Signs in first when the app is on the login screen. Ends on
+# the dashboard.
+#
+# Why the relaunch: on this build (RN new architecture, iOS 26 simulator) a
+# `transparent` Modal presented a SECOND time in the same process is drawn
+# but XCUITest gets an EMPTY accessibility tree for the whole app until it
+# closes — every selector fails, while the first presentation of any modal
+# instance is fine (the returns modal, not transparent, is unaffected). Both
+# this sheet and the customer settle sheet reproduce it. Restarting between
+# the two opens keeps each presentation the first of its process.
+#
+# Elements are addressed by testID (branch-*). No branch is created here —
+# the tenant must already have two.
+appId: com.thestoro.app
+---
+- launchApp
+- runFlow: helpers/dev-launcher.yaml
+- extendedWaitUntil:
+    visible:
+      text: "المزيد|More|تسجيل الدخول|Sign in"
+    timeout: 45000
+- runFlow:
+    when:
+      visible:
+        id: "login-identifier"
+    file: login.yaml
+
+# Dashboard: the chip and its label.
+- runFlow: helpers/dismiss-logbox.yaml
+- tapOn:
+    text: "الرئيسية|Home"
+- extendedWaitUntil:
+    visible:
+      id: "branch-chip-label"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 3000
+- copyTextFrom:
+    id: "branch-chip-label"
+- evalScript: ${output.from = maestro.copiedText}
+- assertTrue: ${output.from.length > 0}
+
+# Open the sheet; the current row is the checked radio; pick the first
+# other one. The rows are accessibility radios whose label is the branch name
+# — suffixed " — <current branch>" on the active one (BranchSwitcher.tsx) —
+# and both platforms expose that label to Maestro. Neither platform-native
+# checked form works on both: Android exposes checked=true but not the iOS
+# "radio button, checked" value; iOS never derives `checked` from RN state
+# and additionally exposes that synthesised value as the row's text, which
+# is why the tap's regex excludes it too (else the checked row matches
+# through it). So: the checked row is the one labelled with the copied chip
+# name plus the suffix; the row to tap is any row whose label is neither.
+- tapOn:
+    id: "branch-chip"
+- extendedWaitUntil:
+    visible:
+      id: "branch-option"
+    timeout: 15000
+- assertVisible:
+    text: "تبديل الفرع|Switch branch"
+- assertVisible:
+    id: "branch-option"
+    text: "${output.from} — .*"
+- tapOn:
+    id: "branch-option"
+    text: "^(?!${output.from}( — .*)?$)(?!radio button, checked$).+$"
+    index: 0
+
+# Switched: the sheet closes, the chip confirms (a ~2 s face that the modal
+# teardown often outlasts — best effort, a miss only warns), then names the
+# new branch.
+- extendedWaitUntil:
+    notVisible:
+      id: "branch-option"
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      text: "تم التبديل إلى .*|Switched to .*"
+    timeout: 3000
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "branch-chip-label"
+    timeout: 15000
+- assertNotVisible:
+    id: "branch-chip-label"
+    text: ${output.from}
+- copyTextFrom:
+    id: "branch-chip-label"
+- evalScript: ${output.to = maestro.copiedText}
+- assertTrue: ${output.to.length > 0 && output.to != output.from}
+
+# The choice is persisted: a cold start comes back on the new branch.
+- launchApp
+- runFlow: helpers/dev-launcher.yaml
+- extendedWaitUntil:
+    visible:
+      id: "branch-chip-label"
+    timeout: 45000
+- waitForAnimationToEnd:
+    timeout: 3000
+- assertVisible:
+    id: "branch-chip-label"
+    text: ${output.to}
+
+# Switch back to where we started.
+- tapOn:
+    id: "branch-chip"
+- extendedWaitUntil:
+    visible:
+      id: "branch-option"
+      text: ${output.from}
+    timeout: 15000
+- tapOn:
+    id: "branch-option"
+    text: ${output.from}
+- extendedWaitUntil:
+    notVisible:
+      id: "branch-option"
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: "branch-chip-label"
+      text: ${output.from}
+    timeout: 15000
+- assertVisible:
+    id: "branch-chip-label"
+    text: ${output.from}
+- assertVisible:
+    text: "أهلاً، .+|Welcome back, .+"
