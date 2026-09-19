@@ -561,6 +561,7 @@ export default function TeamAttendanceScreen() {
             <Text style={styles.modalTitle}>{t("app.team.editEvent.title")}</Text>
             <Text style={styles.fieldLabel}>{t("app.team.editEvent.typeLabel")}</Text>
             <Segmented<AttendanceType>
+              equal
               items={[
                 { key: "check_in", label: t("app.team.editEvent.checkIn") },
                 { key: "check_out", label: t("app.team.editEvent.checkOut") },
@@ -684,8 +685,8 @@ const styles = StyleSheet.create({
   },
   rowHead: { flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: MIN_TOUCH },
   avatar: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     borderRadius: radius.full,
     backgroundColor: colors.accentLight,
     alignItems: "center",

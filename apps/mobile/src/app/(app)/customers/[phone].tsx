@@ -312,7 +312,7 @@ export default function CustomerDetailScreen() {
                 value={money(ledger.lifetimeValue)}
               />
               <Stat
-                icon={<CheckCircle size={14} color={colors.success} />}
+                icon={<CheckCircle size={14} color={colors.textSecondary} />}
                 label={t("app.sales.deferred.markPaid")}
                 value={money(ledger.paidBalance)}
               />
@@ -355,7 +355,7 @@ export default function CustomerDetailScreen() {
               <View style={styles.walletRow}>
                 <View style={styles.walletCell}>
                   <View style={styles.statLabelRow}>
-                    <Star size={14} color={colors.accent} />
+                    <Star size={14} color={colors.textSecondary} />
                     <Text numberOfLines={1} style={styles.statLabel}>
                       {t("mobile.customers.walletPoints")}
                     </Text>
@@ -366,7 +366,7 @@ export default function CustomerDetailScreen() {
                 </View>
                 <View style={styles.walletCell}>
                   <View style={styles.statLabelRow}>
-                    <Wallet size={14} color={colors.successStrong} />
+                    <Wallet size={14} color={colors.textSecondary} />
                     <Text numberOfLines={1} style={styles.statLabel}>
                       {t("mobile.customers.walletCredit")}
                     </Text>

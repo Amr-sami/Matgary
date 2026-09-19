@@ -6,7 +6,6 @@ import { FlashList } from "@shopify/flash-list";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { PackageIcon as Package } from "phosphor-react-native/src/icons/Package";
-import { PlusIcon as Plus } from "phosphor-react-native/src/icons/Plus";
 import { WarningOctagonIcon as WarningOctagon } from "phosphor-react-native/src/icons/WarningOctagon";
 import { WalletIcon as Wallet } from "phosphor-react-native/src/icons/Wallet";
 import { WarningIcon as Warning } from "phosphor-react-native/src/icons/Warning";
@@ -34,8 +33,9 @@ type StatusFilter = "all" | "in" | "low" | "out";
  *
  * Order: search first (it must stay above the keyboard — the capture's
  * KPI-then-search order hid every match behind it), then the 2×2 KPI block
- * (hidden while a query is typed), the add-product CTA, category and status
- * chip rows, the result count, and the product list.
+ * (hidden while a query is typed), category and status chip rows, the result
+ * count, and the product list. Adding a product lives in the bottom bar's
+ * Add product tab, so the page carries no duplicate CTA for it.
  *
  * Doc 04 marks this RECOMPOSE — filters into a bottom sheet, a FAB, a
  * virtualised list. The bottom sheet and FAB are a redesign, and the brief
@@ -167,13 +167,9 @@ export default function InventoryScreen() {
       </View>
       ) : null}
 
-      <Pressable style={styles.cta} accessibilityRole="button" onPress={() => router.push("/add-product")}>
-        <Plus size={18} color="#FFFFFF" weight="bold" />
-        <Text numberOfLines={1} style={styles.ctaText}>
-          {t("app.inventory.tools.addProduct")}
-        </Text>
-      </Pressable>
-
+      {/* No in-page "Add product" CTA: the bottom bar right under this screen
+          already carries the Add product tab, so a second full-width primary
+          for the same action only pushed the chips and the first row down. */}
       <ChipRow>
         <Chip label={t("app.inventory.filters.allCategories")} active={category === "all"} onPress={() => setCategory("all")} />
         {(categories.data ?? []).map((c) => (
@@ -306,9 +302,15 @@ function ProductRow({
   );
 }
 
-/** Arabic counts 1 / 2 / 3–10 / 11+ differently; the dictionary carries One/Two/Few beside the default. */
+/**
+ * Arabic counts 1 / 2 / 3–10 / 11–99 differently (CLDR one/two/few/many); the
+ * dictionary carries One/Two/Few/Many beside the default. 11–99 takes the
+ * singular accusative ("24 منتجًا") — the bare key stays for 0 and for round
+ * hundreds/thousands ("100 منتج"), where the noun is singular again.
+ */
 function countForm(n: number): string {
-  return n === 1 ? "One" : n === 2 ? "Two" : n >= 3 && n <= 10 ? "Few" : "";
+  const m = n % 100;
+  return n === 1 ? "One" : n === 2 ? "Two" : m >= 3 && m <= 10 ? "Few" : m >= 11 ? "Many" : "";
 }
 
 /** The `gap` the old `<View style={styles.list}>` had between cards. */
@@ -344,18 +346,10 @@ const styles = StyleSheet.create({
   headerWrap: { gap: spacing.lg, marginBottom: spacing.lg },
   titleBlock: { gap: 4, alignItems: "flex-start" },
   title: { fontFamily: fonts.bold, fontSize: 26, color: colors.text, ...RTL_TEXT },
-  grid: { gap: spacing.lg },
-  gridRow: { flexDirection: "row", gap: spacing.lg },
-  cta: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.sm,
-    minHeight: 52,
-    borderRadius: radius.lg,
-    backgroundColor: colors.accent,
-  },
-  ctaText: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 16, color: "#FFFFFF" },
+  // spacing.md on both axes — the same StatCard pair uses a 12pt gutter on
+  // sales/history.tsx; one gutter for one component.
+  grid: { gap: spacing.md },
+  gridRow: { flexDirection: "row", gap: spacing.md },
   // Bleeds to the screen edge so a half-visible chip signals "more"; the
   // first chip still lines up with the page gutter via the content padding.
   chipRowWrap: { marginHorizontal: -spacing.lg },

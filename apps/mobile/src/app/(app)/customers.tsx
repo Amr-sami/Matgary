@@ -163,9 +163,9 @@ export default function CustomersScreen() {
   );
   const showTop = filter === "all" && q.length === 0 && topCustomers.length > 0;
 
-  const filters = (): { key: Filter; label: string }[] => [
-    { key: "all", label: t("app.common.all") },
-    { key: "debtors", label: t("mobile.customers.filterDebtors") },
+  const filters = (): { key: Filter; label: string; testID: string }[] => [
+    { key: "all", label: t("app.common.all"), testID: "customers-filter-all" },
+    { key: "debtors", label: t("mobile.customers.filterDebtors"), testID: "customers-filter-debtors" },
   ];
 
   const emptyTitle =

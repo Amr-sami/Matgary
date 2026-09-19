@@ -155,6 +155,8 @@ export default function PurchasesScreen() {
         <StatCard title={t("mobile.purchases.orderCount")} value={String(stats.count)} icon={Receipt} color="accent" />
         <StatCard title={t("app.purchases.kpi.totalPurchases")} value={money(stats.total)} icon={Package} color="accent" />
       </View>
+      {/* Full-width on its own row: a 2x2 grid with one blank cell read as
+          unfinished, so the third KPI spans the row instead. */}
       <View style={styles.gridRow}>
         <StatCard
           title={t("mobile.purchases.owedToSuppliers")}
@@ -162,7 +164,6 @@ export default function PurchasesScreen() {
           icon={Wallet}
           color={stats.outstanding > 0 ? "danger" : "success"}
         />
-        <View style={styles.spacer} />
       </View>
 
       {canManage ? (
@@ -266,9 +267,6 @@ export default function PurchasesScreen() {
 
 const styles = StyleSheet.create({
   gridRow: { flexDirection: "row", gap: spacing.lg },
-  // Same box as a StatCard (padding + border) so Yoga's flex basis matches and
-  // the orphan tile is exactly as wide as the two above it.
-  spacer: { flex: 1, padding: spacing.lg, borderWidth: 1, borderColor: "transparent" },
   list: { gap: spacing.md },
   row: {
     backgroundColor: colors.card,

@@ -41,21 +41,27 @@ const PAYMENT_LABELS = (): Record<Payment, string> => ({
 });
 
 /**
- * "−3,400 ج.م" with the sign at the READING start. A bare "−" + digits has no
- * strong character, so the paragraph fell back to the device direction and
- * in Arabic the sign landed at the visual left, detached from the digits
- * ("3,400 ج.م−" to the reader). A leading RLM/LRM pins the paragraph.
+ * Signed amount the way CLDR shapes it per locale: en "−EGP 3,400" (sign
+ * before the code), ar "ج.م −3,400" visually — sign and digits are ONE LTR
+ * unit (LRI…PDI) that money()'s "{amount} ج.م" shape then suffixes, so a
+ * native never reads "3,400−" (sign trailing the digits, as a bare "−" +
+ * money() painted in Arabic). The leading RLM/LRM outside the isolates pins
+ * the paragraph to the app locale (UAX#9 P2 skips isolates — see money()).
  */
 function negative(value: number): string {
-  return `${isRTL() ? "\u200F" : "\u200E"}−${money(value)}`;
+  if (!isRTL()) return `\u200E−${money(value)}`;
+  const digits = groupDigits(Math.round(value));
+  return `\u200F${t("mobile.format.money", { amount: `\u2066−${digits}\u2069` })}`;
 }
 
 function paymentLabel(p: Payment | null | undefined): string {
   return p ? PAYMENT_LABELS()[p] ?? p : "—";
 }
 
-/** LTR isolate (LRI U+2066 … PDI U+2069): keeps "date · time" and "+20…" in
- *  LTR order inside an Arabic paragraph (same helper as sales/history.tsx). */
+/** LTR isolate (LRI U+2066 … PDI U+2069): keeps all-digit runs — "13:41",
+ *  "+20…" — in LTR order inside an Arabic paragraph (same helper as
+ *  sales/history.tsx). Never wrap the DATE in it: shortDate() carries a month
+ *  name, and an LTR isolate reverses "سبتمبر 2026 13:41" into one RTL span. */
 function ltr(s: string): string {
   return `\u2066${s}\u2069`;
 }
@@ -165,7 +171,7 @@ export default function SaleDetailScreen() {
               {inv.invoiceId ?? inv.key}
             </Text>
             <Text style={styles.when}>
-              {ltr(`${shortDate(inv.saleDate)} · ${timeOf(inv.saleDate)}`)}
+              {shortDate(inv.saleDate)} · {ltr(timeOf(inv.saleDate))}
             </Text>
             <View style={styles.badges}>
               <Badge label={paymentLabel(inv.paymentMethod)} variant={inv.paymentMethod === "deferred" ? "lowstock" : "accent"} />
@@ -192,7 +198,7 @@ export default function SaleDetailScreen() {
               <View style={styles.colName}>
                 <Text style={styles.th}>{t("app.sales.table.col.product")}</Text>
               </View>
-              <Text style={[styles.th, styles.colAmt]}>{t("app.sales.table.col.total")}</Text>
+              <Text style={[styles.th, styles.colAmt]}>{t("mobile.saleDetail.colAmount")}</Text>
             </View>
             {inv.lines.map((l) => (
               <View key={l.id} style={styles.lineRow} testID={`sale-line-${l.id}`}>
@@ -378,7 +384,7 @@ const styles = StyleSheet.create({
   lineSub: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
   lineReturned: { fontFamily: fonts.medium, fontSize: 12, color: colors.danger, ...RTL_TEXT },
   lineQty: { fontVariant: ["tabular-nums"] },
-  lineNum: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 14, color: colors.text, paddingTop: 2 },
+  lineNum: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 14, color: colors.text },
   lineTotal: { ...RTL_TEXT, fontFamily: fonts.semibold },
   struck: { color: colors.textSecondary, textDecorationLine: "line-through" },
   warn: {

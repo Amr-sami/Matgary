@@ -87,7 +87,9 @@ export function StaffTab({ range, from, to }: { range: InsightsRange; from?: str
           <>
             <View style={styles.statRow}>
               <Stat label={t("app.insights.staff.summary.active")} value={String(model.known.length)} />
+              <View style={styles.statDivider} />
               <Stat label={t("app.insights.staff.summary.totalRevenue")} value={money(model.totalRevenue)} />
+              <View style={styles.statDivider} />
               <Stat label={t("app.insights.staff.summary.ops")} value={String(model.totalOps)} />
             </View>
 
@@ -167,6 +169,8 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   stat: { flex: 1, gap: 2 },
+  // Same hairline DeepTab's compare card and the overview trend card put between their three stats.
+  statDivider: { width: 1, alignSelf: "stretch", backgroundColor: colors.border },
   statLabel: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
   statValue: { fontFamily: fonts.bold, fontSize: 15, color: colors.text, fontVariant: ["tabular-nums"], ...RTL_TEXT },
 

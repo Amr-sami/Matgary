@@ -164,7 +164,9 @@ export default function InsightsScreen() {
 
   return (
     <Screen
-      title={t("app.insights.title")}
+      // The tab that opens this screen is labelled with app.shell.primary.insights;
+      // the page reuses that key so the pair can never drift apart (F31).
+      title={t("app.shell.primary.insights")}
       onRefresh={() => void onRefresh()}
       refreshing={refreshing}
     >

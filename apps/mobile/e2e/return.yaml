@@ -45,7 +45,7 @@ env:
       id: "returns-take"
     timeout: 30000
 - assertVisible:
-    text: "مرتجعات الشهر|Returns this month"
+    text: "مرتجعات الشهر|This month's returns"
 
 # Open the picker and take the newest returnable line.
 - tapOn:

@@ -23,13 +23,12 @@ import { Screen } from "@/components/layout/Screen";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { ChevronBack } from "@/components/ui/Chevron";
 import { Chip } from "@/components/ui/Chip";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
+import { SettingsHeader } from "@/components/ui/SettingsHeader";
 import { Sheet } from "@/components/ui/Sheet";
 import { countLabel } from "@/lib/format";
-import { useGoBack } from "@/lib/nav";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
@@ -76,7 +75,6 @@ const byPosition = <T extends { position: number; label: string }>(rows: T[]) =>
   [...rows].sort((a, b) => a.position - b.position || a.label.localeCompare(b.label));
 
 export default function AttributesSettingsScreen() {
-  const goBack = useGoBack("/settings");
   const qc = useQueryClient();
   const me = useSession((s) => s.me);
   const canManage = !!me && (me.isOwner || me.permissions.includes("manage_catalog"));
@@ -232,17 +230,13 @@ export default function AttributesSettingsScreen() {
 
   return (
     <Screen onRefresh={refetch} refreshing={attrsQ.isRefetching}>
-      <View style={styles.header}>
-        <Pressable accessibilityRole="button" onPress={goBack} hitSlop={12} style={styles.back} testID="back-link">
-          <ChevronBack size={16} color={colors.textSecondary} />
-          <Text style={styles.backLabel}>{t("app.settingsPage.title")}</Text>
-        </Pressable>
-        <View style={styles.titleRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.title}>{t("app.catalog.categoriesAdmin.attributes.heading")}</Text>
-            <Text style={styles.subtitle}>{t("mobile.catalog.attributesIntro")}</Text>
-          </View>
-          {canManage && categoryId ? (
+      <SettingsHeader
+        parentLabel={t("app.settingsPage.title")}
+        title={t("app.catalog.categoriesAdmin.attributes.heading")}
+        subtitle={t("mobile.catalog.attributesIntro")}
+        fallback="/settings"
+        accessories={
+          canManage && categoryId ? (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t("app.catalog.categoriesAdmin.attributes.addAttribute")}
@@ -251,9 +245,9 @@ export default function AttributesSettingsScreen() {
             >
               <Plus size={20} color={colors.onAccent} weight="bold" />
             </Pressable>
-          ) : null}
-        </View>
-      </View>
+          ) : null
+        }
+      />
 
       {notice ? (
         <Pressable onPress={() => setNotice(null)} style={[styles.notice, notice.tone === "ok" ? styles.noticeOk : styles.noticeErr]}>
@@ -558,12 +552,6 @@ function NameSheet({
 }
 
 const styles = StyleSheet.create({
-  header: { gap: spacing.sm, marginBottom: spacing.lg },
-  back: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-start", minHeight: MIN_TOUCH },
-  backLabel: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
-  titleRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md },
-  title: { fontFamily: fonts.bold, fontSize: 24, color: colors.text, ...RTL_TEXT },
-  subtitle: { fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary, marginTop: 4, ...RTL_TEXT },
   addBtn: {
     width: MIN_TOUCH,
     height: MIN_TOUCH,

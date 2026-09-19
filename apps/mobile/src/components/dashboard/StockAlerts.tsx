@@ -1,10 +1,11 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useRouter } from "expo-router";
 import { CheckCircleIcon as CheckCircle } from "phosphor-react-native/src/icons/CheckCircle";
 import { WarningIcon as Warning } from "phosphor-react-native/src/icons/Warning";
 
 import { Badge } from "@/components/ui/Badge";
 import { RTL_TEXT } from "@/theme/rtl";
-import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
+import { colors, elevation, fonts, MIN_TOUCH, radius, spacing } from "@/theme/tokens";
 import { t } from "@/i18n";
 import type { LowStockItem } from "@matgary/api-client";
 
@@ -17,9 +18,26 @@ import type { LowStockItem } from "@matgary/api-client";
  * under RTL puts it on the left — matching app__dashboard.png.
  */
 export function StockAlerts({ items }: { items: LowStockItem[] }) {
+  const router = useRouter();
   return (
     <View style={styles.card}>
-      <Text style={styles.heading}>{t("app.dashboard.lowStock.title")}</Text>
+      {/* Same header row as RecentSales (app/(app)/index.tsx cardHeader):
+          MIN_TOUCH tall with a trailing "View all", so the two sibling cards
+          share one title offset and one affordance. The list below is
+          truncated by the server, so the link goes to the full inventory. */}
+      <View style={styles.cardHeader}>
+        <Text style={styles.heading}>{t("app.dashboard.lowStock.title")}</Text>
+        {items.length > 0 ? (
+          <Pressable
+            onPress={() => router.push("/inventory")}
+            hitSlop={8}
+            accessibilityRole="link"
+            style={styles.viewAllHit}
+          >
+            <Text style={styles.viewAll}>{t("app.common.viewAll")}</Text>
+          </Pressable>
+        ) : null}
+      </View>
 
       {items.length === 0 ? (
         <View style={styles.allGood}>
@@ -70,13 +88,18 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     ...elevation.card,
   },
-  heading: {
-    fontFamily: fonts.semibold,
-    fontSize: 16,
-    color: colors.text,
-    marginBottom: spacing.lg,
-    ...RTL_TEXT,
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    // The "view all" hit box is MIN_TOUCH tall, so the header carries its
+    // own breathing room — no margin under it (matches index.tsx).
+    minHeight: MIN_TOUCH,
   },
+  heading: { fontFamily: fonts.semibold, fontSize: 16, color: colors.text, ...RTL_TEXT },
+  // hitSlop alone cannot reach 44pt: RN clips slop to the parent's bounds.
+  viewAllHit: { minHeight: MIN_TOUCH, justifyContent: "center" },
+  viewAll: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.accent },
   list: { gap: spacing.md },
   row: {
     flexDirection: "row",

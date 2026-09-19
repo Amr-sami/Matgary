@@ -393,6 +393,7 @@ const styles = StyleSheet.create({
   stateText: {
     fontFamily: fonts.regular,
     fontSize: 15,
+    lineHeight: 22,
     color: colors.bg,
     textAlign: "center",
   },
@@ -409,6 +410,7 @@ const styles = StyleSheet.create({
   hint: {
     fontFamily: fonts.medium,
     fontSize: 14,
+    lineHeight: 20,
     color: colors.bg,
     textAlign: "center",
     paddingHorizontal: spacing.xxl,

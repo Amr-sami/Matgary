@@ -442,7 +442,7 @@ export default function TeamMemberScreen() {
           </Card>
 
           {/* Permissions */}
-          <View testID="team-permissions">
+          <View testID="team-permissions" collapsable={false}>
           <Card title={t("app.teamAdmin.row.permissions")}>
             {targetIsOwner ? (
               <Text style={styles.hint}>{t("mobile.team.ownerAllPermissions")}</Text>

@@ -18,9 +18,9 @@ import { api } from "@/api/client";
 import { t } from "@/i18n";
 import { Screen } from "@/components/layout/Screen";
 import { HeaderAccessories } from "@/components/shell/HeaderAccessories";
+import { BackLink } from "@/components/ui/BackLink";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { ChevronBack } from "@/components/ui/Chevron";
 import { DateField } from "@/components/ui/DateField";
 import { Field } from "@/components/ui/Field";
 import { Sheet } from "@/components/ui/Sheet";
@@ -191,30 +191,33 @@ export default function LeaveScreen() {
   };
 
   return (
-    <Screen onRefresh={() => void q.refetch()} refreshing={q.isRefetching}>
-      {/* Own header, the same shape as team/attendance: a "‹ الفريق" back link
-          above the title for whoever can open the Team hub (the web's tab
-          strip — with its payroll tab that has no native screen — is gone;
-          Team sub-screens share one nav model). Staff reach this screen from
-          More and get the plain title. */}
+    <Screen
+      onRefresh={() => void q.refetch()}
+      refreshing={q.isRefetching}
+      // "‹ الفريق" in the FIXED header band — the one BackLink recipe, at the
+      // same y as team/attendance and team/[userId] (HeaderAccessories above
+      // it on all three). Only whoever can open the Team hub gets the link
+      // (the web's tab strip — with its payroll tab that has no native screen
+      // — is gone; Team sub-screens share one nav model); staff reach this
+      // screen from More and get the plain title.
+      header={
+        <View style={styles.fixedHeader}>
+          <HeaderAccessories />
+          {canManageTeam ? (
+            <BackLink label={t("mobile.team.back")} onPress={() => router.navigate("/team")} />
+          ) : null}
+        </View>
+      }
+    >
+      {/* The settings sub-page shape: title + subtitle scroll with the page.
+          The subtitle is a mobile key: the web's tabDescriptions.leaves opened
+          with "طلبات الإجازة —", an echo of the 26pt title right above it. */}
       <View style={styles.header}>
-        <HeaderAccessories />
-        {canManageTeam ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.navigate("/team")}
-            hitSlop={12}
-            style={styles.back}
-          >
-            <ChevronBack size={16} color={colors.textSecondary} />
-            <Text style={styles.backLabel}>{t("mobile.team.back")}</Text>
-          </Pressable>
-        ) : null}
         <Text style={styles.title}>{t("mobile.leave.title")}</Text>
         <Text style={styles.subtitle}>
           {isManager && pendingCount > 0
             ? t("app.leave.tab.pendingCount", { n: pendingCount })
-            : t("app.team.tabDescriptions.leaves")}
+            : t("mobile.leave.subtitle")}
         </Text>
       </View>
 
@@ -251,9 +254,10 @@ export default function LeaveScreen() {
             </Text>
           </View>
           {canRequest ? (
-            // The header already carries "طلب إجازة"; this one is "طلب جديد" as in
-            // the web's empty state, so the screen does not show one CTA twice.
-            <PlusButton label={t("app.leave.tab.newRequest")} onPress={() => setFormOpen(true)} />
+            // Same action as the toolbar button above, so it carries the SAME
+            // label: the web's "طلب جديد" here read as a second, different
+            // action one card below "طلب إجازة".
+            <PlusButton label={t("app.leave.tab.request")} onPress={() => setFormOpen(true)} />
           ) : null}
         </View>
       ) : (
@@ -573,9 +577,8 @@ function DecideSheet({
 
 const styles = StyleSheet.create({
   // Same shape as the settings sub-pages and team/attendance: back link, then title, then subtitle.
+  fixedHeader: { gap: spacing.xs, alignItems: "flex-start" },
   header: { gap: spacing.xs, alignItems: "flex-start" },
-  back: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 32 },
-  backLabel: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
   title: { fontFamily: fonts.bold, fontSize: 26, color: colors.text, ...RTL_TEXT },
   subtitle: { fontFamily: fonts.regular, fontSize: 15, color: colors.textSecondary, ...RTL_TEXT },
   toolbar: { flexDirection: "row", justifyContent: "flex-end" },

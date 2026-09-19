@@ -13,9 +13,9 @@ import { dictionaries } from "@matgary/i18n";
 
 import { Logo } from "@/components/Logo";
 import { Screen } from "@/components/layout/Screen";
-import { ChevronBack, ChevronForward } from "@/components/ui/Chevron";
+import { ChevronForward } from "@/components/ui/Chevron";
+import { SettingsHeader } from "@/components/ui/SettingsHeader";
 import { t, useLocale } from "@/i18n";
-import { useGoBack } from "@/lib/nav";
 import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
 
@@ -58,7 +58,6 @@ interface Row {
 
 export default function AboutSettingsScreen() {
   const router = useRouter();
-  const goBack = useGoBack("/settings");
   const locale = useLocale((s) => s.locale);
   const [error, setError] = useState<string | null>(null);
 
@@ -162,19 +161,7 @@ export default function AboutSettingsScreen() {
 
   return (
     <Screen>
-      <View style={styles.header}>
-        <Pressable
-          accessibilityRole="button"
-          onPress={goBack}
-          hitSlop={12}
-          testID="back-link"
-          style={styles.back}
-        >
-          <ChevronBack size={16} color={colors.textSecondary} />
-          <Text style={styles.backLabel}>{t("app.settingsPage.title")}</Text>
-        </Pressable>
-        <Text style={styles.title}>{t("mobile.settings.about")}</Text>
-      </View>
+      <SettingsHeader parentLabel={t("app.settingsPage.title")} title={t("mobile.settings.about")} fallback="/settings" />
 
       {/* Identity block — the same logo lock-up as the login screen, then the
           version line reviewers and support both ask for. */}
@@ -254,11 +241,6 @@ function Group({ heading, rows }: { heading: string; rows: Row[] }) {
 }
 
 const styles = StyleSheet.create({
-  header: { gap: spacing.xs },
-  back: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 32, alignSelf: "flex-start" },
-  backLabel: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary },
-  title: { fontFamily: fonts.bold, fontSize: 26, color: colors.text, ...RTL_TEXT },
-
   identity: {
     alignItems: "center",
     gap: spacing.sm,

@@ -13,6 +13,7 @@ import { FlashList } from "@shopify/flash-list";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CheckIcon as Check } from "phosphor-react-native/src/icons/Check";
+import { CaretDownIcon as CaretDown } from "phosphor-react-native/src/icons/CaretDown";
 
 import { api } from "@/api/client";
 import { getLocale, t } from "@/i18n";
@@ -237,7 +238,7 @@ export default function ActivityScreen() {
       <View style={styles.titleBlock}>
         <HeaderAccessories />
         <Text style={styles.title}>{t("app.activity.heading")}</Text>
-        <Text style={styles.subtitle}>{t("app.activity.subhead")}</Text>
+        <Text style={styles.subtitle}>{t("mobile.activity.subtitle")}</Text>
       </View>
 
       {!allowed ? (
@@ -390,6 +391,7 @@ function Select({
         <Text numberOfLines={1} style={styles.selectValue}>
           {current?.label ?? ""}
         </Text>
+        <CaretDown size={18} color={colors.textSecondary} />
       </Pressable>
 
       <Modal visible={open} transparent animationType="slide" onRequestClose={close}>
@@ -448,7 +450,7 @@ function ActivityRow({ row, first, last }: { row: LogRow; first: boolean; last: 
       </View>
       <View style={styles.rowMeta}>
         <Text style={styles.meta}>{row.actorName ?? "—"}</Text>
-        <Text style={styles.meta}>•</Text>
+        <Text style={styles.meta}>{"·"}</Text>
         <Text style={styles.meta}>{formatRelative(row.createdAt)}</Text>
       </View>
       {details.length > 0 ? (
@@ -502,6 +504,8 @@ const styles = StyleSheet.create({
   selectBox: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
     minHeight: 52,
     paddingHorizontal: spacing.lg,
     borderWidth: 1,
@@ -585,7 +589,7 @@ const styles = StyleSheet.create({
   rowMeta: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" },
   meta: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary },
   details: { marginTop: spacing.xs, gap: 2 },
-  detail: { flexDirection: "row", alignItems: "baseline", gap: spacing.sm },
+  detail: { flexDirection: "row", alignItems: "baseline", gap: spacing.xs },
   detailLabel: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary },
   detailValue: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 12, color: colors.text, flexShrink: 1 },
   footer: { paddingVertical: spacing.xl, alignItems: "center" },

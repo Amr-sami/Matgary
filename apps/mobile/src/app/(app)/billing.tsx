@@ -227,7 +227,11 @@ export default function BillingScreen() {
       ) : null}
 
       {loadingBilling ? (
-        <ActivityIndicator color={colors.accent} style={styles.loading} />
+        // A Card of the plan card's height, not a bare spinner: the manage-on-
+        // web card below keeps its place when the real plan card mounts.
+        <Card style={styles.loadingCard}>
+          <ActivityIndicator color={colors.accent} accessibilityLabel={t("app.common.loading")} />
+        </Card>
       ) : null}
 
       {billing.isError && !b ? (
@@ -370,7 +374,7 @@ const styles = StyleSheet.create({
   },
   noticeOk: { backgroundColor: colors.successLight, color: colors.successStrong },
   noticeErr: { backgroundColor: colors.dangerLight, color: colors.danger },
-  loading: { marginTop: spacing.xxl },
+  loadingCard: { minHeight: 160, alignItems: "center", justifyContent: "center" },
 
   statusRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   statusTitle: { flexShrink: 1, fontFamily: fonts.bold, fontSize: 17, color: colors.text, ...RTL_TEXT },

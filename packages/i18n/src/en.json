@@ -191,7 +191,7 @@
         },
         "heatmap": {
           "title": "Revenue by day × hour",
-          "subtitle": "Colour intensity = revenue. Spot your busiest slots.",
+          "subtitle": "Color intensity = revenue. Spot your busiest slots.",
           "empty": "No sales in this window.",
           "peakLine": "Peak: {day} at {hour}:00 — {revenue}",
           "dayHeader": "Day",
@@ -294,7 +294,7 @@
         "todaySales": "Today's sales",
         "itemCount": "Products",
         "monthSales": "This month's sales",
-        "monthReturns": "Returns this month",
+        "monthReturns": "This month's returns",
         "returnsSuffix": "returns"
       },
       "lowStock": {
@@ -761,7 +761,18 @@
         "tags": "Tags",
         "supplier": "Supplier",
         "supplierId": "Supplier",
-        "location": "Storage location"
+        "location": "Storage location",
+        "name": "Name",
+        "description": "Description",
+        "barcode": "Barcode",
+        "categoryId": "Category",
+        "category": "Category",
+        "unit": "Unit",
+        "imagePath": "Image",
+        "imageUrl": "Image",
+        "quantity": "Quantity",
+        "branchId": "Branch",
+        "price": "Price"
       },
       "paymentMethods": {
         "cash": "Cash",
@@ -1078,7 +1089,7 @@
     },
     "returns": {
       "title": "Returns",
-      "monthLabel": "Returns this month",
+      "monthLabel": "This month's returns",
       "record": "Record return",
       "pickSale": {
         "title": "Choose the sale to return",
@@ -2736,7 +2747,7 @@
         }
       },
       "form": {
-        "createTitle": "New supplier",
+        "createTitle": "Add supplier",
         "editTitle": "Edit supplier",
         "name": "Name *",
         "phone": "Phone number",
@@ -2745,11 +2756,13 @@
         "notes": "Notes",
         "cancel": "Cancel",
         "save": "Save",
-        "add": "Add",
+        "add": "Save supplier",
         "saving": "Saving…",
         "errors": {
           "saveFailed": "Save failed"
-        }
+        },
+        "phonePlaceholder": "01012345678",
+        "emailPlaceholder": "name@example.com"
       },
       "picker": {
         "label": "Supplier (optional)",
@@ -3458,7 +3471,8 @@
       },
       "countOne": "1 product in inventory",
       "countTwo": "2 products in inventory",
-      "countFew": "{n} products in inventory"
+      "countFew": "{n} products in inventory",
+      "countMany": "{n} products in inventory"
     },
     "broadcastStack": {
       "dismissAria": "Dismiss"
@@ -3474,9 +3488,9 @@
     },
     "servicePaused": {
       "title": "Your service is paused",
-      "message": "Access to your store has been temporarily paused by TheStoro support. Contact us to resolve the issue and reactivate your account.",
+      "message": "Access to your store has been temporarily paused by TheStoro support.",
       "reasonLabel": "Reason from support",
-      "contactHint": "Get in touch on WhatsApp to learn how to restore service.",
+      "contactHint": "Contact us on WhatsApp to restore service.",
       "signOut": "Sign out"
     },
     "shell": {
@@ -4243,7 +4257,7 @@
       "sections": [
         {
           "title": "1. Who controls your data",
-          "body": "TheStoro (the \"Platform\") is the data controller within the meaning of the Egyptian Personal Data Protection Law (Law No. 151 of 2020). For any matter relating to your data, use the contact page below."
+          "body": "TheStoro (the “Platform”) is the data controller within the meaning of the Egyptian Personal Data Protection Law (Law No. 151 of 2020). For any matter relating to your data, use the contact page below."
         },
         {
           "title": "2. Data we collect",
@@ -4302,7 +4316,7 @@
       "sections": [
         {
           "title": "1. Acceptance of terms",
-          "body": "By using the TheStoro platform (the \"Service\") you confirm you are of legal age (18+) and have full capacity to contract, and you agree to be bound by these terms and the privacy policy. If you do not agree to any clause, please do not use the Service."
+          "body": "By using the TheStoro platform (the “Service”) you confirm you are of legal age (18+) and have full capacity to contract, and you agree to be bound by these terms and the privacy policy. If you do not agree to any clause, please do not use the Service."
         },
         {
           "title": "2. Service description",
@@ -4334,7 +4348,7 @@
         },
         {
           "title": "9. Limits of liability",
-          "body": "The Service is provided \"as is\" without express or implied warranties beyond what the law requires. In any case, our cumulative liability for any damage related to the Service is limited to what you actually paid in the 12 months preceding the damage. We are not liable for indirect or consequential losses such as lost profits or reputation."
+          "body": "The Service is provided “as is” without express or implied warranties beyond what the law requires. In any case, our cumulative liability for any damage related to the Service is limited to what you actually paid in the 12 months preceding the damage. We are not liable for indirect or consequential losses such as lost profits or reputation."
         },
         {
           "title": "10. Account suspension and termination",
@@ -4385,7 +4399,8 @@
       "passwordChangeRequired": "You must change your password before continuing.",
       "piecesOne": "1 pc",
       "piecesTwo": "{n} pcs",
-      "piecesFew": "{n} pcs"
+      "piecesFew": "{n} pcs",
+      "piecesMany": "{n} pcs"
     },
     "pos": {
       "itemsInCart": "{n} items in the invoice",
@@ -4571,10 +4586,10 @@
       "empty": "No customers yet",
       "backToList": "Back to customers",
       "invoiceHistory": "Invoice history",
-      "outstandingFromCustomer": "Outstanding from customer",
+      "outstandingFromCustomer": "Owed by customer",
       "rowMeta": "{phone} · {n} invoices · {spend}",
       "lastPurchase": "Last purchase {date}",
-      "branchData": "Branch data: {branch}",
+      "branchData": "Branch: {branch}",
       "invoiceMeta": "{date} · {n} items",
       "paid": "Paid: {amount}",
       "remaining": "Remaining: {amount}",
@@ -4742,7 +4757,8 @@
       "matchCount": "{n} matching products",
       "matchCountOne": "1 matching product",
       "matchCountTwo": "2 matching products",
-      "matchCountFew": "{n} matching products"
+      "matchCountFew": "{n} matching products",
+      "matchCountMany": "{n} matching products"
     },
     "billing": {
       "trialDaysLeft": "{days} days left in your free trial.",
@@ -4849,11 +4865,13 @@
       "noPending": "No pending requests",
       "noPendingHint": "Every request has been decided. Switch to \"All\" to review past ones.",
       "decisionNoteHint": "Shown to the employee with the decision.",
-      "payrollHint": "Pay and compensation are set from each employee's detail in Team."
+      "payrollHint": "Pay and compensation are set from each employee's detail in Team.",
+      "subtitle": "Submit leave requests and approve them"
     },
     "activity": {
       "datePlaceholder": "dd/mm/yyyy",
-      "invalidDate": "Enter a date as YYYY-MM-DD or DD/MM/YYYY."
+      "invalidDate": "Enter a date as YYYY-MM-DD or DD/MM/YYYY.",
+      "subtitle": "Every action that happens in the system — who added, edited, or deleted"
     },
     "whatsapp": {
       "connected": "Connected",
@@ -5334,7 +5352,9 @@
       }
     },
     "servicePaused": {
-      "retry": "Check again"
+      "retry": "Check again",
+      "contactWhatsapp": "Contact support on WhatsApp",
+      "contactNeutral": "Contact support to restore service."
     },
     "inventoryDetail": {
       "adjustTitle": "Adjust stock",
@@ -5392,7 +5412,8 @@
       "remaining": "Remaining",
       "qtyAtPrice": "{qty} × {price}",
       "payment": "Payment",
-      "net": "Net"
+      "net": "Net",
+      "colAmount": "Amount"
     },
     "security": {
       "devices": {

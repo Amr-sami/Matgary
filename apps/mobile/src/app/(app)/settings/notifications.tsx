@@ -243,6 +243,7 @@ export default function NotificationSettingsScreen() {
                 style={!p.email ? styles.disabled : undefined}
               >
                 <Segmented
+                  equal
                   items={DELIVERY()}
                   value={p.digestMode}
                   onChange={(v) => save.mutate({ ...p, digestMode: v })}

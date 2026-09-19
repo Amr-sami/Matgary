@@ -83,10 +83,12 @@ function paymentLabel(p: Payment | null | undefined): string {
 }
 
 /**
- * Date + time are one LTR token: wrapped in a LTR isolate (LRI U+2066 … PDI
- * U+2069) so "18/09/2026 06:15" keeps that order inside an Arabic paragraph.
- * Bare, the space between the two number runs takes the paragraph's RTL
- * direction and the time renders before the date — "06:15 18/09/2026".
+ * LTR isolate (LRI U+2066 … PDI U+2069) for an all-digit run such as "13:41".
+ * Only the TIME goes through it: shortDate() returns a month NAME
+ * ("18 سبتمبر 2026"), and an LTR isolate around a run that contains Arabic
+ * letters folds "سبتمبر 2026 13:41" into one reversed RTL span — the row read
+ * "18 13:41 2026 سبتمبر". Bare, the date follows the month's script and the
+ * paragraph's direction, which is the order an Arabic reader expects.
  * Same helper as customers.tsx uses for phones.
  */
 function ltr(s: string): string {
@@ -260,7 +262,7 @@ export default function SalesHistoryScreen() {
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsWrap} contentContainerStyle={styles.chips} keyboardShouldPersistTaps="handled">
         {RANGES().map((r) => (
-          <Chip key={r.key} label={r.label} active={range === r.key} onPress={() => setRange(r.key)} />
+          <Chip key={r.key} label={r.label} active={range === r.key} compact onPress={() => setRange(r.key)} />
         ))}
       </ScrollView>
       {range === "custom" ? (
@@ -391,7 +393,7 @@ function InvoiceRow({ inv, onPress }: { inv: salesApi.Invoice; onPress: () => vo
           </Text>
         </View>
         <Text style={styles.meta} numberOfLines={1}>
-          {ltr(`${shortDate(inv.saleDate)} ${timeOf(inv.saleDate)}`)} · {customer} ·{" "}
+          {shortDate(inv.saleDate)} · {ltr(timeOf(inv.saleDate))} · {customer} ·{" "}
           {t(`mobile.salesHistory.lineCount${countForm(inv.lines.length)}`, { n: inv.lines.length })}
         </Text>
         <View style={styles.badges}>

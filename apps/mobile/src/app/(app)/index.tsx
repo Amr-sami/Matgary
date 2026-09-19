@@ -65,13 +65,10 @@ export default function DashboardScreen() {
   // number can render differently across platforms.
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { paddingTop: insets.top }]}>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[
-          styles.content,
-          { paddingTop: insets.top + spacing.lg },
-        ]}
+        contentContainerStyle={[styles.content, { paddingTop: spacing.lg }]}
         refreshControl={
           <RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />
         }

@@ -563,13 +563,15 @@ export default function AddProductScreen() {
           <Button label={t("app.common.back")} variant="outline" onPress={() => goTo(-1)} style={styles.navBtn} />
         ) : null}
         {step !== "review" ? (
-          <View testID="add-product-next">
-          <Button
-            label={t("app.inventory.addProduct.footer.next")}
-            disabled={!canAdvance}
-            onPress={() => goTo(1)}
-            style={styles.navBtn}
-          />
+          <View testID="add-product-next" collapsable={false} style={styles.navBtn}>
+            {/* The flex must sit on this wrapper: a content-sized View cannot be
+                stretched from inside, so `navBtn` on the Button alone left
+                "Next" shrink-wrapped at the leading edge. */}
+            <Button
+              label={t("app.inventory.addProduct.footer.next")}
+              disabled={!canAdvance}
+              onPress={() => goTo(1)}
+            />
           </View>
         ) : (
           <Button

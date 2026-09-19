@@ -183,6 +183,7 @@ export default function SettingsScreen() {
           where a person looks for it. Same two labels the web uses. */}
       <Card title={t("app.shell.language.label")}>
         <Segmented
+          equal
           value={locale}
           onChange={(v) => void setLocale(v)}
           items={[

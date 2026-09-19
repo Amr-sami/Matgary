@@ -276,6 +276,14 @@ function InboxView({ onSelect }: { onSelect: (id: string) => void }) {
       : filter === "archived"
         ? t("app.whatsappInbox.list.emptyArchived")
         : t("app.whatsappInbox.list.emptyAll");
+  // The dictionary's list empties carry "title\nexplanation": the first line is
+  // the heading (semibold/colors.text, the hierarchy EmptyState draws on the
+  // Sync screen) and the rest the secondary hint. EmptyState itself is not
+  // used here because its own vertical padding would stack on `centered` and
+  // push the heading 36pt away from the ChatCircle icon above it.
+  const nl = emptyText.indexOf("\n");
+  const emptyTitle = nl === -1 ? emptyText : emptyText.slice(0, nl);
+  const emptyRest = nl === -1 ? "" : emptyText.slice(nl + 1).trim();
 
   const header = (
     <View style={styles.headerWrap}>
@@ -319,7 +327,8 @@ function InboxView({ onSelect }: { onSelect: (id: string) => void }) {
   ) : (
     <View style={[styles.centered, styles.listCardBody]}>
       <ChatCircle size={64} color={colors.textSecondary} weight="regular" />
-      <Text style={styles.emptyText}>{emptyText}</Text>
+      <Text style={styles.emptyTitle}>{emptyTitle}</Text>
+      {emptyRest ? <Text style={styles.emptyHint}>{emptyRest}</Text> : null}
       {disconnected && filter === "all" ? (
         <Text style={styles.emptyHint}>{t("mobile.whatsapp.connectFromWeb")}</Text>
       ) : null}
@@ -773,6 +782,15 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     fontSize: 16,
     color: colors.textSecondary,
+    textAlign: "center",
+    maxWidth: 300,
+  },
+  // Mirrors EmptyState's title (semibold 16 / colors.text) so the inbox and
+  // Sync empties share one hierarchy; emptyText stays for the thread empty.
+  emptyTitle: {
+    fontFamily: fonts.semibold,
+    fontSize: 16,
+    color: colors.text,
     textAlign: "center",
     maxWidth: 300,
   },

@@ -31,6 +31,11 @@ export interface SheetAction {
   testID?: string;
 }
 
+/**
+ * Outline button beneath the primary — in practice always "Cancel". It is
+ * then the sheet's ONE dismiss affordance: the header X is not rendered, so
+ * a form never shows two controls for the same close.
+ */
 export interface SheetSecondaryAction {
   label: string;
   onPress: () => void;
@@ -40,7 +45,10 @@ export interface SheetSecondaryAction {
 
 export interface SheetProps {
   visible: boolean;
-  /** Close X, backdrop tap and (unless overridden) the Android back button. */
+  /**
+   * Close X (hidden when the default footer carries a `secondaryAction`),
+   * backdrop tap and (unless overridden) the Android back button.
+   */
   onClose: () => void;
   /**
    * Android back / iOS swipe-dismiss. Defaults to `onClose`; a wizard passes
@@ -92,8 +100,10 @@ export interface SheetProps {
  *
  * Accessibility: the panel is `accessibilityViewIsModal` so VoiceOver does
  * not wander into the dimmed screen behind; the title is a header; the close
- * X is a labelled 44pt button. The panel, close and backdrop carry
- * `${testID}`, `${testID}-close` and `${testID}-backdrop` for Maestro.
+ * X is a labelled 44pt button — rendered only when the default footer has no
+ * `secondaryAction`, so a sheet never offers X and Cancel for the same
+ * dismiss. The panel, close and backdrop carry `${testID}`,
+ * `${testID}-close` and `${testID}-backdrop` for Maestro.
  *
  * Presence is decided by `useSheetPresence` below, not by `visible` alone:
  * a Modal is its own native window, so it neither leaves with the screen
@@ -120,6 +130,9 @@ export function Sheet({
   const shown = useSheetPresence(visible, onClose);
 
   const hasFooter = footer !== undefined || primaryAction !== undefined || secondaryAction !== undefined;
+  // The default footer's secondary button is the Cancel; with it the header
+  // X would be a second control for the same close.
+  const showClose = footer !== undefined || secondaryAction === undefined;
 
   return (
     <Modal
@@ -152,7 +165,7 @@ export function Sheet({
             testID={testID}
           >
             <View style={styles.grabber} />
-            <View style={styles.header}>
+            <View style={[styles.header, !showClose && styles.headerNoClose]}>
               <View style={styles.headerText}>
                 <Text accessibilityRole="header" numberOfLines={2} style={styles.title}>
                   {title}
@@ -163,16 +176,18 @@ export function Sheet({
                   </Text>
                 ) : null}
               </View>
-              <Pressable
-                onPress={onClose}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel={t("app.common.close")}
-                testID={testID ? `${testID}-close` : undefined}
-                style={({ pressed }) => [styles.close, pressed && styles.closePressed]}
-              >
-                <X size={22} color={colors.text} />
-              </Pressable>
+              {showClose ? (
+                <Pressable
+                  onPress={onClose}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("app.common.close")}
+                  testID={testID ? `${testID}-close` : undefined}
+                  style={({ pressed }) => [styles.close, pressed && styles.closePressed]}
+                >
+                  <X size={22} color={colors.text} />
+                </Pressable>
+              ) : null}
             </View>
 
             {scrollable ? (
@@ -316,6 +331,8 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     paddingBottom: spacing.xs,
   },
+  /** Without the X the end edge matches the start edge. */
+  headerNoClose: { paddingEnd: spacing.xl },
   headerText: { flex: 1, gap: 2, paddingTop: (MIN_TOUCH - 26) / 2 },
   title: { ...RTL_TEXT, fontFamily: fonts.semibold, fontSize: 18, lineHeight: 26, color: colors.text },
   subtitle: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary },

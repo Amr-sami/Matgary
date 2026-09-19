@@ -23,10 +23,14 @@ import { colors, fonts, radius, spacing } from "@/theme/tokens";
 export function Chip({
   label,
   active = false,
+  compact = false,
   onPress,
 }: {
   label: string;
   active?: boolean;
+  /** 12pt side padding instead of 16pt — for a fixed set of chips that must
+   *  fit one row without scrolling (the four date ranges on sales/history). */
+  compact?: boolean;
   onPress?: () => void;
 }) {
   return (
@@ -36,6 +40,7 @@ export function Chip({
       accessibilityState={{ selected: active }}
       style={({ pressed }) => [
         styles.chip,
+        compact && styles.compact,
         active ? styles.active : styles.inactive,
         pressed && !active && styles.pressed,
       ]}
@@ -60,6 +65,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexShrink: 0,
   },
+  compact: { paddingHorizontal: spacing.md },
   active: { backgroundColor: colors.accent, borderColor: colors.accent },
   inactive: { backgroundColor: colors.bg, borderColor: colors.border },
   pressed: { backgroundColor: colors.accentLight },

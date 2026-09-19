@@ -51,23 +51,28 @@ export function SettingsHeader({
     <View style={styles.root} testID={testID}>
       <BackLink label={parentLabel} onPress={onBack} fallback={fallback} />
       <View style={styles.titleRow}>
-        <View style={styles.titleText}>
-          <Text accessibilityRole="header" style={styles.title}>
-            {title}
-          </Text>
-          {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
-        </View>
-        {accessories ?? null}
+        <Text accessibilityRole="header" style={styles.title}>
+          {title}
+        </Text>
+        {accessories ? <View style={styles.accessories}>{accessories}</View> : null}
       </View>
+      {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { gap: spacing.sm, marginBottom: spacing.lg },
+  // Only the title shares the row with the accessory; the subtitle is a
+  // full-width sibling below, so an add button or role chip never squeezes
+  // the intro copy into a narrow column with an orphan last line.
   titleRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md },
-  titleText: { flex: 1, minWidth: 0, gap: spacing.xs },
-  title: { fontFamily: fonts.bold, fontSize: 24, color: colors.text, ...RTL_TEXT },
+  // Stretches to the row's cross size and centres its child, so a short
+  // accessory (Badge) sits on the title's optical centre instead of floating
+  // at the top of Cairo's tall line box; a taller accessory (44/52pt button)
+  // still top-aligns with the title block, and a wrapped title stays put.
+  accessories: { alignSelf: "stretch", justifyContent: "center" },
+  title: { flex: 1, minWidth: 0, fontFamily: fonts.bold, fontSize: 24, color: colors.text, ...RTL_TEXT },
   subtitle: {
     fontFamily: fonts.regular,
     fontSize: 14,

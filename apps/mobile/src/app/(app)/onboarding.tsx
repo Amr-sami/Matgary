@@ -544,7 +544,7 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: radius.full,
     borderWidth: 2,
-    borderColor: colors.border,
+    borderColor: colors.textSecondary,
     alignItems: "center",
     justifyContent: "center",
     marginTop: 2,
@@ -565,6 +565,7 @@ const styles = StyleSheet.create({
   optionBody: {
     fontFamily: fonts.regular,
     fontSize: 13,
+    lineHeight: 18,
     color: colors.textSecondary,
     marginTop: 2,
     ...RTL_TEXT,

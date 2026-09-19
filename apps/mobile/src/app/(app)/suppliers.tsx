@@ -361,6 +361,7 @@ function SupplierFormSheet({
       />
       <Field
         label={t("app.suppliers.form.phone")}
+        placeholder={t("app.suppliers.form.phonePlaceholder")}
         value={phone}
         onChangeText={setPhone}
         keyboardType="phone-pad"
@@ -370,6 +371,7 @@ function SupplierFormSheet({
       />
       <Field
         label={t("app.suppliers.form.email")}
+        placeholder={t("app.suppliers.form.emailPlaceholder")}
         value={email}
         onChangeText={setEmail}
         keyboardType="email-address"

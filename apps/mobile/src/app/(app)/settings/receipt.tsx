@@ -28,8 +28,7 @@ import { Field } from "@/components/ui/Field";
 import { Segmented } from "@/components/ui/Segmented";
 import { SettingsHeader } from "@/components/ui/SettingsHeader";
 import { ToggleRow } from "@/components/ui/ToggleRow";
-import { shortDate } from "@/lib/format";
-import { receiptMoney } from "@/receipt/html";
+import { receiptDate, receiptMoney } from "@/receipt/html";
 import { useLogoPicker } from "@/lib/useLogoPicker";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT, directionStyle } from "@/theme/rtl";
@@ -622,7 +621,10 @@ function ReceiptPreview({
     lang === "en" ? en : lang === "ar" ? ar : `${en} · ${ar}`;
   const shopName = (server.shopName || "STORE").toUpperCase();
   const showLoyaltyRows = draft.receiptShowLoyalty && server.loyaltyEnabled;
-  const dateString = shortDate(new Date().toISOString());
+  // Same digits-only "18/09/2026 - 07:32 PM" the paper prints (html.ts
+  // receiptDate) — not the app-locale shortDate(): its month name follows
+  // the APP locale, not receiptLanguage, and reorders under p.ltr.
+  const dateString = receiptDate(new Date());
 
   const renderBlock = (key: ReceiptBlockKey) => {
     if (isCustom(key)) {
@@ -794,6 +796,9 @@ const p = StyleSheet.create({
   black: { ...RTL_TEXT, fontFamily: fonts.bold },
   trackedEn: { letterSpacing: 1 },
   center: { textAlign: "center", alignItems: "center", alignSelf: "stretch" },
+  // Thermal-print convention, mirrors html.ts `.num { direction: ltr }`: money,
+  // date and phone cells are one LTR run so the paper and this preview agree
+  // ("100.00 ج.م", leading "-" and "+" kept in place) even under Arabic labels.
   ltr: { writingDirection: "ltr", fontVariant: ["tabular-nums"] },
   muted: { fontFamily: fonts.regular, fontSize: 10, color: colors.textSecondary, textAlign: "center" },
   row: { flexDirection: "row", justifyContent: "space-between", gap: spacing.sm },

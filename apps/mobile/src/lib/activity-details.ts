@@ -88,7 +88,7 @@ function formatDateValue(v: unknown): string {
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
 }
 
-/** `changed: ["shopName", "phone"]` → "اسم المتجر • الهاتف" — fieldNames first, then fields, then the raw key. */
+/** `changed: ["shopName", "phone"]` → "اسم المتجر · الهاتف" — fieldNames first, then fields, then the raw key. */
 function listOfChangedFields(t: Translate, keys: unknown): string {
   if (!Array.isArray(keys)) return String(keys);
   return keys
@@ -96,7 +96,7 @@ function listOfChangedFields(t: Translate, keys: unknown): string {
       const key = String(k);
       return tOpt(t, `${NS}.fieldNames.${key}`) ?? tOpt(t, `${NS}.fields.${key}`) ?? key;
     })
-    .join(" • ");
+    .join(" · ");
 }
 
 interface SaleLine {

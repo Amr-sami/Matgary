@@ -704,7 +704,12 @@ function signed(n: number): string {
   return n > 0 ? `+${n}` : n < 0 ? `−${Math.abs(n)}` : String(n);
 }
 
-/** ISO → "14/09/2026 · 14:05", locale-neutral like shortDate. */
+/**
+ * ISO → "18 سبتمبر 2026 · 14:05" / "18 September 2026 · 14:05". The month
+ * NAME from shortDate() gives the run a strong direction in both locales, so
+ * the Text must NOT force `writingDirection: "ltr"` — that stranded the day
+ * number at the far left of every history row (round-2 shot 15).
+ */
 function dateTime(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
@@ -987,7 +992,7 @@ const styles = StyleSheet.create({
   historyBody: { flex: 1, minWidth: 0, gap: 2 },
   historyHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: spacing.xs },
   historyLabel: { fontFamily: fonts.medium, fontSize: 14, color: colors.text, ...RTL_TEXT },
-  historyTime: { ...RTL_TEXT, writingDirection: "ltr", fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, fontVariant: ["tabular-nums"] },
+  historyTime: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, fontVariant: ["tabular-nums"] },
   historyMeta: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: spacing.sm },
   historyDelta: { ...RTL_TEXT, writingDirection: "ltr", fontFamily: fonts.semibold, fontSize: 13, fontVariant: ["tabular-nums"] },
   historyDown: { color: colors.warningStrong },

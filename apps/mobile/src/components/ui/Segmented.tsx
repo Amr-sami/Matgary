@@ -18,11 +18,19 @@ export function Segmented<T extends string>({
   items,
   value,
   onChange,
+  equal = false,
 }: {
   /** `testID` is optional and per item (e.g. settings' "language-ar"/"language-en"). */
   items: { key: T; label: string; testID?: string }[];
   value: T;
   onChange: (v: T) => void;
+  /**
+   * Equal halves (`flexBasis: 0`) for a binary choice such as instant/digest
+   * or ar/en, where the content-sized basis below would put the raised pill
+   * visibly off the control's midline. Leave off for tab strips with labels
+   * of very different lengths (Insights).
+   */
+  equal?: boolean;
 }) {
   return (
     <View style={styles.wrap}>
@@ -37,7 +45,7 @@ export function Segmented<T extends string>({
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
             accessibilityLabel={it.label}
-            style={[styles.item, active && styles.itemActive]}
+            style={[styles.item, equal && styles.itemEqual, active && styles.itemActive]}
           >
             <Text
               accessible={false}
@@ -83,6 +91,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingHorizontal: spacing.sm,
   },
+  itemEqual: { flexBasis: 0 },
   itemActive: { backgroundColor: colors.card, ...elevation.card },
   label: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14 },
   labelActive: { ...RTL_TEXT, color: colors.text, fontFamily: fonts.semibold },

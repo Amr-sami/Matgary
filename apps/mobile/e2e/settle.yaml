@@ -60,7 +60,7 @@ appId: com.thestoro.app
       id: "customer-outstanding"
     timeout: 30000
 - assertVisible:
-    text: "متبقي من العميل|Outstanding from customer"
+    text: "المتبقي على العميل|Owed by customer"
 - copyTextFrom:
     id: "customer-outstanding"
 - evalScript: ${output.before = maestro.copiedText}
@@ -108,7 +108,7 @@ appId: com.thestoro.app
     timeout: 45000
 - scrollUntilVisible:
     element:
-      text: "متبقي من العميل|Outstanding from customer|محفظة العميل|Customer wallet"
+      text: "المتبقي على العميل|Owed by customer|محفظة العميل|Customer wallet"
     direction: UP
     centerElement: true
     timeout: 20000

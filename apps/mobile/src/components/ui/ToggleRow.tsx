@@ -1,4 +1,4 @@
-import { ActivityIndicator, StyleSheet, Switch, Text, View } from "react-native";
+import { ActivityIndicator, Platform, StyleSheet, Switch, Text, View } from "react-native";
 
 import { useLocale } from "@/i18n";
 import { RTL_TEXT } from "@/theme/rtl";
@@ -15,28 +15,33 @@ export interface ToggleRowProps {
   testID?: string;
 }
 
-/** iOS UISwitch intrinsic size; RN's Switch renders 51×31 on both platforms here. */
-const SWITCH_W = 51;
+/**
+ * The Switch's frame. RN lays the iOS Switch out at UISwitch's
+ * intrinsicContentSize (49 + 2 for borders = 51 × 31) — but iOS 26's glass
+ * switch PAINTS 63 × 28, leading-anchored in that frame and vertically
+ * centred, so it overhung the content column by 12pt on the trailing side
+ * (mirrored under Arabic; measured on the iOS 26.3 notifications shot). The
+ * frame is widened to the painted width there; older iOS keeps 51 × 31 and
+ * Android keeps its native measure (no explicit frame).
+ */
+const GLASS_SWITCH = Platform.OS === "ios" && parseInt(String(Platform.Version), 10) >= 26;
+const SWITCH_W = GLASS_SWITCH ? 63 : 51;
 const SWITCH_H = 31;
 const LABEL_FONT = 14;
 const LABEL_LINE = 20;
 const HINT_LINE = 18;
 
 /**
- * Where Cairo's glyphs actually sit inside a 20pt line.
- *
- * Cairo (hhea, upm 1000): ascender 1303, descender −571, x-height 500. A 14pt
- * line wants 26.2pt, so at lineHeight 20 RN skips its baseline-centring
- * (RCTApplyBaselineOffset bails when lineHeight < font.lineHeight) and TextKit
- * keeps the ascent: the baseline lands 18.2pt below the line top and the
- * optical centre (baseline − ½ x-height) ≈ 14.7pt — 4.7pt below the 10pt
- * line-box centre, which is the offset the screenshots measured. The Switch's
- * centre is put there instead of on the line box. Derived from the font
- * tables, not re-measured on device: if a screenshot still shows a gap, this
- * is the one constant to nudge.
+ * Where the label's glyphs sit inside its 20pt line — MEASURED on device
+ * (iOS 26.3, settings/notifications, 2026-09-19): the Cairo glyph box is
+ * centred 10pt below the line top on every row, i.e. the line-box centre —
+ * RN does baseline-centre the 14/20 label. (The earlier font-table
+ * derivation, 14.7, assumed TextKit kept the ascent and pinned every Switch
+ * ~5pt below its label.) The Switch's centre is put there. If a screenshot
+ * still shows a gap, this is the one constant to nudge.
  */
-const GLYPH_CENTRE = LABEL_FONT * (1.303 - 0.5 / 2);
-const SWITCH_TOP = Math.round((GLYPH_CENTRE - SWITCH_H / 2) * 2) / 2; // −1
+const GLYPH_CENTRE = LABEL_LINE / 2;
+const SWITCH_TOP = Math.round((GLYPH_CENTRE - SWITCH_H / 2) * 2) / 2; // −5.5
 
 /**
  * Label (+ hint) beside a Switch — the one layout for every toggle.
@@ -70,7 +75,7 @@ export function ToggleRow({ label, hint, value, onValueChange, disabled, busy, t
             trackColor={{ true: colors.accent, false: colors.border }}
             accessibilityLabel={label}
             accessibilityHint={hint}
-            style={rtl ? styles.mirror : undefined}
+            style={[GLASS_SWITCH ? styles.frame : undefined, rtl ? styles.mirror : undefined]}
             testID={testID ? `${testID}-switch` : undefined}
           />
         )}
@@ -103,14 +108,20 @@ const styles = StyleSheet.create({
     lineHeight: HINT_LINE,
     color: colors.textSecondary,
   },
+  /**
+   * No fixed width: the slot wraps the Switch's real frame so its trailing
+   * edge lands on the content edge (a 51pt slot let the 63pt glass switch spill
+   * past it). Height stays SWITCH_H so a frame of another height (Android's
+   * native measure) is still centred on the same line.
+   */
   switchSlot: {
     flexShrink: 0,
-    width: SWITCH_W,
     height: SWITCH_H,
     marginTop: SWITCH_TOP,
-    alignItems: "center",
     justifyContent: "center",
   },
+  /** iOS 26 only — see SWITCH_W. Constant per platform, never per locale. */
+  frame: { width: SWITCH_W, height: SWITCH_H },
   spinner: { width: SWITCH_W, height: SWITCH_H },
   /** Constant, locale-independent — safe in a StyleSheet; the CHOICE is made in render. */
   mirror: { transform: [{ scaleX: -1 }] },

@@ -796,25 +796,29 @@ const styles = StyleSheet.create({
   wizardBody: { paddingHorizontal: 0, paddingTop: 0, paddingBottom: 0, gap: 0 },
   // Same rail as add-product.tsx (6pt, gap sm, accentLight -> accent) so the
   // two wizards read as one pattern.
-  progress: { flexDirection: "row", gap: spacing.sm, paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
+  // Horizontal inset is xl everywhere below (progress, backRow, content,
+  // footer): the Sheet header starts its title at xl, and a 4pt kink in the
+  // start edge ran through all three steps when the body sat at lg.
+  progress: { flexDirection: "row", gap: spacing.sm, paddingHorizontal: spacing.xl, marginBottom: spacing.sm },
   backRow: {
     flexDirection: "row",
     alignItems: "center",
     alignSelf: "flex-start",
     gap: spacing.xs,
     minHeight: MIN_TOUCH - 8,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.xl,
   },
   // The Phosphor caret path fills ~37% of its viewBox, so at 16pt the visible
   // glyph starts ~5pt inside the icon box; pull it back so the caret's edge
-  // lands on the same 16pt start as the progress rail below (U72).
+  // lands on the same xl start as the progress rail below (U72).
   backGlyph: { marginStart: -GLYPH_INSET },
   backLabel: { fontFamily: fonts.semibold, fontSize: 14, color: colors.accent, ...RTL_TEXT },
   progressSeg: { flex: 1, height: 6, borderRadius: 3, backgroundColor: colors.accentLight },
   progressSegActive: { backgroundColor: colors.accent },
-  content: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xl },
+  content: { padding: spacing.lg, paddingHorizontal: spacing.xl, gap: spacing.md, paddingBottom: spacing.xl },
   footer: {
     padding: spacing.lg,
+    paddingHorizontal: spacing.xl,
     gap: spacing.sm,
     borderTopWidth: 1,
     borderTopColor: colors.border,

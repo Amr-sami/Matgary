@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Text,
   View,
+  type TextStyle,
 } from "react-native";
 import { FlashList } from "@shopify/flash-list";
 import { useRouter } from "expo-router";
@@ -266,6 +267,27 @@ export default function NotificationsScreen() {
   );
 }
 
+const STRONG_CHAR = /[A-Za-z\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+
+/**
+ * Stored notifications carry copy rendered by the server in the recipient's
+ * STORED locale (web dispatch.ts renderInApp), which the phone's live locale
+ * can disagree with: an Arabic "بيع جديد — …" inside the English UI is laid
+ * out as an LTR paragraph and its reading start lands mid-card. When the
+ * string's first strong character runs against the UI direction, give it its
+ * own base direction and park it at the END edge — `textAlign: "right"` is
+ * END under the Fabric swap and `alignSelf: "flex-end"` puts a shrink-wrapped
+ * line at that same edge — so it at least reads as a block from its own edge.
+ * Same-direction strings keep the default start alignment.
+ */
+function foreignDirection(s: string, uiRtl: boolean): TextStyle | undefined {
+  const m = STRONG_CHAR.exec(s);
+  if (!m) return undefined;
+  const rtl = !/[A-Za-z]/.test(m[0]);
+  if (rtl === uiRtl) return undefined;
+  return { writingDirection: rtl ? "rtl" : "ltr", textAlign: "right", alignSelf: "flex-end" };
+}
+
 function Row({
   n,
   me,
@@ -282,6 +304,7 @@ function Row({
   const Icon = KIND_ICON[n.kind] ?? Info;
   const tone = KIND_TONE[n.kind] ?? KIND_TONE.info;
   const navigable = routeForNotification(n, me) !== null;
+  const uiRtl = useLocale((s) => s.locale) === "ar";
   return (
     <Pressable
       accessibilityRole="button"
@@ -301,13 +324,13 @@ function Row({
       </View>
       <View style={styles.rowBody}>
         <Text
-          style={[styles.rowTitle, !n.isRead && styles.rowTitleUnread]}
+          style={[styles.rowTitle, !n.isRead && styles.rowTitleUnread, foreignDirection(n.title, uiRtl)]}
           numberOfLines={2}
         >
           {n.title}
         </Text>
         {n.body ? (
-          <Text style={styles.rowText} numberOfLines={2}>
+          <Text style={[styles.rowText, foreignDirection(n.body, uiRtl)]} numberOfLines={2}>
             {n.body}
           </Text>
         ) : null}

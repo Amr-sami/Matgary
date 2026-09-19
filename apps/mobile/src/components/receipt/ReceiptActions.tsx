@@ -140,6 +140,7 @@ export function ReceiptActions({ sale, extraActions, showPaperWidth = true }: Re
           <Text style={styles.widthLabel}>{t("mobile.receipt.paperWidth")}</Text>
           <View style={styles.widthPicker}>
             <Segmented
+              equal
               items={widths}
               value={String(width) as "58" | "80"}
               onChange={(v) => {

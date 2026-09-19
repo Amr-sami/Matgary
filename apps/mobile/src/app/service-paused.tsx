@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { Linking, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { ProhibitIcon as Prohibit } from "phosphor-react-native/src/icons/Prohibit";
 
@@ -13,6 +13,18 @@ import { useBlocked } from "@/stores/blocked";
 import { messageFor, useSession } from "@/stores/session";
 import { colors, fonts, radius, spacing } from "@/theme/tokens";
 import { RTL_TEXT } from "@/theme/rtl";
+
+/**
+ * Same gate as settings/about.tsx: the support number comes from the build
+ * environment (Expo inlines EXPO_PUBLIC_* at bundle time, so the literal
+ * property access is required), wa.me wants digits only, and the CTA is
+ * hidden while the number is unset or still a placeholder run of zeros
+ * ("+20 100 000 0000"). Without it the wall must not name a channel it
+ * cannot open, so the hint falls back to channel-neutral copy.
+ */
+const SUPPORT_WHATSAPP = process.env.EXPO_PUBLIC_SUPPORT_WHATSAPP ?? "";
+const WA_DIGITS = SUPPORT_WHATSAPP.replace(/\D/g, "");
+const HAS_WHATSAPP = WA_DIGITS.length >= 8 && !/0{6}/.test(WA_DIGITS);
 
 /**
  * Landing place for `403 TENANT_SUSPENDED` (doc 02 §1.1 row 26). Port of
@@ -85,6 +97,17 @@ export default function ServicePausedScreen() {
     useBlocked.setState({ current: null, last: null });
   }
 
+  async function handleContact() {
+    setCheckError(null);
+    try {
+      // No canOpenURL pre-check (Android 11+ package visibility) — openURL
+      // rejects when nothing handles the link, and that is the error shown.
+      await Linking.openURL(`https://wa.me/${WA_DIGITS}`);
+    } catch {
+      setCheckError(t("mobile.about.openFailed"));
+    }
+  }
+
   async function handleSignOut() {
     setSigningOut(true);
     try {
@@ -138,9 +161,19 @@ export default function ServicePausedScreen() {
             </View>
           ) : null}
 
-          <Text style={styles.hint}>{t("app.servicePaused.contactHint")}</Text>
+          {HAS_WHATSAPP ? null : (
+            <Text style={styles.hint}>{t("mobile.servicePaused.contactNeutral")}</Text>
+          )}
 
           <View style={styles.footer}>
+            {HAS_WHATSAPP ? (
+              <Button
+                label={t("mobile.servicePaused.contactWhatsapp")}
+                onPress={() => void handleContact()}
+                disabled={checking || signingOut}
+                style={styles.action}
+              />
+            ) : null}
             <Button
               variant="outline"
               label={t("mobile.servicePaused.retry")}

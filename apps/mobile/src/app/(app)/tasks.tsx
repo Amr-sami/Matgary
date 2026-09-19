@@ -338,6 +338,8 @@ function TaskFormSheet({
         value={title}
         onChangeText={setTitle}
         placeholder={t("app.tasks.form.titlePlaceholder")}
+        autoFocus
+        returnKeyType="next"
       />
       <Field
         label={t("app.tasks.form.descriptionLabel")}
@@ -363,7 +365,7 @@ function TaskFormSheet({
 
       <View>
         <DateField
-          label={`${t("app.tasks.form.dueDateLabel")} (${t("app.common.optional")})`}
+          label={t("app.tasks.form.dueDateLabel")}
           value={dueDate}
           onChange={setDueDate}
         />

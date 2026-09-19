@@ -273,6 +273,7 @@ export default function BranchesScreen() {
         <View style={styles.list}>
           {rows.map((b) => {
             const isCurrent = b.id === currentId;
+            const canOpen = !isCurrent && b.isActive;
             return (
               <Card key={b.id}>
                 <View style={styles.row}>
@@ -306,58 +307,60 @@ export default function BranchesScreen() {
                   </View>
                 </View>
 
-                <View style={styles.actions}>
-                  {!isCurrent && b.isActive ? (
-                    <Button
-                      label={t("app.branchesPage.actions.open")}
-                      onPress={() => switching.mutate(b.id)}
-                      loading={switching.isPending && switching.variables === b.id}
-                      disabled={busy}
-                      style={styles.flex1}
-                    />
-                  ) : (
-                    <View style={styles.flex1} />
-                  )}
-
-                  {isOwner ? (
-                    <>
-                      <IconButton
-                        label={t("app.branchesPage.actions.edit")}
+                {/* Hidden when it would be empty (non-owner on the current branch): the
+                    row's minHeight would otherwise leave a blank 52pt band. */}
+                {canOpen || isOwner ? (
+                  <View style={styles.actions}>
+                    {canOpen ? (
+                      <Button
+                        label={t("app.branchesPage.actions.open")}
+                        onPress={() => switching.mutate(b.id)}
+                        loading={switching.isPending && switching.variables === b.id}
                         disabled={busy}
-                        onPress={() =>
-                          setDraft({
-                            id: b.id,
-                            name: b.name,
-                            address: b.address ?? "",
-                            phone: b.phone ?? "",
-                          })
-                        }
-                      >
-                        <PencilSimple size={18} color={colors.textSecondary} />
-                      </IconButton>
+                        style={styles.flex1}
+                      />
+                    ) : null}
 
-                      <IconButton
-                        label={b.isActive ? t("app.branchesPage.actions.suspend") : t("app.branchesPage.actions.activate")}
-                        disabled={busy || b.isPrimary}
-                        onPress={() => toggleActive.mutate(b)}
-                      >
-                        {b.isActive ? (
-                          <EyeSlash size={18} color={colors.textSecondary} />
-                        ) : (
-                          <Eye size={18} color={colors.successStrong} />
-                        )}
-                      </IconButton>
+                    {isOwner ? (
+                      <>
+                        <IconButton
+                          label={t("app.branchesPage.actions.edit")}
+                          disabled={busy}
+                          onPress={() =>
+                            setDraft({
+                              id: b.id,
+                              name: b.name,
+                              address: b.address ?? "",
+                              phone: b.phone ?? "",
+                            })
+                          }
+                        >
+                          <PencilSimple size={18} color={colors.textSecondary} />
+                        </IconButton>
 
-                      <IconButton
-                        label={t("app.branchesPage.actions.delete")}
-                        disabled={busy || b.isPrimary}
-                        onPress={() => confirmDelete(b)}
-                      >
-                        <Trash size={18} color={colors.textSecondary} />
-                      </IconButton>
-                    </>
-                  ) : null}
-                </View>
+                        <IconButton
+                          label={b.isActive ? t("app.branchesPage.actions.suspend") : t("app.branchesPage.actions.activate")}
+                          disabled={busy || b.isPrimary}
+                          onPress={() => toggleActive.mutate(b)}
+                        >
+                          {b.isActive ? (
+                            <EyeSlash size={18} color={colors.textSecondary} />
+                          ) : (
+                            <Eye size={18} color={colors.successStrong} />
+                          )}
+                        </IconButton>
+
+                        <IconButton
+                          label={t("app.branchesPage.actions.delete")}
+                          disabled={busy || b.isPrimary}
+                          onPress={() => confirmDelete(b)}
+                        >
+                          <Trash size={18} color={colors.textSecondary} />
+                        </IconButton>
+                      </>
+                    ) : null}
+                  </View>
+                ) : null}
               </Card>
             );
           })}
@@ -458,13 +461,19 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: "row",
     alignItems: "center",
+    // Icons sit at the row's end whether or not the flex:1 "Open" button is
+    // present (no flex:1 placeholder needed on the current branch's card).
+    justifyContent: "flex-end",
     gap: spacing.sm,
     marginTop: spacing.lg,
+    // Match Button's 52pt minHeight so an icon-only row (current branch) is as
+    // tall as a row with "Open" and adjacent cards keep the same height.
+    minHeight: 52,
     // Same rule as attendance's iconBtn: keep the 44pt target but pull the row
     // out by the box's inner padding so the trailing glyph lands on the card's
     // content edge instead of ~13pt inside it. Horizontal only — the 52pt
-    // "Open" button sets the row height, so a negative bottom margin would
-    // push it into the card padding.
+    // row height means a negative bottom margin would push it into the card
+    // padding.
     marginEnd: -((MIN_TOUCH - ICON_GLYPH) / 2),
   },
   iconButton: {

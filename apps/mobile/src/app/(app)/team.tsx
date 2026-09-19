@@ -1,6 +1,7 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
+import { CalendarBlankIcon as CalendarBlank } from "phosphor-react-native/src/icons/CalendarBlank";
 import { ClockCounterClockwiseIcon as ClockCounterClockwise } from "phosphor-react-native/src/icons/ClockCounterClockwise";
 import { ApiError, team } from "@matgary/api-client";
 
@@ -24,7 +25,7 @@ const ROLE = (): Record<string, string> => ({
 /**
  * Port of app__team.png — the team list, now the hub of the HR drill-ins
  * (doc 02 §1.1 row 15, SPLIT): each row opens /team/[userId], and the
- * attendance chip opens /team/attendance.
+ * attendance chip opens /team/attendance and the leave chip opens /leave.
  *
  * Gating mirrors app/team/page.tsx: the list, the roster and payroll are all
  * behind `manage_team` (owner-expanded server-side into `me.permissions`).
@@ -83,6 +84,23 @@ export default function TeamScreen() {
               <Text style={styles.name}>{t("app.team.tabs.attendance")}</Text>
               <Text numberOfLines={2} style={styles.meta}>
                 {t("app.team.tabDescriptions.attendance")}
+              </Text>
+            </View>
+            <ChevronForward />
+          </Pressable>
+          <Pressable
+            testID="team-leave"
+            accessibilityRole="button"
+            onPress={() => router.push("/leave")}
+            style={({ pressed }) => [styles.attendanceRow, pressed && styles.pressed]}
+          >
+            <View style={styles.attendanceIcon}>
+              <CalendarBlank size={22} color={colors.accent} weight="duotone" />
+            </View>
+            <View style={styles.body}>
+              <Text style={styles.name}>{t("mobile.leave.title")}</Text>
+              <Text numberOfLines={2} style={styles.meta}>
+                {t("mobile.leave.subtitle")}
               </Text>
             </View>
             <ChevronForward />

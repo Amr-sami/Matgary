@@ -550,7 +550,9 @@ export default function AttendanceScreen() {
 
         {loc.kind === "idle" || loc.kind === "locating" ? (
           <View style={styles.rowGap}>
-            <ActivityIndicator color={colors.accent} />
+            <View style={styles.iconCol}>
+              <ActivityIndicator color={colors.accent} />
+            </View>
             <Text style={styles.muted}>{t("mobile.attendance.location.checking")}</Text>
           </View>
         ) : null}
@@ -783,6 +785,10 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   rowGap: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  // The card's leading icons are 18pt (MapPin, ShieldWarning) but the small
+  // ActivityIndicator is 20pt; boxing it to the icon width keeps every row's
+  // text on the same column.
+  iconCol: { width: 18, alignItems: "center", justifyContent: "center" },
   flex: { flex: 1 },
   spinner: { alignSelf: "flex-start", marginVertical: spacing.sm },
   statusHeadline: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 20, color: colors.text },
@@ -799,7 +805,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textSecondary,
     marginTop: spacing.xs,
-    marginBottom: spacing.sm,
     lineHeight: 18,
   },
   inlineBtn: { alignSelf: "flex-start", marginTop: spacing.xs },

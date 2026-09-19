@@ -95,7 +95,7 @@ test("changed-field lists: fieldNames first, then fields, then the raw key; empt
 
   assert.deepEqual(
     formatActivityDetails("settings.update", { changed: ["shopName", "note", "mysteryKey"] }, t),
-    [{ label: "الحقول المعدلة", value: "اسم المتجر • ملاحظة • mysteryKey" }],
+    [{ label: "الحقول المعدلة", value: "اسم المتجر · ملاحظة · mysteryKey" }],
   );
   assert.deepEqual(formatActivityDetails("product.update", { changed: [] }, t), []);
   assert.deepEqual(formatActivityDetails("team.update", null, t), []);

@@ -373,11 +373,16 @@ function DevTools() {
 
 function Stat({ label, value, tone, small, testID }: { label: string; value: string; tone: "neutral" | "warning" | "danger"; small?: boolean; testID?: string }) {
   const color = tone === "danger" ? colors.danger : tone === "warning" ? colors.warningStrong : colors.text;
+  // Only shrink values that would not fit at 24pt ("منذ 12 دقيقة", "لم تتم بعد");
+  // short ones like "الآن" / "Now" keep the sibling tiles' 24pt size.
+  const isSmall = Boolean(small) && value.length > 5;
   return (
     <View style={styles.stat} testID={testID}>
-      <Text style={[styles.statValue, small && styles.statValueSmall, { color }]} numberOfLines={1} testID={testID ? `${testID}-value` : undefined}>
-        {value}
-      </Text>
+      <View style={styles.statValueBox}>
+        <Text style={[styles.statValue, isSmall && styles.statValueSmall, { color }]} numberOfLines={1} testID={testID ? `${testID}-value` : undefined}>
+          {value}
+        </Text>
+      </View>
       <Text style={styles.statLabel} numberOfLines={1}>
         {label}
       </Text>
@@ -687,9 +692,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 2,
   },
-  // One fixed line box for every tile's value so the three labels share a baseline.
+  // One fixed 30pt box for every tile's value so the three labels share a
+  // baseline. The Text is centred inside it rather than given lineHeight 30
+  // itself: iOS bottom-aligns glyphs in an oversized line box, which sank the
+  // 15pt value ~6pt below the 24pt digits in the sibling tiles.
+  statValueBox: { height: 30, maxWidth: "100%", justifyContent: "center" },
   statValue: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 24, lineHeight: 30, fontVariant: ["tabular-nums"] },
-  statValueSmall: { ...RTL_TEXT, fontSize: 15, lineHeight: 30, paddingVertical: 0 },
+  statValueSmall: { ...RTL_TEXT, fontSize: 15, lineHeight: 20, paddingVertical: 0 },
   statLabel: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary },
   banner: {
     flexDirection: "row",

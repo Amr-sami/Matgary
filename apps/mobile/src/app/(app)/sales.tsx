@@ -708,7 +708,7 @@ export default function SalesScreen() {
           ) : null}
 
           {/* Button takes no testID; the wrapper is the automation handle. */}
-          <View testID="pos-record">
+          <View testID="pos-record" collapsable={false}>
           <Button
             label={t("app.sales.form.submit")}
             loading={checkout.isPending}
@@ -847,7 +847,7 @@ const styles = StyleSheet.create({
   cartName: { fontFamily: fonts.medium, fontSize: 14, color: colors.text, ...RTL_TEXT },
   cartUnit: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
   qty: { flexDirection: "row", alignItems: "center", gap: 4 },
-  qtyBtn: { width: 40, height: 40, borderRadius: radius.md, borderWidth: 1, borderColor: colors.accent, alignItems: "center", justifyContent: "center" },
+  qtyBtn: { width: MIN_TOUCH, height: MIN_TOUCH, borderRadius: radius.md, borderWidth: 1, borderColor: colors.accent, alignItems: "center", justifyContent: "center" },
   qtyBtnDisabled: { opacity: 0.35 },
   qtyValue: { minWidth: 28, textAlign: "center", fontFamily: fonts.bold, fontSize: 15, color: colors.text, fontVariant: ["tabular-nums"] },
   // End-aligned (textAlign "right" = END under the Fabric swap) so a column of

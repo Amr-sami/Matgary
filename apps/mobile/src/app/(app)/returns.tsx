@@ -136,25 +136,42 @@ function MetaLine({
   invoice,
   count,
   date,
+  stacked,
   testID,
 }: {
   invoice?: string | null;
   count: number;
   date?: string | null;
+  /**
+   * Narrow rows (the picker, beside a chevron): the date takes its own second
+   * line with no separator, instead of the row breaking around a "·".
+   */
+  stacked?: boolean;
   /** e2e: lands on the invoice Text so a flow can read / match the number. */
   testID?: string;
 }) {
+  const dateText = date ? shortDate(date) : null;
   return (
-    <View style={styles.metaRow}>
-      {invoice ? (
-        <Text numberOfLines={1} style={[styles.meta, styles.metaInvoice]} testID={testID}>
-          {invoice}
-        </Text>
-      ) : null}
-      {invoice ? <Text style={styles.meta}>{"·"}</Text> : null}
-      <Text style={styles.meta}>{t(`mobile.common.pieces${countForm(count)}`, { n: count })}</Text>
-      {date ? <Text style={styles.meta}>{"·"}</Text> : null}
-      {date ? <Text style={styles.meta}>{shortDate(date)}</Text> : null}
+    <View style={styles.metaStack}>
+      <View style={styles.metaRow}>
+        {invoice ? (
+          <Text numberOfLines={1} style={[styles.meta, styles.metaInvoice]} testID={testID}>
+            {invoice}
+          </Text>
+        ) : null}
+        {/* Each "·" is glued to the piece after it, so a wrap can only fall between units, never after a separator. */}
+        <View style={styles.metaUnit}>
+          {invoice ? <Text style={styles.meta}>{"·"}</Text> : null}
+          <Text style={styles.meta}>{t(`mobile.common.pieces${countForm(count)}`, { n: count })}</Text>
+        </View>
+        {dateText && !stacked ? (
+          <View style={styles.metaUnit}>
+            <Text style={styles.meta}>{"·"}</Text>
+            <Text style={styles.meta}>{dateText}</Text>
+          </View>
+        ) : null}
+      </View>
+      {dateText && stacked ? <Text style={styles.meta}>{dateText}</Text> : null}
     </View>
   );
 }
@@ -437,7 +454,7 @@ export default function ReturnsScreen() {
               }
             : undefined
         }
-        secondaryAction={{ label: t("app.common.cancel"), onPress: closeModal }}
+        secondaryAction={line ? { label: t("app.common.cancel"), onPress: closeModal } : undefined}
       >
         {!line ? (
           <>
@@ -463,7 +480,7 @@ export default function ReturnsScreen() {
                 >
                   <View style={styles.pickBody}>
                     <Text numberOfLines={1} style={styles.pickName}>{l.productName}</Text>
-                    <MetaLine invoice={l.invoiceId} count={l.quantitySold} date={l.saleDate} testID="returns-pick-invoice" />
+                    <MetaLine invoice={l.invoiceId} count={l.quantitySold} date={l.saleDate} stacked testID="returns-pick-invoice" />
                   </View>
                   <ChevronForward size={14} />
                 </Pressable>
@@ -511,6 +528,9 @@ const styles = StyleSheet.create({
   // Wraps rather than clips when the invoice id is long on a narrow phone.
   metaRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: spacing.xs },
   metaInvoice: { flexShrink: 1 },
+  // A separator and the piece after it wrap as one unit.
+  metaUnit: { flexDirection: "row", alignItems: "center", columnGap: spacing.xs, flexShrink: 0 },
+  metaStack: { gap: 2 },
   // A Latin reason ("Test") is an LTR paragraph — left-aligned when the Text
   // is stretched to the card's width. Hugging the content parks the box at
   // the start edge, which under Arabic is the right, like the name above it.

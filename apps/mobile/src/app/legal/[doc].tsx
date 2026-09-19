@@ -181,7 +181,7 @@ export default function LegalScreen() {
               onPress={() => jumpTo(i)}
               style={({ pressed }) => [styles.tocRow, pressed && styles.tocRowPressed]}
             >
-              <Text style={styles.tocIndex}>{i + 1}.</Text>
+              <Text style={[styles.tocIndex, { writingDirection: rtl ? "rtl" : "ltr" }]}>{i + 1}.</Text>
               <Text style={styles.tocItem} numberOfLines={1}>
                 {untitled(s.title)}
               </Text>
