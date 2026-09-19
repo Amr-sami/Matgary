@@ -38,6 +38,7 @@ import { shortDate } from "@/lib/format";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT, directionStyle } from "@/theme/rtl";
 import { colors, elevation, fonts, radius, spacing, MIN_TOUCH } from "@/theme/tokens";
+import { errorText as sharedErrorText } from "@/lib/errors";
 
 /**
  * /team/attendance — the manager's roster for one day (port of
@@ -99,11 +100,8 @@ function combine(day: Date, time: string): string | null {
 }
 
 function errorText(error: unknown, fallback: string): string {
-  if (error instanceof ApiError) {
-    if (error.kind === "forbidden") return t("mobile.common.forbidden");
-    if (error.message) return error.message;
-  }
-  return fallback;
+  // Shared helper: walls/codes become the app's sentences, prose 4xx bodies pass.
+  return sharedErrorText(error, fallback);
 }
 
 const STATUS = (): Record<

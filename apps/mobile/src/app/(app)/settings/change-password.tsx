@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Field } from "@/components/ui/Field";
 import { SettingsHeader } from "@/components/ui/SettingsHeader";
+import { errorText } from "@/lib/errors";
 import { useGoBack } from "@/lib/nav";
 import { useSession } from "@/stores/session";
 import { colors, fonts, radius, spacing } from "@/theme/tokens";
@@ -21,9 +22,13 @@ import { t } from "@/i18n";
  * `{ error: <human-readable string> }` with 400 (bad current password /
  * validation) or 429 (rate limited).
  *
- * The web's `mustChangePassword` banner is dropped: the mobile /api/me
- * payload does not carry that flag (only TeamMember does), and the web's
- * forced-redirect flow is a browser middleware concern.
+ * The password WALL (doc 02 §1.1 row 25): when /me says
+ * `user.mustChangePassword`, every other request 403s PASSWORD_CHANGE_REQUIRED
+ * and <SuspensionRouter/> replaces the route with this screen. While the flag
+ * is on the screen is the whole app — BottomNav renders nothing (so no tab
+ * can flash the dashboard shell and its 403s), the back link is replaced by
+ * the wall's own sentence, and the successful re-login below refreshes /me
+ * with the flag off, which brings the bar back and lets `goBack` land.
  *
  * Success is NOT just a pop. The route bumps `users.token_version`, so every
  * live session — this one included — is revoked server-side: the access token
@@ -38,15 +43,16 @@ import { t } from "@/i18n";
 const MIN_LENGTH = 8;
 
 function serverError(e: unknown, fallback: string): string {
-  const err = e as { code?: string | null; status?: number | null } | null;
+  const err = e as { status?: number | null } | null;
   // The route's 429 body is hardcoded Arabic; the mobile app has a locale
   // switch, so it gets our own copy.
   if (err?.status === 429) return t("app.changePassword.rateLimited");
-  // The API puts its human-readable text in `error`, which the client maps to
-  // `code`. 400 is the only other status the route emits (bad current
-  // password / TeamConflictError — length is validated before the request).
-  if (err?.code && err.status === 400) return err.code;
-  return fallback;
+  // 400 carries the route's own human-readable sentence (bad current
+  // password / TeamConflictError — length is validated before the request),
+  // which the shared helper shows as-is; a machine code (a 403
+  // PASSWORD_CHANGE_REQUIRED from a stale token, PERMISSION_DENIED) is mapped
+  // to its sentence instead of printed raw.
+  return errorText(e, fallback);
 }
 
 /**
@@ -64,6 +70,7 @@ export default function ChangePasswordScreen() {
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const passwordWall = useSession((s) => s.me?.user.mustChangePassword === true);
 
   const save = useMutation({
     mutationFn: (vars: { currentPassword: string; newPassword: string }) =>
@@ -132,11 +139,26 @@ export default function ChangePasswordScreen() {
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
       >
-        <SettingsHeader
-          parentLabel={t("app.settingsPage.title")}
-          title={t("app.changePassword.title")}
-          fallback="/settings"
-        />
+        {passwordWall ? (
+          // Behind the wall there is nowhere to go back to: the tab bar is
+          // hidden and every other screen 403s. The header says why instead.
+          <View style={styles.wallHeader} testID="change-password-wall">
+            <Text accessibilityRole="header" style={styles.wallTitle}>
+              {t("app.changePassword.title")}
+            </Text>
+            <View style={[styles.message, styles.messageWall]} accessibilityLiveRegion="polite">
+              <Text style={[styles.messageText, styles.messageWallText]}>
+                {t("mobile.common.passwordChangeRequired")}
+              </Text>
+            </View>
+          </View>
+        ) : (
+          <SettingsHeader
+            parentLabel={t("app.settingsPage.title")}
+            title={t("app.changePassword.title")}
+            fallback="/settings"
+          />
+        )}
 
         <Card style={styles.card}>
           <Field
@@ -222,4 +244,10 @@ const styles = StyleSheet.create({
   messageText: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 13 },
   messageErrorText: { color: colors.danger },
   messageSuccessText: { color: colors.successStrong },
+  // The wall header: SettingsHeader's title without its back link, plus the
+  // reason as a warning pill. Same 24pt/bold and bottom margin as the header.
+  wallHeader: { gap: spacing.md, marginBottom: spacing.lg },
+  wallTitle: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 24, color: colors.text },
+  messageWall: { backgroundColor: colors.warningLight },
+  messageWallText: { color: colors.warningStrong },
 });

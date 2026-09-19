@@ -4627,7 +4627,10 @@
       "summaryOne": "عميل واحد · مستحق {owed}",
       "summaryTwo": "عميلان · مستحق {owed}",
       "summaryFew": "{n} عملاء · مستحق {owed}",
-      "owingPill": "على الحساب"
+      "owingPill": "على الحساب",
+      "invoicePaidLabel": "فاتورة {id}، مدفوعة",
+      "invoicePartialLabel": "فاتورة {id}، مدفوعة جزئيًا، المتبقي {amount}",
+      "invoiceUnpaidLabel": "فاتورة {id}، آجلة، المتبقي {amount}"
     },
     "suppliers": {
       "profileOf": "ملف المورد {name}",
@@ -4841,7 +4844,10 @@
       "badCredentials": "بيانات الدخول غير صحيحة",
       "totpRequired": "أدخل الرمز المكوّن من 6 أرقام من تطبيق المصادقة.",
       "requestFailed": "تعذّر إتمام الطلب",
-      "signInFailed": "تعذّر تسجيل الدخول"
+      "signInFailed": "تعذّر تسجيل الدخول",
+      "sessionEnded": "انتهت جلستك على هذا الجهاز. سجّل الدخول مرة أخرى.",
+      "sessionRevoked": "تم تسجيل خروجك من جميع الأجهزة. سجّل الدخول مرة أخرى.",
+      "sessionReuse": "أُنهيت جلستك لأسباب أمنية. سجّل الدخول مرة أخرى، وإن لم تكن أنت من فعل ذلك فغيّر كلمة المرور."
     },
     "format": {
       "money": "⁧{amount} ج.م⁩",

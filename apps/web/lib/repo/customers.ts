@@ -245,20 +245,34 @@ export async function markCustomerAllPaid(
     if (rows.length === 0) return { markedCount: 0, markedTotal: 0 };
 
     const now = new Date();
+    const ids = rows.map((r) => r.id);
 
     // Bump amount_paid to total_price AND flip the boolean in one shot.
-    // Raw SQL because Drizzle's `set()` can't reference another column.
+    // Kept as raw SQL so amount_paid can copy total_price in the same
+    // statement.
+    //
+    // `paid_at = now()`, NOT `${now}`: a bare value in a raw sql`` template
+    // has no column encoder, so a JS Date reaches postgres.js untouched —
+    // and drizzle's postgres-js driver swaps the timestamptz serializer for
+    // the identity function, so the socket writer is handed a Date object
+    // and throws ERR_INVALID_ARG_TYPE (every "mark all paid" was a 500).
+    // Typed column writes (`tx.insert(...).values({ recordedAt: now })`
+    // below) are safe: the column's mapToDriverValue stringifies first.
+    //
+    // WHERE by the ids just read, so the rows flipped here are exactly the
+    // rows that get a payment event below. The SELECT matches every stored
+    // phone shape (phoneVariants); an equality on the E.164 form alone left
+    // legacy local-form rows unpaid while still recording a payment for
+    // them. tenant_id stays as the RLS belt-and-braces.
     await tx.execute(sql`
       UPDATE sales
          SET amount_paid     = CAST(total_price AS numeric(14,2)),
              is_paid         = true,
-             paid_at         = ${now},
+             paid_at         = now(),
              partial_paid_at = NULL
-       WHERE tenant_id      = ${tenantId}
-         AND branch_id      = ${branchId}
-         AND customer_phone = ${customerPhone}
-         AND is_returned    = false
-         AND is_paid        = false
+       WHERE tenant_id = ${tenantId}
+         AND id IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})
+         AND is_paid   = false
     `);
 
     // One payment event per row touched, recording the actual delta

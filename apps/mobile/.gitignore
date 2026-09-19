@@ -50,3 +50,6 @@ credentials/
 google-services.json
 GoogleService-Info.plist
 *.json.bak
+
+# local Expo module build output (gradle)
+modules/*/android/build/

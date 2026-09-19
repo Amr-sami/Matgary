@@ -14,7 +14,7 @@ import { ArrowCounterClockwiseIcon as ArrowCounterClockwise } from "phosphor-rea
 import { CoinsIcon as Coins } from "phosphor-react-native/src/icons/Coins";
 import { PackageIcon as Package } from "phosphor-react-native/src/icons/Package";
 import { ShoppingCartIcon as ShoppingCart } from "phosphor-react-native/src/icons/ShoppingCart";
-import { ApiError, dashboard as dashboardApi } from "@matgary/api-client";
+import { dashboard as dashboardApi } from "@matgary/api-client";
 
 import { api } from "@/api/client";
 import { usePullRefresh } from "@/components/layout/usePullRefresh";
@@ -29,6 +29,7 @@ import { useSession } from "@/stores/session";
 import { RTL, RTL_TEXT } from "@/theme/rtl";
 import { colors, elevation, fonts, MIN_TOUCH, radius, spacing } from "@/theme/tokens";
 import { t } from "@/i18n";
+import { errorText } from "@/lib/errors";
 
 type RecentSale = dashboardApi.RecentSale;
 
@@ -83,7 +84,7 @@ export default function DashboardScreen() {
           <ActivityIndicator color={colors.accent} style={{ marginTop: spacing.xxl }} />
         ) : error && !data ? (
           <Text style={styles.error}>
-            {error instanceof ApiError ? error.message : t("app.activity.errors.loadFailed")}
+            {errorText(error, t("app.activity.errors.loadFailed"))}
           </Text>
         ) : data ? (
           <>

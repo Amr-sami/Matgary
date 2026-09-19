@@ -8,6 +8,14 @@
 # The flow re-sets the location itself (setLocation) and answers the iOS
 # permission prompt if it appears, so a fresh simulator also works.
 #
+# Android: setLocation drives the emulator's mock-location provider, and the
+# attendance screen refuses a fix flagged `mocked` (the anti-fraud gate in
+# app/(app)/attendance.tsx) — the button stays disabled and the "Mock location
+# detected" box shows. Passing on the Pixel therefore NEEDS the __DEV__
+# mocked-location bypass in the app (added separately); the flow asserts the
+# mocked box is absent right after the fix lands so a build without the
+# bypass fails there, with the reason on screen, rather than at the toast.
+#
 # More → Check in → the location card resolves a fix and, since the owner can
 # read store locations, says "Inside range (… of 100 m)" → the big button
 # reads Check in → tap → "Checked in" toast + the status card says "You're
@@ -84,6 +92,10 @@ env:
     text: "داخل النطاق .*|Inside range .*"
 - assertVisible:
     text: "أقرب فرع: .*|Nearest location: .*"
+# No mocked-location block (the box carries no testID — matched by its copy,
+# mobile.attendance.location.mocked).
+- assertNotVisible:
+    text: "(?s)تم اكتشاف موقع وهمي.*|(?s)Mock location detected.*"
 
 # Already checked in from an earlier half-run → check out first.
 - runFlow:

@@ -122,14 +122,29 @@ appId: com.thestoro.app
 
 # The card: queued, NOT synced (§6.4 — never say synced until the engine does).
 # The card mounts above the form; the ScrollView keeps its offset, so the
-# success head sits above the viewport (and off the iOS hierarchy) until we
-# scroll up — scroll first, then assert.
-- scrollUntilVisible:
-    element:
-      id: "pos-sale-result"
-    direction: UP
-    centerElement: true
+# success head sits above the viewport (and off both hierarchies) until we
+# scroll up. Not with scrollUntilVisible: it drags from the screen centre,
+# and once the emptied form re-lays out that centre is the pos-search input
+# on the Pixel — the EditText swallows the drag and nothing moves. So wait
+# for the card's button to land (always inside the viewport), swipe down
+# explicitly from 30% height (the card's buttons, clear of the input), twice
+# to be sure the head is at the top, then assert.
+- extendedWaitUntil:
+    visible:
+      text: "بيع جديد|New sale"
     timeout: 45000
+- swipe:
+    start: "50%, 30%"
+    end: "50%, 85%"
+    duration: 400
+- swipe:
+    start: "50%, 30%"
+    end: "50%, 85%"
+    duration: 400
+- extendedWaitUntil:
+    visible:
+      id: "pos-sale-result"
+    timeout: 10000
 - assertVisible:
     id: "pos-sync-pending"
 - assertNotVisible:

@@ -4627,7 +4627,10 @@
       "summaryOne": "1 customer · {owed} outstanding",
       "summaryTwo": "{n} customers · {owed} outstanding",
       "summaryFew": "{n} customers · {owed} outstanding",
-      "owingPill": "On account"
+      "owingPill": "On account",
+      "invoicePaidLabel": "Invoice {id}, paid",
+      "invoicePartialLabel": "Invoice {id}, partially paid, {amount} remaining",
+      "invoiceUnpaidLabel": "Invoice {id}, deferred, {amount} remaining"
     },
     "suppliers": {
       "profileOf": "Supplier: {name}",
@@ -4841,7 +4844,10 @@
       "badCredentials": "Incorrect email or password",
       "totpRequired": "Enter the 6-digit code from your authenticator app.",
       "requestFailed": "Couldn't complete the request",
-      "signInFailed": "Couldn't sign in"
+      "signInFailed": "Couldn't sign in",
+      "sessionEnded": "Your session on this device has ended. Please sign in again.",
+      "sessionRevoked": "You were signed out of all your devices. Please sign in again.",
+      "sessionReuse": "Your session was ended for security reasons. Please sign in again, and change your password if this was not you."
     },
     "format": {
       "money": "EGP {amount}",

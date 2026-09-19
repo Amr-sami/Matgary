@@ -106,6 +106,14 @@ appId: com.thestoro.app
     direction: DOWN
     centerElement: true
     timeout: 20000
+# The Printers tile sits below Categories; on the Pixel's shorter viewport it
+# is still off-screen once Categories is centred — scroll to it before asserting.
+- scrollUntilVisible:
+    element:
+      text: "(?s)Printers.*"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
 - assertVisible:
     text: "(?s)Printers.*"
 - scrollUntilVisible:
@@ -148,6 +156,14 @@ appId: com.thestoro.app
 - scrollUntilVisible:
     element:
       text: "(?s)الأقسام.*"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+# The Printers tile sits below Categories; on the Pixel's shorter viewport it
+# is still off-screen once Categories is centred — scroll to it before asserting.
+- scrollUntilVisible:
+    element:
+      text: "(?s)الطابعات.*"
     direction: DOWN
     centerElement: true
     timeout: 20000

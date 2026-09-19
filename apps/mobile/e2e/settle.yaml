@@ -4,7 +4,7 @@
 # debtors by outstanding balance) → the customer's outstanding figure is
 # copied → the first settleable invoice card (unpaid, has an INV- id) opens
 # the settle sheet, amount prefilled with that invoice's remaining balance →
-# Record payment → the "Recorded …" notice → the outstanding figure no longer
+# Record payment → the card stops being settleable → the outstanding figure no longer
 # reads the copied value: it dropped, or the debt block disappeared because
 # it reached zero. Signs in first when the app is on the login screen. Ends
 # on the dashboard.
@@ -94,18 +94,31 @@ appId: com.thestoro.app
 - tapOn:
     id: "settle-submit"
 
-# Recorded: the sheet closes, that invoice's card now wears the Paid badge
+# Recorded: the sheet closes, and that invoice's card is no longer settleable
 # (the notice at the top of the screen is off-view here and fades in 4s, so
 # the card is the assertion), then back at the top the outstanding figure no
 # longer reads the copied value.
+#
+# The paid state is asserted through the card's testID, not its accessibility
+# text: the card is customer-invoice-settleable while it has a balance and
+# customer-invoice once paid (customers/[phone].tsx), and both platforms flip
+# the id. The merged "INV-…, Paid, …" label only exists on iOS — on Android
+# the row keeps its stale "Record a payment on INV-…" label after the
+# settleable props drop (RN does not clear a removed accessibilityLabel), so
+# a text match on the paid badge never lands there. Both labels still carry
+# the invoice number, which ties the id to our invoice.
 - extendedWaitUntil:
     notVisible:
       id: "settle-amount"
     timeout: 45000
 - extendedWaitUntil:
     visible:
-      text: "(?s)${output.inv}, مدفوع, .*|(?s)${output.inv}, Paid, .*"
+      id: "customer-invoice"
+      text: "(?s).*${output.inv}.*"
     timeout: 45000
+- assertNotVisible:
+    id: "customer-invoice-settleable"
+    text: "(?s).*${output.inv}.*"
 - scrollUntilVisible:
     element:
       text: "المتبقي على العميل|Owed by customer|محفظة العميل|Customer wallet"

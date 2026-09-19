@@ -60,6 +60,13 @@ import { RTL_TEXT } from "@/theme/rtl";
  *    server's verdict; the screen says so rather than pretending to know.
  *
  * Foreground permission only (v1 per §3.2). No background geofencing.
+ *
+ * DEV BYPASS of the `mocked` block — `__DEV__` only. On the Android emulator
+ * every location Maestro/adb injects (`setLocation`) IS a mock provider, so
+ * the fraud block made the e2e check-in flow impossible to pass there. In a
+ * development bundle the flag is treated as false (logged once); a release
+ * build never enters that branch — Metro strips the `__DEV__` block — so the
+ * production rule below is exactly as written: a mocked fix blocks the button.
  */
 
 type AttendanceEvent = attendance.AttendanceEvent;
@@ -84,6 +91,24 @@ type Fix = Extract<LocationState, { kind: "fix" }>;
 
 /** expo-location has no timeout option; the simulator without a fix hangs forever. */
 const FIX_TIMEOUT_MS = 15_000;
+/**
+ * The platform's `mocked` verdict, after the dev bypass described in the file
+ * header. Release builds return the flag untouched.
+ */
+let mockedBypassLogged = false;
+function effectiveMocked(mocked: boolean): boolean {
+  if (!mocked) return false;
+  if (__DEV__) {
+    if (!mockedBypassLogged) {
+      mockedBypassLogged = true;
+      console.warn(
+        "[attendance] mock location provider accepted in __DEV__ only (emulator/Maestro setLocation); release builds block it",
+      );
+    }
+    return false;
+  }
+  return true;
+}
 /** A fix older than this is re-acquired before it is sent. */
 const FIX_STALE_MS = 60_000;
 const HISTORY_DAYS = 7;
@@ -235,7 +260,7 @@ export default function AttendanceScreen() {
           latitude: pos.coords.latitude,
           longitude: pos.coords.longitude,
           accuracy: pos.coords.accuracy ?? null,
-          mocked: pos.mocked === true,
+          mocked: effectiveMocked(pos.mocked === true),
           at: Date.now(),
         };
         setLoc(fix);
@@ -697,7 +722,7 @@ export default function AttendanceScreen() {
             ) : null}
 
             {mocked ? (
-              <View style={styles.warnBox}>
+              <View style={styles.warnBox} testID="attendance-mocked">
                 <ShieldWarning size={16} color={colors.danger} weight="fill" />
                 <Text style={[styles.errText, styles.flex]}>
                   {t("mobile.attendance.location.mocked")}

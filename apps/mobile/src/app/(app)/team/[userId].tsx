@@ -32,6 +32,7 @@ import { money, shortDate } from "@/lib/format";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
 import { colors, elevation, fonts, radius, spacing, MIN_TOUCH } from "@/theme/tokens";
+import { errorText as sharedErrorText } from "@/lib/errors";
 
 /**
  * /team/[userId] — employee detail (doc 02 §1.1 row 15, §2.8).
@@ -145,7 +146,8 @@ function errorText(error: unknown, fallback: string): string {
     if (error.kind === "conflict") {
       return getLocale() === "ar" && error.message ? error.message : t("mobile.common.conflict");
     }
-    if (error.message) return error.message;
+    // Codes such as PASSWORD_CHANGE_REQUIRED never reach the screen as text.
+    return sharedErrorText(error, fallback);
   }
   return fallback;
 }

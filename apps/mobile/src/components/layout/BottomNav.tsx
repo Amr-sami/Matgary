@@ -66,6 +66,12 @@ interface TabBarProps {
 export function BottomNav({ state, navigation }: TabBarProps) {
   const insets = useSafeAreaInsets();
   const permissions = useSession((s) => s.me?.permissions);
+  // The password wall (doc 02 §1.1 row 25). SuspensionRouter lands the user
+  // on /settings/change-password, but a bar that stays tappable lets them
+  // open a tab whose queries all 403 PASSWORD_CHANGE_REQUIRED and flash the
+  // dashboard shell until the router bounces them back. No bar, no leak; the
+  // re-login after the change refreshes /me with the flag off and it returns.
+  const passwordWall = useSession((s) => s.me?.user.mustChangePassword === true);
   const allowed = new Set(permissions ?? []);
 
   // Doc 02 §1.1 row 14 / web MobileBottomNav: the badge is the web's
@@ -128,7 +134,7 @@ export function BottomNav({ state, navigation }: TabBarProps) {
   const section = currentRoute?.split("/")[0] ?? "";
   const activeRoute = barRoutes.has(section) ? section : "more";
 
-  if (keyboardShown) return null;
+  if (keyboardShown || passwordWall) return null;
 
   return (
     <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>

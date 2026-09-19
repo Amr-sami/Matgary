@@ -74,11 +74,19 @@ export function SuspensionRouter() {
   // pathname check below apply to both sources alike. Re-runs on every /me
   // refresh (refreshMe, switchBranch, re-login after a password change) — a
   // wall that has lifted simply raises nothing.
+  //
+  // Also re-runs on every route change: the wall is a state, not an event.
+  // BottomNav hides itself behind the password wall, but a hardware back, a
+  // deep link or a stale `router.push` can still leave the wall's screen, and
+  // waiting for that screen's first 403 meant the dashboard shell (and the
+  // raw code its error line printed) was visible for a moment. Re-raising
+  // on arrival sends the user straight back; on the wall's own route the
+  // pathname check below makes it a no-op.
   useEffect(() => {
     if (status !== "signedIn" || !me) return;
     const code = wallStatedIn(me);
-    if (code) raise(code, code);
-  }, [me, status, raise]);
+    if (code && pathname !== ROUTE_FOR[code]) raise(code, code);
+  }, [me, status, raise, pathname]);
 
   useEffect(() => {
     if (!current) return;

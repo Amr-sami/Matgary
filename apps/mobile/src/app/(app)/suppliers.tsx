@@ -155,10 +155,10 @@ export default function SuppliersScreen() {
         />
       ) : (
         <View style={styles.list}>
-          {rows.map((s) => (
+          {rows.map((s, i) => (
             <Pressable
               testID="supplier-row"
-              key={s.id}
+              key={s.id ?? `supplier-${i}`}
               accessibilityRole="button"
               accessibilityLabel={t("mobile.suppliers.profileOf", { name: s.name })}
               onPress={() => router.push(`/suppliers/${encodeURIComponent(s.id)}`)}

@@ -113,8 +113,8 @@ export default function ExpensesScreen() {
         <EmptyState title={t("mobile.expenses.empty")} />
       ) : (
         <View style={styles.list}>
-          {rows.map((e) => (
-            <View key={e.id} style={styles.row}>
+          {rows.map((e, i) => (
+            <View key={e.id ?? `expense-${i}`} style={styles.row}>
               <View style={styles.head}>
                 <Text numberOfLines={1} style={styles.name}>
                   {e.title}

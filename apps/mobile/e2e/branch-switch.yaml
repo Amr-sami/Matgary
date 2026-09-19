@@ -7,10 +7,7 @@
 # ~2 s → then reads the new name.
 #
 # The flow copies the chip's label, opens the sheet and taps the first option
-# that is NOT the current one (the rows are accessibility radios: XCUITest
-# exposes them as "radio button, checked" / "radio button, unchecked", with
-# the branch name as the label — so "unchecked" is the other branch), asserts
-# the confirmation
+# that is NOT the current one, asserts the confirmation
 # and the changed label, RELAUNCHES the app and asserts the choice survived
 # the restart (switchBranch persists it), then opens the sheet once more and
 # taps the option named by the copied label, so the app is left on the branch
@@ -57,7 +54,15 @@ appId: com.thestoro.app
 - assertTrue: ${output.from.length > 0}
 
 # Open the sheet; the current row is the checked radio; pick the first
-# unchecked one.
+# other one. The rows are accessibility radios whose label is the branch name
+# — suffixed " — <current branch>" on the active one (BranchSwitcher.tsx) —
+# and both platforms expose that label to Maestro. Neither platform-native
+# checked form works on both: Android exposes checked=true but not the iOS
+# "radio button, checked" value; iOS never derives `checked` from RN state
+# and additionally exposes that synthesised value as the row's text, which
+# is why the tap's regex excludes it too (else the checked row matches
+# through it). So: the checked row is the one labelled with the copied chip
+# name plus the suffix; the row to tap is any row whose label is neither.
 - tapOn:
     id: "branch-chip"
 - extendedWaitUntil:
@@ -68,10 +73,10 @@ appId: com.thestoro.app
     text: "تبديل الفرع|Switch branch"
 - assertVisible:
     id: "branch-option"
-    text: "radio button, checked"
+    text: "${output.from} — .*"
 - tapOn:
     id: "branch-option"
-    text: "radio button, unchecked"
+    text: "^(?!${output.from}( — .*)?$)(?!radio button, checked$).+$"
     index: 0
 
 # Switched: the sheet closes, the chip confirms (a ~2 s face that the modal

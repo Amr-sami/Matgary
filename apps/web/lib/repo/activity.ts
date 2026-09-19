@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, lt, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lt, lte } from "drizzle-orm";
 import { withTenant } from "@/lib/db";
 import { activityLogs, tenantMembers, tenants, users } from "@/lib/db/schema";
 import type { ActivityLogRow } from "@/lib/db/schema";
@@ -267,7 +267,11 @@ export async function listActivity(
     if (filters.actorUserId)
       where.push(eq(activityLogs.actorUserId, filters.actorUserId));
     if (filters.category) where.push(eq(activityLogs.category, filters.category));
-    if (filters.before) where.push(sql`${activityLogs.createdAt} < ${filters.before}`);
+    // `lt(column, date)`, not a raw sql`` with `${filters.before}`: a bare
+    // Date in a raw template bypasses the column encoder and drizzle's
+    // postgres-js driver hands postgres.js the Date object itself
+    // (ERR_INVALID_ARG_TYPE → 500 on every keyset page after the first).
+    if (filters.before) where.push(lt(activityLogs.createdAt, filters.before));
 
     const rows = (await tx
       .select()

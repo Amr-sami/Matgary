@@ -53,8 +53,14 @@ appId: com.thestoro.app
     notVisible:
       id: "ble-state-unknown"
     timeout: 20000
+# Any settled Bluetooth state is fine: the iOS simulator has no radio
+# (unsupported), the Pixel's is usually on (poweredOn) — off or unauthorized
+# are legitimate too. The row's testID is ble-state-<state>; the copy is
+# mobile.printing.state<State>.
 - assertVisible:
-    text: "(?s)البلوتوث غير متاح على هذا الجهاز.*|(?s)Bluetooth is not available on this device.*|(?s)البلوتوث مقفول.*|(?s)Bluetooth is off.*"
+    id: "ble-state-(unsupported|poweredOff|poweredOn|unauthorized)"
+- assertVisible:
+    text: "(?s)البلوتوث غير متاح على هذا الجهاز.*|(?s)Bluetooth is not available on this device.*|(?s)البلوتوث مقفول.*|(?s)Bluetooth is off.*|(?s)البلوتوث شغّال.*|(?s)Bluetooth is on.*|(?s)التطبيق غير مسموح له باستخدام البلوتوث.*|(?s)The app is not allowed to use Bluetooth.*"
 - runFlow:
     when:
       visible:
@@ -120,7 +126,17 @@ appId: com.thestoro.app
     timeout: 20000
 - assertVisible:
     id: "receipt-preview"
-# Back out without saving so the store's real setting is untouched.
+# Back out without saving so the store's real setting is untouched. The
+# receipt screen's header scrolls with the content (SettingsHeader is a child
+# of the Screen's ScrollView), and the preview sits below it — on the Pixel
+# the back link is still above the viewport once the preview is in view, so
+# scroll back up to it first.
+- scrollUntilVisible:
+    element:
+      id: "back-link"
+    direction: UP
+    centerElement: true
+    timeout: 20000
 - tapOn:
     id: "back-link"
 - extendedWaitUntil:

@@ -87,7 +87,12 @@ appId: com.thestoro.app
       id: "customer-row"
     timeout: 20000
 - eraseText: 6
-- hideKeyboard
+# Dismiss the keyboard by tapping the static receivables strip (the Screen's
+# ScrollView has keyboardShouldPersistTaps="handled", so a tap on a plain
+# View/Text closes it) — not the Maestro keyboard-dismiss command, which is a BACK press on Android
+# and pops the screen.
+- tapOn:
+    id: "customers-summary"
 - extendedWaitUntil:
     visible:
       id: "customer-row"

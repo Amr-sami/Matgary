@@ -560,11 +560,15 @@ export async function deleteDemoClone(cloneId: string): Promise<void> {
 export async function cleanupIdleDemoClones(maxIdleMs = 60 * 60 * 1000): Promise<number> {
   const db = getAdminDb();
   const cutoff = new Date(Date.now() - maxIdleMs);
+  // `${cutoff.toISOString()}::timestamptz`, not `${cutoff}`: a bare Date in
+  // a raw sql`` template has no column encoder, and drizzle's postgres-js
+  // driver makes the timestamptz serializer the identity, so postgres.js
+  // would be handed the Date object and throw ERR_INVALID_ARG_TYPE.
   const deleted = await db
     .delete(s.tenants)
     .where(
       sql`${s.tenants.demoTemplateId} IS NOT NULL
-          AND (${s.tenants.demoLastActiveAt} IS NULL OR ${s.tenants.demoLastActiveAt} < ${cutoff})`,
+          AND (${s.tenants.demoLastActiveAt} IS NULL OR ${s.tenants.demoLastActiveAt} < ${cutoff.toISOString()}::timestamptz)`,
     )
     .returning({ id: s.tenants.id });
   return deleted.length;

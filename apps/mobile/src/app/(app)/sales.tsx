@@ -471,8 +471,17 @@ export default function SalesScreen() {
             </Pressable>
           ) : null}
           <View style={styles.receipt} testID="pos-receipt">
-            {shownResult.lines.map((l) => (
-              <View key={l.productId} style={styles.receiptRow}>
+            {/* The server's line summary (CartSaleLineSummary) carries no
+                productId — only the locally built result does — so keying on
+                it alone left every server-answered row keyless (the LogBox
+                "unique key" warning on this screen). One sale id per line, in
+                line order, is the server's own handle; the index closes the
+                last gap. */}
+            {shownResult.lines.map((l, i) => (
+              <View
+                key={l.productId ?? shownResult.saleIds[i] ?? `line-${i}`}
+                style={styles.receiptRow}
+              >
                 <Text numberOfLines={1} style={styles.receiptName}>
                   {l.productName} ×{l.quantity}
                 </Text>

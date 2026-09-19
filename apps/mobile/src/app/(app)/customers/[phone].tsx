@@ -399,14 +399,33 @@ export default function CustomerDetailScreen() {
                 // modify_sales (doc 02), and a sheet that can only fail is
                 // worse than no sheet.
                 const settleable = canModifySales && !legacy && !inv.isPaid && inv.balance > 0;
+                // Always a string, recomputed from THIS render's paid state.
+                // The row keeps its key across a settle, and on Android
+                // (Fabric) a label that goes from a string to `undefined` is
+                // not reliably cleared from the node's contentDescription —
+                // TalkBack kept reading "تسجيل دفعة على فاتورة …" on a row
+                // that visually showed مدفوع. A fresh string for every state
+                // is always applied.
+                const a11yLabel = settleable
+                  ? t("mobile.customers.settleFor", { id: inv.invoiceId })
+                  : inv.isPaid
+                    ? t("mobile.customers.invoicePaidLabel", { id: inv.invoiceId })
+                    : partial
+                      ? t("mobile.customers.invoicePartialLabel", {
+                          id: inv.invoiceId,
+                          amount: money(inv.balance),
+                        })
+                      : t("mobile.customers.invoiceUnpaidLabel", {
+                          id: inv.invoiceId,
+                          amount: money(inv.balance),
+                        });
                 return (
                   <Pressable
                     key={inv.invoiceId}
                     disabled={!settleable}
-                    accessibilityRole={settleable ? "button" : undefined}
-                    accessibilityLabel={
-                      settleable ? t("mobile.customers.settleFor", { id: inv.invoiceId }) : undefined
-                    }
+                    accessibilityRole={settleable ? "button" : "text"}
+                    accessibilityState={{ disabled: !settleable }}
+                    accessibilityLabel={a11yLabel}
                     onPress={() => setSettleTarget(inv)}
                     // e2e: a flow taps the first settleable card by id.
                     testID={settleable ? "customer-invoice-settleable" : "customer-invoice"}

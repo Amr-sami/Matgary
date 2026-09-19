@@ -6,6 +6,7 @@ import { ApiError, auth, me as meApi, type MeResponse } from "@matgary/api-clien
 import { api, deviceMeta, onSessionLost, setActiveBranchId } from "@/api/client";
 import { getLocale, t } from "@/i18n";
 import { getInstallId } from "@/auth/installId";
+import { sessionEndedText } from "@/lib/errors";
 import { markBoot } from "@/observability/perf";
 import { useCart } from "@/stores/cart";
 
@@ -32,7 +33,13 @@ interface SessionState {
    * <SnapshotRefresher/> asks for as soon as connectivity returns.
    */
   offline: boolean;
-  /** Populated only by signIn, for the login form. Cleared on the next attempt. */
+  /**
+   * What the login form shows under the fields. Set by signIn (the reason
+   * the attempt failed) and by every dead-session path (why the device was
+   * signed out — revoked from another device, "sign out everywhere", an
+   * expired refresh), so the drop to login is never silent. One slot, cleared
+   * by the next sign-in attempt.
+   */
   signInError: string | null;
   signingIn: boolean;
   /**
@@ -158,6 +165,8 @@ export function messageFor(error: unknown): string {
         : t("mobile.auth.requestFailed");
     case "server":
       return t("mobile.common.serverError");
+    case "session":
+      return sessionEndedText(error);
     default:
       return t("mobile.auth.signInFailed");
   }
@@ -199,7 +208,12 @@ async function revalidateMe(cached: MeResponse): Promise<void> {
     const fatal = error instanceof ApiError && error.fatalToSession;
     if (fatal) {
       applyBranch(null);
-      useSession.setState({ status: "signedOut", me: null, offline: false, signInError: null });
+      useSession.setState({
+        status: "signedOut",
+        me: null,
+        offline: false,
+        signInError: sessionEndedText(error),
+      });
       return;
     }
     useSession.setState({ offline: true });
@@ -264,11 +278,13 @@ export const useSession = create<SessionState>((set, get) => ({
       set({ status: "signedIn", me, offline: false });
     } catch (error) {
       // A dead session (revoked, reused, refresh rejected) already cleared
-      // storage inside the client — signing out is correct and final.
+      // storage inside the client — signing out is correct and final. The
+      // reason goes where the login screen shows it, so the user learns why
+      // the app asks for the password again.
       const fatal = error instanceof ApiError && error.fatalToSession;
       if (fatal) {
         applyBranch(null);
-        set({ status: "signedOut", me: null, offline: false, signInError: null });
+        set({ status: "signedOut", me: null, offline: false, signInError: sessionEndedText(error) });
       } else {
         set({ status: "signedOut", me: null, offline: false, signInError: messageFor(error) });
       }
@@ -444,7 +460,21 @@ export const useSession = create<SessionState>((set, get) => ({
 
 // The client cannot import the store (that would be a cycle), so the store
 // registers itself here.
-onSessionLost(() => {
+//
+// Fires from inside the client the moment a refresh is refused (or a 401 the
+// client may not refresh past), with the ApiError that carries the server's
+// code — so the login screen can say WHY, not just drop the user there: a
+// "sign out everywhere" (SESSION_REVOKED), a reuse kill
+// (TOKEN_REUSE_DETECTED), or the generic sentence for everything else. The
+// tokens are already gone; this only mirrors that into the UI.
+onSessionLost((error) => {
   applyBranch(null);
-  useSession.setState({ status: "signedOut", me: null, offline: false });
+  useSession.setState({
+    status: "signedOut",
+    me: null,
+    offline: false,
+    signInError: sessionEndedText(error),
+    challenge: null,
+    twoFactorError: null,
+  });
 });

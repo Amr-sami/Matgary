@@ -31,6 +31,7 @@ import { money, shortDate } from "@/lib/format";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT, directionStyle } from "@/theme/rtl";
 import { MIN_TOUCH, colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
+import { errorText } from "@/lib/errors";
 
 /**
  * Port of app__supplier-detail.png (/suppliers/<id>).
@@ -408,7 +409,7 @@ function EditSupplierModal({
       });
       onSaved();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : t("mobile.suppliers.saveFailed"));
+      setError(errorText(e, t("mobile.suppliers.saveFailed")));
     } finally {
       setBusy(false);
     }

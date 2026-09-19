@@ -54,15 +54,17 @@ appId: com.thestoro.app
 - assertVisible:
     id: "team-permissions"
 # The card is taller than the screen, so centring it scrolls its header hint
-# ("{n} صلاحية" / the owner line) off the top — scroll back up to it.
+# ("{n} صلاحية" / "{n} صلاحيات" by count, or the owner line) off the top —
+# scroll back up to it. The stem "صلاحي" / "permission" covers every plural
+# form the count picks (the Pixel's seeded owner shows "5 صلاحيات").
 - scrollUntilVisible:
     element:
-      text: "(?s).*صلاحية.*|(?s).*permissions.*|(?s).*المالك عنده كل الصلاحيات.*|(?s).*owner has every permission.*"
+      text: "(?s).*صلاحي.*|(?s).*permission.*|(?s).*المالك عنده كل الصلاحيات.*|(?s).*owner has every permission.*"
     direction: UP
     centerElement: true
     timeout: 20000
 - assertVisible:
-    text: "(?s).*صلاحية.*|(?s).*permissions.*|(?s).*المالك عنده كل الصلاحيات.*|(?s).*owner has every permission.*"
+    text: "(?s).*صلاحي.*|(?s).*permission.*|(?s).*المالك عنده كل الصلاحيات.*|(?s).*owner has every permission.*"
 
 # Back to Team via the breadcrumb (router.navigate("/team")). The breadcrumb
 # reads t("app.team.tabs.team") ("الفريق والصلاحيات" / "Team & permissions"),

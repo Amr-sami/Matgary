@@ -4,6 +4,7 @@ import { can } from "@/lib/permissions";
 import { markCustomerAllPaid } from "@/lib/repo/customers";
 import { logActivity } from "@/lib/repo/activity";
 import { normalizeEgyptPhone } from "@/lib/validators/egypt";
+import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
 
@@ -31,12 +32,28 @@ export async function POST(
     return NextResponse.json({ error: "INVALID_PHONE" }, { status: 400 });
   }
 
-  const result = await markCustomerAllPaid(
-    r.ctx.tenantId,
-    r.ctx.branchId,
-    normalised,
-    { recordedByUserId: r.ctx.userId },
-  );
+  let result: Awaited<ReturnType<typeof markCustomerAllPaid>>;
+  try {
+    result = await markCustomerAllPaid(
+      r.ctx.tenantId,
+      r.ctx.branchId,
+      normalised,
+      { recordedByUserId: r.ctx.userId },
+    );
+  } catch (err) {
+    // A thrown repo error used to surface as Next's bare 500 with an empty
+    // body, so the app showed nothing at all. Same JSON shape as the other
+    // routes (`{ error: "INTERNAL" }`) so the client renders its generic
+    // failure toast; the cause goes to the server log, never to the client.
+    logger.error({
+      event: "customers.mark_all_paid.failed",
+      tenantId: r.ctx.tenantId,
+      branchId: r.ctx.branchId,
+      customerPhone: normalised,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return NextResponse.json({ error: "INTERNAL" }, { status: 500 });
+  }
 
   if (result.markedCount > 0) {
     logActivity({

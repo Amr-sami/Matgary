@@ -1,4 +1,4 @@
-import { eq, isNotNull, lte, sql } from "drizzle-orm";
+import { and, eq, isNotNull, lte, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { tenants, tenantDeletions, tenantMembers, users } from "@/lib/db/schema";
 
@@ -86,8 +86,16 @@ export async function findDueDeletions(now: Date = new Date()): Promise<number> 
   const rows = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(tenants)
+    // Typed operators, not a raw sql`` with `${now}`: a bare Date in a raw
+    // template has no column encoder and drizzle's postgres-js driver makes
+    // the timestamptz serializer the identity, so postgres.js is handed a
+    // Date object and throws ERR_INVALID_ARG_TYPE. `lte(column, date)` runs
+    // the value through the column's mapToDriverValue first.
     .where(
-      sql`${tenants.deletionScheduledAt} IS NOT NULL AND ${tenants.deletionScheduledAt} <= ${now}`,
+      and(
+        isNotNull(tenants.deletionScheduledAt),
+        lte(tenants.deletionScheduledAt, now),
+      ),
     );
   return rows[0]?.count ?? 0;
 }
