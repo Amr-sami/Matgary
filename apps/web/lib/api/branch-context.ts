@@ -32,6 +32,26 @@ export interface BranchContext {
   allowedBranchIds: string[];
 }
 
+/**
+ * Outcome of resolving the active branch, with the failure typed so a caller
+ * can answer the client precisely instead of collapsing every miss to null.
+ *
+ *   - INVALID_BRANCH (400): the request named a branch through `X-Branch-Id`
+ *     that cannot be served — not a UUID, not on the caller's allow-list, or
+ *     no longer active. Only the header transport (the native app) gets this;
+ *     see resolveActiveBranchImpl for why the cookie keeps its fallback.
+ *   - NO_BRANCH_ACCESS (403): the caller can reach no active branch at all.
+ *
+ * `resolveActiveBranch` is the legacy `BranchContext | null` view of the same
+ * result — both failures become null there, which its callers already answer
+ * with 403 NO_BRANCH_ACCESS. Switch a caller to this function to send the
+ * 400 body the native client keys on.
+ */
+export type ActiveBranchResult =
+  | { ok: true; branch: BranchContext }
+  | { ok: false; status: 400; error: "INVALID_BRANCH"; branchId: string }
+  | { ok: false; status: 403; error: "NO_BRANCH_ACCESS" };
+
 interface ResolveInput {
   tenantId: string;
   userId: string;
@@ -105,15 +125,33 @@ export async function getAccessibleBranches(
 /**
  * Resolve the active branch for the current request. Honours the `mg.branch`
  * cookie when it points to an accessible, active branch; otherwise falls
- * back to the user's primary (or first available) branch.
+ * back to the user's primary (or first available) branch. An `X-Branch-Id`
+ * header is honoured or refused, never substituted — see
+ * resolveActiveBranchResult.
  *
- * Returns null only when the tenant has no active branches at all the user
- * can reach — every signed-in caller in a normal flow gets a valid context
- * because the migration seeds a primary branch per tenant.
+ * Returns null when the branch cannot be resolved: the tenant has no active
+ * branch the user can reach (a misconfigured staff row), or the header named
+ * a branch that cannot be served. Every signed-in caller in a normal flow
+ * gets a valid context because the migration seeds a primary branch per
+ * tenant. Callers that want to tell the two apart use
+ * resolveActiveBranchResult.
  */
 export async function resolveActiveBranch(
   ctx: ResolveInput,
 ): Promise<BranchContext | null> {
+  const r = await resolveActiveBranchResult(ctx);
+  return r.ok ? r.branch : null;
+}
+
+/**
+ * resolveActiveBranch with the failure kept: 400 INVALID_BRANCH for a header
+ * that names an unservable branch, 403 NO_BRANCH_ACCESS for a caller with no
+ * reachable branch. The shape mirrors resolveBranchFilter's, so a route
+ * answers `NextResponse.json({ error }, { status })` for either.
+ */
+export async function resolveActiveBranchResult(
+  ctx: ResolveInput,
+): Promise<ActiveBranchResult> {
   return withSpan(
     "api.branch.resolve_active",
     {
@@ -124,11 +162,16 @@ export async function resolveActiveBranch(
   );
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 async function resolveActiveBranchImpl(
   ctx: ResolveInput,
-): Promise<BranchContext | null> {
+): Promise<ActiveBranchResult> {
   const allowedBranchIds = await getAccessibleBranches(ctx);
-  if (allowedBranchIds.length === 0) return null;
+  if (allowedBranchIds.length === 0) {
+    return { ok: false, status: 403, error: "NO_BRANCH_ACCESS" };
+  }
 
   // Branch selection has two transports, in priority order:
   //
@@ -140,14 +183,36 @@ async function resolveActiveBranchImpl(
   //      still the fallback when no header is present.
   //
   // Both are validated against the SAME allow-list below, so the header grants
-  // no authority the cookie did not already have: an id outside
-  // `allowedBranchIds` is ignored exactly as a tampered cookie is, and the user
-  // falls through to their primary branch.
+  // no authority the cookie did not already have. What differs is the answer
+  // to a miss:
+  //
+  //   - The cookie is a remembered preference. A stale or tampered value falls
+  //     through to the user's primary branch, as it always has — the web app
+  //     never asked for a specific branch on this request.
+  //   - The header is an explicit, per-request choice. Serving another branch
+  //     under it would hand the client rows it did not ask for, labelled as
+  //     the branch it did (doc 14 §5.3: a zero UUID answered 200 with primary
+  //     data). So a header that is not a UUID, not on the allow-list, or
+  //     names an inactive branch is refused with INVALID_BRANCH instead. The
+  //     web (cookie) path is unchanged: it never sends the header.
   const headerStore = await headers();
   const headerValue = headerStore.get("x-branch-id")?.trim() || null;
   const cookieStore = await cookies();
   const requested =
     headerValue ?? cookieStore.get(ACTIVE_BRANCH_COOKIE)?.value ?? null;
+  const strict = headerValue !== null;
+
+  if (
+    strict &&
+    (!UUID_RE.test(headerValue) || !allowedBranchIds.includes(headerValue))
+  ) {
+    return {
+      ok: false,
+      status: 400,
+      error: "INVALID_BRANCH",
+      branchId: headerValue,
+    };
+  }
 
   return withTenant(ctx.tenantId, async (tx) => {
     // First try the explicitly requested branch (header, else cookie).
@@ -169,10 +234,23 @@ async function resolveActiveBranchImpl(
         .limit(1);
       if (b) {
         return {
-          branchId: b.id,
-          branchName: b.name,
-          isPrimary: b.isPrimary,
-          allowedBranchIds,
+          ok: true,
+          branch: {
+            branchId: b.id,
+            branchName: b.name,
+            isPrimary: b.isPrimary,
+            allowedBranchIds,
+          },
+        };
+      }
+      // On the allow-list but no longer active. The header asked for it by
+      // name, so it gets the refusal rather than a quiet swap to primary.
+      if (strict) {
+        return {
+          ok: false,
+          status: 400,
+          error: "INVALID_BRANCH",
+          branchId: requested,
         };
       }
     }
@@ -194,12 +272,15 @@ async function resolveActiveBranchImpl(
       )
       .orderBy(desc(branches.isPrimary), asc(branches.createdAt))
       .limit(1);
-    if (!first) return null;
+    if (!first) return { ok: false, status: 403, error: "NO_BRANCH_ACCESS" };
     return {
-      branchId: first.id,
-      branchName: first.name,
-      isPrimary: first.isPrimary,
-      allowedBranchIds,
+      ok: true,
+      branch: {
+        branchId: first.id,
+        branchName: first.name,
+        isPrimary: first.isPrimary,
+        allowedBranchIds,
+      },
     };
   });
 }
@@ -210,10 +291,12 @@ async function resolveActiveBranchImpl(
  * three cases identically:
  *   - "all" → owner-only; returns null (no filter).
  *   - <uuid> → must be in the user's allow-list.
- *   - omitted → default to the active branch (cookie context).
+ *   - omitted → default to the active branch (X-Branch-Id header, else the
+ *     cookie); an unservable header is 400 INVALID_BRANCH and a caller with
+ *     no reachable branch is 403 NO_BRANCH_ACCESS, never "all".
  *
- * Returns either the resolved branch id (or null for "all"), or a NextResponse
- * for the caller to return immediately.
+ * Returns either the resolved branch id (or null for "all"), or the status +
+ * error code for the caller to return immediately.
  */
 export async function resolveBranchFilter(
   ctx: ResolveInput,
@@ -239,8 +322,15 @@ export async function resolveBranchFilter(
     }
     return { ok: true, branchId: raw };
   }
-  const active = await resolveActiveBranch(ctx);
-  return { ok: true, branchId: active?.branchId ?? null };
+  // Omitted: the active branch. A miss is answered, not widened — `null`
+  // here would mean "every branch", which is exactly the read the caller
+  // has no claim to (an unservable X-Branch-Id, or a staff row with no
+  // branch at all).
+  const active = await resolveActiveBranchResult(ctx);
+  if (!active.ok) {
+    return { ok: false, status: active.status, error: active.error };
+  }
+  return { ok: true, branchId: active.branch.branchId };
 }
 
 /**

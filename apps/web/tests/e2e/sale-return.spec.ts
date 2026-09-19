@@ -54,15 +54,13 @@ test("return happy path: full return of 2 units restores stock", async ({
   expect(after?.quantity).toBe(10);
 });
 
-test("return behaviour: over-return is accepted today (pinned: latent bug — recordReturn does not validate qty vs sold)", async ({
+test("return cap: a return past the quantity sold is refused with RETURN_EXCEEDS_SOLD", async ({
   page,
   baseURL,
 }) => {
-  // This test PINS CURRENT behaviour, not desired behaviour. The
-  // recordReturn repo function credits whatever returnedQuantity the
-  // caller sends, with `allowNegative: true` on the stock adjust. A
-  // future fix that adds qty-vs-sold validation should update this test
-  // to assert 400 + a new DomainError code (RETURN_OVER_QTY).
+  // Doc 14 R25. recordReturn (lib/repo/operations.ts) caps a return at
+  // quantitySold − quantity already returned for that sale line and answers
+  // 400 RETURN_EXCEEDS_SOLD; the stock must not move on a refused return.
   const catId = await getWatchesCategoryId(page.request, baseURL!);
   const p = await createProduct(page.request, baseURL!, catId, {
     quantity: 5,
@@ -89,9 +87,27 @@ test("return behaviour: over-return is accepted today (pinned: latent bug — re
       reason: "Over-return attempt",
     },
   });
-  // Pin: currently 201 (accepted). A refactor that adds validation will
-  // legitimately break this test — update it then.
-  expect(ret.status()).toBe(201);
+  expect(ret.status(), await ret.text()).toBe(400);
+  expect(((await ret.json()) as { error: string }).error).toBe("RETURN_EXCEEDS_SOLD");
+
+  // Nothing credited: 5 in stock, 1 sold, refused return leaves 4.
+  const prods = await page.request.get(`${baseURL}/api/products`);
+  const { data: rows } = (await prods.json()) as {
+    data: Array<{ id: string; quantity: number }>;
+  };
+  expect(rows.find((r) => r.id === p.id)?.quantity).toBe(4);
+
+  // The cap is cumulative: the one unit sold can be returned once, and a
+  // second return of the same line finds nothing left.
+  const first = await page.request.post(`${baseURL}/api/returns`, {
+    data: { saleId, productId: p.id, returnedQuantity: 1, reason: "First" },
+  });
+  expect(first.status(), await first.text()).toBe(201);
+  const second = await page.request.post(`${baseURL}/api/returns`, {
+    data: { saleId, productId: p.id, returnedQuantity: 1, reason: "Second" },
+  });
+  expect(second.status()).toBe(400);
+  expect(((await second.json()) as { error: string }).error).toBe("RETURN_EXCEEDS_SOLD");
 });
 
 test("return authz: anonymous returns 401", async ({ playwright, baseURL }) => {

@@ -7,7 +7,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST() {
-  const r = await requireAdmin();
+  // Signing out must always work, rotation pending or not.
+  const r = await requireAdmin({ allowMustRotate: true });
   if (!r.ok) return r.response;
 
   await revokeSession(r.session.sessionId);

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireTenant } from "@/lib/api/auth-helpers";
+import { markUserRevoked, requireTenant } from "@/lib/api/auth-helpers";
 import { bumpTokenVersion } from "@/lib/repo/account-security";
 import { logActivity } from "@/lib/repo/activity";
 
@@ -11,6 +11,8 @@ export async function POST() {
   const r = await requireTenant();
   if (!r.ok) return r.response;
   await bumpTokenVersion(r.ctx.userId);
+  // H4 — access tokens already in native hands die now, not at expiry.
+  await markUserRevoked(r.ctx.userId);
   logActivity({
     tenantId: r.ctx.tenantId,
     actorUserId: r.ctx.userId,

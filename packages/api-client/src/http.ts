@@ -344,6 +344,7 @@ export class ApiClient {
         status: response.status,
         message: readErrorMessage(payload) ?? code ?? `HTTP ${response.status}`,
         retryAfterSec: Number.isFinite(retryAfter) ? retryAfter : null,
+        body: payload,
       });
       this.notifyBlocked(error);
       throw error;

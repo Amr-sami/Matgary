@@ -12,7 +12,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const r = await requireAdmin();
+  // Read-only self view; the rotation screen shows the signed-in email from
+  // it, so a must-rotate session may still read (but not PATCH) the account.
+  const r = await requireAdmin({ allowMustRotate: true });
   if (!r.ok) return r.response;
   const db = getAdminDb();
   const [me] = await db

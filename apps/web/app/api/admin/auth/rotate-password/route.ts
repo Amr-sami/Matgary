@@ -24,7 +24,9 @@ const schema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const r = await requireAdmin();
+  // The rotation screen must stay reachable for an admin who is forced to
+  // rotate — this is the one write that clears must_rotate.
+  const r = await requireAdmin({ allowMustRotate: true });
   if (!r.ok) return r.response;
   const ip = clientIp(req);
   const ua = req.headers.get("user-agent") ?? null;

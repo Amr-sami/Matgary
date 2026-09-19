@@ -4839,7 +4839,7 @@
     "auth": {
       "unexpected": "Something went wrong",
       "badCredentials": "Incorrect email or password",
-      "totpRequired": "This account uses two-factor authentication, which the app does not support yet. Sign in on thestoro.com and turn it off under Security, or wait for the next app update.",
+      "totpRequired": "Enter the 6-digit code from your authenticator app.",
       "requestFailed": "Couldn't complete the request",
       "signInFailed": "Couldn't sign in"
     },
@@ -5459,6 +5459,23 @@
     },
     "languagePill": {
       "switchTo": "Switch to {lang}"
+    },
+    "twoFactor": {
+      "title": "Two-step verification",
+      "hint": "Open your authenticator app and enter the 6-digit code shown for TheStoro.",
+      "codeLabel": "Authenticator code",
+      "recoveryLabel": "Recovery code",
+      "recoveryHint": "Enter one of the recovery codes you saved when you turned on two-factor authentication. Each code works once.",
+      "useRecovery": "Can’t open the app? Use a recovery code",
+      "useAuthenticator": "Back to the authenticator code",
+      "verify": "Verify",
+      "back": "Back to sign in",
+      "invalidCode": "That code isn’t right.",
+      "attemptsLeft_one": "One attempt left.",
+      "attemptsLeft_two": "Two attempts left.",
+      "attemptsLeft_few": "{n} attempts left.",
+      "expired": "The verification window has ended. Sign in again to continue.",
+      "tooManyAttempts": "Too many wrong codes. Sign in again to try once more."
     }
   }
 }

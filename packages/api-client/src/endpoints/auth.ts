@@ -1,3 +1,4 @@
+import { ApiError } from "../errors";
 import type { ApiClient } from "../http";
 import type { DeviceSummary, LoginResponse } from "../types";
 
@@ -24,6 +25,74 @@ export async function login(
   input: LoginInput,
 ): Promise<LoginResponse> {
   const data = await client.request<LoginResponse>("/api/v1/auth/login", {
+    method: "POST",
+    body: input,
+    auth: false,
+    noBranch: true,
+  });
+  await client.adoptTokens(data.accessToken, data.refreshToken, data.expiresIn);
+  return data;
+}
+
+// ---------------------------------------------------------------------------
+// Second factor (doc 14 C7 / decision D3-b).
+// ---------------------------------------------------------------------------
+
+/**
+ * `login` throws `ApiError { kind: "conflict", code: "TOTP_REQUIRED" }` for an
+ * account with 2FA on; the 409 body carries a one-shot `challengeToken` worth
+ * five minutes. This reads it, and is null for every other error — so the
+ * caller can branch on "is this a 2FA prompt" with one call.
+ */
+export function challengeTokenOf(error: unknown): string | null {
+  if (!(error instanceof ApiError) || error.code !== "TOTP_REQUIRED") return null;
+  const body = error.body as { challengeToken?: unknown } | null;
+  return typeof body?.challengeToken === "string" ? body.challengeToken : null;
+}
+
+/**
+ * `verifyTwoFactor` throws `ApiError { code: "INVALID_CODE" }` with
+ * `attemptsLeft` in the body; 0 means that was the last try and the challenge
+ * is now dead (the next call would be CHALLENGE_EXPIRED). Null when the error
+ * is anything else.
+ */
+export function attemptsLeftOf(error: unknown): number | null {
+  if (!(error instanceof ApiError) || error.code !== "INVALID_CODE") return null;
+  const body = error.body as { attemptsLeft?: unknown } | null;
+  return typeof body?.attemptsLeft === "number" ? body.attemptsLeft : null;
+}
+
+/**
+ * Body of POST /api/v1/auth/2fa/verify
+ * (apps/web/app/api/v1/auth/2fa/verify/route.ts bodySchema).
+ */
+export interface TwoFactorVerifyInput {
+  /** From the 409 TOTP_REQUIRED login response — see `challengeTokenOf`. */
+  challengeToken: string;
+  /** The 6-digit authenticator code, or one of the recovery codes. */
+  code: string;
+  /** Same display-only metadata `login` sends; lands on the auth_devices row. */
+  device?: {
+    name?: string;
+    platform?: "ios" | "android" | "web";
+    appVersion?: string;
+    installId?: string;
+  };
+}
+
+/**
+ * Finish a 2FA sign-in: the challenge plus the code become the same session
+ * `login` would have returned, and the tokens are persisted the same way.
+ *
+ *   401 INVALID_CODE       wrong code — `attemptsLeftOf(error)`
+ *   401 CHALLENGE_EXPIRED  start over at the password
+ *   429 RATE_LIMITED       per IP
+ */
+export async function verifyTwoFactor(
+  client: ApiClient,
+  input: TwoFactorVerifyInput,
+): Promise<LoginResponse> {
+  const data = await client.request<LoginResponse>("/api/v1/auth/2fa/verify", {
     method: "POST",
     body: input,
     auth: false,

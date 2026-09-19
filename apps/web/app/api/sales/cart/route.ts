@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireTenantWithBranch, requirePermissionWithBranch } from "@/lib/api/auth-helpers";
-import { recordCartSale } from "@/lib/repo/operations";
+import { findCartSaleByIdempotencyKey, recordCartSale } from "@/lib/repo/operations";
 import { logActivity } from "@/lib/repo/activity";
 import { normalizeEgyptPhone } from "@/lib/validators/egypt";
 import { isDomainError, domainErrorBody } from "@/lib/errors";
 import { checkTenantRateLimit } from "@/lib/api/tenant-rate-limit";
 import {
-  getCachedResponse,
+  IDEMPOTENCY_MISMATCH_BODY,
+  SALES_IDEMPOTENCY_INDEX,
+  isUniqueViolation,
+  lookupIdempotent,
   rememberResponse,
+  requestFingerprint,
+  sameCart,
   validateIdempotencyKey,
 } from "@/lib/api/idempotency";
 
@@ -66,12 +71,19 @@ export async function POST(req: NextRequest) {
 
   // Offline POS: replays of the same outbox row carry the same
   // Idempotency-Key. Short-circuit on a known key so the second POST
-  // returns the original response without re-running the sale.
+  // returns the original response without re-running the sale. The body is
+  // read first because the cached entry is bound to (user, body): the same
+  // key with a different sender or payload is refused (409), not replayed.
+  const body = await req.json().catch(() => null);
   const idemp = validateIdempotencyKey(req.headers.get("Idempotency-Key"));
-  if (idemp) {
-    const cached = await getCachedResponse(r.ctx.tenantId, idemp);
-    if (cached) {
-      return NextResponse.json(cached.body, { status: cached.status });
+  const fingerprint = idemp ? requestFingerprint(r.ctx.userId, body) : null;
+  if (idemp && fingerprint) {
+    const hit = await lookupIdempotent(r.ctx.tenantId, idemp, fingerprint);
+    if (hit.kind === "mismatch") {
+      return NextResponse.json(IDEMPOTENCY_MISMATCH_BODY, { status: 409 });
+    }
+    if (hit.kind === "replay") {
+      return NextResponse.json(hit.cached.body, { status: hit.cached.status });
     }
   }
 
@@ -92,7 +104,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
@@ -126,6 +137,9 @@ export async function POST(req: NextRequest) {
       recordedByUserId: r.ctx.userId,
       recordedByRole: r.ctx.role === "owner" ? "owner" : "staff",
       branchId: r.ctx.branchId,
+      // M3: lands on the anchor sales row under a partial unique index, so
+      // the replay guard survives a Redis flush / TTL expiry.
+      idempotencyKey: idemp ?? undefined,
     });
     const totalQty = result.lines.reduce((s, l) => s + l.quantity, 0);
     logActivity({
@@ -154,11 +168,35 @@ export async function POST(req: NextRequest) {
     });
     // Cache the response so a replay of the same Idempotency-Key returns
     // the original instead of re-running the sale.
-    if (idemp) {
-      await rememberResponse(r.ctx.tenantId, idemp, 201, result);
+    if (idemp && fingerprint) {
+      await rememberResponse(r.ctx.tenantId, idemp, 201, result, fingerprint);
     }
     return NextResponse.json(result, { status: 201 });
   } catch (err) {
+    // M3 durable replay: the Redis entry was gone (flushed / expired / Redis
+    // down) but the key is already on a sales row for this tenant. The
+    // anchor INSERT is the first write of the transaction, so nothing was
+    // booked twice. Answer exactly what the first call answered — after
+    // checking it is the same user and the same cart, since there is no
+    // fingerprint left to compare; anything else is 409 like the fast path.
+    if (idemp && fingerprint && isUniqueViolation(err, SALES_IDEMPOTENCY_INDEX)) {
+      const existing = await findCartSaleByIdempotencyKey(r.ctx.tenantId, idemp);
+      if (existing) {
+        const same = sameCart(
+          { userId: existing.recordedByUserId, lines: existing.lineKeys },
+          {
+            userId: r.ctx.userId,
+            lines: parsed.data.lines.map((l) => ({ productId: l.productId, quantity: l.quantity })),
+          },
+        );
+        if (!same) {
+          return NextResponse.json(IDEMPOTENCY_MISMATCH_BODY, { status: 409 });
+        }
+        // Re-warm the fast path so the next retry never reaches the DB.
+        await rememberResponse(r.ctx.tenantId, idemp, 201, existing.sale, fingerprint);
+        return NextResponse.json(existing.sale, { status: 201 });
+      }
+    }
     // Failures are NOT cached — only a 2xx is. A domain refusal (or a 500)
     // means nothing was booked, so replaying the key cannot double-post,
     // and the offline POS retries a refused sale under the SAME key with

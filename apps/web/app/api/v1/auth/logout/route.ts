@@ -8,6 +8,7 @@ import { pushTokens } from "@/lib/db/schema";
 import { isExpoPushToken } from "@/lib/push/expo-push";
 import { rateLimit } from "@/lib/ratelimit";
 import { hashRefreshToken } from "@/lib/api/native-token";
+import { markDevicesRevoked } from "@/lib/api/auth-helpers";
 import { clientIp } from "@/lib/request-ip";
 
 // Sign out ONE device.
@@ -72,18 +73,22 @@ export async function POST(req: Request) {
        SET revoked_at = now(), revoked_reason = 'logout'
      WHERE refresh_token_hash = ${tokenHash}
        AND revoked_at IS NULL
-    RETURNING user_id, tenant_id
-  `)) as unknown as Array<{ user_id: string; tenant_id: string }>;
+    RETURNING id, user_id, tenant_id
+  `)) as unknown as Array<{ id: string; user_id: string; tenant_id: string }>;
+
+  // H4 — the access token this device still holds names this row (`did`);
+  // mark it so the token dies now, not at its natural expiry. Best-effort.
+  await markDevicesRevoked(revoked.map((r) => r.id));
 
   // Same-device retry after the refresh token was already revoked: the push
   // token must still be silenced, so fall back to the (now revoked) row's owner.
   const owner =
     revoked[0] ??
     ((await db.execute(sql`
-      SELECT user_id, tenant_id FROM auth_devices
+      SELECT id, user_id, tenant_id FROM auth_devices
        WHERE refresh_token_hash = ${tokenHash}
        LIMIT 1
-    `)) as unknown as Array<{ user_id: string; tenant_id: string }>)[0];
+    `)) as unknown as Array<{ id: string; user_id: string; tenant_id: string }>)[0];
 
   const pushToken = isExpoPushToken(body.pushToken) ? body.pushToken : null;
   if (pushToken && owner) {

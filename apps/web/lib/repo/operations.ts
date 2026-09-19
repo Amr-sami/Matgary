@@ -594,6 +594,13 @@ export interface CartSaleOptions {
    *  product_history ("oversell: requested N, available M, …"). Interactive
    *  online sales keep the hard INSUFFICIENT_STOCK 400 (default false). */
   allowOversell?: boolean;
+  /** The validated Idempotency-Key of the request (doc 14 §10 M3). Written
+   *  on the cart's FIRST sales row under the partial unique index
+   *  sales_tenant_idempotency_key_idx (migration 0054), so a retry that
+   *  outlives (or never reaches) the Redis entry fails the anchor INSERT
+   *  with 23505 — inside the transaction, before any other line or stock
+   *  change commits — and the route answers with the existing cart. */
+  idempotencyKey?: string;
 }
 
 export interface CartSaleLineSummary {
@@ -943,6 +950,8 @@ async function recordCartSaleImpl(
           paymentMethod,
           ...computePaidFields(paymentMethod, totalPrice, linePaid),
           recordedByUserId: options.recordedByUserId ?? null,
+          // Anchor row only — see CartSaleOptions.idempotencyKey.
+          idempotencyKey: i === 0 ? options.idempotencyKey ?? null : null,
         })
         .returning({ id: sales.id });
 
@@ -1126,6 +1135,79 @@ async function recordCartSaleImpl(
     note: result.note,
     oversold: result.oversold,
   };
+}
+
+/**
+ * The cart a given Idempotency-Key already booked, rebuilt from its sales
+ * rows into the same shape `recordCartSale` returned the first time — what
+ * POST /api/sales/cart answers when the anchor INSERT hit
+ * sales_tenant_idempotency_key_idx (doc 14 §10 M3). Null when no cart
+ * carries the key for this tenant.
+ *
+ * Fidelity: every field a replay needs (invoice, sale ids, lines, total,
+ * payment, customer, note) comes straight off the rows. `oversold` is not
+ * persisted per cart and comes back empty; `saleIds` are ordered by
+ * insertion (sale_date, then id) — the anchor row first.
+ */
+export interface ReplayedCartSale {
+  /** Exactly the body the original 201 carried. */
+  sale: CartSaleResult;
+  /** Who booked it — the replay must come from the same user. */
+  recordedByUserId: string | null;
+  /** (productId, quantity) per row, so the route can tell a genuine retry
+   *  from a different cart reusing the key when Redis has no fingerprint. */
+  lineKeys: { productId: string; quantity: number }[];
+}
+
+export async function findCartSaleByIdempotencyKey(
+  tenantId: string,
+  idempotencyKey: string,
+): Promise<ReplayedCartSale | null> {
+  return withTenant(tenantId, async (tx) => {
+    const [anchor] = await tx
+      .select({ invoiceId: sales.invoiceId, id: sales.id })
+      .from(sales)
+      .where(
+        and(eq(sales.tenantId, tenantId), eq(sales.idempotencyKey, idempotencyKey)),
+      )
+      .limit(1);
+    if (!anchor) return null;
+    const rows = anchor.invoiceId
+      ? await tx
+          .select()
+          .from(sales)
+          .where(and(eq(sales.tenantId, tenantId), eq(sales.invoiceId, anchor.invoiceId)))
+          .orderBy(sales.saleDate, sales.id)
+      : await tx
+          .select()
+          .from(sales)
+          .where(and(eq(sales.tenantId, tenantId), eq(sales.id, anchor.id)));
+    if (rows.length === 0) return null;
+    // Anchor first regardless of uuid order — it is the line the key names.
+    rows.sort((a, b) => (a.id === anchor.id ? -1 : b.id === anchor.id ? 1 : 0));
+    const first = rows[0]!;
+    const lines: CartSaleLineSummary[] = rows.map((r) => ({
+      productName: r.productName,
+      quantity: r.quantitySold,
+      pricePerUnit: Number(r.pricePerUnit),
+      lineTotal: Number(r.totalPrice),
+    }));
+    return {
+      sale: {
+        invoiceId: anchor.invoiceId ?? "",
+        saleIds: rows.map((r) => r.id),
+        lines,
+        total: Math.round(lines.reduce((s, l) => s + l.lineTotal, 0) * 100) / 100,
+        paymentMethod: (first.paymentMethod ?? "cash") as PaymentMethod,
+        customerName: first.customerName,
+        customerPhone: first.customerPhone,
+        note: first.note,
+        oversold: [],
+      },
+      recordedByUserId: first.recordedByUserId,
+      lineKeys: rows.map((r) => ({ productId: r.productId, quantity: r.quantitySold })),
+    };
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1599,12 +1681,40 @@ export async function recordReturn(
   input: RecordReturnInput,
 ): Promise<{ returnId: string }> {
   const result = await withTenant(tenantId, async (tx) => {
+    // FOR UPDATE: two returns against the same line serialise here, so the
+    // second one sums the first one's row below instead of racing past the
+    // cap.
     const [sale] = await tx
       .select()
       .from(sales)
       .where(and(eq(sales.tenantId, tenantId), eq(sales.id, input.saleId)))
-      .limit(1);
+      .limit(1)
+      .for("update");
     if (!sale) throw new Error("البيع غير موجود");
+
+    // Cap: a line can give back at most what it sold, less what earlier
+    // returns already took back (doc 14 R25 — the route used to credit any
+    // quantity, 99 against a sale of 1 included). The returns rows are the
+    // ledger; `sales.returned_quantity` is kept as their running total below.
+    const [agg] = await tx
+      .select({
+        total: sql<number>`coalesce(sum(${returnsTable.returnedQuantity}), 0)::int`,
+      })
+      .from(returnsTable)
+      .where(
+        and(
+          eq(returnsTable.tenantId, tenantId),
+          eq(returnsTable.saleId, input.saleId),
+        ),
+      );
+    const alreadyReturned = Number(agg?.total ?? 0);
+    const maxQty = Math.max(0, sale.quantitySold - alreadyReturned);
+    if (input.returnedQuantity > maxQty) {
+      throw new DomainError("RETURN_EXCEEDS_SOLD", 400, {
+        lineId: input.saleId,
+        maxQty,
+      });
+    }
 
     // Re-credit the product's qty directly — multi-store products always
     // live at one branch so there's no ambiguity. allowNegative=true on the
@@ -1622,7 +1732,7 @@ export async function recordReturn(
       .set({
         isReturned: true,
         returnedAt: new Date(),
-        returnedQuantity: input.returnedQuantity,
+        returnedQuantity: alreadyReturned + input.returnedQuantity,
       })
       .where(and(eq(sales.tenantId, tenantId), eq(sales.id, input.saleId)));
 

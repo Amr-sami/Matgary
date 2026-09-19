@@ -46,8 +46,16 @@ export default function LoginScreen() {
   const locale = useLocale((s) => s.locale);
   const signingIn = useSession((s) => s.signingIn);
   const error = useSession((s) => s.signInError);
+  const challenge = useSession((s) => s.challenge);
 
   const canSubmit = identifier.trim().length >= 3 && password.length > 0;
+
+  // The password was right and the account has 2FA on: the store holds the
+  // one-shot challenge and the code screen takes over (doc 14 C7). Pushed,
+  // not replaced, so "back to sign in" pops onto this form with its values.
+  useEffect(() => {
+    if (challenge) router.push("/two-factor");
+  }, [challenge]);
 
   // Dev-only credential prefill.
   //

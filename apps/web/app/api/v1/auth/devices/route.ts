@@ -4,7 +4,7 @@ import { sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/lib/db";
-import { requireTenant } from "@/lib/api/auth-helpers";
+import { markDevicesRevoked, requireTenant } from "@/lib/api/auth-helpers";
 import { bearerFromHeader, verifyAccessToken } from "@/lib/api/native-token";
 import { revokeDeviceLineage } from "@/lib/api/native-devices";
 
@@ -91,12 +91,13 @@ export async function DELETE(req: Request) {
   }
 
   // This tombstone IS the per-device revocation: the row can never refresh
-  // again (lib/api/native-token.ts `judgeRefresh` → "revoked"). What it does
-  // NOT do is invalidate the access token the device currently holds — those
-  // are verified statelessly, so the device keeps working for the remaining
-  // life of that token, at most ACCESS_TTL_SEC (15 minutes), and is refused
-  // at its next refresh. Documented, accepted: the alternative is a database
-  // read on every authenticated request.
+  // again (lib/api/native-token.ts `judgeRefresh` → "revoked"). Access tokens
+  // are verified statelessly, so on its own it would leave the device working
+  // for the remaining life of the token it holds (≤ ACCESS_TTL_SEC); the
+  // revocation marker set below (H4, lib/api/auth-helpers.ts) closes that
+  // window — the bearer path answers 401 REVOKED on the device's very next
+  // request. Redis-backed and fail-open: without it the old 15-minute tail
+  // is what remains.
   //
   // The id the user tapped is the row the list showed — and a row's id
   // rotates on every refresh the device performs. `revokeDeviceLineage`
@@ -112,6 +113,7 @@ export async function DELETE(req: Request) {
   const result = await revokeDeviceLineage(auth.ctx.userId, parsed.data);
   switch (result.kind) {
     case "revoked":
+      await markDevicesRevoked(result.ids);
       return NextResponse.json({
         ok: true,
         revokedId: result.ids[0],

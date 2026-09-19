@@ -700,6 +700,11 @@ export const sales = pgTable(
     /** Cash drawer shift this sale was recorded on. Null on non-cash sales,
      *  legacy rows, or when reconciliation isn't enabled for the branch. */
     cashShiftId: uuid("cash_shift_id"),
+    /** The Idempotency-Key the offline outbox sent with the cart this row
+     *  anchors — set on the cart's FIRST line only, null everywhere else.
+     *  Backs the durable half of POST /api/sales/cart's replay protection
+     *  (migration 0054; Redis keeps the fast path). */
+    idempotencyKey: text("idempotency_key"),
   },
   (t) => [
     index("sales_tenant_date_idx").on(t.tenantId, t.saleDate),
@@ -708,6 +713,9 @@ export const sales = pgTable(
     index("sales_tenant_product_idx").on(t.tenantId, t.productId),
     index("sales_tenant_recorded_by_idx").on(t.tenantId, t.recordedByUserId),
     index("sales_tenant_branch_date_idx").on(t.tenantId, t.branchId, t.saleDate),
+    uniqueIndex("sales_tenant_idempotency_key_idx")
+      .on(t.tenantId, t.idempotencyKey)
+      .where(sql`idempotency_key IS NOT NULL`),
   ],
 );
 

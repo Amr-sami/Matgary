@@ -4,14 +4,19 @@ import { headers } from "next/headers";
 import type { Permission } from "@/lib/permissions";
 import { can } from "@/lib/permissions";
 import { logger } from "@/lib/logger";
-import { bearerFromHeader, verifyAccessToken } from "@/lib/api/native-token";
+import {
+  ACCESS_TTL_SEC,
+  bearerFromHeader,
+  verifyAccessToken,
+} from "@/lib/api/native-token";
+import { cacheGet, cacheSet, globalKey } from "@/lib/cache";
 import {
   enterRequestContext,
   getRequestContext,
   setRequestContext,
 } from "@/lib/request-context";
 import {
-  resolveActiveBranch,
+  resolveActiveBranchResult,
   type BranchContext,
 } from "./branch-context";
 
@@ -43,6 +48,103 @@ async function ensureRequestContext(
     requestId: reqId || crypto.randomUUID(),
     ...(patch ?? {}),
   });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Instant revocation (doc 14 §10 H4)
+//
+// Access tokens are verified statelessly, so a device the user revoked kept
+// working for the remaining life of its token (≤ ACCESS_TTL_SEC). This is the
+// small stateful supplement: every revocation path (sign out this device,
+// sign out everywhere, password change, 2FA toggle) drops a marker in Redis
+// keyed by the device row id (`did` claim) or the user id, with the access
+// TTL as its lifetime — by the time it expires, no token minted before the
+// revocation can still be valid. The bearer path consults both markers after
+// the signature check and answers 401 REVOKED.
+//
+// Fail-open, on purpose: lib/cache already swallows every Redis error into a
+// miss/no-op, so an outage degrades to the pre-H4 behaviour (revocation lands
+// at the next refresh) rather than locking every native client out.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** `revoked:did:<deviceId>` — the auth_devices row an access token names. */
+export function revokedDeviceKey(deviceId: string): string {
+  return globalKey("revoked", "did", deviceId);
+}
+
+/** `revoked:uid:<userId>` — every device of the user, set on a token_version
+ *  bump. */
+export function revokedUserKey(userId: string): string {
+  return globalKey("revoked", "uid", userId);
+}
+
+/** Marker value: when (ms since epoch) the revocation happened. */
+interface RevokedMark {
+  at: number;
+}
+
+/** Mark auth_devices rows as revoked for the access-token lifetime. Empty
+ *  ids (a token minted without a device row) are skipped. Never throws. */
+export async function markDevicesRevoked(deviceIds: readonly string[]): Promise<void> {
+  const ids = deviceIds.filter((id) => typeof id === "string" && id.length > 0);
+  if (ids.length === 0) return;
+  const mark: RevokedMark = { at: Date.now() };
+  try {
+    await Promise.all(ids.map((id) => cacheSet(revokedDeviceKey(id), mark, ACCESS_TTL_SEC)));
+  } catch (err) {
+    logger.warn({ event: "auth.revocation_mark_failed", scope: "device", err: String(err) });
+  }
+}
+
+/** Mark every access token of a user minted up to NOW as revoked, for the
+ *  access-token lifetime — the companion of a users.token_version bump. A
+ *  token the user mints afterwards (logging back in within the 15 minutes)
+ *  carries a later `iat` and passes. Never throws. */
+export async function markUserRevoked(userId: string): Promise<void> {
+  if (!userId) return;
+  const mark: RevokedMark = { at: Date.now() };
+  try {
+    await cacheSet(revokedUserKey(userId), mark, ACCESS_TTL_SEC);
+  } catch (err) {
+    logger.warn({ event: "auth.revocation_mark_failed", scope: "user", err: String(err) });
+  }
+}
+
+/** Pure verdict for the user-level marker: a token is revoked when it was
+ *  issued in a second EARLIER than the mark. `iat` is unix SECONDS (JWT), the
+ *  mark is ms, so both are compared at second precision: a token minted in the
+ *  same second as the revocation passes — the only session that can be is the
+ *  one the user is minting right now (sign-out-everywhere followed by an
+ *  immediate sign-in, or 2FA enable in the app, which bumps token_version and
+ *  is followed by the re-login the app forces); refusing it locked that user
+ *  out for the whole 15-minute window. A token with no readable iat (0) is old
+ *  by definition. A marker without a timestamp (never written by this code,
+ *  kept for robustness) revokes unconditionally. */
+export function issuedBeforeMark(iatSec: number | undefined, mark: unknown): boolean {
+  const at = (mark as RevokedMark | null | undefined)?.at;
+  if (typeof at !== "number") return true;
+  return (iatSec ?? 0) < Math.floor(at / 1000);
+}
+
+/** True when the device marker is present, or the user marker is present
+ *  and the token predates it. A Redis error reads as "not revoked" (cacheGet
+ *  returns null on failure) — see the fail-open note above. */
+export async function isRevoked(
+  userId: string,
+  deviceId: string,
+  iatSec?: number,
+): Promise<boolean> {
+  try {
+    const [byUser, byDevice] = await Promise.all([
+      cacheGet<unknown>(revokedUserKey(userId)),
+      deviceId ? cacheGet<unknown>(revokedDeviceKey(deviceId)) : Promise.resolve(null),
+    ]);
+    if (byDevice != null) return true;
+    return byUser != null && issuedBeforeMark(iatSec, byUser);
+  } catch (err) {
+    logger.warn({ event: "auth.revocation_check_failed", err: String(err) });
+    return false;
+  }
 }
 
 /**
@@ -86,6 +188,10 @@ export type AuthedBranchContext = AuthedContext & {
  */
 type SessionResult =
   | { kind: "none" }
+  /** A correctly signed access token whose device or user was revoked since
+   *  it was minted (H4). 401, distinct from "none" so the client signs out
+   *  instead of retrying the refresh. */
+  | { kind: "revoked" }
   | { kind: "ok"; ctx: AuthedContext }
   /** A valid token whose tenant/account state blocks the request. Mirrors the
    *  bodies middleware returns for cookie sessions, so a client handles one
@@ -123,6 +229,17 @@ async function resolveSession(opts: ResolveOptions = {}): Promise<SessionResult>
     // path: that would let an expired native token borrow a browser session
     // that happened to be attached to the same request.
     if (!claims) return { kind: "none" };
+
+    // H4 — instant revocation. Consulted right after the signature check so
+    // a revoked device cannot even learn which wall it stands behind.
+    if (await isRevoked(claims.sub, claims.did, claims.iat)) {
+      logger.info({
+        event: "native_auth.access_revoked",
+        userId: claims.sub,
+        deviceId: claims.did || null,
+      });
+      return { kind: "revoked" };
+    }
 
     // middleware.ts applies these three gates to cookie sessions and skips
     // them for bearer requests, because the edge runtime cannot verify the
@@ -193,6 +310,9 @@ export async function requireTenant(opts: ResolveOptions = {}): Promise<
   if (r.kind === "none") {
     return { ok: false, response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   }
+  if (r.kind === "revoked") {
+    return { ok: false, response: NextResponse.json({ error: "REVOKED" }, { status: 401 }) };
+  }
   if (r.kind === "blocked") {
     return {
       ok: false,
@@ -233,7 +353,10 @@ export async function requirePermission(perm: Permission): Promise<
  *
  * Returns 403 NO_BRANCH_ACCESS only when the user genuinely has zero
  * accessible branches (a misconfigured staff row); the migration guarantees
- * every tenant has a primary branch, so owners never hit this.
+ * every tenant has a primary branch, so owners never hit this. A native
+ * caller whose X-Branch-Id names a branch it cannot use (unknown, foreign,
+ * deactivated) gets 400 INVALID_BRANCH instead of a silent primary swap —
+ * see resolveActiveBranchResult.
  */
 export async function requireTenantWithBranch(opts: ResolveOptions = {}): Promise<
   | { ok: true; ctx: AuthedBranchContext }
@@ -241,16 +364,14 @@ export async function requireTenantWithBranch(opts: ResolveOptions = {}): Promis
 > {
   const r = await requireTenant(opts);
   if (!r.ok) return r;
-  const branch = await resolveActiveBranch(r.ctx);
-  if (!branch) {
+  const res = await resolveActiveBranchResult(r.ctx);
+  if (!res.ok) {
     return {
       ok: false,
-      response: NextResponse.json(
-        { error: "NO_BRANCH_ACCESS" },
-        { status: 403 },
-      ),
+      response: NextResponse.json({ error: res.error }, { status: res.status }),
     };
   }
+  const branch = res.branch;
   return {
     ok: true,
     ctx: {

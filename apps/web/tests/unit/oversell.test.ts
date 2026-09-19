@@ -45,16 +45,23 @@ vi.mock("@/lib/api/tenant-rate-limit", () => ({
 
 vi.mock("@/lib/repo/activity", () => ({ logActivity: vi.fn() }));
 
-/** In-memory idempotency store standing in for Redis. */
-const idempStore = new Map<string, { status: number; body: unknown }>();
+/** In-memory idempotency store standing in for Redis. The pure helpers
+ *  (fingerprint, classifyLookup, sameCart, isUniqueViolation, constants) are
+ *  the real ones; only the Redis-backed reads/writes are faked. */
+const idempStore = new Map<string, { status: number; body: unknown; at: number; fingerprint?: string }>();
 vi.mock("@/lib/api/idempotency", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api/idempotency")>("@/lib/api/idempotency");
   return {
-    validateIdempotencyKey: actual.validateIdempotencyKey,
+    ...actual,
     getCachedResponse: vi.fn(async (tenantId: string, key: string) => idempStore.get(`${tenantId}:${key}`) ?? null),
-    rememberResponse: vi.fn(async (tenantId: string, key: string, status: number, body: unknown) => {
-      idempStore.set(`${tenantId}:${key}`, { status, body });
-    }),
+    lookupIdempotent: vi.fn(async (tenantId: string, key: string, fingerprint: string) =>
+      actual.classifyLookup(idempStore.get(`${tenantId}:${key}`) ?? null, fingerprint),
+    ),
+    rememberResponse: vi.fn(
+      async (tenantId: string, key: string, status: number, body: unknown, fingerprint?: string) => {
+        idempStore.set(`${tenantId}:${key}`, { status, body, at: Date.now(), ...(fingerprint ? { fingerprint } : {}) });
+      },
+    ),
   };
 });
 
@@ -66,6 +73,8 @@ const repo = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/repo/operations", () => ({
+  // Only reached on a 23505 from the anchor row; the fake repo never raises one.
+  findCartSaleByIdempotencyKey: vi.fn(async () => null),
   recordCartSale: vi.fn(async (_tenantId: string, lines: Array<{ productId: string; quantity: number; pricePerUnit: number }>, options: Record<string, unknown>) => {
     repo.calls.push({ lines, options });
     const requested = lines.reduce((s, l) => s + l.quantity, 0);
@@ -177,7 +186,13 @@ describe("POST /api/sales/cart — S7 oversell + idempotency", () => {
 
     // Only the 2xx was remembered
     expect(rememberResponse).toHaveBeenCalledTimes(1);
-    expect(rememberResponse).toHaveBeenCalledWith(TENANT, KEY, 201, expect.objectContaining({ invoiceId: KEY }));
+    expect(rememberResponse).toHaveBeenCalledWith(
+      TENANT,
+      KEY,
+      201,
+      expect.objectContaining({ invoiceId: KEY }),
+      expect.any(String), // fingerprint of (user, body) — M3
+    );
   });
 
   it("a replay of a landed key returns the cached 201 without re-running the sale", async () => {

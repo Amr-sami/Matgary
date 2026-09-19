@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireTenant } from "@/lib/api/auth-helpers";
+import { markUserRevoked, requireTenant } from "@/lib/api/auth-helpers";
 import { disable2fa, TotpRateLimitedError } from "@/lib/repo/account-security";
 import { logActivity } from "@/lib/repo/activity";
 
@@ -23,6 +23,9 @@ export async function POST(req: NextRequest) {
   }
   try {
     await disable2fa(r.ctx.userId, parsed.data.password, parsed.data.code);
+    // disable2fa bumps users.token_version (sign out everywhere); H4 —
+    // access tokens already in native hands die now, not at expiry.
+    await markUserRevoked(r.ctx.userId);
     logActivity({
       tenantId: r.ctx.tenantId,
       actorUserId: r.ctx.userId,

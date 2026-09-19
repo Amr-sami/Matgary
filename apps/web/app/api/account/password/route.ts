@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireTenant } from "@/lib/api/auth-helpers";
+import { markUserRevoked, requireTenant } from "@/lib/api/auth-helpers";
 import { changeOwnPassword, TeamConflictError } from "@/lib/repo/team";
 import { logActivity } from "@/lib/repo/activity";
 import { bustUserContextCache } from "@/lib/auth";
@@ -46,6 +46,8 @@ export async function POST(req: NextRequest) {
     );
     // H09 — also invalidates every other live session for this user.
     await bumpTokenVersion(r.ctx.userId);
+    // H4 — access tokens already in native hands die now, not at expiry.
+    await markUserRevoked(r.ctx.userId);
     await bustUserContextCache(r.ctx.userId);
     logActivity({
       tenantId: r.ctx.tenantId,

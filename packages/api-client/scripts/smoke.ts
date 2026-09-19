@@ -9,7 +9,7 @@
  * It asserts the things that are easy to get subtly wrong and impossible to
  * see from a screenshot: that refresh rotates, that a rotated token is refused,
  * that concurrent 401s collapse into ONE refresh, and that a bogus branch id is
- * ignored rather than honoured.
+ * refused (400 INVALID_BRANCH) rather than honoured.
  */
 import { ApiClient, ApiError, auth, catalog, dashboard, me, sales } from "../src/index";
 import type { AuthTokens, TokenStore } from "../src/index";
@@ -94,12 +94,21 @@ async function main() {
     const switched = await me.getMe(client);
     check("X-Branch-Id switches branch", switched.branch.id === other.id, other.name);
 
+    // A header naming a branch the caller cannot use is REFUSED (400
+    // INVALID_BRANCH), never honoured and never silently swapped for the
+    // primary branch — the app must drop its stored branch and re-read /me.
     branchId = "00000000-0000-0000-0000-000000000000";
-    const bogus = await me.getMe(client);
+    let bogusErr: ApiError | null = null;
+    try {
+      await me.getMe(client);
+    } catch (e) {
+      if (e instanceof ApiError) bogusErr = e;
+      else throw e;
+    }
     check(
-      "a branch id outside the allow-list is ignored, not honoured",
-      bogus.branch.id !== "00000000-0000-0000-0000-000000000000",
-      `fell back to ${bogus.branch.name}`,
+      "a branch id outside the allow-list is refused, not honoured",
+      bogusErr?.status === 400 && bogusErr.code === "INVALID_BRANCH",
+      bogusErr ? `${bogusErr.status} ${bogusErr.code}` : "resolved a branch instead of refusing",
     );
     branchId = null;
   } else {

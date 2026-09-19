@@ -13,7 +13,8 @@ export type ApiErrorKind =
   | "offline"
   /** Reached the server, no answer in time. Retryable. */
   | "timeout"
-  /** Credentials rejected at sign-in. Not retryable. */
+  /** Credentials rejected at sign-in — password, 2FA code, or a spent 2FA
+   *  challenge. Not retryable. */
   | "credentials"
   /** Session is gone for good — revoked, reused, or refresh failed. Sign out. */
   | "session"
@@ -40,6 +41,14 @@ export class ApiError extends Error {
   readonly code: string | null;
   readonly status: number | null;
   readonly retryAfterSec: number | null;
+  /**
+   * The parsed JSON body of the failed response, when there was one. Most
+   * callers never need it — `kind` and `code` are the contract — but a few
+   * errors carry data the next step needs: the 409 TOTP_REQUIRED that holds
+   * a `challengeToken`, the 401 INVALID_CODE that holds `attemptsLeft`. Read
+   * it through a typed helper (endpoints/auth.ts), not inline.
+   */
+  readonly body: unknown;
 
   constructor(opts: {
     kind: ApiErrorKind;
@@ -47,6 +56,7 @@ export class ApiError extends Error {
     status?: number | null;
     message?: string;
     retryAfterSec?: number | null;
+    body?: unknown;
   }) {
     super(opts.message ?? opts.code ?? opts.kind);
     this.name = "ApiError";
@@ -54,6 +64,7 @@ export class ApiError extends Error {
     this.code = opts.code ?? null;
     this.status = opts.status ?? null;
     this.retryAfterSec = opts.retryAfterSec ?? null;
+    this.body = opts.body ?? null;
   }
 
   /**
@@ -108,7 +119,12 @@ export function classify(status: number, code: string | null): ApiErrorKind {
     case 400:
       return "validation";
     case 401:
-      return code === "INVALID_CREDENTIALS" ? "credentials" : "session";
+      // The three sign-in rejections: a wrong password, a wrong second
+      // factor, and a 2FA challenge that is no longer redeemable. None of
+      // them is about an existing session — there is none yet.
+      return code === "INVALID_CREDENTIALS" || code === "INVALID_CODE" || code === "CHALLENGE_EXPIRED"
+        ? "credentials"
+        : "session";
     case 402:
       // SUBSCRIPTION_REQUIRED. A wall, not a failure.
       return "billing";

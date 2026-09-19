@@ -11,6 +11,16 @@ import { useCart } from "@/stores/cart";
 
 type Status = "loading" | "signedOut" | "signedIn";
 
+/**
+ * What the two-factor screen renders under the code field. Structured, not
+ * a string, because the screen decides differently per case: a wrong code
+ * stays on the screen with the count, everything terminal (expiry, the last
+ * attempt burnt) clears `challenge` and lands on the login screen instead.
+ */
+export type TwoFactorError =
+  | { code: "INVALID_CODE"; attemptsLeft: number | null }
+  | { code: "OTHER"; message: string };
+
 interface SessionState {
   status: Status;
   me: MeResponse | null;
@@ -25,9 +35,28 @@ interface SessionState {
   /** Populated only by signIn, for the login form. Cleared on the next attempt. */
   signInError: string | null;
   signingIn: boolean;
+  /**
+   * A sign-in that passed the password and is waiting on the authenticator
+   * code: the one-shot challenge token the 409 TOTP_REQUIRED carried
+   * (doc 14 C7). In memory only — it is worth five minutes and one use, so
+   * there is nothing to persist; a relaunch starts over at the password.
+   * `status` stays "signedOut" meanwhile: the root layout's guards keep the
+   * public stack up, and the login screen pushes /two-factor when this is set.
+   */
+  challenge: string | null;
+  twoFactorError: TwoFactorError | null;
 
   bootstrap: () => Promise<void>;
   signIn: (identifier: string, password: string) => Promise<void>;
+  /**
+   * Second step of signIn: trade `challenge` plus the code for a session and
+   * finish exactly as signIn does (seeded from /me). Terminal failures —
+   * CHALLENGE_EXPIRED, the fifth wrong code — clear `challenge` and put the
+   * reason in `signInError`, so the login screen shows it after the pop.
+   */
+  verifyTwoFactor: (code: string) => Promise<void>;
+  /** "Back to sign in": drop the challenge; the server lets it expire. */
+  cancelTwoFactor: () => void;
   signOut: () => Promise<void>;
   switchBranch: (branchId: string) => Promise<void>;
   /**
@@ -183,6 +212,8 @@ export const useSession = create<SessionState>((set, get) => ({
   offline: false,
   signInError: null,
   signingIn: false,
+  challenge: null,
+  twoFactorError: null,
 
   /**
    * Called once at launch. A stored refresh token is worth 90 days, so the
@@ -247,7 +278,7 @@ export const useSession = create<SessionState>((set, get) => ({
   },
 
   async signIn(identifier, password) {
-    set({ signingIn: true, signInError: null });
+    set({ signingIn: true, signInError: null, challenge: null, twoFactorError: null });
     try {
       await auth.login(api, {
         identifier: identifier.trim(),
@@ -265,8 +296,81 @@ export const useSession = create<SessionState>((set, get) => ({
       adoptMe(me);
       set({ status: "signedIn", me, offline: false, signingIn: false });
     } catch (error) {
+      // The password was right and the account has 2FA on: not an error to
+      // show, a step to take. The login screen routes to /two-factor on this.
+      const challenge = auth.challengeTokenOf(error);
+      if (challenge) {
+        set({ signingIn: false, challenge, twoFactorError: null });
+        return;
+      }
       set({ signingIn: false, signInError: messageFor(error) });
     }
+  },
+
+  async verifyTwoFactor(code) {
+    const challengeToken = get().challenge;
+    if (!challengeToken || get().signingIn) return;
+    set({ signingIn: true, twoFactorError: null });
+
+    // Terminal: the challenge is gone server-side, so it goes here too. The
+    // reason lands where the login screen already shows sign-in failures.
+    const startOver = (message: string) =>
+      set({ signingIn: false, challenge: null, twoFactorError: null, signInError: message });
+
+    try {
+      await auth.verifyTwoFactor(api, {
+        challengeToken,
+        code: code.trim(),
+        device: {
+          name: Device.deviceName ?? Device.modelName ?? undefined,
+          platform: deviceMeta.platform,
+          appVersion: deviceMeta.appVersion,
+          installId: await getInstallId(),
+        },
+      });
+    } catch (error) {
+      if (error instanceof ApiError && error.code === "CHALLENGE_EXPIRED") {
+        startOver(t("mobile.twoFactor.expired"));
+        return;
+      }
+      if (error instanceof ApiError && error.code === "INVALID_CODE") {
+        const attemptsLeft = auth.attemptsLeftOf(error);
+        // 0 means that was the last one: the server has already killed the
+        // challenge, and a retry would only answer CHALLENGE_EXPIRED.
+        if (attemptsLeft === 0) {
+          startOver(t("mobile.twoFactor.tooManyAttempts"));
+          return;
+        }
+        set({ signingIn: false, twoFactorError: { code: "INVALID_CODE", attemptsLeft } });
+        return;
+      }
+      set({ signingIn: false, twoFactorError: { code: "OTHER", message: messageFor(error) } });
+      return;
+    }
+
+    // The challenge is spent and the tokens are stored: from here on this is
+    // signIn's tail. A /me that fails now (the connection dropped between the
+    // two requests) is reported on the login screen, and the next attempt
+    // mints a fresh challenge — the spent one must not be retried.
+    try {
+      const me = await meApi.getMe(api);
+      adoptMe(me);
+      set({
+        status: "signedIn",
+        me,
+        offline: false,
+        signingIn: false,
+        challenge: null,
+        twoFactorError: null,
+        signInError: null,
+      });
+    } catch (error) {
+      startOver(messageFor(error));
+    }
+  },
+
+  cancelTwoFactor() {
+    set({ challenge: null, twoFactorError: null, signInError: null });
   },
 
   async adoptSession() {
@@ -297,7 +401,7 @@ export const useSession = create<SessionState>((set, get) => ({
   async signOut() {
     await auth.logout(api);
     applyBranch(null);
-    set({ status: "signedOut", me: null, offline: false, signInError: null });
+    set({ status: "signedOut", me: null, offline: false, signInError: null, challenge: null });
   },
 
   /**

@@ -379,6 +379,13 @@
       "when": 1781900800000,
       "tag": "0053_products_norm_sku_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1781900900000,
+      "tag": "0054_sales_idempotency_key",
+      "breakpoints": true
     }
   ]
 }

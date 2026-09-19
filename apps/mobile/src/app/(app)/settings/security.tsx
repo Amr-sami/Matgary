@@ -222,8 +222,7 @@ export default function SecurityScreen() {
   // instead would be wrong: every button below MOVES this machine, and a
   // cached 2fa-status must not drag it back.
   const [status, setStatus] = useState<Status | null>(null);
-  // C7: enrolment starts on the web for now, so the preview is never set here.
-  const [preview] = useState<EnrollmentPreview | null>(null);
+  const [preview, setPreview] = useState<EnrollmentPreview | null>(null);
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
@@ -309,6 +308,20 @@ export default function SecurityScreen() {
       ],
     );
   };
+
+  // Enrolment is native again (doc 14 C7 proper fix): the app now answers a
+  // TOTP_REQUIRED login through /api/v1/auth/2fa/verify and the two-factor
+  // screen, so turning 2FA on here no longer locks the owner out of the app.
+  const startEnroll = useMutation({
+    mutationFn: () =>
+      api.request<EnrollmentPreview>("/api/account/2fa/start", { method: "POST" }),
+    onSuccess: (p) => {
+      setError(null);
+      setPreview(p);
+      setStatus("enrolling");
+    },
+    onError: (e) => setError(errorText(e, t("app.accountSecurity.errors.startFailed"))),
+  });
 
   const confirmEnroll = useMutation({
     mutationFn: () =>
@@ -519,9 +532,13 @@ export default function SecurityScreen() {
           <Text style={styles.body}>
             {t("mobile.settings.currentStatus")} <Text style={styles.bodyStrong}>{t("app.accountSecurity.statusOff")}</Text>
           </Text>
-          {/* C7: enrolment stays on the web until the app can answer a
-              TOTP_REQUIRED login (POST /api/v1/auth/2fa/verify + code screen). */}
-          <Text style={styles.body}>{t("mobile.security.twoFactorOnWeb")}</Text>
+          <View style={styles.stack} testID="security-enable-2fa">
+            <Button
+              label={t("app.accountSecurity.enableButton")}
+              onPress={() => startEnroll.mutate()}
+              loading={startEnroll.isPending}
+            />
+          </View>
         </Card>
       ) : null}
 
@@ -559,6 +576,7 @@ export default function SecurityScreen() {
                 variant="ghost"
                 onPress={() => {
                   setStatus("off");
+                  setPreview(null);
                   setCode("");
                 }}
                 style={styles.flex1}

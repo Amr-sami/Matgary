@@ -72,6 +72,11 @@ export interface AccessClaims {
   mcp: boolean;
   /** Subscription grants access right now. */
   sub_ok: boolean;
+  /** Issued-at, unix seconds, as read back by `verifyAccessToken` (0 when the
+   *  token carries none). Set by `signAccessToken` itself — callers never
+   *  supply it. The revocation check (lib/api/auth-helpers.ts, H4) uses it
+   *  to let a token minted AFTER a "sign out everywhere" through. */
+  iat?: number;
 }
 
 function secret(): Uint8Array {
@@ -133,6 +138,7 @@ export async function verifyAccessToken(
       // Absent claim means "not granted". Failing closed matters here: a token
       // minted before this field existed must not imply a paid subscription.
       sub_ok: p.sub_ok === true,
+      iat: typeof payload.iat === "number" ? payload.iat : 0,
     };
   } catch {
     return null;
@@ -220,4 +226,83 @@ export function judgeRefresh(
   if (row.expired) return { kind: "expired" };
   if (row.tokenVersion !== liveTokenVersion) return { kind: "stale_version" };
   return { kind: "ok" };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2FA challenge token (doc 14 C7 / decision D3-b)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// A native login whose password checked out but whose account has TOTP on
+// gets a CHALLENGE instead of a session: a short-lived JWT that proves "this
+// caller knew the password a moment ago" and nothing more. It is exchanged
+// for a real session by /api/v1/auth/2fa/verify together with the code.
+//
+// Shape decisions:
+//   - Its OWN audience. `verifyAccessToken` pins AUDIENCE, so a challenge can
+//     never be presented as a bearer, and an access token can never be
+//     replayed as a challenge. The `purpose` claim is belt to that brace.
+//   - A jti, so Redis can hold "still redeemable + attempts so far" and the
+//     token is one-shot (lib/api/native-login.ts). The JWT alone is stateless
+//     and would otherwise be replayable for its whole life.
+//   - Five minutes: long enough to open an authenticator app, short enough
+//     that a token lifted from a log is worthless by the time it is read.
+
+export const CHALLENGE_TTL_SEC = 5 * 60;
+const CHALLENGE_AUDIENCE = "matgary-native-2fa";
+const CHALLENGE_PURPOSE = "2fa";
+
+export interface ChallengeClaims {
+  sub: string;
+  tenantId: string;
+  jti: string;
+  /** Unix seconds. Lets the redeem step size its Redis TTL to the token's. */
+  exp: number;
+}
+
+export function mintChallengeId(): string {
+  return randomBytes(16).toString("base64url");
+}
+
+export async function signChallengeToken(
+  claims: Pick<ChallengeClaims, "sub" | "tenantId" | "jti">,
+): Promise<string> {
+  return new SignJWT({ tenantId: claims.tenantId, purpose: CHALLENGE_PURPOSE })
+    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .setSubject(claims.sub)
+    .setJti(claims.jti)
+    .setIssuer(ISSUER)
+    .setAudience(CHALLENGE_AUDIENCE)
+    .setIssuedAt()
+    .setExpirationTime(`${CHALLENGE_TTL_SEC}s`)
+    .sign(secret());
+}
+
+/**
+ * Verify a challenge token. Null for ANY failure — bad signature, wrong
+ * audience (an access token), wrong purpose, expired, malformed. The caller
+ * answers every null with the same CHALLENGE_EXPIRED so the response cannot
+ * be used to tell a forged token from a stale one.
+ */
+export async function verifyChallengeToken(
+  token: string,
+): Promise<ChallengeClaims | null> {
+  try {
+    const { payload } = await jwtVerify(token, secret(), {
+      issuer: ISSUER,
+      audience: CHALLENGE_AUDIENCE,
+    });
+    const p = payload as JWTPayload & { tenantId?: unknown; purpose?: unknown };
+    if (
+      !payload.sub ||
+      !payload.jti ||
+      typeof payload.exp !== "number" ||
+      p.purpose !== CHALLENGE_PURPOSE ||
+      typeof p.tenantId !== "string"
+    ) {
+      return null;
+    }
+    return { sub: payload.sub, tenantId: p.tenantId, jti: payload.jti, exp: payload.exp };
+  } catch {
+    return null;
+  }
 }

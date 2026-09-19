@@ -11,7 +11,9 @@
  */
 import { openDatabaseSync, type SQLiteDatabase } from "expo-sqlite";
 import { drizzle, type ExpoSQLiteDatabase } from "drizzle-orm/expo-sqlite";
+import { Platform } from "react-native";
 
+import { setExcludedFromBackup } from "../../modules/backup-exclusion";
 import * as schema from "./schema";
 
 export const DB_NAME = "thestoro.db";
@@ -69,6 +71,27 @@ const POST_DDL = [
 let sqliteHandle: SQLiteDatabase | null = null;
 let drizzleHandle: ExpoSQLiteDatabase<typeof schema> | null = null;
 
+/**
+ * Keep the store out of iCloud / Finder backups (doc 14 C13, security M2):
+ * it is a replayable cache of tenant data plus the outbox, not something a
+ * restored device should carry across. iOS only — Android is covered app-wide
+ * by `allowBackup: false` in app.config.ts. Runs once per process, right
+ * after the schema is in place so the -wal / -shm siblings already exist
+ * (WAL mode creates them on the first write). Best effort: a missing native
+ * module (web, a build made before `npm run ios:prebuild`) or a failed
+ * attribute write must never block opening the database.
+ */
+function excludeFromBackup(handle: SQLiteDatabase) {
+  if (Platform.OS !== "ios") return;
+  try {
+    const base = handle.databasePath;
+    if (!base || base === ":memory:") return;
+    for (const path of [base, `${base}-wal`, `${base}-shm`]) setExcludedFromBackup(path, true);
+  } catch {
+    // never block the DB on backup hygiene
+  }
+}
+
 function ensureSchema(handle: SQLiteDatabase) {
   handle.execSync("PRAGMA journal_mode = WAL");
   handle.execSync("PRAGMA busy_timeout = 3000");
@@ -92,6 +115,7 @@ export function getSqlite(): SQLiteDatabase {
   if (!sqliteHandle) {
     sqliteHandle = openDatabaseSync(DB_NAME);
     ensureSchema(sqliteHandle);
+    excludeFromBackup(sqliteHandle);
   }
   return sqliteHandle;
 }
