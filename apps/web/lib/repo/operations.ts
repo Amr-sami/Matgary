@@ -154,7 +154,8 @@ async function adjustProductStock(
     )
     .limit(1);
   if (!row) {
-    throw new Error("المنتج غير موجود");
+    // Typed so the legacy single-line POST /api/sales answers 404, not a 500.
+    throw new DomainError("PRODUCT_NOT_FOUND", 404, { message: "المنتج غير موجود" });
   }
   // S7 oversell: a sale that physically already happened may take more
   // than the shelf shows — drive the quantity to the floor, never below.
@@ -162,7 +163,14 @@ async function adjustProductStock(
     ? Math.max(0, row.quantity + delta)
     : row.quantity + delta;
   if (next < 0 && !opts.allowNegative) {
-    throw new Error("الكمية المطلوبة غير متوفرة في هذا الفرع");
+    // Same code the cart route uses, so every client sees one INSUFFICIENT_STOCK
+    // (the plain Error used to surface as 500 INTERNAL on POST /api/sales).
+    throw new DomainError("INSUFFICIENT_STOCK", 400, {
+      message: "الكمية المطلوبة غير متوفرة في هذا الفرع",
+      productId,
+      available: row.quantity,
+      requested: -delta,
+    });
   }
   await tx
     .update(products)
