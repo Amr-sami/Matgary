@@ -30,6 +30,7 @@
 appId: com.thestoro.app
 ---
 - launchApp
+- runFlow: helpers/dev-launcher.yaml
 - extendedWaitUntil:
     visible:
       text: "المزيد|More|تسجيل الدخول|Sign in"
@@ -43,7 +44,7 @@ appId: com.thestoro.app
 # Dashboard: the chip and its label.
 - runFlow: helpers/dismiss-logbox.yaml
 - tapOn:
-    text: "لوحة|Home"
+    text: "الرئيسية|Home"
 - extendedWaitUntil:
     visible:
       id: "branch-chip-label"
@@ -99,6 +100,7 @@ appId: com.thestoro.app
 
 # The choice is persisted: a cold start comes back on the new branch.
 - launchApp
+- runFlow: helpers/dev-launcher.yaml
 - extendedWaitUntil:
     visible:
       id: "branch-chip-label"

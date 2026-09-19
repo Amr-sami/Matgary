@@ -1,0 +1,45 @@
+# Dev client only: a cold launch (every Maestro launchApp) can land on the
+# expo-dev-client launcher instead of the last bundle. Wait for either the
+# launcher or the app, then tap the Metro entry when it is the launcher — a
+# no-op otherwise. Run it right after every `launchApp`.
+#
+# The launcher lists the Metro URL as 127.0.0.1 on iOS and as localhost on
+# Android (adb reverse). The app-side alternatives are the More tab label and
+# the sign-in title, whichever locale the app was left in.
+#
+# On a loaded machine the dev client can time out on Metro and raise the
+# "Error loading app" alert; dismiss it and try the entry once more.
+appId: com.thestoro.app
+---
+- extendedWaitUntil:
+    visible:
+      text: "http://127.0.0.1:8081|http://localhost:8081|المزيد|More|تسجيل الدخول|Sign in"
+    timeout: 45000
+- runFlow:
+    when:
+      visible:
+        text: "http://127.0.0.1:8081|http://localhost:8081"
+    commands:
+      - tapOn:
+          text: "http://127.0.0.1:8081|http://localhost:8081"
+      - extendedWaitUntil:
+          visible:
+            text: "المزيد|More|تسجيل الدخول|Sign in|Error loading app"
+          timeout: 60000
+      - runFlow:
+          when:
+            visible:
+              text: "Error loading app"
+          commands:
+            - tapOn:
+                text: "OK"
+            - tapOn:
+                text: "http://127.0.0.1:8081|http://localhost:8081"
+            - extendedWaitUntil:
+                visible:
+                  text: "المزيد|More|تسجيل الدخول|Sign in"
+                timeout: 60000
+# The bar renders before the session/dashboard hydration settles; a tab tap in
+# that window can be dropped. Let the screen go static before the flow acts.
+- waitForAnimationToEnd:
+    timeout: 5000

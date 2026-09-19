@@ -20,6 +20,7 @@ env:
   STAFF_PW: "Cashier123!"
 ---
 - launchApp
+- runFlow: helpers/dev-launcher.yaml
 - extendedWaitUntil:
     visible:
       text: "المزيد|More|تسجيل الدخول|Sign in"
@@ -34,6 +35,9 @@ env:
       - runFlow: helpers/dismiss-logbox.yaml
       - tapOn:
           text: "المزيد|More"
+          # A tab press right after a cold launch is occasionally dropped
+          # while the shell hydrates; retry when the screen did not change.
+          retryTapIfNoChange: true
       - scrollUntilVisible:
           element:
             text: "تسجيل الخروج|Sign out"

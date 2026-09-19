@@ -7,6 +7,7 @@
 appId: com.thestoro.app
 ---
 - launchApp
+- runFlow: helpers/dev-launcher.yaml
 - extendedWaitUntil:
     visible:
       text: "المزيد|More|تسجيل الدخول|Sign in"
@@ -24,7 +25,8 @@ appId: com.thestoro.app
       id: "pos-recent-chip"
     timeout: 30000
 - assertVisible:
-    text: "منتجات حديثة:|Recent products:"
+    # The label lost its trailing colon in the visual audit; accept both.
+    text: "منتجات حديثة:?|Recent products:?"
 
 - tapOn:
     id: "pos-recent-chip"
@@ -69,12 +71,12 @@ appId: com.thestoro.app
 
 - scrollUntilVisible:
     element:
-      text: "كاش|Cash"
+      text: "نقدي|Cash"
     direction: DOWN
     centerElement: true
     timeout: 20000
 - tapOn:
-    text: "كاش|Cash"
+    text: "نقدي|Cash"
 
 - scrollUntilVisible:
     element:
@@ -86,16 +88,15 @@ appId: com.thestoro.app
     text: "تسجيل الفاتورة|Record sale"
 
 # The result card: title, then the receipt lines + total.
-- extendedWaitUntil:
-    visible:
-      id: "pos-sale-result"
-    timeout: 45000
+# The card mounts above the form; the ScrollView keeps its offset, so the
+# success head sits above the viewport (and off the iOS hierarchy) until we
+# scroll up — scroll first, then assert.
 - scrollUntilVisible:
     element:
       id: "pos-sale-result"
     direction: UP
     centerElement: true
-    timeout: 20000
+    timeout: 45000
 - assertVisible:
     text: "تم تسجيل البيع بنجاح|Sale recorded"
 - assertVisible:
@@ -111,6 +112,6 @@ appId: com.thestoro.app
     text: "بيع جديد|New sale"
 - runFlow: helpers/dismiss-logbox.yaml
 - tapOn:
-    text: "لوحة|Home"
+    text: "الرئيسية|Home"
 - assertVisible:
     text: "أهلاً، .+|Welcome back, .+"

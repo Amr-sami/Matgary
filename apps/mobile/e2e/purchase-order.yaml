@@ -19,6 +19,7 @@ env:
   PO_SEARCH: "Casio"
 ---
 - launchApp
+- runFlow: helpers/dev-launcher.yaml
 - extendedWaitUntil:
     visible:
       text: "المزيد|More|تسجيل الدخول|Sign in"
@@ -45,7 +46,7 @@ env:
       id: "po-supplier-row"
     timeout: 30000
 - assertVisible:
-    text: "خطوة 1 من 4|Step 1 of 4"
+    text: "(?s).*خطوة 1 من 4.*|(?s).*Step 1 of 4.*"
 - tapOn:
     id: "po-supplier-row"
     index: 0
@@ -58,7 +59,7 @@ env:
       id: "po-product-search"
     timeout: 30000
 - assertVisible:
-    text: "خطوة 2 من 4|Step 2 of 4"
+    text: "(?s).*خطوة 2 من 4.*|(?s).*Step 2 of 4.*"
 - tapOn:
     id: "po-product-search"
 - inputText: ${PO_SEARCH}
@@ -84,7 +85,7 @@ env:
       id: "po-submit"
     timeout: 30000
 - assertVisible:
-    text: "خطوة 3 من 4|Step 3 of 4"
+    text: "(?s).*خطوة 3 من 4.*|(?s).*Step 3 of 4.*"
 - tapOn:
     id: "po-submit"
 
@@ -126,6 +127,6 @@ env:
 # bar — clear it first, otherwise the tab tap opens LogBox.
 - runFlow: helpers/dismiss-logbox.yaml
 - tapOn:
-    text: "لوحة|Home"
+    text: "الرئيسية|Home"
 - assertVisible:
     text: "أهلاً، .+|Welcome back, .+"

@@ -11,6 +11,7 @@
 appId: com.thestoro.app
 ---
 - launchApp
+- runFlow: helpers/dev-launcher.yaml
 - extendedWaitUntil:
     visible:
       text: "المزيد|More|تسجيل الدخول|Sign in"
@@ -57,7 +58,7 @@ appId: com.thestoro.app
     timeout: 20000
 # The store now says offline: the banner is up.
 - assertVisible:
-    text: "مفيش اتصال بالإنترنت.*|No internet connection.*"
+    text: "لا يوجد اتصال بالإنترنت.*|No internet connection.*"
 
 # Sales → add a recent product (fall through to the next chip if the first is out of stock).
 - tapOn:
@@ -104,12 +105,12 @@ appId: com.thestoro.app
 
 - scrollUntilVisible:
     element:
-      text: "كاش|Cash"
+      text: "نقدي|Cash"
     direction: DOWN
     centerElement: true
     timeout: 20000
 - tapOn:
-    text: "كاش|Cash"
+    text: "نقدي|Cash"
 - scrollUntilVisible:
     element:
       text: "تسجيل الفاتورة|Record sale"
@@ -120,16 +121,15 @@ appId: com.thestoro.app
     text: "تسجيل الفاتورة|Record sale"
 
 # The card: queued, NOT synced (§6.4 — never say synced until the engine does).
-- extendedWaitUntil:
-    visible:
-      id: "pos-sale-result"
-    timeout: 45000
+# The card mounts above the form; the ScrollView keeps its offset, so the
+# success head sits above the viewport (and off the iOS hierarchy) until we
+# scroll up — scroll first, then assert.
 - scrollUntilVisible:
     element:
       id: "pos-sale-result"
     direction: UP
     centerElement: true
-    timeout: 20000
+    timeout: 45000
 - assertVisible:
     id: "pos-sync-pending"
 - assertNotVisible:

@@ -17,6 +17,7 @@ env:
   REASON: "e2e — عيب في المنتج"
 ---
 - launchApp
+- runFlow: helpers/dev-launcher.yaml
 - extendedWaitUntil:
     visible:
       text: "المزيد|More|تسجيل الدخول|Sign in"
@@ -119,6 +120,6 @@ env:
 # Back to the dashboard.
 - runFlow: helpers/dismiss-logbox.yaml
 - tapOn:
-    text: "لوحة|Home"
+    text: "الرئيسية|Home"
 - assertVisible:
     text: "أهلاً، .+|Welcome back, .+"

@@ -18,17 +18,8 @@
 appId: com.thestoro.app
 ---
 - launchApp
-
-# Dev client only: a cold launch can land on the launcher instead of the last
-# bundle. Tap the Metro entry when it shows; a no-op otherwise.
-# Dev-client launcher: iOS lists the Metro URL as 127.0.0.1, Android (adb reverse) as localhost.
-- runFlow:
-    when:
-      visible:
-        text: "http://127.0.0.1:8081|http://localhost:8081"
-    commands:
-      - tapOn:
-          text: "http://127.0.0.1:8081|http://localhost:8081"
+# Dev-client launcher guard (waits for launcher-or-app, taps through the launcher).
+- runFlow: helpers/dev-launcher.yaml
 
 - extendedWaitUntil:
     visible:
@@ -43,6 +34,9 @@ appId: com.thestoro.app
     commands:
       - tapOn:
           text: "المزيد|More"
+          # A tab press right after a cold launch is occasionally dropped
+          # while the shell hydrates; retry when the screen did not change.
+          retryTapIfNoChange: true
       - scrollUntilVisible:
           element:
             text: "تسجيل الخروج|Sign out"

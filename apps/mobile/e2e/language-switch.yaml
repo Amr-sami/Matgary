@@ -11,6 +11,7 @@
 appId: com.thestoro.app
 ---
 - launchApp
+- runFlow: helpers/dev-launcher.yaml
 - extendedWaitUntil:
     visible:
       text: "المزيد|More|تسجيل الدخول|Sign in"
@@ -155,6 +156,6 @@ appId: com.thestoro.app
 
 # Finish on the dashboard, in Arabic.
 - tapOn:
-    text: "لوحة"
+    text: "الرئيسية"
 - assertVisible:
     text: "أهلاً، .+"
