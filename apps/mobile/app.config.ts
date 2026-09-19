@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import type { ExpoConfig } from "expo/config";
 
 // Dynamic config. Values that differ per build (EAS project id, API base URL)
@@ -29,6 +31,10 @@ import type { ExpoConfig } from "expo/config";
 // EAS project id — written by `eas init`. Absent locally, so the dev client
 // never tries to reach the update server and `expo config` still parses.
 const EAS_PROJECT_ID = process.env.EAS_PROJECT_ID || undefined;
+const GOOGLE_SERVICES_JSON = (() => {
+  const p = process.env.GOOGLE_SERVICES_JSON || "./google-services.json";
+  return fs.existsSync(path.resolve(__dirname, p)) ? p : undefined;
+})();
 
 // Fail fast on the EAS build worker (EAS sets EAS_BUILD=true on every worker;
 // local `expo config` / dev-client builds are unaffected). Without the project
@@ -144,6 +150,16 @@ const config: ExpoConfig = {
   android: {
     package: "com.thestoro.app",
     versionCode: 1,
+    // Device backups would copy thestoro.db (customer PII + unsynced outbox
+    // rows) to the user's Google account; the outbox is re-fetched from the
+    // server anyway (C13 / security M2).
+    allowBackup: false,
+    // FCM config for push (expo-notifications). On EAS the file comes from a
+    // secret (`eas env:create --type file GOOGLE_SERVICES_JSON`); locally it
+    // is gitignored, and without it every Android push registration ends in
+    // "Default FirebaseApp is not initialized" (C12). Only referenced when
+    // present so `expo prebuild` keeps working on a machine without it.
+    ...(GOOGLE_SERVICES_JSON ? { googleServicesFile: GOOGLE_SERVICES_JSON } : {}),
     adaptiveIcon: {
       backgroundColor: "#FFFFFF",
       foregroundImage: "./assets/images/android-icon-foreground.png",
@@ -180,8 +196,11 @@ const config: ExpoConfig = {
     [
       "expo-image-picker",
       {
-        photosPermission: "نحتاج الوصول للصور لإضافة صورة الصنف",
+        photosPermission: "نحتاج الوصول للصور لإضافة صورة الصنف أو شعار الفاتورة",
         cameraPermission: "نحتاج الكاميرا لمسح الباركود وتصوير الأصناف",
+        // The picker never records video: no RECORD_AUDIO on Android, no
+        // placeholder NSMicrophoneUsageDescription on iOS (C9).
+        microphonePermission: false,
       },
     ],
     "expo-background-task",
@@ -208,7 +227,11 @@ const config: ExpoConfig = {
       {
         // Attendance check-in geofence; foreground only.
         locationWhenInUsePermission: "نحتاج موقعك لتسجيل الحضور داخل نطاق المتجر",
+        locationAlwaysAndWhenInUsePermission: false,
+        locationAlwaysPermission: false,
+        motionUsagePermission: false,
         isAndroidBackgroundLocationEnabled: false,
+        isIosBackgroundLocationEnabled: false,
       },
     ],
     [
