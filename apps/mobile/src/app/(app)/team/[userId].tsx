@@ -510,6 +510,7 @@ export default function TeamMemberScreen() {
 
           {/* Compensation — owner only, like the web */}
           {!targetIsOwner ? (
+            <View testID="team-payroll" collapsable={false}>
             <Card title={t("app.team.tabs.payroll")}>
               {!meIsOwner ? (
                 <Text style={styles.hint}>{t("app.team.compensation.ownerOnly")}</Text>
@@ -537,6 +538,7 @@ export default function TeamMemberScreen() {
                 </>
               )}
             </Card>
+            </View>
           ) : null}
 
           {/* Attendance this month */}
