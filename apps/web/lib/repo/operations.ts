@@ -28,6 +28,21 @@ import {
   earnPoints as walletEarnPoints,
   redeemPoints as walletRedeemPoints,
 } from "@/lib/repo/loyalty";
+import { resolveCollectionsFeatures } from "@/lib/collections/flags";
+import type { CollectionPartInput } from "@/lib/collections/math";
+import {
+  NO_SALE_COLLECTIONS,
+  createSaleCollections,
+  createSettlementCollection,
+  lockCollectionsForSales,
+  onSaleLinesDeleted,
+  onSaleReturned,
+  onSaleUpdated,
+  saleCollectionIdsForInvoice,
+  type SaleCollectionsResult,
+} from "@/lib/repo/collections";
+import { flushMatchEffects } from "@/lib/repo/collection-matching";
+import { isDigitalMethod } from "@matgary/domain/collections/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -75,6 +90,8 @@ function rowToSale(r: typeof sales.$inferSelect): Sale {
     paidAt: r.paidAt ?? undefined,
     amountPaid: Number(r.amountPaid ?? 0),
     partialPaidAt: r.partialPaidAt ?? undefined,
+    // Digital collections (0055): the invoice-level verification status.
+    collectionStatus: (r.collectionStatus as Sale["collectionStatus"]) ?? null,
   };
 }
 
@@ -298,6 +315,9 @@ export interface ListSalesPageInput {
   limit?: number;
   /** Opaque cursor from a previous page. Null/missing = first page. */
   cursor?: string | null;
+  /** Digital collections: only lines with this `collection_status`
+   *  (`any` = IS NOT NULL, i.e. every digital sale with a collection). */
+  collectionStatus?: "pending" | "confirmed" | "rejected" | "any" | null;
 }
 
 export interface ListSalesPageResult {
@@ -336,6 +356,11 @@ export async function listSalesPage(
     // a separate count query.
     const filters = [eq(sales.tenantId, tenantId)];
     if (input.branchId) filters.push(eq(sales.branchId, input.branchId));
+    if (input.collectionStatus === "any") {
+      filters.push(sql`${sales.collectionStatus} IS NOT NULL`);
+    } else if (input.collectionStatus) {
+      filters.push(eq(sales.collectionStatus, input.collectionStatus));
+    }
     if (cursor) {
       // (saleDate, id) < (cursor.saleDate, cursor.id) — strict tuple compare
       // so a sale with the SAME date as the cursor row but later id is also
@@ -399,12 +424,24 @@ export interface RecordSaleInput {
    *  callers must pass the active branch from `requireTenantWithBranch()`.
    *  Inventory is decremented from this branch only. */
   branchId: string;
+  /** Digital collections (05 §4.7): the receiving account and payer hints of
+   *  an instapay / wallet line. No parts on this legacy route. */
+  collectionAccountId?: string;
+  payerPhoneLast4?: string;
+  payerReference?: string;
+}
+
+export interface RecordSaleResult {
+  saleId: string;
+  /** "pending" when the line created or grew a collection part. */
+  collectionStatus: "pending" | null;
+  collectionIds: string[];
 }
 
 export async function recordSale(
   tenantId: string,
   input: RecordSaleInput,
-): Promise<{ saleId: string }> {
+): Promise<RecordSaleResult> {
   const result = await withTenant(tenantId, async (tx) => {
     const [product] = await tx
       .select()
@@ -484,6 +521,32 @@ export async function recordSale(
       quantityAfter: nextBranchQty,
     });
 
+    // Digital collections (05 §4.7): this legacy route is called once per
+    // line with a shared client invoice id, so the single part ACCUMULATES
+    // while pending (a decided part is flagged `total_changed` instead).
+    let collection: SaleCollectionsResult = NO_SALE_COLLECTIONS;
+    if (
+      isDigitalMethod(paymentMethod) &&
+      (await resolveCollectionsFeatures(tenantId, input.branchId, tx)).collections
+    ) {
+      collection = await createSaleCollections(tx, {
+        tenantId,
+        branchId: input.branchId,
+        invoiceId,
+        saleIds: [created.id],
+        customerPhone: input.customerPhone?.trim() || null,
+        method: paymentMethod,
+        total: totalPrice,
+        collectionAccountId: input.collectionAccountId ?? null,
+        payerPhoneLast4: input.payerPhoneLast4 ?? null,
+        payerReference: input.payerReference ?? null,
+        rungAt: input.customDate ?? new Date(),
+        customDate: !!input.customDate,
+        recordedByUserId: input.recordedByUserId ?? null,
+        mode: "accumulate",
+      });
+    }
+
     // Snapshot everything the post-commit fanout needs so we don't hold a
     // reference to `product` across the tx boundary.
     return {
@@ -494,6 +557,8 @@ export async function recordSale(
       priorQty: product.quantity,
       nextBranchQty,
       lowStockThreshold: product.lowStockThreshold,
+      collection,
+      customerName: input.customerName?.trim() || null,
     };
   });
   await bustInsightsCache(tenantId);
@@ -520,8 +585,28 @@ export async function recordSale(
       actorUserId: input.recordedByUserId ?? null,
     });
   }
+  // Only a newly INSERTED part notifies; a later line growing it does not.
+  if (result.collection.insertedIds.length > 0) {
+    void fanoutEvent(tenantId, input.branchId, "collection.pending", {
+      invoiceId: result.invoiceId,
+      sourceType: "sale",
+      method: input.paymentMethod === "wallet" ? "wallet" : "instapay",
+      amountEgp: result.collection.amountEgp,
+      partsCount: result.collection.partsCount,
+      accountLabel: result.collection.accountLabel,
+      customerName: result.customerName,
+      branchName: branchName ?? "",
+      link: "/collections?status=pending",
+      actorUserId: input.recordedByUserId ?? null,
+    });
+  }
+  flushMatchEffects(tenantId, result.collection.matchEffects);
 
-  return { saleId: result.saleId };
+  return {
+    saleId: result.saleId,
+    collectionStatus: result.collection.collectionIds.length > 0 ? "pending" : null,
+    collectionIds: result.collection.collectionIds,
+  };
 }
 
 // Small helper — used by the fanout hooks to enrich payloads with the
@@ -609,6 +694,13 @@ export interface CartSaleOptions {
    *  with 23505 — inside the transaction, before any other line or stock
    *  change commits — and the route answers with the existing cart. */
   idempotencyKey?: string;
+  /** Digital collections (03 §B.17, 05 §4.6) — instapay / wallet only; the
+   *  server never requires them ("book and flag, never refuse"). */
+  collectionAccountId?: string;
+  payerPhoneLast4?: string;
+  payerReference?: string;
+  /** Split transfers (Q5): 1..4 parts; Σ below the total = cash remainder. */
+  collectionParts?: CollectionPartInput[];
 }
 
 export interface CartSaleLineSummary {
@@ -637,6 +729,11 @@ export interface CartSaleResult {
     requested: number;
     available: number;
   }[];
+  /** Digital collections: "pending" when ≥ 1 part was created, else null
+   *  (not a digital sale, feature off, or a zero total). */
+  collectionStatus: "pending" | null;
+  /** One id per part, in part order; [] when none. */
+  collectionIds: string[];
 }
 
 export async function recordCartSale(
@@ -1095,6 +1192,35 @@ async function recordCartSaleImpl(
       }
     }
 
+    // ── Digital collections (05 §4.6) ─────────────────────────────────
+    // After every line exists (anchor id, final total and normalised phone
+    // are known). "Book and flag, never refuse": createSaleCollections only
+    // throws on programmer errors, so a collection problem can never turn a
+    // queued offline sale into a terminal 4xx. Skipped entirely (no query)
+    // while COLLECTIONS_ENABLED does not admit the tenant.
+    let collection: SaleCollectionsResult = NO_SALE_COLLECTIONS;
+    if (
+      isDigitalMethod(paymentMethod) &&
+      (await resolveCollectionsFeatures(tenantId, options.branchId, tx)).collections
+    ) {
+      collection = await createSaleCollections(tx, {
+        tenantId,
+        branchId: options.branchId,
+        invoiceId,
+        saleIds,
+        customerPhone: customerPhoneNorm,
+        method: paymentMethod,
+        total: cartTotal,
+        collectionAccountId: options.collectionAccountId ?? null,
+        collectionParts: options.collectionParts ?? null,
+        payerPhoneLast4: options.payerPhoneLast4 ?? null,
+        payerReference: options.payerReference ?? null,
+        rungAt: saleDate,
+        customDate: !!options.customDate,
+        recordedByUserId: options.recordedByUserId ?? null,
+      });
+    }
+
     return {
       invoiceId,
       saleIds,
@@ -1108,6 +1234,8 @@ async function recordCartSaleImpl(
       lowStockCrossings: Array.from(finalQtyByProduct.values()).filter(
         (f) => f.priorQty > f.threshold && f.nextQty <= f.threshold,
       ),
+      // Internal: never serialised (stripped from the CartSaleResult below).
+      collection,
     };
   });
   await bustInsightsCache(tenantId);
@@ -1131,6 +1259,23 @@ async function recordCartSaleImpl(
       actorUserId: options.recordedByUserId ?? null,
     });
   }
+  if (result.collection.collectionIds.length > 0) {
+    void fanoutEvent(tenantId, options.branchId, "collection.pending", {
+      invoiceId: result.invoiceId,
+      sourceType: "sale",
+      method: result.paymentMethod === "wallet" ? "wallet" : "instapay",
+      amountEgp: result.collection.amountEgp,
+      partsCount: result.collection.partsCount,
+      accountLabel: result.collection.accountLabel,
+      customerName: result.customerName,
+      branchName: branchName ?? "",
+      link: "/collections?status=pending",
+      actorUserId: options.recordedByUserId ?? null,
+    });
+  }
+  // 07 (M2) logs, fans out and busts for credits reverse-matched inside the
+  // transaction; a no-op in M1. Never throws.
+  flushMatchEffects(tenantId, result.collection.matchEffects);
 
   return {
     invoiceId: result.invoiceId,
@@ -1142,6 +1287,8 @@ async function recordCartSaleImpl(
     customerPhone: result.customerPhone,
     note: result.note,
     oversold: result.oversold,
+    collectionStatus: result.collection.collectionIds.length > 0 ? "pending" : null,
+    collectionIds: result.collection.collectionIds,
   };
 }
 
@@ -1200,6 +1347,12 @@ export async function findCartSaleByIdempotencyKey(
       pricePerUnit: Number(r.pricePerUnit),
       lineTotal: Number(r.totalPrice),
     }));
+    // Digital collections: the ids the first 201 carried, and "pending" as it
+    // said then — even if a part was decided since (the replay contract is
+    // "the original body").
+    const collectionIds = anchor.invoiceId
+      ? await saleCollectionIdsForInvoice(tx, tenantId, anchor.invoiceId)
+      : [];
     return {
       sale: {
         invoiceId: anchor.invoiceId ?? "",
@@ -1211,6 +1364,8 @@ export async function findCartSaleByIdempotencyKey(
         customerPhone: first.customerPhone,
         note: first.note,
         oversold: [],
+        collectionStatus: collectionIds.length > 0 ? "pending" : null,
+        collectionIds,
       },
       recordedByUserId: first.recordedByUserId,
       lineKeys: rows.map((r) => ({ productId: r.productId, quantity: r.quantitySold })),
@@ -1243,6 +1398,9 @@ export async function updateSale(
       .where(and(eq(sales.tenantId, tenantId), eq(sales.id, saleId)))
       .limit(1);
     if (!sale) throw new Error("البيع غير موجود");
+    // Digital collections: lock the invoice's parts before the line (the
+    // decision paths' order, 05 §4.9); onSaleUpdated runs after the UPDATE.
+    await lockCollectionsForSales(tx, tenantId, [saleId]);
 
     const oldQty = sale.quantitySold;
     const newQty = patch.quantitySold ?? oldQty;
@@ -1335,6 +1493,9 @@ export async function updateSale(
       .update(sales)
       .set(set)
       .where(and(eq(sales.tenantId, tenantId), eq(sales.id, saleId)));
+    // A pending pure-transfer part follows the new invoice total
+    // (`amount_changed`); anything else is flagged `total_changed`.
+    await onSaleUpdated(tx, tenantId, saleId, sale.totalPrice);
   });
   await bustInsightsCache(tenantId);
 }
@@ -1347,6 +1508,7 @@ export async function voidSale(tenantId: string, saleId: string): Promise<void> 
       .where(and(eq(sales.tenantId, tenantId), eq(sales.id, saleId)))
       .limit(1);
     if (!sale) throw new Error("البيع غير موجود");
+    const invoiceIds = await lockCollectionsForSales(tx, tenantId, [saleId]);
 
     if (!sale.isReturned) {
       // Refund stock — only if the sale wasn't already returned (stock was
@@ -1365,6 +1527,9 @@ export async function voidSale(tenantId: string, saleId: string): Promise<void> 
     await tx
       .delete(sales)
       .where(and(eq(sales.tenantId, tenantId), eq(sales.id, saleId)));
+    // Last line gone → the invoice's sale parts become `void` (credits
+    // released); lines left → `total_changed`. Settlements are untouched.
+    await onSaleLinesDeleted(tx, tenantId, invoiceIds);
   });
   await bustInsightsCache(tenantId);
 }
@@ -1419,7 +1584,9 @@ export async function markInvoicePaid(
 // Returns a summary the caller can drop into a toast / activity log.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type SettlementMethod = "cash" | "instapay" | "card";
+/** `wallet` = mobile-wallet transfer (03 §B.1). instapay / wallet settlements
+ *  create a pending `settlement` collection when the feature is on (05 §4.8). */
+export type SettlementMethod = "cash" | "instapay" | "wallet" | "card";
 
 export interface SettleCustomerPaymentInput {
   /** Customer matching key — canonicalised E.164 phone (the same key the
@@ -1440,6 +1607,13 @@ export interface SettleCustomerPaymentInput {
   /** Branch context — used to locate the active cash shift for the cash
    *  movement record. */
   branchId: string;
+  /** Digital settlements (05 §4.8): where the transfer landed and the payer
+   *  hints. Ignored for cash / card. Never required ("book and flag"). */
+  collection?: {
+    accountId?: string;
+    payerPhoneLast4?: string;
+    payerReference?: string;
+  };
 }
 
 export interface SettleCustomerPaymentResult {
@@ -1457,6 +1631,9 @@ export interface SettleCustomerPaymentResult {
   fullySettledInvoices: number;
   /** The customer's remaining outstanding balance AFTER this payment. */
   newBalance: number;
+  /** Digital settlements: the pending `settlement` collection, else null. */
+  collectionId: string | null;
+  collectionStatus: "pending" | null;
 }
 
 export class SettlementError extends Error {
@@ -1488,6 +1665,7 @@ export async function settleCustomerPayment(
   if (
     input.method !== "cash" &&
     input.method !== "instapay" &&
+    input.method !== "wallet" &&
     input.method !== "card"
   ) {
     throw new SettlementError("INVALID_METHOD", 400);
@@ -1536,6 +1714,11 @@ export async function settleCustomerPayment(
 
     let remaining = requested;
     const fullySettledInvoices = new Set<string>();
+    // Digital collections: the rows this settlement writes, so a pending
+    // `settlement` collection can point at them (and void them on reject).
+    const paymentIds: string[] = [];
+    const touchedSaleIds: string[] = [];
+    const touchedInvoiceIds = new Set<string>();
     const now = new Date();
     // ISO-string form for SQL param binding. Drizzle's raw `sql` template
     // serializes JS Date via Date.prototype.toString() (e.g. "Thu Jun 11
@@ -1567,18 +1750,49 @@ export async function settleCustomerPayment(
       `);
       // Persist the individual event so the customer detail page can
       // render a real timeline (vs. just the latest partial_paid_at).
-      await tx.insert(salePayments).values({
-        tenantId,
-        saleId: row.id,
-        amount: String(apply),
-        method: input.method,
-        recordedAt: now,
-        recordedByUserId: input.recordedByUserId,
-      });
+      const [payment] = await tx
+        .insert(salePayments)
+        .values({
+          tenantId,
+          saleId: row.id,
+          amount: String(apply),
+          method: input.method,
+          recordedAt: now,
+          recordedByUserId: input.recordedByUserId,
+        })
+        .returning({ id: salePayments.id });
+      paymentIds.push(payment!.id);
+      touchedSaleIds.push(row.id);
+      if (row.invoice_id) touchedInvoiceIds.add(row.invoice_id);
     }
 
     const applied = requested - remaining;
     const overpay = remaining;
+
+    // Digital settlement (05 §4.8): the debt drops now (as today) and one
+    // pending `settlement` collection records the transfer to be verified.
+    // Settlement parts never write sales.collection_status.
+    let settlementCollection: { id: string; accountLabel: string | null } | null = null;
+    if (
+      isDigitalMethod(input.method) &&
+      applied > 0 &&
+      (await resolveCollectionsFeatures(tenantId, input.branchId, tx)).collections
+    ) {
+      settlementCollection = await createSettlementCollection(tx, {
+        tenantId,
+        branchId: input.branchId,
+        method: input.method,
+        amount: applied,
+        invoiceId: touchedInvoiceIds.size === 1 ? [...touchedInvoiceIds][0]! : null,
+        anchorSaleId: touchedSaleIds[0] ?? null,
+        customerPhone: input.customerPhone,
+        accountId: input.collection?.accountId ?? null,
+        payerPhoneLast4: input.collection?.payerPhoneLast4 ?? null,
+        payerReference: input.collection?.payerReference ?? null,
+        recordedByUserId: input.recordedByUserId,
+        paymentIds,
+      });
+    }
 
     // New balance for this customer = sum of remaining unpaid balance.
     const [{ owed }] = (await tx.execute(sql`
@@ -1611,10 +1825,28 @@ export async function settleCustomerPayment(
       fullySettledInvoices: fullySettledInvoices.size,
       newBalance: Number(owed),
       customerName: nameRows[0]?.customer_name ?? null,
+      settlementCollection,
+      settledInvoiceId: touchedInvoiceIds.size === 1 ? [...touchedInvoiceIds][0]! : null,
     };
   });
 
   await bustInsightsCache(tenantId);
+
+  if (result.settlementCollection) {
+    const branchName = await resolveBranchName(tenantId, input.branchId);
+    void fanoutEvent(tenantId, input.branchId, "collection.pending", {
+      invoiceId: result.settledInvoiceId,
+      sourceType: "settlement",
+      method: input.method === "wallet" ? "wallet" : "instapay",
+      amountEgp: result.appliedAmount,
+      partsCount: 1,
+      accountLabel: result.settlementCollection.accountLabel,
+      customerName: result.customerName,
+      branchName: branchName ?? "",
+      link: "/collections?status=pending",
+      actorUserId: input.recordedByUserId,
+    });
+  }
 
   // Only fanout when at least one invoice went from partially- to fully-paid
   // — this is the moment the owner cares about ("customer cleared their tab").
@@ -1634,6 +1866,8 @@ export async function settleCustomerPayment(
     overpay: result.overpay,
     fullySettledInvoices: result.fullySettledInvoices,
     newBalance: result.newBalance,
+    collectionId: result.settlementCollection?.id ?? null,
+    collectionStatus: result.settlementCollection ? "pending" : null,
   };
 }
 
@@ -1689,6 +1923,8 @@ export async function recordReturn(
   input: RecordReturnInput,
 ): Promise<{ returnId: string }> {
   const result = await withTenant(tenantId, async (tx) => {
+    // Digital collections: parts before lines (05 §4.9 lock order).
+    await lockCollectionsForSales(tx, tenantId, [input.saleId]);
     // FOR UPDATE: two returns against the same line serialise here, so the
     // second one sums the first one's row below instead of racing past the
     // cap.
@@ -1765,6 +2001,10 @@ export async function recordReturn(
       note: input.reason || null,
     });
 
+    // Flag `returned` on the invoice's live transfer parts; no money change
+    // (refunds are the owner's outgoing transfers, 03 §C.4).
+    await onSaleReturned(tx, tenantId, input.saleId, created.id, input.returnedQuantity);
+
     return { returnId: created.id };
   });
   await bustInsightsCache(tenantId);
@@ -1795,6 +2035,7 @@ export async function bulkDeleteSales(
 ): Promise<void> {
   if (saleIds.length === 0) return;
   await withTenant(tenantId, async (tx) => {
+    const invoiceIds = await lockCollectionsForSales(tx, tenantId, saleIds);
     // Refund stock for non-returned sales before delete.
     const rows = await tx
       .select({
@@ -1823,6 +2064,7 @@ export async function bulkDeleteSales(
     await tx
       .delete(sales)
       .where(and(eq(sales.tenantId, tenantId), inArray(sales.id, saleIds)));
+    await onSaleLinesDeleted(tx, tenantId, invoiceIds);
   });
   await bustInsightsCache(tenantId);
 }

@@ -30,10 +30,19 @@ export async function GET(req: NextRequest) {
     const cursor = req.nextUrl.searchParams.get("cursor");
     const limitRaw = req.nextUrl.searchParams.get("limit");
     const limit = limitRaw ? Math.min(200, Math.max(1, Number(limitRaw))) : 50;
+    // Digital collections (05 §4.13): pending | confirmed | rejected | any.
+    const statusRaw = req.nextUrl.searchParams.get("collectionStatus");
+    if (statusRaw && !(COLLECTION_STATUS_FILTERS as readonly string[]).includes(statusRaw)) {
+      return NextResponse.json(
+        { error: "INVALID_REQUEST", detail: { path: "collectionStatus", message: "invalid value" } },
+        { status: 400 },
+      );
+    }
     const page = await listSalesPage(r.ctx.tenantId, {
       branchId: filter.branchId,
       cursor,
       limit,
+      collectionStatus: (statusRaw as CollectionStatusFilter | null) ?? null,
     });
     return NextResponse.json({
       data: page.data,
@@ -60,8 +69,15 @@ const recordSchema = z.object({
   invoiceId: z.string().max(40).optional(),
   customerName: z.string().max(120).optional(),
   customerPhone: z.string().max(40).optional(),
-  paymentMethod: z.enum(["cash", "instapay", "card", "deferred"]).optional(),
+  paymentMethod: z.enum(["cash", "instapay", "wallet", "card", "deferred"]).optional(),
+  // Digital collections (05 §4.7): one accumulating part per invoice, no splits.
+  collectionAccountId: z.string().uuid().optional(),
+  payerPhoneLast4: z.string().regex(/^\d{4}$/).optional(),
+  payerReference: z.string().regex(/^[0-9A-Za-z]{4,16}$/).optional(),
 });
+
+const COLLECTION_STATUS_FILTERS = ["pending", "confirmed", "rejected", "any"] as const;
+type CollectionStatusFilter = (typeof COLLECTION_STATUS_FILTERS)[number];
 
 export async function POST(req: NextRequest) {
   const r = await requirePermissionWithBranch("record_sales");
@@ -95,13 +111,14 @@ export async function POST(req: NextRequest) {
       action: "sale.create",
       category: "sale",
       entityType: "sale",
-      entityId: (result as { id?: string }).id ?? null,
+      entityId: result.saleId,
       branchId: r.ctx.branchId,
       metadata: {
         productId: parsed.data.productId,
         quantitySold: parsed.data.quantitySold,
         pricePerUnit: parsed.data.pricePerUnit,
         paymentMethod: parsed.data.paymentMethod ?? null,
+        ...(result.collectionIds?.length ? { collectionIds: result.collectionIds } : {}),
       },
     });
     return NextResponse.json(result, { status: 201 });

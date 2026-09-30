@@ -3710,7 +3710,11 @@
         "NOT_FOUND": "Not found. Refresh and try again.",
         "FORBIDDEN_BRANCH": "You don't have access to this branch.",
         "TENANT_SUSPENDED": "This shop's account is suspended.",
-        "IDEMPOTENCY_MISMATCH": "This request was already sent with different details. Refresh and try again."
+        "IDEMPOTENCY_MISMATCH": "This request was already sent with different details. Refresh and try again.",
+        "INVALID_PHONE": "Enter a valid Egyptian mobile number.",
+        "INVALID_BRANCH": "This branch is not available. Pick another branch.",
+        "INVALID_CURSOR": "The list changed. Refresh and try again.",
+        "ALL_BRANCHES_OWNER_ONLY": "Only the owner can view all branches together."
       }
     }
   },

@@ -10,12 +10,17 @@
  * here. The behaviour of the helpers themselves (audit vs enforce) lives in
  * lib/api/auth-helpers.ts and is exercised by the DB-backed suites.
  */
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const AUDITED = (perm: string) => `requirePermissionAudited("${perm}")`;
 const BRANCH = (perm: string) => `requirePermissionWithBranch("${perm}")`;
+/** Digital collections (doc 15 spec 05 §4.3): always enforced, whatever
+ *  PERMISSION_ENFORCE_WRITES says. */
+const ENFORCED = (perm: string) => `requirePermissionWithBranchEnforced("${perm}")`;
+const COLL = "requireCollectionsTenant(";
 
 /** [route path under app/api, handler, every string its body must contain] */
 const GATES: Array<[string, string, string[]]> = [
@@ -62,6 +67,24 @@ const GATES: Array<[string, string, string[]]> = [
   ["whatsapp/cloud/send-template", "POST", [BRANCH("record_sales")]],
   ["whatsapp/messages/[clientMessageId]", "GET", [BRANCH("record_sales")]],
   ["whatsapp/otp/send", "POST", [BRANCH("manage_whatsapp")]],
+  // Digital collections (doc 15 spec 05 §4.3 / §7). The two mixed reads
+  // decide with the enforced `can()` (never the audited helper); every
+  // handler but `config` answers 403 COLLECTIONS_DISABLED when the env gate
+  // does not admit the tenant.
+  ["collections", "GET", ["requireTenantWithBranch()", 'can(r.ctx, "view_collections")', 'can(r.ctx, "record_sales")', COLL]],
+  ["collections/summary", "GET", [ENFORCED("view_collections"), COLL]],
+  ["collections/[id]", "GET", ["requireTenantWithBranch()", 'can(r.ctx, "view_collections")', 'can(r.ctx, "record_sales")', COLL]],
+  ["collections/[id]", "PATCH", ["requireTenantWithBranch()", 'can(r.ctx, "confirm_collections")', 'can(r.ctx, "record_sales")', COLL]],
+  ["collections/[id]/confirm", "POST", [ENFORCED("confirm_collections"), "IDEMPOTENCY_KEY_REQUIRED", COLL]],
+  ["collections/[id]/reject", "POST", [ENFORCED("confirm_collections"), "IDEMPOTENCY_KEY_REQUIRED", COLL]],
+  ["collections/[id]/reopen", "POST", ["requireTenantWithBranch()", "isOwner(r.ctx)", "IDEMPOTENCY_KEY_REQUIRED", COLL]],
+  ["collections/accounts", "GET", ["requireTenantWithBranch()", 'can(r.ctx, "manage_collection_accounts")', COLL]],
+  ["collections/accounts", "POST", [ENFORCED("manage_collection_accounts"), COLL]],
+  ["collections/accounts/[id]", "PATCH", [ENFORCED("manage_collection_accounts"), COLL]],
+  ["collections/accounts/[id]", "DELETE", [ENFORCED("manage_collection_accounts"), COLL]],
+  ["collections/settings", "GET", ["requireTenantWithBranch()", COLL]],
+  ["collections/settings", "PATCH", [ENFORCED("manage_collection_accounts"), COLL]],
+  ["collections/config", "GET", ["requireTenantWithBranch()", "resolveCollectionsFeatures("]],
 ];
 
 const OPEN_GATES = [/\brequireTenant\(\)/, /\brequireTenantWithBranch\(\)/];
@@ -89,6 +112,39 @@ describe("route handlers open with the doc 14 §3.1 C3–C5 gate", () => {
       if (permissionGated) {
         for (const open of OPEN_GATES) expect(body).not.toMatch(open);
       }
+    });
+  }
+});
+
+/** Every `route.ts` under a directory of app/api, as its route path. */
+function routeFilesUnder(dir: string): string[] {
+  const apiRoot = fileURLToPath(new URL("../../app/api/", import.meta.url));
+  const out: string[] = [];
+  const walk = (abs: string) => {
+    for (const name of readdirSync(abs)) {
+      const p = join(abs, name);
+      if (statSync(p).isDirectory()) walk(p);
+      else if (name === "route.ts") out.push(relative(apiRoot, abs).split("\\").join("/"));
+    }
+  };
+  walk(join(apiRoot, dir));
+  return out.sort();
+}
+
+describe("every digital-collections handler is pinned (doc 15 spec 05 §6 criterion 14)", () => {
+  const pinned = new Set(GATES.map(([route, handler]) => `${handler} ${route}`));
+  const routes = routeFilesUnder("collections");
+
+  it("finds the collections route files", () => {
+    expect(routes.length).toBeGreaterThanOrEqual(8);
+  });
+
+  for (const route of routes) {
+    it(`/api/${route}: each exported handler has a GATES row`, () => {
+      const src = routeSource(route);
+      const handlers = [...src.matchAll(/export async function (GET|POST|PATCH|PUT|DELETE)\(/g)].map((m) => m[1]);
+      expect(handlers.length).toBeGreaterThan(0);
+      for (const h of handlers) expect(pinned.has(`${h} ${route}`), `${h} /api/${route} has no GATES row`).toBe(true);
     });
   }
 });

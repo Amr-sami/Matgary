@@ -35,7 +35,25 @@ const schema = z.object({
       customDate: z.string().datetime().optional(),
       customerName: z.string().max(120).optional(),
       customerPhone: z.string().max(40).optional(),
-      paymentMethod: z.enum(["cash", "instapay", "card", "deferred"]).optional(),
+      paymentMethod: z.enum(["cash", "instapay", "wallet", "card", "deferred"]).optional(),
+      // Digital collections (03 §B.17, 05 §4.6). Malformed input is a client
+      // bug (400); an unknown or archived account is NOT — the sale books and
+      // the part is flagged (book and flag, never refuse).
+      collectionAccountId: z.string().uuid().optional(),
+      payerPhoneLast4: z.string().regex(/^\d{4}$/).optional(),
+      payerReference: z.string().regex(/^[0-9A-Za-z]{4,16}$/).optional(),
+      collectionParts: z
+        .array(
+          z.object({
+            accountId: z.string().uuid(),
+            amount: z.number().positive().max(10_000_000),
+            payerPhoneLast4: z.string().regex(/^\d{4}$/).optional(),
+            payerReference: z.string().regex(/^[0-9A-Za-z]{4,16}$/).optional(),
+          }),
+        )
+        .min(1)
+        .max(4)
+        .optional(),
       // Client-supplied invoice id, used by the offline POS so the receipt
       // the cashier already printed matches the eventual server record.
       invoiceId: z
@@ -164,6 +182,8 @@ export async function POST(req: NextRequest) {
         // S7: who booked an oversell, and by how much — auditable without
         // joining stock_discrepancies.
         ...(result.oversold.length > 0 ? { oversold: result.oversold } : {}),
+        // Digital collections: the pending parts this cart created.
+        ...(result.collectionIds?.length ? { collectionIds: result.collectionIds } : {}),
       },
     });
     // Cache the response so a replay of the same Idempotency-Key returns

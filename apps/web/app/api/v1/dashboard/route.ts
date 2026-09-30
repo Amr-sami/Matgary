@@ -74,6 +74,9 @@ interface RecentSaleSummary {
   /** True when every line on the invoice has been returned. */
   isReturned: boolean;
   isPaid: boolean;
+  /** Digital collections (0055): the invoice's verification status (first
+   *  non-null line value); null = not a digital sale. */
+  collectionStatus: Sale["collectionStatus"] | null;
 }
 
 /**
@@ -112,6 +115,7 @@ function foldRecentSales(rows: Sale[], hasMore: boolean): RecentSaleSummary[] {
       current.customerName ??= row.customerName ?? null;
       current.customerPhone ??= row.customerPhone ?? null;
       current.paymentMethod ??= row.paymentMethod ?? null;
+      current.collectionStatus ??= row.collectionStatus ?? null;
       continue;
     }
     const group: RecentSaleSummary = {
@@ -125,6 +129,7 @@ function foldRecentSales(rows: Sale[], hasMore: boolean): RecentSaleSummary[] {
       itemCount: row.quantitySold,
       isReturned: row.isReturned,
       isPaid: row.isPaid !== false,
+      collectionStatus: row.collectionStatus ?? null,
     };
     byKey.set(key, group);
     order.push(group);

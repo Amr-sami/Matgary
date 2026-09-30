@@ -6,6 +6,8 @@
  * drift is a grep away.
  */
 
+import type { CollectionsFeatures } from "./endpoints/me";
+
 /** apps/web/app/api/v1/auth/login/route.ts */
 export interface LoginResponse {
   accessToken: string;
@@ -92,6 +94,11 @@ export interface MeResponse {
    * Optional: older servers omit it.
    */
   onboardingComplete?: boolean;
+  /**
+   * Digital collections flags for the active branch (03 §B.14). Optional:
+   * older servers omit it — treat a missing object as all-false.
+   */
+  features?: CollectionsFeatures;
 }
 
 /** apps/web/app/api/v1/auth/devices/route.ts */

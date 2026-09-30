@@ -29,6 +29,9 @@ export interface LedgerInvoice {
   isPaid: boolean;
   paidAt: Date | null;
   paymentMethod: string | null;
+  /** Digital collections (0055): the invoice's verification status (the same
+   *  value on every line); null = not a digital sale. */
+  collectionStatus: "pending" | "confirmed" | "rejected" | null;
   /** Per-line summary for receipt-style display. */
   lines: Array<{
     saleId: string;
@@ -116,6 +119,7 @@ export async function getCustomerLedger(
       isPaid: boolean;
       paidAt: Date | null;
       paymentMethod: string | null;
+      collectionStatus: LedgerInvoice["collectionStatus"];
       lines: LedgerInvoice["lines"];
     };
     const byInvoice = new Map<string, Acc>();
@@ -143,6 +147,8 @@ export async function getCustomerLedger(
         if (r.paidAt && (!existing.paidAt || r.paidAt > existing.paidAt)) {
           existing.paidAt = r.paidAt;
         }
+        existing.collectionStatus ??=
+          (r.collectionStatus as LedgerInvoice["collectionStatus"]) ?? null;
       } else {
         byInvoice.set(id, {
           invoiceId: id,
@@ -153,6 +159,7 @@ export async function getCustomerLedger(
           isPaid: r.isPaid,
           paidAt: r.paidAt,
           paymentMethod: r.paymentMethod,
+          collectionStatus: (r.collectionStatus as LedgerInvoice["collectionStatus"]) ?? null,
           lines: [line],
         });
       }

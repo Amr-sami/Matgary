@@ -83,6 +83,11 @@ const fake = vi.hoisted(() => {
         return { ...done, returning: () => thenable(() => [{ id: "ret-1" }]) };
       },
     }),
+    // Raw SQL (the digital-collections hooks recordReturn calls, doc 15 spec
+    // 05 §4.12): no rows here, i.e. the line has no invoice with transfer
+    // parts, so the collections lock and the `returned` flag are no-ops and
+    // the scripted selects above stay exactly what the cap reads.
+    execute: () => thenable(() => []),
   };
   return { state, tx };
 });

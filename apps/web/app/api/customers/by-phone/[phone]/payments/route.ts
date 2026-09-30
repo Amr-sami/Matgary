@@ -18,6 +18,11 @@ export const dynamic = "force-dynamic";
  *
  * Optional `?invoiceId=INV-...` narrows to one invoice's history (used
  * by the per-invoice settle modal to show "previous payments" inline).
+ *
+ * Digital collections (05 §4.13): each row also carries `collectionId`, the
+ * collection's `collectionStatus` (LEFT JOIN) and `voidedAt` — a payment
+ * whose transfer was rejected is returned with `voidedAt` set (the UI strikes
+ * it through); it no longer counts towards the line's amount_paid.
  */
 export async function GET(
   req: NextRequest,
@@ -46,10 +51,14 @@ export async function GET(
         p.method,
         p.recorded_at    AS "recordedAt",
         p.note,
-        u.name           AS "recordedByName"
+        u.name           AS "recordedByName",
+        p.collection_id  AS "collectionId",
+        p.voided_at      AS "voidedAt",
+        c.status         AS "collectionStatus"
       FROM sale_payments p
       JOIN sales s ON s.id = p.sale_id
       LEFT JOIN users u ON u.id = p.recorded_by_user_id
+      LEFT JOIN collections c ON c.tenant_id = p.tenant_id AND c.id = p.collection_id
       WHERE p.tenant_id      = ${r.ctx.tenantId}
         AND s.tenant_id      = ${r.ctx.tenantId}
         AND s.branch_id      = ${r.ctx.branchId}
@@ -66,6 +75,9 @@ export async function GET(
     recordedAt: Date;
     note: string | null;
     recordedByName: string | null;
+    collectionId: string | null;
+    voidedAt: string | Date | null;
+    collectionStatus: string | null;
   }>;
 
   return NextResponse.json({
@@ -78,6 +90,9 @@ export async function GET(
       recordedAt: row.recordedAt,
       note: row.note,
       recordedByName: row.recordedByName,
+      collectionId: row.collectionId ?? null,
+      voidedAt: row.voidedAt ? new Date(row.voidedAt).toISOString() : null,
+      collectionStatus: row.collectionStatus ?? null,
     })),
   });
 }

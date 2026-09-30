@@ -120,6 +120,10 @@ const ERRORS_03 = [
   "IDEMPOTENCY_MISMATCH",
 ];
 
+/** Existing codes the phase-B routes also return (05 step 15 / 18; order 6
+ *  decided to give them collections copy, 05 "As landed — phase B"). */
+const ERRORS_05B = ["INVALID_PHONE", "INVALID_BRANCH", "INVALID_CURSOR", "ALL_BRANCHES_OWNER_ONLY"];
+
 const KEYS = ["view_collections", "confirm_collections", "manage_collection_accounts"] as const;
 
 const ACTIONS = [
@@ -166,7 +170,7 @@ describe("app.collections.vocab — every domain union value, both locales", () 
 });
 
 describe("app.collections.errors", () => {
-  it.each([...ERRORS_05, ...ERRORS_03])("%s has copy in both locales", (code) => {
+  it.each([...ERRORS_05, ...ERRORS_03, ...ERRORS_05B])("%s has copy in both locales", (code) => {
     expectLeaf(["app", "collections", "errors", code]);
   });
 

@@ -2,6 +2,22 @@ import type { ApiClient } from "../http";
 import type { MeResponse } from "../types";
 
 /**
+ * Digital collections feature flags for the active branch (03 §B.14), sent as
+ * `features` on GET /api/v1/me and GET /api/collections/config. A missing
+ * object (an older server) reads as all-false.
+ */
+export interface CollectionsFeatures {
+  /** COLLECTIONS_ENABLED admits the shop AND the branch switch is on. */
+  collections: boolean;
+  collectionsIngest: boolean;
+  collectionsAutoConfirm: boolean;
+  collectionsProviders: boolean;
+  /** COLLECTIONS_ENABLED admits the shop (ignores the branch switch): the
+   *  settings tile shows, so the owner can turn the branch on. */
+  collectionsAvailable: boolean;
+}
+
+/**
  * Identity, tenant, active branch, switchable branches and EFFECTIVE
  * permissions in one call — the app's session bootstrap.
  */

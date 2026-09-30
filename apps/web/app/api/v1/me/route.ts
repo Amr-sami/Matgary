@@ -7,6 +7,7 @@ import { resolveTenantContext } from "@/lib/auth";
 import { requireTenantWithBranch } from "@/lib/api/auth-helpers";
 import { listBranches } from "@/lib/repo/branches";
 import { ALL_PERMISSIONS, type Permission } from "@/lib/permissions";
+import { resolveCollectionsFeatures } from "@/lib/collections/flags";
 
 // GET /api/v1/me — the native client's bootstrap call.
 //
@@ -64,7 +65,7 @@ export async function GET() {
   const { ctx } = r;
   const walls = new Set(ctx.walls ?? []);
 
-  const [account, tenantRow, allBranches, userCtx] = await Promise.all([
+  const [account, tenantRow, allBranches, userCtx, features] = await Promise.all([
     // users/tenants are not RLS-protected (they are the tables that establish
     // tenancy in the first place), so the plain client is correct here — and
     // neither id comes from the request body, both come from the verified
@@ -86,6 +87,11 @@ export async function GET() {
     // form worth trusting for display, and this resolution is itself cached
     // for ~60s, so it is effectively free on a warm path.
     resolveTenantContext(ctx.userId),
+    // Digital collections (03 §B.14, 05 step 21): the five flags for the
+    // active branch. One PK read, skipped while COLLECTIONS_ENABLED does not
+    // admit the tenant. Clients treat a missing object as all-false (older
+    // servers omit it).
+    resolveCollectionsFeatures(ctx.tenantId, ctx.branchId),
   ]);
 
   // The user row is guaranteed by the token, but a hard-deleted account with a
@@ -137,5 +143,6 @@ export async function GET() {
     // shop_settings.shopName is set, i.e. the wizard's Finish/Skip ran. The
     // app's soft gate reads it to offer "Finish setup" until it flips.
     onboardingComplete: userCtx.onboardingComplete,
+    features,
   });
 }

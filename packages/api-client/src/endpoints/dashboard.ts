@@ -24,6 +24,9 @@ export interface RecentSale {
   /** True when every line has been returned. */
   isReturned: boolean;
   isPaid: boolean;
+  /** Digital collections: the invoice's verification status; null = not a
+   *  digital sale. Optional: older servers omit it. */
+  collectionStatus?: "pending" | "confirmed" | "rejected" | null;
 }
 
 /**

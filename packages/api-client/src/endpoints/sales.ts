@@ -41,6 +41,23 @@ export interface CartOptions {
    * interactive sales omit it and keep the INSUFFICIENT_STOCK refusal.
    */
   allowOversell?: boolean;
+  /**
+   * Digital collections (03 §B.17) — instapay / wallet only; the server never
+   * requires them ("book and flag, never refuse"). `collectionAccountId` is
+   * the single-transfer case; `collectionParts` (1..4) splits the sale, and
+   * Σ parts below the total is cash taken at the counter.
+   */
+  collectionAccountId?: string;
+  /** /^\d{4}$/ */
+  payerPhoneLast4?: string;
+  /** /^[0-9A-Za-z]{4,16}$/, stored lower-case. */
+  payerReference?: string;
+  collectionParts?: Array<{
+    accountId: string;
+    amount: number;
+    payerPhoneLast4?: string;
+    payerReference?: string;
+  }>;
 }
 
 /** apps/web/lib/repo/operations.ts — CartSaleResult */
@@ -56,6 +73,10 @@ export interface CartSaleResult {
   /** S7: products the sale took past their shelf (`allowOversell` replays
    *  only). Optional: servers older than migration 0050 do not send it. */
   oversold?: { productId: string; productName: string; requested: number; available: number }[];
+  /** Digital collections: "pending" when ≥ 1 transfer part was created, else
+   *  null. Optional: older servers omit both. */
+  collectionStatus?: "pending" | null;
+  collectionIds?: string[];
 }
 
 /**
@@ -174,6 +195,9 @@ export interface ListSalesPageParams {
    * access, or `"all"` (owner only — anyone else gets 403 FORBIDDEN_BRANCH).
    */
   branchId?: string | "all";
+  /** Digital collections: only lines with this status (`any` = every
+   *  digital sale that has a collection). */
+  collectionStatus?: "pending" | "confirmed" | "rejected" | "any";
 }
 
 /**
@@ -190,6 +214,7 @@ export async function listSalesPage(
   if (params.limit) qs.set("limit", String(params.limit));
   if (params.cursor) qs.set("cursor", params.cursor);
   if (params.branchId) qs.set("branchId", params.branchId);
+  if (params.collectionStatus) qs.set("collectionStatus", params.collectionStatus);
   return client.request<SalesPage>(`/api/sales?${qs.toString()}`);
 }
 

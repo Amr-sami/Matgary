@@ -117,6 +117,9 @@ export interface CustomerLedgerInvoice {
   isPaid: boolean;
   paidAt: string | null;
   paymentMethod: string | null;
+  /** Digital collections (0055): null = not a digital sale. Optional: older
+   *  servers omit it. */
+  collectionStatus?: "pending" | "confirmed" | "rejected" | null;
   lines: CustomerLedgerLine[];
 }
 
@@ -156,6 +159,12 @@ export interface CustomerPaymentEvent {
   recordedAt: string;
   note: string | null;
   recordedByName: string | null;
+  /** Digital settlement: the pending collection this payment belongs to. */
+  collectionId?: string | null;
+  /** Set when that transfer was rejected: excluded from every sum, shown
+   *  struck through. */
+  voidedAt?: string | null;
+  collectionStatus?: "pending" | "confirmed" | "auto_confirmed" | "rejected" | "void" | null;
 }
 
 export async function listCustomerPayments(
@@ -198,8 +207,9 @@ export const getCustomerWallet = (c: ApiClient, phone: string) =>
     `/api/customers/by-phone/${encodeURIComponent(phone)}/wallet`,
   );
 
-/** apps/web/app/api/sales/settle/route.ts — zod enum, closed. */
-export type SettlementMethod = "cash" | "instapay" | "card";
+/** apps/web/app/api/sales/settle/route.ts — zod enum, closed. `wallet` =
+ *  mobile-wallet transfer (digital collections). */
+export type SettlementMethod = "cash" | "instapay" | "wallet" | "card";
 
 export interface SettleCustomerInput {
   customerPhone: string;
@@ -208,6 +218,11 @@ export interface SettleCustomerInput {
   method: SettlementMethod;
   /** Omit to apply oldest-first across every unpaid invoice. */
   invoiceIds?: string[];
+  /** Digital settlements (instapay / wallet): where the money landed and the
+   *  payer hints. Never required. */
+  collectionAccountId?: string;
+  payerPhoneLast4?: string;
+  payerReference?: string;
 }
 
 /** lib/repo/operations.ts — SettleCustomerPaymentResult. */
@@ -216,6 +231,10 @@ export interface SettleCustomerResult {
   overpay: number;
   fullySettledInvoices: number;
   newBalance: number;
+  /** Digital settlements: the pending `settlement` collection. Optional:
+   *  older servers omit both. */
+  collectionId?: string | null;
+  collectionStatus?: "pending" | null;
 }
 
 /**
@@ -224,8 +243,12 @@ export interface SettleCustomerResult {
  * sees them. Server errors carry a code in `error` (NOTHING_TO_SETTLE, …)
  * that maps onto app.customers.settle.errors.*.
  */
-export const settleCustomer = (c: ApiClient, input: SettleCustomerInput) =>
-  c.request<SettleCustomerResult>("/api/sales/settle", { method: "POST", body: input });
+export const settleCustomer = (c: ApiClient, input: SettleCustomerInput, idempotencyKey?: string) =>
+  c.request<SettleCustomerResult>("/api/sales/settle", {
+    method: "POST",
+    body: input,
+    headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined,
+  });
 
 export interface MarkAllPaidResult {
   markedCount: number;

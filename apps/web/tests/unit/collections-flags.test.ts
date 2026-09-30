@@ -6,6 +6,8 @@
  * switch read (mocked withTenant / tx), and the 403 COLLECTIONS_DISABLED
  * route gate.
  */
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TenantTx } from "@/lib/collections/flags";
 
@@ -291,7 +293,11 @@ describe("constants", () => {
     expect(Object.values(NO_COLLECTIONS_FEATURES).every((v) => v === false)).toBe(true);
   });
 
-  // 05 step 21 (phase B, order 6) adds `features:` to GET /api/v1/me; the
-  // source-read case belongs to that step.
-  it.todo("GET /api/v1/me source contains `features:` (05 step 21, order 6)");
+  // 05 step 21 (phase B, order 6): GET /api/v1/me answers `features` from
+  // the resolver (source-read, like route-gates.test.ts).
+  it("GET /api/v1/me source contains `features` from resolveCollectionsFeatures (05 step 21)", () => {
+    const src = readFileSync(fileURLToPath(new URL("../../app/api/v1/me/route.ts", import.meta.url)), "utf8");
+    expect(src).toContain("resolveCollectionsFeatures(ctx.tenantId, ctx.branchId)");
+    expect(src).toMatch(/\n\s+features,\n/);
+  });
 });
