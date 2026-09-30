@@ -4140,7 +4140,8 @@
           },
           "walletOpenedOn": {
             "label": "Wallet opening date (optional)",
-            "hint": "New wallets have lower limits for the first 90 days."
+            "hint": "New wallets have lower limits for the first 90 days.",
+            "invalid": "Pick a date that is not in the future."
           },
           "branch": {
             "label": "Branch",
@@ -4899,7 +4900,7 @@
       },
       "eyebrow": "Privacy policy",
       "title": "Your data belongs to you",
-      "lead": "Last updated: 7 May 2026 — compliant with Law No. 151 of 2020 on Personal Data Protection.",
+      "lead": "Last updated: 30 September 2026 — compliant with Law No. 151 of 2020 on Personal Data Protection.",
       "sections": [
         {
           "title": "1. Who controls your data",
@@ -4946,7 +4947,11 @@
           "body": "If a breach affects your personal data, we commit to notifying the Personal Data Protection Centre and you within 72 hours of discovery, where practicable, including the nature of the breach and the steps taken."
         },
         {
-          "title": "12. Updates to this policy",
+          "title": "12. Receiving accounts and transfer records",
+          "body": "If you use Collections, you register the bank and wallet accounts your customers transfer money to (such as an InstaPay payment link, the last 4 digits of an account, an IBAN or a wallet number). When a sale is paid by transfer we record the method, the receiving account, the amount and the time, and optionally the last 4 digits of the sender's phone number and the transfer reference. We use these records only to show you which transfers are waiting for confirmation and to reconcile them; the full IBAN is visible only to people you allow to manage accounts. For the personal data of the people who pay your shop, your shop decides why it is recorded and TheStoro processes it on your behalf and on your instructions. These records are kept for as long as your account exists (see section 7); if a sale is deleted, its transfer record is kept and marked as void. TheStoro does not receive or move money."
+        },
+        {
+          "title": "13. Updates to this policy",
           "body": "We may update this policy from time to time. For any material change, we'll notify you via your registered email or in-app notice a reasonable time before it takes effect."
         }
       ]
@@ -6129,6 +6134,167 @@
       "attemptsLeft_few": "{n} attempts left.",
       "expired": "The verification window has ended. Sign in again to continue.",
       "tooManyAttempts": "Too many wrong codes. Sign in again to try once more."
+    },
+    "collections": {
+      "consent": {
+        "version": "2026-10-01",
+        "versionLabel": "Consent text version",
+        "title": "Automatic confirmation of transfers: your consent",
+        "ios": {
+          "lead": "When you turn this on, the shortcut “ستورو — تأكيد التحويلات” (TheStoro — confirm transfers) on this iPhone sends your shop account on TheStoro the text of bank and wallet messages and app notifications about money that reached you or left your registered accounts — even when the app is closed — so we can match them to transfer sales and confirm them.",
+          "reads": "The shortcut runs only on text messages that contain words about money received or sent, and on notifications from the bank, wallet and InstaPay apps you choose yourself in the Shortcuts app. It skips messages that look like one-time passwords (OTP).",
+          "sends": "Each message is sent with the sender name as your phone shows it, the time it arrived, and a short fingerprint that prevents duplicates.",
+          "key": "This phone is linked to your shop by a key made for it alone. In the shortcut setup the key is saved inside the shortcut, so anyone who can open the Shortcuts app on this phone can see and copy it — unlink the phone at once if that happens. When the shortcut calls the TheStoro app directly, the key is kept in the iPhone Keychain instead."
+        },
+        "android": {
+          "lead": "When you turn this on, TheStoro reads notifications on this phone from the bank and wallet apps you choose (for example InstaPay and Ana Vodafone) and sends your shop account on TheStoro the text of notifications about money that reached you or left your registered accounts — even when the app is closed — so we can match them to transfer sales and confirm them.",
+          "reads": "TheStoro reads notifications only from those apps and sends only the ones that contain words about money received or sent. It never reads notifications from any other app, never reads your text messages (SMS), and skips notifications that look like one-time passwords (OTP). Android will then ask you to allow notification access; you can withdraw it at any time in the phone's settings.",
+          "sends": "Each notification is sent with the name of the app that posted it, the time it arrived, and a short fingerprint that prevents duplicates.",
+          "key": "This phone is linked to your shop by a key made for it alone, stored encrypted on this phone."
+        },
+        "common": {
+          "neverSends": "Never sent: your other messages and notifications, passwords, PINs or verification codes. TheStoro never asks for the PIN or password of a bank account or wallet, and never moves money.",
+          "purpose": "We use this data only to match transfers to your shop's sales, to show you incoming transfers and wallet balances, and to warn you about suspicious messages. We don't use it for advertising, and we don't sell or share it.",
+          "payers": "The messages include details of the people who pay you (name, phone number, amount). We keep only the last 4 digits of the number and a shortened name (like “AHMED M****”) unless you choose to keep full names. You are responsible for recording your customers' data for a legitimate purpose.",
+          "retention": "The full message text is stored encrypted and deleted automatically after 7 days (30 days for messages whose format we don't recognise yet, 90 days for messages you send us so we can support them). Deleted text, still encrypted, can remain in backups for up to 8 weeks. The details we extract (amount, time, reference, account) are kept with your shop's records for as long as your account exists.",
+          "control": "You can stop at any time: Settings → Collections → Linked phones → Unlink. Unlinking stops forwarding at once and deletes the messages stored from this phone. Confirming transfers by hand keeps working whether you agree or not.",
+          "law": "We process this data under Egypt's Personal Data Protection Law (Law No. 151 of 2020) and TheStoro's privacy policy. Your consent is recorded with your user account, the time, and the version number of this text.",
+          "statement": "By tapping “I agree”, I confirm that I am the shop owner or authorised by them, that the bank and wallet accounts whose messages reach this phone belong to the shop or to me, and that I explicitly consent to the processing described above."
+        },
+        "privacyLink": "Read the privacy policy",
+        "agree": "I agree — link this phone",
+        "decline": "Not now"
+      },
+      "setup": {
+        "title": "Confirm transfers automatically",
+        "entry": {
+          "title": "Automatic confirmation",
+          "hintOn": "Set up on this phone",
+          "hintPending": "Setup not finished on this phone",
+          "hintOff": "Not set up on this phone"
+        },
+        "devicesEntry": {
+          "title": "Linked phones",
+          "hint": "Phones that pass on bank and wallet messages",
+          "silentWarning": "A phone stopped forwarding"
+        },
+        "hub": {
+          "thisPhoneForwards": "This phone forwards messages for {accounts}"
+        },
+        "stepOf": "Step {n} of {total}",
+        "next": "Next",
+        "back": "Back",
+        "finishLater": "Finish later",
+        "intro": {
+          "body": "When money arrives, your bank or wallet sends your phone a message. This phone can pass those messages to TheStoro to match them with sales.",
+          "whichPhone": "Set this up on the phone that receives the bank or wallet messages (the phone with the wallet SIM).",
+          "manualStays": "Confirming by hand always stays available.",
+          "pathIos27": "On this iPhone (iOS {version}) you use the TheStoro shortcut with bank-app notifications and messages.",
+          "pathLegacy": "On this iPhone (iOS {version}) you use the TheStoro shortcut with SMS messages.",
+          "pathAndroid": "On this phone TheStoro reads notifications only from the bank and wallet apps you choose.",
+          "duration": "Takes about {min} minutes."
+        },
+        "unsupported": {
+          "iosTooOld": "Automatic confirmation needs iOS 17 or later. Update the iPhone or use an Android phone; you can confirm by hand meanwhile.",
+          "androidPending": "Automatic confirmation on Android comes in an app update. You can confirm by hand meanwhile.",
+          "linkMissing": "The shortcut isn't ready yet. Try again later.",
+          "ingestOff": "Automatic confirmation isn't available for your shop yet.",
+          "noAccounts": "Add at least one receiving account first.",
+          "platform": "This device isn't supported."
+        },
+        "consentDeclined": "The phone was not linked. Confirming by hand works as usual.",
+        "device": {
+          "heading": "This phone",
+          "label": "Phone name",
+          "labelHint": "Name its holder, e.g. Ahmed's iPhone.",
+          "default": "{name} — {model}",
+          "accounts": "Accounts whose messages reach this phone",
+          "allAccounts": "All accounts",
+          "create": "Link this phone",
+          "replaced": "This phone's previous link was removed."
+        },
+        "token": {
+          "heading": "Link code",
+          "body": "The shortcut asks for this code when you add it. Copy it and paste it there, and don't share it with anyone.",
+          "share": "Copy the code",
+          "shown": "{prefix}…",
+          "lost": "You left setup before the code was used, so we'll create a new one."
+        },
+        "install": {
+          "openLink": "Add the shortcut",
+          "openShortcut": "Open the shortcut",
+          "openAccess": "Open notification access",
+          "openBattery": "Open battery settings",
+          "done": "I've added it",
+          "connected": "Connected to app notifications.",
+          "notConnected": "Not connected yet. Make sure notification access is on for TheStoro."
+        },
+        "enable": {
+          "done": "It's on"
+        },
+        "verify": {
+          "heading": "Send a test",
+          "body": "Tap \"Send test\". The shortcut opens and sends a test message to TheStoro; then come back here.",
+          "bodyAndroid": "Tap \"Send test\" to check this phone reaches TheStoro.",
+          "send": "Send test",
+          "waiting": "Waiting for the test to reach TheStoro…",
+          "ok": "The test arrived and the link works.",
+          "timeout": "The test didn't arrive within two minutes.",
+          "retry": "Try again",
+          "checks": {
+            "title": "Check these, then try again:",
+            "online": "The phone is online."
+          },
+          "realTransfer": "To check end to end, send a small amount to one of your accounts and watch it arrive in the Collections inbox."
+        },
+        "done": {
+          "title": "Linked",
+          "body": "When a transfer message arrives it appears in the Collections inbox. Automatic confirmation stays off for each account until you turn it on.",
+          "finish": "Done"
+        },
+        "devices": {
+          "title": "Linked phones",
+          "subtitle": "Phones that pass bank and wallet messages to TheStoro.",
+          "empty": {
+            "title": "No linked phones",
+            "hint": "Link the phone that receives transfer messages from \"Automatic confirmation\"."
+          },
+          "thisPhone": "This phone",
+          "addThisPhone": "Link this phone",
+          "setupAgain": "Set up again",
+          "platform": {
+            "ios_shortcut": "iPhone — shortcut",
+            "ios_app_intent": "iPhone — TheStoro action",
+            "android_listener": "Android — notifications",
+            "android_collector": "Android — Collector app"
+          },
+          "lastMessage": "Last message {date}",
+          "lastCredit": "Last transfer {date}",
+          "never": "No message yet",
+          "heartbeat": "Last check-in {date}",
+          "queued": "Waiting to send: {n}",
+          "linkedBy": "Linked by {name} on {date}",
+          "accountsAll": "All accounts",
+          "accountsList": "Accounts: {list}",
+          "health": {
+            "ok": "Working",
+            "never_seen": "Waiting for the first message",
+            "silent": "Stopped forwarding",
+            "heartbeat_late": "Not checked in lately",
+            "listener_off": "Notification access is off",
+            "silentHint": "Transfer sales keep arriving on its accounts but no messages come from it. Set it up again on this phone."
+          },
+          "revoke": "Unlink",
+          "revokeConfirmTitle": "Unlink \"{label}\"?",
+          "revokeConfirmBody": "TheStoro will stop accepting messages from this phone.",
+          "revokeIosHint": "Also delete the shortcut from the Shortcuts app.",
+          "revoked": "Unlinked",
+          "revokeFailed": "Couldn't unlink"
+        },
+        "dev": {
+          "simulateTest": "Simulate the test (dev)"
+        }
+      }
     }
   }
 }

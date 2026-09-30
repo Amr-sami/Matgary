@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
+import { ArrowsLeftRightIcon as ArrowsLeftRight } from "phosphor-react-native/src/icons/ArrowsLeftRight";
 import { BellIcon as Bell } from "phosphor-react-native/src/icons/Bell";
 import { ChatCircleIcon as ChatCircle } from "phosphor-react-native/src/icons/ChatCircle";
 import { IdentificationCardIcon as IdentificationCard } from "phosphor-react-native/src/icons/IdentificationCard";
@@ -19,6 +20,8 @@ import { ChevronForward } from "@/components/ui/Chevron";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { Segmented } from "@/components/ui/Segmented";
+import { collectionsTileVisible } from "@/components/collections/setup/access";
+import { useCollectionsAccess } from "@/components/collections/setup/useCollectionsAccess";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
@@ -46,6 +49,12 @@ interface Tile {
   ownerOnly: boolean;
   /** Rendered but not pressable — there is no destination yet. */
   soon?: boolean;
+  /**
+   * `false` hides the tile outright (a feature gate, not a role gate): the
+   * collections tile exists only when the tenant is admitted AND the member
+   * may manage receiving accounts (doc 15 spec 09 §4.2). Omitted = shown.
+   */
+  visible?: boolean;
 }
 
 export default function SettingsScreen() {
@@ -55,6 +64,7 @@ export default function SettingsScreen() {
   const setLocale = useLocale((s) => s.setLocale);
   const isOwner = me?.isOwner ?? false;
   const branchCount = me?.branches.length ?? 0;
+  const collectionsAccess = useCollectionsAccess();
 
   const tiles: Tile[] = [
     {
@@ -75,6 +85,19 @@ export default function SettingsScreen() {
       title: t("app.digestSettings.title"),
       hint: t("app.settingsPage.digestTile.subtitle"),
       ownerOnly: true,
+    },
+    {
+      // Digital collections (doc 15 spec 09 §4.2, M1): receiving accounts and
+      // the branch switches. Not owner-only — staff granted
+      // manage_collection_accounts manage them too; hidden (no "soon" state)
+      // while COLLECTIONS_ENABLED does not admit the tenant.
+      key: "collections",
+      route: "/settings/collections",
+      icon: ArrowsLeftRight,
+      title: t("app.collectionsSettings.title"),
+      hint: t("app.collectionsSettings.tileHint"),
+      ownerOnly: false,
+      visible: collectionsTileVisible(collectionsAccess),
     },
     {
       key: "notifications",
@@ -166,7 +189,7 @@ export default function SettingsScreen() {
     },
   ];
 
-  const visible = tiles.filter((t) => !t.ownerOnly || isOwner);
+  const visible = tiles.filter((tile) => tile.visible !== false && (!tile.ownerOnly || isOwner));
 
   return (
     <Screen title={t("app.settingsPage.title")}>

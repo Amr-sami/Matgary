@@ -64,6 +64,28 @@ const SENSITIVE_KEYS = new Set([
   "email",
   "customeremail",
   "customer_email",
+  // Digital collections (doc 15 spec 14 step 6; 03 §E.3–E.4): forwarded bank /
+  // wallet message text, the shop's receiving accounts and payer details. An
+  // ingest body is `{ v, messages: [{ sender, title, subtitle, body, … }] }`;
+  // `messages` alone already drops the whole array, the leaf keys cover the
+  // same fields when they travel outside it (credit DTOs, paste bodies).
+  "messages",
+  "body",
+  "text",
+  "subtitle",
+  "sender",
+  "rawtext",
+  "iban",
+  "walletmsisdn",
+  "wallet_msisdn",
+  "ipalink",
+  "ipa_link",
+  "ipahandle",
+  "ipa_handle",
+  "payername",
+  "payer_name",
+  "payerphone",
+  "payer_phone",
 ]);
 
 const REDACTED = "[REDACTED]";
@@ -95,6 +117,7 @@ export function scrubHeaders(
 
 interface SentryLikeEvent {
   request?: {
+    url?: string;
     headers?: Record<string, string>;
     data?: unknown;
     cookies?: unknown;
@@ -113,6 +136,25 @@ interface SentryLikeEvent {
 }
 
 /**
+ * `request.data` arrives as an object or as the raw body string. A string used
+ * to pass through untouched (`scrubObject` returns non-objects as-is), so a
+ * JSON body's keys were never checked (SEC14-F2). Parse it and scrub the
+ * object; a body that is not a JSON object on a collections route is dropped,
+ * because it may be forwarded message text.
+ */
+function scrubRequestData(data: unknown, url: string | undefined): unknown {
+  if (typeof data !== "string") return scrubObject(data);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(data);
+  } catch {
+    parsed = undefined;
+  }
+  if (parsed !== null && typeof parsed === "object") return scrubObject(parsed);
+  return typeof url === "string" && url.includes("/collections") ? REDACTED : data;
+}
+
+/**
  * Scrub a Sentry event in place + return it. Safe to call from both the
  * server-side and client-side `beforeSend` hooks.
  */
@@ -120,7 +162,7 @@ export function scrubSentryEvent<T extends SentryLikeEvent>(event: T): T {
   if (event.request) {
     event.request.headers = scrubHeaders(event.request.headers);
     if (event.request.data !== undefined) {
-      event.request.data = scrubObject(event.request.data);
+      event.request.data = scrubRequestData(event.request.data, event.request.url);
     }
     if (event.request.cookies !== undefined) {
       event.request.cookies = REDACTED;

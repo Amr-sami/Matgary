@@ -165,7 +165,7 @@ export default function LegalScreen() {
 
         <View style={styles.rule} />
 
-        {/* Table of contents — 12 numbered clauses each; a reviewer or a
+        {/* Table of contents — one row per numbered clause; a reviewer or a
             merchant checking one clause should not have to scroll blind, so
             every row is a full-height button that jumps to its clause. */}
         <View style={styles.toc} accessibilityRole="list">
