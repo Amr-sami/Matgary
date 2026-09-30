@@ -11,7 +11,13 @@ export type NotificationKind =
   | "task_updated"
   | "leave_submitted"
   | "leave_decided"
-  | "info";
+  | "info"
+  // Digital collections (doc 15 spec 13 §4.6).
+  | "collection_pending"
+  | "collection_stale"
+  | "collection_unmatched"
+  | "collection_source_silent"
+  | "collection_limit";
 
 export interface NotificationItem {
   id: string;

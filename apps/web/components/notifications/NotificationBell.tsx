@@ -2,7 +2,18 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Bell, Check, Package, ListChecks, Info } from "@/lib/icons";
+import {
+  ArrowDownLeft,
+  Bell,
+  Check,
+  Clock,
+  Gauge,
+  Info,
+  ListChecks,
+  Package,
+  Wallet,
+  WifiSlash,
+} from "@/lib/icons";
 import { useNotifications, type NotificationKind } from "@/hooks/useNotifications";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +26,12 @@ const KIND_ICON: Record<NotificationKind, typeof Bell> = {
   leave_submitted: Info,
   leave_decided: Info,
   info: Info,
+  // Digital collections (doc 15 spec 13 §4.6) — same icons as mobile.
+  collection_pending: Wallet,
+  collection_stale: Clock,
+  collection_unmatched: ArrowDownLeft,
+  collection_source_silent: WifiSlash,
+  collection_limit: Gauge,
 };
 
 const KIND_TONE: Record<NotificationKind, string> = {
@@ -26,6 +43,11 @@ const KIND_TONE: Record<NotificationKind, string> = {
   leave_submitted: "bg-blue-50 text-blue-700",
   leave_decided: "bg-blue-50 text-blue-700",
   info: "bg-gray-100 text-text-secondary",
+  collection_pending: "bg-accent-light text-accent",
+  collection_stale: "bg-orange-50 text-orange-700",
+  collection_unmatched: "bg-success-light text-success",
+  collection_source_silent: "bg-red-50 text-red-700",
+  collection_limit: "bg-orange-100 text-orange-700",
 };
 
 interface Props {

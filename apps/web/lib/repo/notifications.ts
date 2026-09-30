@@ -5,10 +5,11 @@ import {
   notifications,
   tenantMembers,
 } from "@/lib/db/schema";
+import { collectionsTenantAdmitted } from "@/lib/collections/flags";
 import {
   DEFAULT_EVENT_PREFERENCE,
-  NOTIFICATION_EVENT_TYPES,
   resolvePreference,
+  visibleEventTypes,
   type DigestMode,
   type NotificationEventType,
   type TenantMemberRole,
@@ -24,7 +25,13 @@ export type NotificationKind =
   | "task_updated"
   | "leave_submitted"
   | "leave_decided"
-  | "info";
+  | "info"
+  // Digital collections (13 §4.6, 03 §B.6) — one kind per collection event.
+  | "collection_pending"
+  | "collection_stale"
+  | "collection_unmatched"
+  | "collection_source_silent"
+  | "collection_limit";
 
 export interface NotificationDto {
   id: string;
@@ -268,6 +275,14 @@ export const DEFAULT_PUSH: Record<
     "inventory.low_stock": true,
     "payment.deferred_settled": true,
     "leave.requested": true,
+    // Collections (13 §4.2, 03 §B.6): pending is digest mode (never pushes);
+    // limit warnings are in-app only because the limit semantics are
+    // UNVERIFIED (W7, 13 §8 R2).
+    "collection.pending": false,
+    "collection.stale": true,
+    "collection.unmatched_credit": true,
+    "collection.source_silent": true,
+    "collection.limit_warning": false,
   },
   staff: {
     "sale.created": false,
@@ -275,6 +290,12 @@ export const DEFAULT_PUSH: Record<
     "inventory.low_stock": true,
     "payment.deferred_settled": false,
     "leave.requested": false,
+    // Only staff holding the event's EVENT_RECIPIENT_PERMISSION receive these.
+    "collection.pending": false,
+    "collection.stale": true,
+    "collection.unmatched_credit": true,
+    "collection.source_silent": true,
+    "collection.limit_warning": false,
   },
 };
 
@@ -304,27 +325,32 @@ export interface SetEventPreferenceInput {
   digestMode: DigestMode;
 }
 
-async function memberRole(
+/** The member's role and permission keys from one row (13 §4.9). A missing
+ *  row reads as staff with no permissions. */
+async function memberRoleAndPermissions(
   tx: Parameters<Parameters<typeof withTenant>[1]>[0],
   tenantId: string,
   userId: string,
-): Promise<TenantMemberRole> {
+): Promise<{ role: TenantMemberRole; permissions: string[] }> {
   const [member] = await tx
-    .select({ role: tenantMembers.role })
+    .select({ role: tenantMembers.role, permissions: tenantMembers.permissions })
     .from(tenantMembers)
     .where(
       and(eq(tenantMembers.tenantId, tenantId), eq(tenantMembers.userId, userId)),
     )
     .limit(1);
-  return member?.role === "owner" ? "owner" : "staff";
+  return {
+    role: member?.role === "owner" ? "owner" : "staff",
+    permissions: member?.permissions ?? [],
+  };
 }
 
 export async function getNotificationPreferences(
   tenantId: string,
   userId: string,
 ): Promise<NotificationPreferencesDto> {
-  const [role, stored] = await withTenant(tenantId, async (tx) => {
-    const r = await memberRole(tx, tenantId, userId);
+  const [member, stored] = await withTenant(tenantId, async (tx) => {
+    const m = await memberRoleAndPermissions(tx, tenantId, userId);
     const rows = await tx
       .select({
         eventType: notificationPreferences.eventType,
@@ -340,11 +366,20 @@ export async function getNotificationPreferences(
           eq(notificationPreferences.userId, userId),
         ),
       );
-    return [r, rows] as const;
+    return [m, rows] as const;
   });
+  const { role } = member;
 
+  // D13-8: list only the events this member can ever receive — the
+  // collection events need COLLECTIONS_ENABLED to admit the tenant, and a
+  // staff member needs the event's permission. The PUT stays permissive.
+  const visible = visibleEventTypes(
+    role,
+    member.permissions,
+    collectionsTenantAdmitted(tenantId),
+  );
   const storedByEvent = new Map(stored.map((s) => [s.eventType, s]));
-  const preferences = NOTIFICATION_EVENT_TYPES.map((eventType): EventPreferenceDto => {
+  const preferences = visible.map((eventType): EventPreferenceDto => {
     const s = storedByEvent.get(eventType);
     const resolved = resolvePreference(
       role,
@@ -382,7 +417,7 @@ export async function setNotificationPreference(
 ): Promise<{ isDefault: boolean }> {
   const { eventType, inApp, email, digestMode } = input;
   return withTenant(tenantId, async (tx) => {
-    const role = await memberRole(tx, tenantId, userId);
+    const { role } = await memberRoleAndPermissions(tx, tenantId, userId);
     const where = and(
       eq(notificationPreferences.tenantId, tenantId),
       eq(notificationPreferences.userId, userId),

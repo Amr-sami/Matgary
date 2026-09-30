@@ -14,7 +14,7 @@ import {
   renderInApp,
   type EventPayloadMap,
 } from "@/lib/notifications/dispatch";
-import { isNotificationEventType } from "@/lib/notifications/event-types";
+import { EVENT_LABELS, isNotificationEventType } from "@/lib/notifications/event-types";
 import { clientIp } from "@/lib/request-ip";
 
 // Daily digest cron. Drains `notification_digest_queue` — every row is a
@@ -229,7 +229,7 @@ function renderDigest(
   const sections: string[] = [];
   for (const [eventType, list] of byType) {
     if (!isNotificationEventType(eventType)) continue;
-    sections.push(ar ? `— ${labelAr(eventType)} (${list.length})` : `— ${labelEn(eventType)} (${list.length})`);
+    sections.push(`— ${ar ? EVENT_LABELS[eventType].ar : EVENT_LABELS[eventType].en} (${list.length})`);
     for (const r of list) {
       const rendered = renderInApp(
         eventType,
@@ -254,38 +254,4 @@ function renderDigest(
     subject,
     text: `${header}\n${sections.join("\n")}${footer}`,
   };
-}
-
-function labelAr(eventType: string): string {
-  switch (eventType) {
-    case "sale.created":
-      return "المبيعات";
-    case "purchase.received":
-      return "التوريدات المستلمة";
-    case "inventory.low_stock":
-      return "تنبيهات مخزون منخفض";
-    case "payment.deferred_settled":
-      return "مدفوعات آجل مسدّدة";
-    case "leave.requested":
-      return "طلبات إجازة";
-    default:
-      return eventType;
-  }
-}
-
-function labelEn(eventType: string): string {
-  switch (eventType) {
-    case "sale.created":
-      return "Sales";
-    case "purchase.received":
-      return "Purchases received";
-    case "inventory.low_stock":
-      return "Low stock alerts";
-    case "payment.deferred_settled":
-      return "Deferred settlements";
-    case "leave.requested":
-      return "Leave requests";
-    default:
-      return eventType;
-  }
 }

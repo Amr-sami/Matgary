@@ -81,6 +81,28 @@ const EVENTS = (): Record<EventType, { title: string; hint: string }> => ({
     title: t("app.notificationSettings.events.leave.requested.title"),
     hint: t("app.notificationSettings.events.leave.requested.hint"),
   },
+  // Digital collections (doc 15 spec 13 §4.9): the server lists these only to
+  // members who can receive them; the map must still cover every event.
+  "collection.pending": {
+    title: t("app.notificationSettings.events.collection.pending.title"),
+    hint: t("app.notificationSettings.events.collection.pending.hint"),
+  },
+  "collection.stale": {
+    title: t("app.notificationSettings.events.collection.stale.title"),
+    hint: t("app.notificationSettings.events.collection.stale.hint"),
+  },
+  "collection.unmatched_credit": {
+    title: t("app.notificationSettings.events.collection.unmatched_credit.title"),
+    hint: t("app.notificationSettings.events.collection.unmatched_credit.hint"),
+  },
+  "collection.source_silent": {
+    title: t("app.notificationSettings.events.collection.source_silent.title"),
+    hint: t("app.notificationSettings.events.collection.source_silent.hint"),
+  },
+  "collection.limit_warning": {
+    title: t("app.notificationSettings.events.collection.limit_warning.title"),
+    hint: t("app.notificationSettings.events.collection.limit_warning.hint"),
+  },
 });
 
 const DELIVERY = () => ([

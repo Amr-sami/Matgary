@@ -32,6 +32,8 @@ const KEY_TOKEN = "token"; // last token the server acknowledged
 const KEY_USER = "user"; // … and the user it was registered for
 
 const ANDROID_CHANNEL = "default";
+/** Must equal the server's channelForKind() value (apps/web/lib/push/notify.ts). */
+const COLLECTIONS_CHANNEL = "collections";
 
 // Foreground presentation: banner + list + sound + badge. Set at module scope
 // so it is in place before the first notification can arrive.
@@ -164,6 +166,15 @@ async function register(userId: string, opts: { prompt: boolean }): Promise<void
       // channel the user cannot tune (doc 06 §8.5).
       await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL, {
         name: t("mobile.push.channelDefault"),
+        importance: Notifications.AndroidImportance.HIGH,
+        sound: "default",
+      });
+      // Transfers (doc 15 spec 13 §4.7): the server sends every collection_*
+      // push with channelId "collections". Created unconditionally — not behind
+      // the collections flag — so the channel exists before the first such
+      // push; a push naming a missing channel may not display (13 §8 R3).
+      await Notifications.setNotificationChannelAsync(COLLECTIONS_CHANNEL, {
+        name: t("mobile.push.channelCollections"),
         importance: Notifications.AndroidImportance.HIGH,
         sound: "default",
       });

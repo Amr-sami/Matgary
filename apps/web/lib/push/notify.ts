@@ -50,15 +50,39 @@ const KIND_ROUTES: Partial<Record<NotificationKind, string>> = {
   task_updated: "/tasks",
   leave_submitted: "/leave",
   leave_decided: "/leave",
+  // Digital collections (13 §4.6). The producers' links keep their
+  // `tab|status|stale` query; the app filters it (notification-routes.ts).
+  collection_pending: "/collections",
+  collection_stale: "/collections",
+  collection_unmatched: "/collections",
+  collection_limit: "/collections",
+  collection_source_silent: "/settings/collections/devices",
+};
+
+/** Mobile routes that beat the producer's web link (03 §B.6): the silent-phone
+ *  alert links to the web settings page, but on the phone it must open the
+ *  devices screen. Mirrored by the app's KIND_ROUTE_OVERRIDE. */
+export const KIND_MOBILE_ROUTE_OVERRIDE: Partial<Record<NotificationKind, string>> = {
+  collection_source_silent: "/settings/collections/devices",
 };
 
 const DEFAULT_ROUTE = "/notifications";
 
-/** App route for a notification. A producer-supplied `link` (already an
- *  app-relative path) takes precedence; the kind table is the fallback. */
+/** App route for a notification. A kind override wins; then a
+ *  producer-supplied `link` (already an app-relative path); the kind table
+ *  is the fallback. */
 export function routeForNotification(kind: string, link: string | null | undefined): string {
+  const override = KIND_MOBILE_ROUTE_OVERRIDE[kind as NotificationKind];
+  if (override) return override;
   if (link && link.startsWith("/") && !link.startsWith("//")) return link;
   return KIND_ROUTES[kind as NotificationKind] ?? DEFAULT_ROUTE;
+}
+
+/** Android channel for a notification kind: every `collection_*` kind goes to
+ *  the "collections" channel (importance HIGH, created unconditionally by the
+ *  app's PushRegistrar); everything else stays on "default". */
+export function channelForKind(kind: string): "collections" | undefined {
+  return kind.startsWith("collection_") ? "collections" : undefined;
 }
 
 // ─── Preference gate ─────────────────────────────────────────────────────────
@@ -68,6 +92,11 @@ export function routeForNotification(kind: string, link: string | null | undefin
 const KIND_TO_EVENT: Partial<Record<NotificationKind, NotificationEventType>> = {
   low_stock: "inventory.low_stock",
   leave_submitted: "leave.requested",
+  collection_pending: "collection.pending",
+  collection_stale: "collection.stale",
+  collection_unmatched: "collection.unmatched_credit",
+  collection_source_silent: "collection.source_silent",
+  collection_limit: "collection.limit_warning",
 };
 
 // ─── Public API ──────────────────────────────────────────────────────────────
@@ -134,11 +163,13 @@ export async function notifyUserDevices(
     const tokens = await activeTokens(tenantId, userId);
     if (tokens.length === 0) return { status: "no_tokens", outcomes: [], disabled: [] };
 
+    const channelId = channelForKind(input.data.type);
     const messages: PushMessage[] = tokens.map((to) => ({
       to,
       title: input.title,
       body: input.body ?? undefined,
       data: input.data,
+      ...(channelId ? { channelId } : {}),
     }));
     const outcomes = await sendPush(messages, opts);
     const disabled = await handleOutcomes(tenantId, userId, outcomes);

@@ -93,6 +93,10 @@ export {
   Users,
   UsersThree as UsersGroup,
   Wallet,
+  // Digital collections notification kinds (doc 15 spec 13 §4.6).
+  ArrowDownLeft,
+  WifiSlash,
+  Gauge,
   Wrench,
   X,
   XCircle,

@@ -7,7 +7,12 @@ import { CheckIcon as Check } from "phosphor-react-native/src/icons/Check";
 import { InfoIcon as Info } from "phosphor-react-native/src/icons/Info";
 import { ListChecksIcon as ListChecks } from "phosphor-react-native/src/icons/ListChecks";
 import { PackageIcon as Package } from "phosphor-react-native/src/icons/Package";
-import { notifications, type MeResponse } from "@matgary/api-client";
+import { ArrowDownLeftIcon as ArrowDownLeft } from "phosphor-react-native/src/icons/ArrowDownLeft";
+import { ClockIcon as Clock } from "phosphor-react-native/src/icons/Clock";
+import { GaugeIcon as Gauge } from "phosphor-react-native/src/icons/Gauge";
+import { WalletIcon as Wallet } from "phosphor-react-native/src/icons/Wallet";
+import { WifiSlashIcon as WifiSlash } from "phosphor-react-native/src/icons/WifiSlash";
+import { notifications } from "@matgary/api-client";
 
 type NotificationKind = notifications.NotificationKind;
 type NotificationPage = notifications.NotificationPage;
@@ -60,6 +65,12 @@ export const KIND_ICON: Record<NotificationKind, Icon> = {
   leave_submitted: Info,
   leave_decided: Info,
   info: Info,
+  // Digital collections (doc 15 spec 13 §4.6).
+  collection_pending: Wallet,
+  collection_stale: Clock,
+  collection_unmatched: ArrowDownLeft,
+  collection_source_silent: WifiSlash,
+  collection_limit: Gauge,
 };
 
 /** Web KIND_TONE, measured pairs from the token sheet (no hex literals). */
@@ -72,139 +83,24 @@ export const KIND_TONE: Record<NotificationKind, { bg: string; fg: string }> = {
   leave_submitted: { bg: colors.accentLight, fg: colors.accent },
   leave_decided: { bg: colors.accentLight, fg: colors.accent },
   info: { bg: colors.neutralTint, fg: colors.neutralText },
+  collection_pending: { bg: colors.accentLight, fg: colors.accent },
+  collection_stale: { bg: colors.warningLight, fg: colors.warningStrong },
+  collection_unmatched: { bg: colors.successLight, fg: colors.successStrong },
+  collection_source_silent: { bg: colors.dangerLight, fg: colors.danger },
+  collection_limit: { bg: colors.warningTint, fg: colors.warningStrong },
 };
 
-/** Where a kind lands when the row carries no `link` (mirrors the producers). */
-const KIND_ROUTE: Record<NotificationKind, string | null> = {
-  low_stock: "/inventory",
-  task_assigned: "/tasks",
-  task_started: "/tasks",
-  task_done: "/tasks",
-  task_updated: "/tasks",
-  leave_submitted: "/leave",
-  leave_decided: "/leave",
-  info: null,
-};
-
-/** Top-level routes under app/(app)/. A push or link outside this set is ignored. */
-const KNOWN_TOP = new Set([
-  "activity",
-  "add-product",
-  "attendance",
-  "billing",
-  "customers",
-  "expenses",
-  "insights",
-  "inventory",
-  "leave",
-  "more",
-  "notifications",
-  "onboarding",
-  "purchases",
-  "returns",
-  "sales",
-  "settings",
-  "suppliers",
-  "sync",
-  "tasks",
-  "team",
-  "whatsapp",
-]);
-
-/** Routes that have a dynamic child screen on mobile (inventory/[id] …). */
-const HAS_DETAIL = new Set(["inventory", "customers", "suppliers", "team"]);
-
-const SETTINGS_CHILDREN = new Set([
-  "about",
-  "app-lock",
-  "attributes",
-  "branches",
-  "brands",
-  "categories",
-  "change-password",
-  "digest",
-  "notifications",
-  "printers",
-  "receipt",
-  "security",
-  "store",
-]);
-
-/**
- * Map a web `link` ("/purchases/<id>", "/inventory?low=1") or a push
- * `data.route` onto a route this app actually has. Unknown → null, so the
- * caller never pushes a path expo-router would 404 on. A detail path whose
- * screen does not exist on mobile degrades to its list ("/purchases/<id>" →
- * "/purchases").
- */
-export function toAppRoute(path: string | null | undefined): string | null {
-  if (!path || typeof path !== "string") return null;
-  const clean = path.split("?")[0].split("#")[0].replace(/^\/\(app\)/, "");
-  const segs = clean.split("/").filter(Boolean);
-  if (segs.length === 0) return clean === "/" ? "/" : null;
-  const [top, second] = segs;
-  if (!KNOWN_TOP.has(top)) return null;
-  if (second) {
-    if (HAS_DETAIL.has(top)) return `/${top}/${second}`;
-    if (top === "settings" && SETTINGS_CHILDREN.has(second)) return `/${top}/${second}`;
-    return `/${top}`;
-  }
-  return `/${top}`;
-}
-
-/**
- * Client-side gate per top-level route — the same table app/(app)/more.tsx
- * uses to decide which rows to show. A route not listed here (the tabs:
- * sales, inventory, insights, purchases …) is open to any signed-in member.
- * `null` = any signed-in member; a string = that permission; a function =
- * a composite rule.
- */
-const ROUTE_GATE: Record<string, string | null | ((me: MeResponse) => boolean)> = {
-  tasks: null,
-  attendance: null,
-  notifications: null,
-  sync: "record_sales",
-  customers: "view_customers",
-  expenses: "view_expenses",
-  suppliers: "view_suppliers",
-  returns: "view_returns",
-  activity: "view_activity_log",
-  whatsapp: "manage_whatsapp",
-  settings: "view_settings",
-  team: (me) => ["manage_team", "request_leave", "manage_leave"].some((p) => me.permissions.includes(p)),
-  leave: (me) => me.permissions.includes("request_leave") || me.permissions.includes("manage_leave"),
-  // Billing is owner-only on the web (app.billing.ownerOnly).
-  billing: (me) => me.isOwner,
-};
-
-/**
- * Spec §8.5: "guard against the route being permission-forbidden". True when
- * `me` may open `route` (an app route from toAppRoute). A cashier tapping a
- * push about /team must land in the inbox, not on the screen's 403 state.
- */
-export function canOpenRoute(route: string, me: MeResponse | null): boolean {
-  if (!me) return false;
-  const top = route.split("/").filter(Boolean)[0];
-  if (!top) return true;
-  const gate = ROUTE_GATE[top];
-  if (gate === undefined || gate === null) return true;
-  if (typeof gate === "function") return gate(me);
-  return me.isOwner || me.permissions.includes(gate);
-}
-
-/**
- * The route a tapped inbox row should open, or null for a dead-end row —
- * including a row whose target `me` is not allowed to open (the row is then
- * read-only: tapping marks it read and goes nowhere).
- */
-export function routeForNotification(
-  n: { kind: NotificationKind; link: string | null },
-  me: MeResponse | null,
-): string | null {
-  const route = toAppRoute(n.link) ?? KIND_ROUTE[n.kind] ?? null;
-  if (!route) return null;
-  return canOpenRoute(route, me) ? route : null;
-}
+// The routing registry (KIND_ROUTE, toAppRoute, canOpenRoute,
+// routeForNotification) lives in src/lib/notification-routes.ts so it can be
+// unit-tested with plain Node (doc 15 spec 13 §4.8); re-exported here so
+// /notifications and <PushRegistrar/> keep importing from this module.
+export {
+  KIND_ROUTE,
+  KIND_ROUTE_OVERRIDE,
+  canOpenRoute,
+  routeForNotification,
+  toAppRoute,
+} from "@/lib/notification-routes";
 
 export function NotificationBell() {
   const router = useRouter();

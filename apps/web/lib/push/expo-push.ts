@@ -39,23 +39,32 @@ export interface PushData {
   [key: string]: unknown;
 }
 
+/** Android notification channels the app creates at push registration
+ *  (apps/mobile/src/effects/PushRegistrar.tsx). A push naming a channel the
+ *  device never created may not display (13 §4.7 R3), so only these two. */
+export type PushChannelId = "default" | "collections";
+
 export interface PushMessage {
   to: string;
   title: string;
   body?: string;
   data?: PushData;
+  /** Android channel; omitted → "default". `collection_*` kinds use
+   *  "collections" (lib/push/notify.ts `channelForKind`). */
+  channelId?: PushChannelId;
 }
 
 /** The wire shape actually POSTed. Fields beyond `PushMessage` are fixed
- *  policy: every TheStoro push sounds, goes to the `default` Android
- *  channel, and is high-priority (a late "task assigned" is useless). */
+ *  policy: every TheStoro push sounds, goes to an Android channel the app
+ *  created (`default` unless the message names `collections`), and is
+ *  high-priority (a late "task assigned" is useless). */
 export interface ExpoPushRequest {
   to: string;
   title: string;
   body?: string;
   data?: PushData;
   sound: "default";
-  channelId: "default";
+  channelId: PushChannelId;
   priority: "high";
 }
 
@@ -100,7 +109,7 @@ export function toExpoRequest(m: PushMessage): ExpoPushRequest {
     to: m.to,
     title: m.title,
     sound: "default",
-    channelId: "default",
+    channelId: m.channelId ?? "default",
     priority: "high",
   };
   if (m.body) req.body = m.body;

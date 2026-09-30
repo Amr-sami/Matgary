@@ -19,7 +19,13 @@ export type NotificationKind =
   | "task_updated"
   | "leave_submitted"
   | "leave_decided"
-  | "info";
+  | "info"
+  // Digital collections (doc 15 spec 13 §4.6) — one kind per collection event.
+  | "collection_pending"
+  | "collection_stale"
+  | "collection_unmatched"
+  | "collection_source_silent"
+  | "collection_limit";
 
 export interface NotificationItem {
   id: string;
@@ -171,7 +177,15 @@ export type NotificationEventType =
   | "purchase.received"
   | "inventory.low_stock"
   | "payment.deferred_settled"
-  | "leave.requested";
+  | "leave.requested"
+  // Listed by the preferences GET only to members who can receive them
+  // (doc 15 spec 13 D13-8): owners when collections are admitted, staff
+  // holding the event's permission.
+  | "collection.pending"
+  | "collection.stale"
+  | "collection.unmatched_credit"
+  | "collection.source_silent"
+  | "collection.limit_warning";
 
 export type DigestMode = "instant" | "digest";
 

@@ -3097,6 +3097,26 @@
         "leave.requested": {
           "title": "Leave request",
           "hint": "Fires when a staff member submits a leave request."
+        },
+        "collection.pending": {
+          "title": "Transfer awaiting confirmation",
+          "hint": "Fires when a sale is paid by InstaPay or mobile wallet. Collected into the daily summary."
+        },
+        "collection.stale": {
+          "title": "Transfer waiting too long",
+          "hint": "Fires when a transfer stays unconfirmed longer than the branch's limit."
+        },
+        "collection.unmatched_credit": {
+          "title": "Money with no matching sale",
+          "hint": "Fires when a bank or wallet message arrives and no sale matches it."
+        },
+        "collection.source_silent": {
+          "title": "Automatic confirmation stopped",
+          "hint": "Fires when a phone that forwards bank messages goes quiet while sales keep coming."
+        },
+        "collection.limit_warning": {
+          "title": "Wallet near its limit",
+          "hint": "Fires when a wallet reaches 80% of its day or month limit, or 90% of its balance cap."
         }
       },
       "delivery": {
@@ -5401,7 +5421,8 @@
       "perEventHint": "Push only fires while in-app is on",
       "perEventDigestHint": "Daily-digest events never push — set delivery to Instant",
       "prefsLoadFailed": "Couldn't load notification settings",
-      "prefsEmpty": "No events to configure"
+      "prefsEmpty": "No events to configure",
+      "channelCollections": "Collections"
     },
     "offline": {
       "chipOffline": "Offline",

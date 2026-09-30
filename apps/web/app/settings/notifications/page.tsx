@@ -10,7 +10,14 @@ type EventType =
   | "purchase.received"
   | "inventory.low_stock"
   | "payment.deferred_settled"
-  | "leave.requested";
+  | "leave.requested"
+  // Digital collections (doc 15 spec 13 §4.9): the GET lists them only to
+  // members who can receive them.
+  | "collection.pending"
+  | "collection.stale"
+  | "collection.unmatched_credit"
+  | "collection.source_silent"
+  | "collection.limit_warning";
 
 interface Pref {
   eventType: EventType;
