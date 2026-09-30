@@ -15,6 +15,7 @@
  * Menlo/Courier look (Menlo ships on iOS).
  */
 
+import { receiptPaymentRows, type ReceiptPayment } from "@matgary/domain";
 import { groupDigits } from "@/lib/format";
 
 export type ReceiptWidth = 58 | 80;
@@ -81,6 +82,9 @@ export interface ReceiptSale {
   loyaltyPointsEarned?: number;
   loyaltyPointsBalance?: number;
   loyaltyCreditBalance?: number;
+  /** Doc 15 spec 13 §4.15: method + masked receiving account (instapay /
+   *  wallet / card only); the customer's receipt never shows a status. */
+  payment?: ReceiptPayment | null;
 }
 
 export interface BuildReceiptOptions {
@@ -234,6 +238,7 @@ export function buildReceiptHtml(
     totals += row(rl("paid", lang), receiptMoney(sale.amountPaid));
     totals += row(rl("balance", lang), receiptMoney(sale.totalPrice - sale.amountPaid), "receipt-total-row");
   }
+  for (const r of receiptPaymentRows(sale.payment, lang)) totals += row(esc(r.label), esc(r.value));
 
   let loyalty = "";
   if (showLoyalty && ((sale.loyaltyPointsEarned ?? 0) > 0 || sale.loyaltyPointsBalance !== undefined)) {
@@ -397,6 +402,7 @@ export function receiptPageSize(
   }
   rows += 4; // subtotal, discounts, total
   if (typeof sale.amountPaid === "number" && sale.amountPaid < sale.totalPrice) rows += 2;
+  rows += receiptPaymentRows(sale.payment, settings.receiptLanguage).length;
   if (settings.receiptShowLoyalty) rows += 3;
   rows += 4; // thank you + eta + code
   if (settings.receiptFooterText) rows += 1 + wrappedLines(settings.receiptFooterText, fit.text);

@@ -24,6 +24,12 @@ import {
 const SYNCED_TTL_MS = 60_000; // keep "synced" rows for 60s for UI confirmation
 const MAX_ATTEMPTS = 8;
 
+// A queued cart sale's payload carries the digital-collection fields too
+// (collectionAccountId, payerPhoneLast4, payerReference, collectionParts —
+// doc 15 03 §B.17). It is re-posted verbatim, so it must stay byte-identical
+// across retries under its Idempotency-Key. The server never answers 4xx for a
+// collection problem (03 §C.1 "book and flag"): a queued digital sale cannot
+// land in `failed` because its account was archived or deleted meanwhile.
 export interface EnqueueInput {
   type: "sale";
   idempotencyKey: string;

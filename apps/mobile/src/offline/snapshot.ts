@@ -48,6 +48,9 @@ export const SNAPSHOT_ROOTS: readonly string[] = [
   "dashboard",
   "shop-settings", // receipt / store settings
   "branches",
+  // POS transfer panel — receiving accounts + the branch's collections
+  // settings (same root), readable offline (doc 15 03 §B.10, spec 08 §4.6).
+  "collection-accounts",
 ];
 
 /** Bytes of JSON one entry may occupy; bigger answers are not kept (and are reported via `onDropped`). */

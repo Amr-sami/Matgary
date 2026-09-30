@@ -90,7 +90,14 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 export function toReceiptSale(
   cart: ReceiptCart,
   result: salesApi.CartSaleResult,
-  extra: { saleDate?: Date; amountPaid?: number } = {},
+  extra: {
+    saleDate?: Date;
+    amountPaid?: number;
+    /** Doc 15 spec 13 §4.15: the receiving accounts' ASCII masks
+     *  (CollectionAccountDTO.mask), passed by the POS (08). Omitted → the
+     *  receipt prints the method only. */
+    accountMasks?: string[];
+  } = {},
 ): ReceiptSale {
   const lines = cart.lines.map((l) => ({
     productName: l.name,
@@ -111,6 +118,8 @@ export function toReceiptSale(
     orderDiscountAmount,
     totalPrice: result.total,
     amountPaid: result.paymentMethod === "deferred" ? extra.amountPaid ?? 0 : extra.amountPaid,
+    // instapay / wallet / card print a method row; cash / deferred print none.
+    payment: { method: result.paymentMethod, accountMasks: extra.accountMasks ?? null },
   };
 }
 

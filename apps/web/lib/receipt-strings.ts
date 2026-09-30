@@ -7,6 +7,8 @@
 // because those are tenant-controlled.
 
 import type { ReceiptLanguage } from "./settings";
+import { receiptPaymentRows, type ReceiptPayment } from "@matgary/domain/receipt/payment";
+import { accountMask, type AccountMaskInput } from "@matgary/domain/collections/normalize";
 
 interface LabelPair {
   en: string;
@@ -42,4 +44,25 @@ export function rl(key: ReceiptLabelKey, lang: ReceiptLanguage): string {
   // bilingual: English first (matches the LTR receipt direction) then Arabic
   // separated by a thin spacer so it reads as one cell on a single line.
   return `${pair.en} · ${pair.ar}`;
+}
+
+// ─── Payment method row (doc 15 spec 13 §4.15) ───────────────────────────────
+// One helper for every receipt renderer (web receipt, invoice receipt, PDF,
+// mobile HTML, thermal): instapay / wallet / card print the method and the
+// receiving account's ASCII mask; cash / deferred print nothing new; a
+// confirmation status is never printed.
+
+export { receiptPaymentRows, type ReceiptPayment };
+
+/**
+ * The `payment` value a receipt carries, from the sale's method and the
+ * receiving accounts it names (12 fills `ReceiptInvoiceData.payment` /
+ * `ReceiptSaleData.payment` with it; reprints pass `[]` → method only).
+ */
+export function receiptPaymentInfo(
+  method: string | null | undefined,
+  accounts: readonly AccountMaskInput[],
+): ReceiptPayment | undefined {
+  if (!method) return undefined;
+  return { method, accountMasks: accounts.map((a) => accountMask(a)) };
 }

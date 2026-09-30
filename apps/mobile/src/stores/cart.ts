@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import { computeCartTotals, type DiscountType } from "@matgary/domain";
-import type { Product } from "@matgary/api-client";
+import type { Product, sales as salesApi } from "@matgary/api-client";
 
+import { emptyPayment, isDigitalMethod, type CartPaymentFields } from "@/collections/checkout";
 import { mintInvoiceId } from "@/offline/invoice-id";
 
 /**
@@ -36,7 +37,13 @@ export interface CartLine {
   lineDiscountValue: number;
 }
 
-interface CartState {
+/**
+ * The payment fields (doc 15 spec 08 §4.1) live HERE, not in the screen:
+ * `reset()` returns them to cash with nothing picked (the sticky-chip fix,
+ * code-mobile §15.2), `loadSaleIntoCart` restores them on offline Edit
+ * (§15.1), and the live POST and the outbox read one source.
+ */
+interface CartState extends CartPaymentFields {
   invoiceId: string;
   lines: CartLine[];
   orderDiscountType: DiscountType;
@@ -51,6 +58,15 @@ interface CartState {
   setCustomer: (name: string, phone: string) => void;
   setOrderDiscount: (type: DiscountType, value: number) => void;
   setNote: (note: string) => void;
+  /**
+   * Pick a method. Clears the account, parts and payer hints, then applies
+   * `defaultAccountId` (the rail's POS default) when the method is digital.
+   */
+  setPaymentMethod: (method: salesApi.PaymentMethod, defaultAccountId?: string | null) => void;
+  setCollectionAccount: (id: string | null) => void;
+  setPayer: (last4: string, reference: string) => void;
+  /** Whole-object replace of the payment fields (the panel's split helpers). */
+  setPayment: (fields: CartPaymentFields) => void;
   /** New empty cart with a fresh invoice id. Called after a successful sale. */
   reset: () => void;
 }
@@ -63,6 +79,8 @@ const empty = () => ({
   customerName: "",
   customerPhone: "",
   note: "",
+  // Cash, no account, no parts — every new cart (sticky-chip fix).
+  ...emptyPayment(),
 });
 
 export const useCart = create<CartState>((set) => ({
@@ -118,6 +136,22 @@ export const useCart = create<CartState>((set) => ({
   setOrderDiscount: (orderDiscountType, orderDiscountValue) =>
     set({ orderDiscountType, orderDiscountValue }),
   setNote: (note) => set({ note }),
+  setPaymentMethod: (method, defaultAccountId = null) =>
+    set({
+      ...emptyPayment(),
+      paymentMethod: method,
+      collectionAccountId: isDigitalMethod(method) ? defaultAccountId ?? null : null,
+    }),
+  setCollectionAccount: (collectionAccountId) => set({ collectionAccountId }),
+  setPayer: (payerPhoneLast4, payerReference) => set({ payerPhoneLast4, payerReference }),
+  setPayment: (fields) =>
+    set({
+      paymentMethod: fields.paymentMethod,
+      collectionAccountId: fields.collectionAccountId,
+      payerPhoneLast4: fields.payerPhoneLast4,
+      payerReference: fields.payerReference,
+      collectionParts: fields.collectionParts,
+    }),
   reset: () => set(empty()),
 }));
 

@@ -17,6 +17,7 @@ import {
   ExternalLink,
   ChevronLeft,
   History,
+  ArrowLeftRight,
 } from "@/lib/icons";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/Button";
@@ -25,6 +26,7 @@ import { Toast } from "@/components/ui/Toast";
 import { useShopSettings } from "@/hooks/useShopSettings";
 import { useSettings } from "@/components/settings-context";
 import { useBranches } from "@/hooks/useBranches";
+import { useCollectionsAccess } from "@/hooks/useCollections";
 import {
   DEFAULT_TEMPLATE,
   saveSettings,
@@ -182,6 +184,11 @@ function SettingsPageInner() {
     ? { role: session.user.role, permissions: session.user.permissions }
     : null;
   const canManage = can(principal, "manage_whatsapp");
+  // Digital collections (doc 15 spec 12 §4.8): the tile shows for
+  // manage_collection_accounts while COLLECTIONS_ENABLED admits the shop,
+  // even when this branch's switch is off (so it can be turned on).
+  const collectionsAccess = useCollectionsAccess();
+  const showCollectionsTile = collectionsAccess.canManage && collectionsAccess.available;
   const { branches: accessibleBranches } = useBranches();
   const branchCount = accessibleBranches.length;
   const { settings, loading, refresh: refreshLocalSettings } = useShopSettings();
@@ -535,6 +542,31 @@ function SettingsPageInner() {
             <ChevronLeft className="w-5 h-5 text-text-secondary shrink-0 group-hover:text-accent transition-colors" />
           </div>
         </Link>
+
+        {/* Digital collections — receiving accounts and branch switches. */}
+        {showCollectionsTile && (
+          <Link
+            href="/settings/collections"
+            data-testid="settings-tile-collections"
+            className="group block bg-white rounded-xl border border-border p-5 hover:border-accent transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <ArrowLeftRight className="w-5 h-5 text-text-secondary shrink-0 group-hover:text-accent transition-colors" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-bold text-text-primary">{t.collectionsTile.title}</h3>
+                  {!collectionsAccess.features.collections && (
+                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-bg-main text-text-secondary">
+                      {t.collectionsTile.off}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-text-secondary mt-0.5">{t.collectionsTile.subtitle}</p>
+              </div>
+              <ChevronLeft className="w-5 h-5 text-text-secondary shrink-0 group-hover:text-accent transition-colors" />
+            </div>
+          </Link>
+        )}
 
         {/* Activity log — moved here from the sidebar. Owner-only by default
             (matches the `view_activity_log` permission catalog default). */}

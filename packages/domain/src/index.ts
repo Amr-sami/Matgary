@@ -11,3 +11,4 @@
 // time with `git mv`, re-point the web imports, and let tsc prove nothing broke.
 export * from "./money/cart-math";
 export * from "./escpos";
+export * from "./receipt/payment";

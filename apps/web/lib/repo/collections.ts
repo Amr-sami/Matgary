@@ -1325,6 +1325,9 @@ export interface RejectDetails {
    *  rejection. Reopen treats any other live payment as "a settle happened
    *  since" — by id, so app-server vs database clock skew cannot matter. */
   livePaymentIds?: string[];
+  /** True when this rejection wrote the typed phone into the collection's
+   *  own `customer_phone` snapshot (it was NULL); reopen clears it again. */
+  setCustomerPhone?: boolean;
 }
 
 /** Live sale_payments ids on these lines (after this transaction's voids). */
@@ -1456,6 +1459,9 @@ export async function rejectCollection(
     const amountPt = pt(row.amount);
     let details: RejectDetails;
     let outcome: RejectOutcome;
+    // The collection's `customer_phone` snapshot follows the lines when a
+    // reject-to-debt fills a phone they did not have (03 §B.2.2, §C.4).
+    let snapshotPhone: string | null = null;
 
     if (row.sourceType === "settlement") {
       // A settlement always has a phone: the rejection restores the debt.
@@ -1534,12 +1540,14 @@ export async function rejectCollection(
           await writeLine(tx, tenantId, l.id, after);
           snapshots.push({ saleId: l.id, before, after });
         }
+        if (!row.customerPhone && phone) snapshotPhone = phone;
         details = {
           outcome,
           lines: snapshots,
           voidedPaymentIds: [],
           unallocated: fromPiasters(alloc.unallocatedPt),
           livePaymentIds: await livePaymentIdsOn(tx, tenantId, snapshots.map((x) => x.saleId)),
+          ...(snapshotPhone ? { setCustomerPhone: true } : {}),
         };
       } else {
         // Loss: the lines stay as taken; the summary shows it under
@@ -1558,6 +1566,7 @@ export async function rejectCollection(
         decidedByUserId: actor.userId,
         decidedAt: sql`now()`,
         updatedAt: sql`now()`,
+        ...(snapshotPhone ? { customerPhone: snapshotPhone } : {}),
       })
       .where(and(eq(collections.tenantId, tenantId), eq(collections.id, id)));
     await insertCollectionEvent(tx, {
@@ -1619,6 +1628,7 @@ export async function reopenCollection(
     if (!win?.open) throw new DomainError("REOPEN_WINDOW_CLOSED", 409);
 
     const fromStatus = row.status as CollectionStatus;
+    let clearSnapshotPhone = false;
     if (row.status === "rejected") {
       const [ev] = await tx
         .select({ details: collectionEvents.details })
@@ -1633,6 +1643,7 @@ export async function reopenCollection(
         .orderBy(sql`${collectionEvents.createdAt} DESC`, sql`${collectionEvents.id} DESC`)
         .limit(1);
       const d = (ev?.details ?? {}) as Partial<RejectDetails>;
+      clearSnapshotPhone = d.setCustomerPhone === true;
       const snaps = Array.isArray(d.lines) ? d.lines : [];
       const voidedIds = Array.isArray(d.voidedPaymentIds) ? d.voidedPaymentIds : [];
       if (snaps.length > 0) {
@@ -1702,6 +1713,7 @@ export async function reopenCollection(
         decisionNote: null,
         staleNotifiedAt: null,
         updatedAt: sql`now()`,
+        ...(clearSnapshotPhone ? { customerPhone: null } : {}),
       })
       .where(and(eq(collections.tenantId, tenantId), eq(collections.id, id)));
     await releaseCredits(tx, tenantId, [id], "reopened");

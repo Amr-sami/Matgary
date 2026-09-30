@@ -25,6 +25,7 @@ export function Chip({
   active = false,
   compact = false,
   onPress,
+  testID,
 }: {
   label: string;
   active?: boolean;
@@ -32,9 +33,12 @@ export function Chip({
    *  fit one row without scrolling (the four date ranges on sales/history). */
   compact?: boolean;
   onPress?: () => void;
+  /** Automation handle, e.g. `pos-pay-<method>` (doc 15 03 §B.12). */
+  testID?: string;
 }) {
   return (
     <Pressable
+      testID={testID}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected: active }}

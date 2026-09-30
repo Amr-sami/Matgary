@@ -3,7 +3,9 @@ import { z } from "zod";
 
 import { requireTenantWithBranch } from "@/lib/api/auth-helpers";
 import { resolveBranchFilter } from "@/lib/api/branch-context";
-import { loadDashboardStats } from "@/lib/repo/insights";
+import { loadAwaitingCollections, loadDashboardStats, type AwaitingCollections } from "@/lib/repo/insights";
+import { collectionsTenantAdmitted, resolveCollectionsFeatures } from "@/lib/collections/flags";
+import { can } from "@/lib/permissions";
 import { listProducts } from "@/lib/repo/catalog";
 import { listSalesPage } from "@/lib/repo/operations";
 import type { Sale } from "@/lib/types";
@@ -190,11 +192,24 @@ export async function GET(req: NextRequest) {
 
   // Independent reads — run them concurrently rather than serially, since the
   // whole point of this route is to shorten a cold start.
-  const [stats, products, salesPage] = await Promise.all([
+  // Doc 15 spec 13 §4.12: the "awaiting confirmation" card — only for the
+  // owner or view_collections (03 §E.5), and only while Collections is on for
+  // the scope (the branch switch; the env gate for "all branches"). Same rule
+  // as the web <AwaitingCollectionsCardServer>.
+  const seesCollections =
+    (r.ctx.role === "owner" || can(r.ctx, "view_collections")) &&
+    (branchId
+      ? (await resolveCollectionsFeatures(r.ctx.tenantId, branchId)).collections
+      : collectionsTenantAdmitted(r.ctx.tenantId));
+
+  const [stats, products, salesPage, collections] = await Promise.all([
     loadDashboardStats(r.ctx.tenantId, branchId),
     listProducts(r.ctx.tenantId, branchId),
     // Same repo read <RecentSalesListServer> makes, folded into invoices.
     listSalesPage(r.ctx.tenantId, { branchId, limit: RECENT_SALES_ROW_FETCH }),
+    seesCollections
+      ? loadAwaitingCollections(r.ctx.tenantId, branchId)
+      : Promise.resolve<AwaitingCollections | null>(null),
   ]);
   const recentSales = foldRecentSales(salesPage.data, salesPage.nextCursor !== null);
 
@@ -238,6 +253,8 @@ export async function GET(req: NextRequest) {
         allowedBranchIds: r.ctx.allowedBranchIds,
       },
       stats,
+      // {count, amount, staleCount, oldestRungAt} or null (not allowed / off).
+      collections,
       lowStock: {
         outOfStockCount: outOfStock.length,
         lowStockCount: lowStock.length,

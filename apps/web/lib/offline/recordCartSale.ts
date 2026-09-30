@@ -4,6 +4,7 @@ import type {
   DiscountType,
   PaymentMethod,
 } from "@/lib/types";
+import type { CartOptions } from "@matgary/api-client/endpoints/sales";
 import { enqueue } from "./outbox";
 import { decrementSnapshotStock } from "./snapshot";
 
@@ -46,6 +47,13 @@ export interface OfflineCartOptions {
   /** Partial payment on آجل: amount paid at the counter. Distributed across
    *  the line items by the server. Ignored for non-deferred sales. */
   amountPaidNow?: number;
+  /** Digital collections (03 §B.17): instapay / wallet only. They ride the
+   *  payload verbatim, so the live POST and the outbox replay are the same
+   *  bytes under the same Idempotency-Key. */
+  collectionAccountId?: CartOptions["collectionAccountId"];
+  payerPhoneLast4?: CartOptions["payerPhoneLast4"];
+  payerReference?: CartOptions["payerReference"];
+  collectionParts?: CartOptions["collectionParts"];
 }
 
 export interface OfflineCartContext {
@@ -60,6 +68,11 @@ export interface OfflineCartResult {
    *  sitting in the outbox waiting to sync. The UI uses this to surface
    *  a small "queued" indicator on the receipt. */
   synced: boolean;
+  /** "pending" when the server booked ≥ 1 transfer part (live path only);
+   *  null for a queued sale or an older server — the form then shows its
+   *  own local pending line. */
+  collectionStatus: "pending" | null;
+  collectionIds: string[];
 }
 
 /** RFC 4122 v4 — modern browsers all expose this. */
@@ -119,11 +132,15 @@ export async function recordCartSaleOfflineAware(
         const body = (await res.json()) as {
           invoiceId: string;
           saleIds: string[];
+          collectionStatus?: "pending" | null;
+          collectionIds?: string[];
         };
         return {
           invoiceId: body.invoiceId,
           saleIds: body.saleIds,
           synced: true,
+          collectionStatus: body.collectionStatus ?? null,
+          collectionIds: Array.isArray(body.collectionIds) ? body.collectionIds : [],
         };
       }
 
@@ -162,5 +179,5 @@ export async function recordCartSaleOfflineAware(
   for (const l of lines) {
     await decrementSnapshotStock(ctx.tenantId, ctx.branchId, l.productId, l.quantity);
   }
-  return { invoiceId, saleIds: [], synced: false };
+  return { invoiceId, saleIds: [], synced: false, collectionStatus: null, collectionIds: [] };
 }

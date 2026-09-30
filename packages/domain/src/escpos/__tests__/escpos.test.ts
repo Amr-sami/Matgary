@@ -203,3 +203,87 @@ test("saleToTicket mirrors the web receipt blocks and money formatting", () => {
   assert.equal(en.rtl, false);
   assert.ok(!hex(textReceipt(en, { width: 58 })).includes("1b 74 25"));
 });
+
+// ---------------------------------------------------------------------------
+// Doc 15 spec 13 §7 T8 — receipt payment row (13 §4.15, D13-5): method +
+// masked account on instapay / wallet / card receipts, never a status.
+
+import { receiptPaymentRows, RECEIPT_PAYMENT_LABELS } from "../../receipt/payment";
+
+test("receiptPaymentRows: cash / deferred / unknown / missing print nothing", () => {
+  for (const method of ["cash", "deferred", "initial", "", "INSTAPAY"]) {
+    assert.deepEqual(receiptPaymentRows({ method, accountMasks: ["***0150"] }, "ar"), []);
+  }
+  assert.deepEqual(receiptPaymentRows(null, "en"), []);
+  assert.deepEqual(receiptPaymentRows(undefined, "bilingual"), []);
+  // Untrusted shapes (the PDF routes pass the body through): never throw.
+  assert.deepEqual(receiptPaymentRows("instapay" as never, "en"), []);
+  assert.deepEqual(receiptPaymentRows({ method: "instapay", accountMasks: "***0150" as never }, "en"), [{ label: "PAID BY", value: "InstaPay" }]);
+  assert.deepEqual(receiptPaymentRows({ method: "wallet", accountMasks: [42, null, "***0150"] as never }, "en"), [{ label: "PAID BY", value: "Mobile wallet ***0150" }]);
+});
+
+test("receiptPaymentRows: one mask → one row; none → the method alone; several → method row + one row per mask", () => {
+  assert.deepEqual(receiptPaymentRows({ method: "instapay", accountMasks: ["***0150"] }, "ar"), [
+    { label: "طريقة الدفع", value: "إنستاباي ***0150" },
+  ]);
+  assert.deepEqual(receiptPaymentRows({ method: "card" }, "en"), [{ label: "PAID BY", value: "Card" }]);
+  assert.deepEqual(receiptPaymentRows({ method: "wallet", accountMasks: ["***1234", "***@instapay"] }, "en"), [
+    { label: "PAID BY", value: "Mobile wallet" },
+    { label: "", value: "***1234" },
+    { label: "", value: "***@instapay" },
+  ]);
+});
+
+test("receiptPaymentRows: non-ASCII, over-long or markup masks are dropped; at most 4 masks", () => {
+  const bad = ["•••• 12", "x".repeat(40), "<b>", "ah…@instapay"];
+  assert.deepEqual(receiptPaymentRows({ method: "instapay", accountMasks: bad }, "en"), [{ label: "PAID BY", value: "InstaPay" }]);
+  assert.deepEqual(receiptPaymentRows({ method: "instapay", accountMasks: [...bad, "***0150"] }, "en"), [
+    { label: "PAID BY", value: "InstaPay ***0150" },
+  ]);
+  const five = ["***0001", "***0002", "***0003", "***0004", "***0005"];
+  const rows = receiptPaymentRows({ method: "wallet", accountMasks: five }, "ar");
+  assert.equal(rows.length, 5); // method row + 4 masks
+  assert.deepEqual(rows.slice(1).map((r) => r.value), five.slice(0, 4));
+});
+
+test("receiptPaymentRows: bilingual joiners and order", () => {
+  assert.deepEqual(receiptPaymentRows({ method: "instapay", accountMasks: ["***0150"] }, "bilingual"), [
+    { label: "PAID BY · طريقة الدفع", value: "InstaPay · إنستاباي ***0150" },
+  ]);
+  assert.deepEqual(receiptPaymentRows({ method: "wallet" }, "bilingual", " / ", "ar-en"), [
+    { label: "طريقة الدفع / PAID BY", value: "محفظة موبايل / Mobile wallet" },
+  ]);
+  // 03 §B.9: never the bare loyalty word.
+  assert.notEqual(RECEIPT_PAYMENT_LABELS.wallet.ar, "محفظة");
+});
+
+const STATUS_WORDS = /pending|awaiting|confirm|مستني|تأكيد|انتظار/i;
+const baseSale = {
+  invoiceId: "INV-77",
+  saleDate: new Date(2026, 8, 30, 10, 0),
+  lines: [{ productName: "ساعة", quantity: 1, pricePerUnit: 3200, subtotal: 3200, lineDiscountAmount: 0 }],
+  cartSubtotal: 3200,
+  orderDiscountAmount: 0,
+  totalPrice: 3200,
+};
+
+test("saleToTicket: the payment row sits after the total; no status word anywhere", () => {
+  for (const lang of ["ar", "en", "bilingual"] as const) {
+    const ticket = saleToTicket({ ...baseSale, payment: { method: "instapay", accountMasks: ["***0150"] } }, { shopName: "متجري" }, lang);
+    const rows = ticket.lines.filter((l) => l.kind === "row") as { start: string; end: string }[];
+    const iTotal = rows.findIndex((r) => r.end === "3,200.00" && /TOTAL|الإجمالي/.test(r.start));
+    const iPay = rows.findIndex((r) => r.end.includes("***0150"));
+    assert.ok(iTotal >= 0 && iPay > iTotal, `payment row after total (${lang})`);
+    const text = ticket.lines.map((l) => ("text" in l ? l.text : "start" in l ? `${l.start} ${l.end}` : "")).join("\n");
+    assert.ok(!STATUS_WORDS.test(text), `no status word (${lang})`);
+  }
+  const ar = saleToTicket({ ...baseSale, payment: { method: "wallet", accountMasks: ["***9876"] } }, { shopName: "x" }, "ar");
+  assert.ok(ar.lines.some((l) => l.kind === "row" && l.start === "طريقة الدفع" && l.end === "محفظة موبايل ***9876"));
+});
+
+test("saleToTicket: no payment, or a cash payment → identical to the ticket without the field", () => {
+  const plain = saleToTicket(baseSale, { shopName: "متجري", qrPayload: "https://x" }, "ar");
+  assert.deepEqual(saleToTicket({ ...baseSale, payment: undefined }, { shopName: "متجري", qrPayload: "https://x" }, "ar"), plain);
+  assert.deepEqual(saleToTicket({ ...baseSale, payment: { method: "cash", accountMasks: ["***1"] } }, { shopName: "متجري", qrPayload: "https://x" }, "ar"), plain);
+  assert.deepEqual(textReceipt(saleToTicket({ ...baseSale, payment: null }, { shopName: "a" }, "en"), { width: 58 }), textReceipt(saleToTicket(baseSale, { shopName: "a" }, "en"), { width: 58 }));
+});

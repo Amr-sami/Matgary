@@ -2,6 +2,7 @@
 
 import { RotateCcw, Printer, Pencil, Trash2 } from "@/lib/icons";
 import { ShareReceiptButton } from "./ShareReceiptButton";
+import { SaleCollectionBadge } from "@/components/collections/SaleCollectionBadge";
 import type { Sale } from "@/lib/types";
 import { Badge } from "../ui/Badge";
 import { CATEGORY_LABELS } from "@/lib/types";
@@ -94,6 +95,7 @@ export function SalesTableRow({
                 {sale.paymentMethod === "deferred" && (sale.isPaid ? " ✓" : "")}
               </span>
             )}
+            <SaleCollectionBadge sale={sale} />
           </div>
         </div>
       </td>

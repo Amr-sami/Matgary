@@ -36,6 +36,22 @@ export interface RecentSale {
  */
 export interface DashboardHomeResponse extends DashboardResponse {
   recentSales: RecentSale[];
+  /** Digital collections "awaiting confirmation" card (doc 15 spec 13 §4.12):
+   *  null when the caller is neither the owner nor holds view_collections, or
+   *  Collections is off for the scope. Optional: older servers omit it. */
+  collections?: AwaitingCollections | null;
+}
+
+/** Pending digital collections of the scope (13 §4.12). */
+export interface AwaitingCollections {
+  /** = GET /api/collections counts.pending for the same branch. */
+  count: number;
+  /** EGP. */
+  amount: number;
+  /** Past their branch's stale threshold. */
+  staleCount: number;
+  /** ISO time of the oldest pending one; null when count = 0. */
+  oldestRungAt: string | null;
 }
 
 /**

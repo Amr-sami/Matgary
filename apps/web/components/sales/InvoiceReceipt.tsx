@@ -3,7 +3,7 @@
 import type { ReceiptInvoiceData } from "./SaleForm";
 import type { ReceiptBlockKey, ReceiptFixedBlock } from "@/lib/settings";
 import { useShopSettings } from "@/hooks/useShopSettings";
-import { rl } from "@/lib/receipt-strings";
+import { receiptPaymentRows, rl, type ReceiptPayment } from "@/lib/receipt-strings";
 
 function formatMoney(n: number): string {
   return `${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م`;
@@ -31,7 +31,11 @@ const FONT_VAR: Record<string, string> = {
   lemonada: "var(--font-catchy)",
 };
 
-export function InvoiceReceipt({ invoice }: { invoice: ReceiptInvoiceData }) {
+/** Doc 15 spec 13 §4.15: the payment row's data. Typed here so this file
+ *  compiles before (and after) 12 adds the same field to ReceiptInvoiceData. */
+type InvoiceReceiptData = ReceiptInvoiceData & { payment?: ReceiptPayment };
+
+export function InvoiceReceipt({ invoice }: { invoice: InvoiceReceiptData }) {
   const { settings } = useShopSettings();
   const lang = settings.receiptLanguage;
   const code = (invoice.invoiceId || invoice.saleDate.getTime().toString())
@@ -170,6 +174,13 @@ export function InvoiceReceipt({ invoice }: { invoice: ReceiptInvoiceData }) {
               </div>
             </>
           )}
+        {/* Method + masked receiving account; never a status (13 §4.15). */}
+        {receiptPaymentRows(invoice.payment, lang).map((r, i) => (
+          <div key={`pay-${i}`} className="receipt-row">
+            <span>{r.label}</span>
+            <span dir="ltr">{r.value}</span>
+          </div>
+        ))}
       </>
     ),
     loyalty:

@@ -1,7 +1,8 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { CATEGORY_LABELS, GENDER_LABELS, type Category, type Gender } from "@/lib/types";
+import { CATEGORY_LABELS, GENDER_LABELS, type Category, type Gender, type PaymentMethod } from "@/lib/types";
+import { methodsFor } from "@/components/collections/rules";
 import { useDictionary } from "@/components/i18n/DictionaryProvider";
 import { FilterSelect, SortSelect } from "@/components/ui/FilterSelect";
 
@@ -21,6 +22,9 @@ export const DATE_RANGE_LABELS: Record<DateRangeKey, string> = {
   all: "الكل",
   custom: "مخصص",
 };
+
+/** Digital collections (doc 15 spec 12 §4.5): the `coll=` filter values. */
+export type SalesCollectionFilter = "pending" | "confirmed" | "rejected" | "any";
 
 export type SalesSortKey =
   | "newest"
@@ -52,6 +56,13 @@ interface SalesFiltersProps {
   onSortChange: (s: SalesSortKey) => void;
   query: string;
   onQueryChange: (v: string) => void;
+  /** Digital collections: payment-method and transfer-status filters,
+   *  rendered only while the feature is on for the branch. */
+  selectedPay?: PaymentMethod | null;
+  onPayChange?: (v: PaymentMethod | null) => void;
+  selectedCollection?: SalesCollectionFilter | null;
+  onCollectionChange?: (v: SalesCollectionFilter | null) => void;
+  collectionsOn?: boolean;
 }
 
 export function SalesFilters({
@@ -76,6 +87,11 @@ export function SalesFilters({
   onSortChange,
   query,
   onQueryChange,
+  selectedPay = null,
+  onPayChange,
+  selectedCollection = null,
+  onCollectionChange,
+  collectionsOn = false,
 }: SalesFiltersProps) {
   const dict = useDictionary();
   const t = dict.app.sales.filters;
@@ -212,6 +228,34 @@ export function SalesFilters({
             allLabel={t.allBrands}
             options={brands}
           />
+        )}
+
+        {collectionsOn && onPayChange && (
+          <div data-testid="sales-filter-pay">
+            <FilterSelect
+              value={selectedPay}
+              onChange={(v) => onPayChange(v as PaymentMethod | null)}
+              allLabel={dict.app.collections.web.salesFilter.payAll}
+              ariaLabel={dict.app.collections.web.salesFilter.pay}
+              options={methodsFor(true).map((m) => ({ value: m, label: dict.app.catalog.payment[m] }))}
+            />
+          </div>
+        )}
+        {collectionsOn && onCollectionChange && (
+          <div data-testid="sales-filter-collection">
+            <FilterSelect
+              value={selectedCollection}
+              onChange={(v) => onCollectionChange(v as SalesCollectionFilter | null)}
+              allLabel={dict.app.collections.web.salesFilter.collectionAll}
+              ariaLabel={dict.app.collections.web.salesFilter.collection}
+              options={[
+                { value: "pending", label: dict.app.collections.vocab.status.pending },
+                { value: "confirmed", label: dict.app.collections.vocab.status.confirmed },
+                { value: "rejected", label: dict.app.collections.vocab.status.rejected },
+                { value: "any", label: dict.app.collections.web.salesFilter.collectionAny },
+              ]}
+            />
+          </div>
         )}
 
         <SortSelect

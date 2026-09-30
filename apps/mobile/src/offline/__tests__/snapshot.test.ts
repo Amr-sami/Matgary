@@ -42,6 +42,12 @@ test("only allow-listed roots are snapshotted", () => {
   assert.equal(isSnapshotKey([]), false);
   assert.equal(isSnapshotKey([{ root: "products" }]), false);
   assert.equal(isSnapshotKey(["products"], ["customers"]), false);
+  // Digital collections (spec 08 step 8): accounts + settings offline; the
+  // inbox and the daily totals never.
+  assert.equal(isSnapshotKey(["collection-accounts", "b1"]), true);
+  assert.equal(isSnapshotKey(["collection-accounts", "b1", "settings"]), true);
+  assert.equal(isSnapshotKey(["collections", { status: "pending" }]), false);
+  assert.equal(isSnapshotKey(["collection-summary", "2026-09-27", "b1"]), false);
 });
 
 test("hashQueryKey matches TanStack: object keys sorted, arrays ordered", () => {

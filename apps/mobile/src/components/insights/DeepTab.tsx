@@ -508,16 +508,31 @@ function HeatmapReport(props: ReportProps) {
 
 /* -------------------------------------------------------------- payments */
 
-type Method = "cash" | "instapay" | "card" | "deferred" | "unknown";
+type Method = "cash" | "instapay" | "wallet" | "card" | "deferred" | "unknown";
+
+interface CollectionsSplitBucket {
+  confirmed: number;
+  autoConfirmed: number;
+  pending: number;
+  rejectedDebt: number;
+  rejectedLoss: number;
+}
 
 interface PaymentsData {
   methods: string[];
   series: ({ label: string; day: string; total: number } & Record<string, number | string>)[];
+  /** Doc 15 spec 13 §4.11 — absent on an old server, null when Collections is off. */
+  collections?: {
+    byMethod: Record<"instapay" | "wallet", CollectionsSplitBucket>;
+    cashRemainder: number;
+    unverified: number;
+  } | null;
 }
 
 const METHOD_COLOR: Record<Method, string> = {
   cash: colors.accent,
   instapay: colors.success,
+  wallet: colors.successStrong,
   card: colors.warning,
   deferred: colors.danger,
   unknown: colors.textSecondary,
@@ -592,9 +607,66 @@ function PaymentsReport(props: ReportProps) {
             ))}
           </View>
           <AxisEnds first={dayMonth(model.series[0]?.day)} last={dayMonth(model.series[model.series.length - 1]?.day)} />
+          {q.data.collections ? (
+            <CollectionsStrip split={q.data.collections} valueAlign={valueAlign} />
+          ) : null}
         </>
       )}
     </Card>
+  );
+}
+
+/**
+ * The "digital Z" strip under the payments chart (13 §4.11): transfer money
+ * by verification state, both digital methods summed; confirmed includes
+ * auto-confirmed. Same five cells as the web strip.
+ */
+function CollectionsStrip({
+  split,
+  valueAlign,
+}: {
+  split: NonNullable<PaymentsData["collections"]>;
+  valueAlign: { alignItems: "flex-start" | "flex-end" };
+}) {
+  const both = (k: keyof CollectionsSplitBucket) =>
+    Number(split.byMethod.instapay?.[k] ?? 0) + Number(split.byMethod.wallet?.[k] ?? 0);
+  const cells: { key: string; label: string; value: number; color: string }[] = [
+    {
+      key: "confirmed",
+      label: t("app.insights.deep.payments.collectionConfirmed"),
+      value: both("confirmed") + both("autoConfirmed"),
+      color: colors.successStrong,
+    },
+    { key: "pending", label: t("app.insights.deep.payments.collectionPending"), value: both("pending"), color: colors.warningStrong },
+    { key: "rejectedDebt", label: t("app.insights.deep.payments.collectionRejectedDebt"), value: both("rejectedDebt"), color: colors.danger },
+    { key: "rejectedLoss", label: t("app.insights.deep.payments.collectionRejectedLoss"), value: both("rejectedLoss"), color: colors.danger },
+    {
+      key: "cashRemainder",
+      label: t("app.insights.deep.payments.collectionCashRemainder"),
+      value: Number(split.cashRemainder ?? 0),
+      color: colors.textSecondary,
+    },
+  ];
+  return (
+    <View testID="insights-payments-collections" collapsable={false} style={styles.collectionsStrip}>
+      <Text style={styles.collectionsTitle}>{t("app.insights.deep.payments.collectionTitle")}</Text>
+      <View style={styles.list}>
+        {cells.map((c) => (
+          <View key={c.key} style={styles.methodRow}>
+            <View style={[styles.dot, { backgroundColor: c.color }]} />
+            <Text style={styles.methodName}>{c.label}</Text>
+            <View style={[styles.methodValue, valueAlign]}>
+              <Text style={styles.methodValueText}>{money(c.value)}</Text>
+            </View>
+          </View>
+        ))}
+      </View>
+      {Number(split.unverified ?? 0) > 0 ? (
+        <Text style={styles.collectionsNote}>
+          {t("app.insights.deep.payments.collectionUnverified", { amount: money(Number(split.unverified)) })}
+        </Text>
+      ) : null}
+    </View>
   );
 }
 
@@ -878,6 +950,15 @@ const styles = StyleSheet.create({
   heatFooter: { marginTop: spacing.xs },
 
   list: { gap: spacing.sm },
+  collectionsStrip: {
+    marginTop: spacing.lg,
+    paddingTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    gap: spacing.sm,
+  },
+  collectionsTitle: { fontFamily: fonts.semibold, fontSize: 14, color: colors.text, ...RTL_TEXT },
+  collectionsNote: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
   methodRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, minHeight: 28 },
   methodName: { flex: 1, fontFamily: fonts.medium, fontSize: 14, color: colors.text, ...RTL_TEXT },
   // Fixed width so the share column lines up across rows ("41.2%" / "8.0%").

@@ -16,6 +16,7 @@ import { ApiError, sales as salesApi } from "@matgary/api-client";
 import { calcLineDiscount, computeCartTotals, type DiscountType } from "@matgary/domain";
 
 import { api } from "@/api/client";
+import { cartPaymentFromOptions, paymentSummaryOf } from "@/collections/checkout";
 import { classifyOutcome, discard, enqueue, hasHandler, registerHandler, retry, type DrainResult, type OutboxItem } from "@/offline";
 import { isSimulatedOffline } from "@/offline/dev-offline";
 import { mintInvoiceId } from "@/offline/invoice-id";
@@ -306,6 +307,10 @@ export function loadSaleIntoCart(
     customerName: o.customerName ?? "",
     customerPhone: o.customerPhone ?? "",
     note: o.note ?? "",
+    // Method, receiving account, payer hints and split parts — Edit used to
+    // drop them and re-ring a transfer as cash (code-mobile §15.1; doc 15
+    // spec 08 §4.6). One pure inverse of the POST body, round-trip tested.
+    ...cartPaymentFromOptions(o),
   });
   return fresh;
 }
@@ -337,9 +342,23 @@ export interface SaleSummary {
   customerPhone: string | null;
   /** options.customDate — the moment the sale was rung / will be booked under. */
   rungAt: string | null;
+  /** options.paymentMethod; null for a legacy body without one (spec 08 §4.6). */
+  paymentMethod: salesApi.PaymentMethod | null;
+  /** Every receiving account the body names (single or split). */
+  collectionAccountIds: string[];
 }
 
-const EMPTY_SUMMARY: SaleSummary = { invoiceId: null, total: 0, itemCount: 0, lines: [], customerName: null, customerPhone: null, rungAt: null };
+const EMPTY_SUMMARY: SaleSummary = {
+  invoiceId: null,
+  total: 0,
+  itemCount: 0,
+  lines: [],
+  customerName: null,
+  customerPhone: null,
+  rungAt: null,
+  paymentMethod: null,
+  collectionAccountIds: [],
+};
 
 export function describeSalePayload(
   payload: SalePayload | null | undefined,
@@ -371,6 +390,7 @@ export function describeSalePayload(
     customerName: payload.options?.customerName ?? null,
     customerPhone: payload.options?.customerPhone ?? null,
     rungAt: payload.options?.customDate ?? null,
+    ...paymentSummaryOf(payload.options),
   };
 }
 

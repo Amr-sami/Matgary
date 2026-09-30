@@ -515,3 +515,56 @@ async function computeOverview(
     };
   });
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Digital collections — the dashboard "awaiting confirmation" card
+// (mobile-dev-docs/15-digital-collections/13 §4.12). Cached under the
+// dashboard-stats prefix for 60 s, so every bustInsightsCache (cart, settle,
+// confirm / reject / reopen, 07's auto-confirm) invalidates it. Visibility is
+// the caller's job (owner or view_collections, and features.collections).
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface AwaitingCollections {
+  /** Pending collections (any age), = GET /api/collections counts.pending for the same scope. */
+  count: number;
+  /** Σ amount of those, EGP. */
+  amount: number;
+  /** Those past their branch's stale threshold (default 120 min, Q15). */
+  staleCount: number;
+  /** ISO time of the oldest pending one, or null when count = 0. */
+  oldestRungAt: string | null;
+}
+
+/** `branchId` null = every branch (owner "all branches"). */
+export async function loadAwaitingCollections(
+  tenantId: string,
+  branchId: string | null,
+): Promise<AwaitingCollections> {
+  return cacheRemember(
+    tenantKey(tenantId, DASHBOARD_STATS_PREFIX, "awaiting", branchId ?? "all"),
+    60,
+    () =>
+      withTenant(tenantId, async (tx) => {
+        const branchFilter = branchId ? sql`AND c.branch_id = ${branchId}` : sql``;
+        const [r] = (await tx.execute(sql`
+          SELECT count(*)::int AS count,
+                 COALESCE(sum(c.amount), 0)::text AS amount,
+                 count(*) FILTER (
+                   WHERE c.rung_at < now() - make_interval(mins => COALESCE(s.collections_stale_after_minutes, 120))
+                 )::int AS stale_count,
+                 to_json(min(c.rung_at)) #>> '{}' AS oldest
+            FROM collections c
+            LEFT JOIN shop_settings s ON s.tenant_id = c.tenant_id AND s.branch_id = c.branch_id
+           WHERE c.tenant_id = ${tenantId} AND c.status = 'pending'
+             ${branchFilter}
+        `)) as unknown as Array<{ count: number; amount: string; stale_count: number; oldest: string | null }>;
+        const amount = Number(r?.amount ?? 0);
+        return {
+          count: Number(r?.count ?? 0),
+          amount: Number.isFinite(amount) ? Math.round(amount * 100) / 100 : 0,
+          staleCount: Number(r?.stale_count ?? 0),
+          oldestRungAt: r?.oldest ? new Date(r.oldest).toISOString() : null,
+        };
+      }),
+  );
+}

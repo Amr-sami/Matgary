@@ -25,6 +25,12 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { useShopSettings } from "@/hooks/useShopSettings";
 import { formatPrice, formatDate } from "@/lib/utils";
 import { InvoiceSettleModal } from "@/components/customers/InvoiceSettleModal";
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
+import { formatCurrency } from "@/lib/i18n/format";
+import { useCollectionsAccess } from "@/hooks/useCollections";
+import { CollectionPill } from "@/components/collections/CollectionPill";
+import { SaleCollectionBadge } from "@/components/collections/SaleCollectionBadge";
+import { paymentEventView } from "@/components/collections/rules";
 
 // Customer ledger detail. Lives at /customers/<urlencoded-phone>. Shows:
 //   - header: name, phone, outstanding (red if > 0), lifetime, last visit
@@ -47,6 +53,8 @@ interface LedgerInvoice {
   isPaid: boolean;
   paidAt: string | null;
   paymentMethod: string | null;
+  /** Digital collections (0055): null = not a digital invoice. */
+  collectionStatus: "pending" | "confirmed" | "rejected" | null;
   lines: Array<{
     saleId: string;
     productName: string;
@@ -112,6 +120,11 @@ interface PaymentEvent {
   method: string;
   recordedAt: string;
   recordedByName: string | null;
+  /** Digital collections (05 §4.13): the transfer behind this payment,
+   *  when it was voided (transfer rejected) and the collection's status. */
+  collectionId: string | null;
+  voidedAt: string | null;
+  collectionStatus: string | null;
 }
 
 export default function CustomerDetailPage({
@@ -125,6 +138,10 @@ export default function CustomerDetailPage({
 
   const { data: session } = useSession();
   const isOwner = session?.user?.role === "owner";
+  const dict = useDictionary();
+  const locale = useLocale();
+  const ledgerT = dict.app.collections.web.ledger;
+  const { canView: canViewCollections } = useCollectionsAccess();
   const { settings } = useShopSettings();
   const shopName = settings.shopName?.trim() || "متجرنا";
   const loyaltyEnabled = settings.loyaltyEnabled;
@@ -666,7 +683,7 @@ export default function CustomerDetailPage({
           <div className="px-5 py-3 border-b border-border flex items-center gap-2">
             <Receipt className="w-4 h-4 text-text-secondary" />
             <h2 className="text-sm font-semibold text-text-primary">
-              سجل الفواتير
+              {ledgerT.invoicesTitle}
             </h2>
           </div>
           <ul className="divide-y divide-border">
@@ -686,17 +703,20 @@ export default function CustomerDetailPage({
                           flow (e.g. customer paid 1000 of 1300). */}
                       {inv.isPaid ? (
                         <span className="text-[10px] px-2 py-0.5 rounded-full bg-success-light text-success font-medium">
-                          مدفوع
+                          {ledgerT.status.paid}
                         </span>
                       ) : inv.amountPaid > 0 ? (
                         <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-medium">
-                          جزئي
+                          {ledgerT.status.partial}
                         </span>
                       ) : (
                         <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium">
-                          آجل
+                          {ledgerT.status.deferred}
                         </span>
                       )}
+                      <SaleCollectionBadge
+                        sale={{ collectionStatus: inv.collectionStatus ?? null, invoiceId: inv.invoiceId }}
+                      />
                     </div>
                     <p className="text-xs text-text-secondary mt-1">
                       {formatDate(new Date(inv.date))} · {inv.lines.length} قطعة
@@ -752,7 +772,7 @@ export default function CustomerDetailPage({
                       className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-success text-white text-xs font-medium hover:bg-success/90 disabled:opacity-50"
                     >
                       <CheckCircle className="w-3.5 h-3.5" />
-                      تسجيل دفعة
+                      {ledgerT.recordPayment}
                     </button>
                     {ledger.customerPhone && (
                       <a
@@ -778,29 +798,27 @@ export default function CustomerDetailPage({
                   return (
                     <div className="mt-3 pt-3 border-t border-border">
                       <p className="text-[10px] uppercase tracking-wider text-text-secondary mb-1.5">
-                        سجل الدفعات
+                        {ledgerT.paymentsTitle}
                       </p>
                       <ul className="space-y-1">
                         {events.map((p) => {
-                          const methodLabel =
-                            p.method === "cash"
-                              ? "كاش"
-                              : p.method === "instapay"
-                                ? "إنستا باي"
-                                : p.method === "card"
-                                  ? "كارت"
-                                  : "دفعة سابقة";
+                          const view = paymentEventView(p, {
+                            methods: dict.app.catalog.payment as Record<string, string>,
+                            initial: ledgerT.initialPayment,
+                          });
+                          const methodLabel = view.label;
                           const methodCls =
                             p.method === "cash"
                               ? "bg-success-light text-success"
                               : p.method === "initial"
                                 ? "bg-bg-main text-text-secondary"
                                 : "bg-accent-light text-accent";
-                          return (
-                            <li
-                              key={p.id}
-                              className="flex items-center justify-between gap-2 text-xs"
-                            >
+                          const collectionHref =
+                            canViewCollections && view.collectionId
+                              ? `/collections?id=${encodeURIComponent(view.collectionId)}`
+                              : null;
+                          const row = (
+                            <>
                               <div className="min-w-0 flex items-center gap-2 flex-wrap">
                                 <span className="text-text-secondary">
                                   {formatDate(new Date(p.recordedAt))}
@@ -810,15 +828,39 @@ export default function CustomerDetailPage({
                                 >
                                   {methodLabel}
                                 </span>
+                                {view.pill && <CollectionPill status={view.pill} />}
                                 {p.recordedByName && (
                                   <span className="text-[10px] text-text-secondary/80 truncate">
                                     {p.recordedByName}
                                   </span>
                                 )}
                               </div>
-                              <span className="font-bold text-success tabular-nums shrink-0">
+                              <span
+                                className={`font-bold text-success tabular-nums shrink-0 ${
+                                  view.struck ? "line-through opacity-60" : ""
+                                }`}
+                              >
                                 {formatPrice(p.amount)}
                               </span>
+                            </>
+                          );
+                          return (
+                            <li
+                              key={p.id}
+                              title={view.struck ? ledgerT.voided : undefined}
+                            >
+                              {collectionHref ? (
+                                <Link
+                                  href={collectionHref}
+                                  className="flex items-center justify-between gap-2 text-xs rounded hover:bg-bg-main"
+                                >
+                                  {row}
+                                </Link>
+                              ) : (
+                                <div className="flex items-center justify-between gap-2 text-xs">
+                                  {row}
+                                </div>
+                              )}
                             </li>
                           );
                         })}
@@ -853,11 +895,15 @@ export default function CustomerDetailPage({
         }
         customerPhone={decodedPhone}
         onClose={() => setSettleInvoice(null)}
-        onSettled={async (collected) => {
+        onSettled={async ({ collected, collectionStatus }) => {
           setSettleInvoice(null);
+          const amount = formatCurrency(collected, locale);
           setToast({
             type: "success",
-            message: `تم تسجيل ${formatPrice(collected)}`,
+            message:
+              collectionStatus === "pending"
+                ? dict.app.collections.pos.settlePending.replace("{amount}", amount)
+                : dict.app.collections.web.settle.done.replace("{amount}", amount),
           });
           await refresh();
         }}

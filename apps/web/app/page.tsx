@@ -33,6 +33,7 @@ import {
   RecentSalesListServer,
   RecentSalesListSkeleton,
 } from "@/components/dashboard/RecentSalesListServer";
+import { AwaitingCollectionsCardServer } from "@/components/dashboard/AwaitingCollectionsCardServer";
 import { resolveActiveBranch } from "@/lib/api/branch-context";
 import { getDictionary } from "@/lib/i18n/get-dictionary";
 import { defaultLocale, isLocale } from "@/lib/i18n/config";
@@ -80,6 +81,19 @@ export default async function DashboardPage() {
           <StatsGridServer
             tenantId={tenantId}
             branchId={branchId}
+            dict={dict}
+            locale={locale}
+          />
+        </Suspense>
+
+        {/* Doc 15 spec 13 §4.12: "awaiting confirmation" (owner or
+            view_collections; renders nothing when nothing is pending). */}
+        <Suspense fallback={null}>
+          <AwaitingCollectionsCardServer
+            tenantId={tenantId}
+            branchId={branchId}
+            role={session.user.role}
+            permissions={session.user.permissions ?? []}
             dict={dict}
             locale={locale}
           />

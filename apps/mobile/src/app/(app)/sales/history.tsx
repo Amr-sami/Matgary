@@ -17,6 +17,8 @@ import { ReceiptIcon as Receipt } from "phosphor-react-native/src/icons/Receipt"
 import { sales as salesApi } from "@matgary/api-client";
 
 import { api } from "@/api/client";
+import { useCollectionsFeatures } from "@/collections/queries";
+import { CollectionBadge } from "@/components/collections/CollectionBadge";
 import { t } from "@/i18n";
 import { usePullRefresh } from "@/components/layout/usePullRefresh";
 import { Badge } from "@/components/ui/Badge";
@@ -77,7 +79,9 @@ const PAYMENT_LABELS = (): Record<Payment, string> => ({
 function countForm(n: number): string {
   return n === 1 ? "One" : n === 2 ? "Two" : n >= 3 && n <= 10 ? "Few" : "";
 }
-const PAYMENT_ORDER: Payment[] = ["cash", "instapay", "card", "deferred"];
+/** `wallet` only while digital collections are on for the branch (doc 15 spec 08 §4.9). */
+const PAYMENT_ORDER = (collectionsOn: boolean): Payment[] =>
+  collectionsOn ? ["cash", "instapay", "wallet", "card", "deferred"] : ["cash", "instapay", "card", "deferred"];
 
 function paymentLabel(p: Payment | null | undefined): string {
   return p ? PAYMENT_LABELS()[p] ?? p : "—";
@@ -159,6 +163,10 @@ export default function SalesHistoryScreen() {
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [payment, setPayment] = useState<Payment | null>(null);
+  // "Awaiting confirmation" — digital sales the owner has not confirmed yet.
+  // Client-side like every other filter here (the paginated route has none).
+  const [awaitingOnly, setAwaitingOnly] = useState(false);
+  const collectionsOn = useCollectionsFeatures().collections;
   const [query, setQuery] = useState("");
 
   const q = useInfiniteQuery({
@@ -208,13 +216,14 @@ export default function SalesHistoryScreen() {
       if (start && at < start.getTime()) return false;
       if (end && at > end.getTime()) return false;
       if (payment && inv.paymentMethod !== payment) return false;
+      if (awaitingOnly && inv.collectionStatus !== "pending") return false;
       if (needle) {
         const hay = `${inv.invoiceId ?? ""} ${inv.customerName ?? ""} ${inv.customerPhone ?? ""}`.toLowerCase();
         if (!hay.includes(needle)) return false;
       }
       return true;
     });
-  }, [rows, q.hasNextPage, start, end, payment, query]);
+  }, [rows, q.hasNextPage, start, end, payment, awaitingOnly, query]);
 
   const totalCount = invoices.length;
   const totalSum = useMemo(() => invoices.reduce((s, inv) => s + inv.netTotal, 0), [invoices]);
@@ -291,7 +300,7 @@ export default function SalesHistoryScreen() {
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsWrap} contentContainerStyle={styles.chips} keyboardShouldPersistTaps="handled">
         <Chip label={t("mobile.salesHistory.paymentAll")} active={payment === null} onPress={() => setPayment(null)} />
-        {PAYMENT_ORDER.map((p) => (
+        {PAYMENT_ORDER(collectionsOn).map((p) => (
           <Chip
             key={p}
             label={PAYMENT_LABELS()[p]}
@@ -299,6 +308,14 @@ export default function SalesHistoryScreen() {
             onPress={() => setPayment(payment === p ? null : p)}
           />
         ))}
+        {collectionsOn || awaitingOnly ? (
+          <Chip
+            label={t("app.collections.inbox.tabs.pending")}
+            active={awaitingOnly}
+            onPress={() => setAwaitingOnly((v) => !v)}
+            testID="sales-history-filter-awaiting"
+          />
+        ) : null}
       </ScrollView>
 
       <View style={styles.stats}>
@@ -375,6 +392,9 @@ function InvoiceRow({ inv, onPress }: { inv: salesApi.Invoice; onPress: () => vo
   // No name and no phone is a walk-in sale, not missing data — so not the
   // deferred-customer "No name" fallback.
   const customer = inv.customerName?.trim() || inv.customerPhone || t("mobile.salesHistory.walkIn");
+  // Only the states that need attention; "confirmed" is the normal state and
+  // shows on the detail screen (spec 08 §4.9).
+  const collection = inv.collectionStatus;
   return (
     <Pressable
       accessibilityRole="button"
@@ -407,6 +427,7 @@ function InvoiceRow({ inv, onPress }: { inv: salesApi.Invoice; onPress: () => vo
           {inv.outstanding > 0 ? (
             <Badge label={t("mobile.customers.remaining", { amount: money(inv.outstanding) })} variant="outofstock" />
           ) : null}
+          {collection === "pending" || collection === "rejected" ? <CollectionBadge status={collection} /> : null}
         </View>
       </View>
       <ChevronForward size={16} color={colors.textSecondary} />

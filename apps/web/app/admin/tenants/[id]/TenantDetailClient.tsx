@@ -22,7 +22,7 @@ interface SalesPerformance {
   series12mo: { month: string; gross: string; count: number }[];
   topBranches: { branchId: string; name: string; gross: string; count: number }[];
   topProducts: { productName: string; gross: string; qty: number }[];
-  paymentMix: { cash: string; card: string; instapay: string; deferred: string };
+  paymentMix: { cash: string; card: string; instapay: string; wallet: string; deferred: string };
 }
 
 interface Detail {
@@ -489,7 +489,7 @@ interface SalesPerfT {
   topBranches: string;
   topProducts: string;
   paymentMix: string;
-  paymentMethods: { cash: string; card: string; instapay: string; deferred: string };
+  paymentMethods: { cash: string; card: string; instapay: string; wallet: string; deferred: string };
   noBranches: string;
   noProducts: string;
 }
@@ -561,6 +561,10 @@ function SalesPerformanceSection({
             <li className="flex justify-between">
               <span>{t.paymentMethods.instapay}</span>
               <span dir="ltr">{fmtCurrencyShort(perf.paymentMix.instapay)}</span>
+            </li>
+            <li className="flex justify-between">
+              <span>{t.paymentMethods.wallet}</span>
+              <span dir="ltr">{fmtCurrencyShort(perf.paymentMix.wallet ?? "0")}</span>
             </li>
             <li className="flex justify-between">
               <span>{t.paymentMethods.deferred}</span>

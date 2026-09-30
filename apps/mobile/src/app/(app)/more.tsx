@@ -7,6 +7,7 @@ import { ClockCounterClockwiseIcon as ClockCounterClockwise } from "phosphor-rea
 import { CloudArrowUpIcon as CloudArrowUp } from "phosphor-react-native/src/icons/CloudArrowUp";
 import { CreditCardIcon as CreditCard } from "phosphor-react-native/src/icons/CreditCard";
 import { GearIcon as Gear } from "phosphor-react-native/src/icons/Gear";
+import { HandCoinsIcon as HandCoins } from "phosphor-react-native/src/icons/HandCoins";
 import { ListChecksIcon as ListChecks } from "phosphor-react-native/src/icons/ListChecks";
 import { MapPinAreaIcon as MapPinArea } from "phosphor-react-native/src/icons/MapPinArea";
 import { SignOutIcon as SignOut } from "phosphor-react-native/src/icons/SignOut";
@@ -41,6 +42,7 @@ const ITEMS = () =>
   { route: "/sync", label: t("mobile.sync.title"), icon: CloudArrowUp, requires: "record_sales" },
   { route: "/notifications", label: t("mobile.notifications.title"), icon: Bell, requires: null },
   { route: "/customers", label: t("app.shell.secondary.customers"), icon: Users, requires: "view_customers" },
+  { route: "/collections", label: t("app.collections.inbox.title"), icon: HandCoins, requires: "view_collections" },
   { route: "/expenses", label: t("app.shell.secondary.expenses"), icon: Wallet, requires: "view_expenses" },
   { route: "/suppliers", label: t("app.shell.secondary.suppliers"), icon: Truck, requires: "view_suppliers" },
   { route: "/returns", label: t("app.shell.secondary.returns"), icon: ArrowCounterClockwise, requires: "view_returns" },
@@ -73,6 +75,10 @@ export default function MoreScreen() {
     if (i.route === "/leave") return allowed.has("request_leave") || allowed.has("manage_leave");
     // Billing is owner-only on the web (app.billing.ownerOnly).
     if (i.route === "/billing") return Boolean(me?.isOwner);
+    // Digital collections inbox (doc 15 spec 08 §4.12): the branch has the
+    // feature on AND the member may view collections (owners always may).
+    if (i.route === "/collections")
+      return Boolean(me?.features?.collections) && (Boolean(me?.isOwner) || allowed.has("view_collections"));
     // `requires: null` = any signed-in member (attendance, notifications).
     return i.requires === null ? Boolean(me) : allowed.has(i.requires);
   });
@@ -107,6 +113,7 @@ export default function MoreScreen() {
               style={styles.row}
               accessibilityRole="button"
               onPress={() => router.push(item.route as never)}
+              testID={`more-row-${item.route.slice(1)}`}
             >
               <Icon size={22} color={colors.accent} />
               <Text style={styles.rowLabel}>{item.label}</Text>

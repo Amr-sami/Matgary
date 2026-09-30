@@ -91,6 +91,8 @@ export interface TenantSalesPerformance {
     cash: string;
     card: string;
     instapay: string;
+    /** Digital collections (doc 15 spec 13 §4.14): the mobile-wallet bucket. */
+    wallet: string;
     deferred: string;
   };
 }
@@ -455,7 +457,7 @@ export async function getTenantSalesPerformance(
       series12mo: fillMonths([], 12),
       topBranches: [],
       topProducts: [],
-      paymentMix: { cash: "0", card: "0", instapay: "0", deferred: "0" },
+      paymentMix: { cash: "0", card: "0", instapay: "0", wallet: "0", deferred: "0" },
     };
   }
   const tz = tenant.tz ?? "Africa/Cairo";
@@ -566,6 +568,7 @@ export async function getTenantSalesPerformance(
       cash: sql<string>`coalesce(sum(${sales.totalPrice}::numeric) filter (where ${sales.paymentMethod} = 'cash'), 0)::text`,
       card: sql<string>`coalesce(sum(${sales.totalPrice}::numeric) filter (where ${sales.paymentMethod} = 'card'), 0)::text`,
       instapay: sql<string>`coalesce(sum(${sales.totalPrice}::numeric) filter (where ${sales.paymentMethod} = 'instapay'), 0)::text`,
+      wallet: sql<string>`coalesce(sum(${sales.totalPrice}::numeric) filter (where ${sales.paymentMethod} = 'wallet'), 0)::text`,
       deferred: sql<string>`coalesce(sum(${sales.totalPrice}::numeric) filter (where ${sales.paymentMethod} = 'deferred'), 0)::text`,
     })
     .from(sales)
@@ -594,7 +597,7 @@ export async function getTenantSalesPerformance(
       gross: r.gross,
       qty: r.qty,
     })),
-    paymentMix: paymentAgg ?? { cash: "0", card: "0", instapay: "0", deferred: "0" },
+    paymentMix: paymentAgg ?? { cash: "0", card: "0", instapay: "0", wallet: "0", deferred: "0" },
   };
 }
 

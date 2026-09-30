@@ -14,6 +14,9 @@ interface TabsProps<K extends string> {
   active: K;
   onChange: (key: K) => void;
   className?: string;
+  /** When set, each tab button gets `data-testid={testIdPrefix + key}`
+   *  (e.g. "collections-tab-" → `collections-tab-pending`). */
+  testIdPrefix?: string;
 }
 
 export function Tabs<K extends string>({
@@ -21,6 +24,7 @@ export function Tabs<K extends string>({
   active,
   onChange,
   className,
+  testIdPrefix,
 }: TabsProps<K>) {
   return (
     <div
@@ -38,6 +42,7 @@ export function Tabs<K extends string>({
             role="tab"
             type="button"
             aria-selected={isActive}
+            data-testid={testIdPrefix ? testIdPrefix + it.key : undefined}
             onClick={() => onChange(it.key)}
             className={cn(
               "shrink-0 inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors",

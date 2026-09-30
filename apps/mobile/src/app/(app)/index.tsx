@@ -21,6 +21,7 @@ import { usePullRefresh } from "@/components/layout/usePullRefresh";
 import { HeaderAccessories } from "@/components/shell/HeaderAccessories";
 import { money, shortDate } from "@/lib/format";
 import { useSnapshotAge } from "@/offline/hydrate";
+import { AwaitingCollectionsCard } from "@/components/dashboard/AwaitingCollectionsCard";
 import { StockAlerts } from "@/components/dashboard/StockAlerts";
 import { Badge } from "@/components/ui/Badge";
 import { ChevronForward } from "@/components/ui/Chevron";
@@ -30,6 +31,8 @@ import { RTL, RTL_TEXT } from "@/theme/rtl";
 import { colors, elevation, fonts, MIN_TOUCH, radius, spacing } from "@/theme/tokens";
 import { t } from "@/i18n";
 import { errorText } from "@/lib/errors";
+import { saleBadgeKind } from "@/collections/rules";
+import { CollectionBadge } from "@/components/collections/CollectionBadge";
 
 type RecentSale = dashboardApi.RecentSale;
 
@@ -126,6 +129,8 @@ export default function DashboardScreen() {
               </View>
             </View>
 
+            <AwaitingCollectionsCard data={data.collections} />
+
             <RecentSales items={data.recentSales ?? []} />
 
             <StockAlerts items={data.lowStock.items} />
@@ -214,17 +219,20 @@ function RecentSales({ items }: { items: RecentSale[] }) {
 /**
  * One status chip per row, mirroring the web's sold/returned column but
  * carrying the payment method too, since that is what a cashier glances for:
- * returned beats everything; an unsettled آجل invoice is a warning; otherwise
- * the method in neutral.
+ * returned beats everything; then a rejected transfer, then one awaiting the
+ * owner's confirmation (doc 15 spec 08 §4.9, `saleBadgeKind`); an unsettled
+ * آجل invoice is a warning; otherwise the method in neutral.
  */
 function SaleBadge({ sale }: { sale: RecentSale }) {
-  if (sale.isReturned) {
+  const kind = saleBadgeKind(sale);
+  if (kind === "returned") {
     return <Badge label={t("app.dashboard.recentSales.status.returned")} variant="outofstock" />;
   }
-  if (sale.paymentMethod === "deferred" && !sale.isPaid) {
+  if (kind === "rejected" || kind === "pending") return <CollectionBadge status={kind} />;
+  if (kind === "unpaid") {
     return <Badge label={t("mobile.dashboard.unpaid")} variant="lowstock" />;
   }
-  if (!sale.paymentMethod) return null;
+  if (kind !== "method" || !sale.paymentMethod) return null;
   return (
     <Badge
       label={t(`app.activityLabels.paymentMethods.${sale.paymentMethod}`)}

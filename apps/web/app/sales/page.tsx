@@ -11,8 +11,11 @@ import { PrintOptionsModal } from "@/components/sales/PrintOptionsModal";
 import {
   SalesFilters,
   type DateRangeKey,
+  type SalesCollectionFilter,
   type SalesSortKey,
 } from "@/components/sales/SalesFilters";
+import { useCollectionsAccess } from "@/hooks/useCollections";
+import { receiptPaymentInfo } from "@/lib/receipt-strings";
 import { SalesKpiCards } from "@/components/sales/SalesKpiCards";
 import { DayCompareCard } from "@/components/sales/DayCompareCard";
 import { SalesChart } from "@/components/sales/SalesChart";
@@ -32,7 +35,10 @@ import { Pagination } from "@/components/ui/Pagination";
 import { voidSale } from "@/lib/api/sales";
 import { salesToCsv, downloadCsv } from "@/lib/csv";
 import { useDictionary } from "@/components/i18n/DictionaryProvider";
-import type { Sale, Category, Gender } from "@/lib/types";
+import type { Sale, Category, Gender, PaymentMethod } from "@/lib/types";
+
+const PAY_VALUES: readonly PaymentMethod[] = ["cash", "instapay", "wallet", "card", "deferred"];
+const COLL_VALUES: readonly SalesCollectionFilter[] = ["pending", "confirmed", "rejected", "any"];
 
 export default function SalesPage() {
   const dict = useDictionary();
@@ -132,6 +138,17 @@ function SalesPageInner() {
   const [sort, setSort] = useState<SalesSortKey>(
     (searchParams.get("sort") as SalesSortKey) || "newest"
   );
+  // Digital collections (doc 15 spec 12 §4.5): `pay=` / `coll=` filters.
+  const { features: collectionFeatures } = useCollectionsAccess();
+  const collectionsOn = collectionFeatures.collections;
+  const [selectedPay, setSelectedPay] = useState<PaymentMethod | null>(() => {
+    const v = searchParams.get("pay");
+    return v && (PAY_VALUES as readonly string[]).includes(v) ? (v as PaymentMethod) : null;
+  });
+  const [selectedCollection, setSelectedCollection] = useState<SalesCollectionFilter | null>(() => {
+    const v = searchParams.get("coll");
+    return v && (COLL_VALUES as readonly string[]).includes(v) ? (v as SalesCollectionFilter) : null;
+  });
   const [page, setPage] = useState(Number(searchParams.get("p") || "1"));
   const [pageSize, setPageSize] = useState(Number(searchParams.get("ps") || "50"));
 
@@ -156,6 +173,8 @@ function SalesPageInner() {
     if (customFrom) params.set("from", customFrom);
     if (customTo) params.set("to", customTo);
     if (discountOnly) params.set("disc", "1");
+    if (selectedPay) params.set("pay", selectedPay);
+    if (selectedCollection) params.set("coll", selectedCollection);
     if (sort !== "newest") params.set("sort", sort);
     if (page !== 1) params.set("p", String(page));
     if (pageSize !== 50) params.set("ps", String(pageSize));
@@ -170,6 +189,8 @@ function SalesPageInner() {
     customFrom,
     customTo,
     discountOnly,
+    selectedPay,
+    selectedCollection,
     sort,
     page,
     pageSize,
@@ -207,6 +228,12 @@ function SalesPageInner() {
       if (selectedStatus === "sold" && s.isReturned) return false;
       if (selectedStatus === "returned" && !s.isReturned) return false;
       if (discountOnly && !(s.discountAmount && s.discountAmount > 0)) return false;
+      if (collectionsOn && selectedPay && s.paymentMethod !== selectedPay) return false;
+      if (collectionsOn && selectedCollection) {
+        if (selectedCollection === "any" ? s.collectionStatus == null : s.collectionStatus !== selectedCollection) {
+          return false;
+        }
+      }
       if (q) {
         const hay =
           `${s.productName} ${s.brand || ""} ${s.note || ""} ${s.customerName || ""} ${s.customerPhone || ""}`.toLowerCase();
@@ -239,6 +266,9 @@ function SalesPageInner() {
     selectedBrand,
     selectedStatus,
     discountOnly,
+    collectionsOn,
+    selectedPay,
+    selectedCollection,
     query,
     sort,
   ]);
@@ -313,6 +343,8 @@ function SalesPageInner() {
           orderDiscountAmount: Math.max(0, cartSubtotal - totalPrice - discountTotal),
           totalPrice,
           note: sale.note,
+          // A Sale row carries no account: the method row only.
+          payment: receiptPaymentInfo(sale.paymentMethod, []),
         });
         return;
       }
@@ -329,6 +361,7 @@ function SalesPageInner() {
       discountAmount: sale.discountAmount || 0,
       totalPrice: sale.totalPrice,
       saleDate: sale.saleDate,
+      payment: receiptPaymentInfo(sale.paymentMethod, []),
     });
   };
   const handleReturnSuccess = async () => {
@@ -476,6 +509,11 @@ function SalesPageInner() {
           onSortChange={setSort}
           query={query}
           onQueryChange={setQuery}
+          collectionsOn={collectionsOn}
+          selectedPay={selectedPay}
+          onPayChange={setSelectedPay}
+          selectedCollection={selectedCollection}
+          onCollectionChange={setSelectedCollection}
         />
 
         <div className="flex items-center justify-between">

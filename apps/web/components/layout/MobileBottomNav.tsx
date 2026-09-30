@@ -15,6 +15,7 @@ import {
   Users,
   UsersGroup,
   Settings,
+  ArrowLeftRight,
   Truck,
   Receipt,
   ListChecks,
@@ -27,6 +28,8 @@ import { cn } from "@/lib/utils";
 import { logoutAction } from "@/app/[lang]/(auth)/actions";
 import { can, canAny, type Permission } from "@/lib/permissions";
 import { useUnreadTaskCount } from "@/hooks/useUnreadTaskCount";
+import { useCollectionsAccess, usePendingCollectionsCount } from "@/hooks/useCollections";
+import { ShellNotificationBell } from "@/components/notifications/ShellNotificationBell";
 import { useLeaveUnread } from "@/hooks/useLeaveUnread";
 import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
 import type { Locale } from "@/lib/i18n/config";
@@ -52,6 +55,9 @@ const primaryItems: NavItem[] = [
 const moreItems: NavItem[] = [
   { href: "/tasks", labelKey: "tasks", icon: ListChecks, requires: "view_dashboard" },
   { href: "/customers", labelKey: "customers", icon: Users, requires: "view_customers" },
+  // Digital collections inbox (doc 15 spec 12 §4.9): only for feature-on
+  // tenants with view_collections (keeps the list from overflowing).
+  { href: "/collections", labelKey: "collections", icon: ArrowLeftRight, requires: "view_collections" },
   { href: "/expenses", labelKey: "expenses", icon: Wallet, requires: "view_expenses" },
   { href: "/suppliers", labelKey: "suppliers", icon: Truck, requires: "view_suppliers" },
   { href: "/returns", labelKey: "returns", icon: RotateCcw, requires: "view_returns" },
@@ -74,7 +80,12 @@ export function MobileBottomNav() {
     ? { role: session.user.role, permissions: session.user.permissions }
     : null;
   const visiblePrimary = primaryItems.filter((i) => can(principal, i.requires));
+  const { features: collectionFeatures } = useCollectionsAccess();
+  const { count: pendingCollections } = usePendingCollectionsCount();
   const visibleMore = moreItems.filter((i) => {
+    if (i.href === "/collections") {
+      return collectionFeatures.collections && can(principal, "view_collections");
+    }
     if (i.href === "/tasks") return !!principal;
     if (i.href === "/team") {
       return canAny(principal, ["manage_team", "request_leave", "manage_leave"]);
@@ -118,6 +129,7 @@ export function MobileBottomNav() {
 
   const badgeFor = (href: string): number | null => {
     if (href === "/tasks" && unreadTasks > 0) return unreadTasks;
+    if (href === "/collections") return pendingCollections > 0 ? pendingCollections : null;
     if (href === "/team") {
       const total = leaveUnread.submitted + leaveUnread.decided;
       return total > 0 ? total : null;
@@ -203,6 +215,7 @@ export function MobileBottomNav() {
       >
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold text-text-primary">{shellT.more}</h3>
+          <ShellNotificationBell place="mobile" className="ms-auto me-2" />
           <button
             type="button"
             onClick={() => setMoreOpen(false)}
@@ -222,6 +235,7 @@ export function MobileBottomNav() {
               <Link
                 key={item.href}
                 href={item.href}
+                data-testid={`nav-${item.labelKey}`}
                 className={cn(
                   "flex flex-col items-center gap-1 py-3 rounded-xl transition-colors",
                   isActive
@@ -232,7 +246,14 @@ export function MobileBottomNav() {
                 <span className="relative">
                   <Icon className="w-5 h-5" />
                   {badge !== null && (
-                    <span className="absolute -top-1.5 -end-2 min-w-[16px] h-[16px] rounded-full bg-danger text-white text-[9px] font-bold flex items-center justify-center px-1">
+                    <span
+                      aria-label={
+                        item.href === "/collections"
+                          ? dict.app.collections.web.nav.badgeA11y.replace("{n}", String(badge))
+                          : undefined
+                      }
+                      className="absolute -top-1.5 -end-2 min-w-[16px] h-[16px] rounded-full bg-danger text-white text-[9px] font-bold flex items-center justify-center px-1"
+                    >
                       {badge > 9 ? "9+" : badge}
                     </span>
                   )}
@@ -319,6 +340,7 @@ export function MobileBottomNav() {
             <Link
               key={item.href}
               href={item.href}
+              data-testid={`nav-${item.labelKey}`}
               className={cn(
                 "relative flex flex-col items-center justify-center gap-0.5 px-1 py-1 rounded-lg flex-1 min-w-[48px]",
                 isActive ? "text-accent" : "text-text-secondary"

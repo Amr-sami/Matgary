@@ -85,6 +85,8 @@ const GATES: Array<[string, string, string[]]> = [
   ["collections/settings", "GET", ["requireTenantWithBranch()", COLL]],
   ["collections/settings", "PATCH", [ENFORCED("manage_collection_accounts"), COLL]],
   ["collections/config", "GET", ["requireTenantWithBranch()", "resolveCollectionsFeatures("]],
+  // Doc 15 spec 13 §7 T7 — the collections tick is a bearer-guarded cron.
+  ["cron/collections-tick", "POST", ['guardCronRequest(req, { bucket: "collections-tick" })']],
 ];
 
 const OPEN_GATES = [/\brequireTenant\(\)/, /\brequireTenantWithBranch\(\)/];

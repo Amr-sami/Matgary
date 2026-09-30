@@ -98,6 +98,9 @@ export {
   WifiSlash,
   Gauge,
   Wrench,
+  // Digital collections web UI (doc 15 spec 12 §4.1): nav entry, POS QR.
+  ArrowsLeftRight as ArrowLeftRight,
+  QrCode,
   X,
   XCircle,
   Lightning as Zap,

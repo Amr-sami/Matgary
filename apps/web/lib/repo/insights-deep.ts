@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, gte, ilike, isNotNull, lte, or, sql } from "drizzle-orm";
 import { format } from "date-fns";
 import { withTenant } from "@/lib/db";
+import { collectionsTenantAdmitted } from "@/lib/collections/flags";
 import {
   sales,
   products,
@@ -208,9 +209,34 @@ export interface PaymentMixReport {
   // `total` convenience field. Recharts consumes this directly.
   series: Array<Record<string, string | number>>;
   totals: Record<string, number>;
+  /** Digital collections split (doc 15 spec 13 §4.11); null when
+   *  COLLECTIONS_ENABLED does not admit the tenant (no extra query runs). */
+  collections: PaymentCollectionsSplit | null;
 }
 
-const KNOWN_METHODS = ["cash", "instapay", "card", "deferred"] as const;
+/** The "digital Z" of the payments report: money by verification state. The
+ *  gross series above stays revenue by the method on the line (03 §F); a
+ *  rejected-to-debt sale is therefore in the `deferred` bar AND in
+ *  `rejectedDebt` here — the split is about collections, the bars about lines
+ *  (13 §8 R7). Settlement collections are left out: this report is sales. */
+export interface PaymentCollectionsSplit {
+  byMethod: Record<
+    "instapay" | "wallet",
+    { confirmed: number; autoConfirmed: number; pending: number; rejectedDebt: number; rejectedLoss: number }
+  >;
+  /** Σ over digital invoices in the window of max(0, invoice total − Σ non-void sale parts). */
+  cashRemainder: number;
+  /** Σ total_price of instapay/wallet lines with collection_status IS NULL (rung while collections were off). */
+  unverified: number;
+}
+
+const KNOWN_METHODS = ["cash", "instapay", "wallet", "card", "deferred"] as const;
+
+/** EGP number from a numeric's text, rounded to piasters. */
+function egp2(v: string | number | null | undefined): number {
+  const n = Number(v ?? 0);
+  return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0;
+}
 
 export async function loadPaymentMixReport(
   tenantId: string,
@@ -288,6 +314,82 @@ export async function loadPaymentMixReport(
       totals[m] = series.reduce((s, r) => s + Number(r[m] ?? 0), 0);
     }
 
+    // Digital collections split (13 §4.11): three queries in the same
+    // transaction, same window (rung_at = sale_date, 03 §B.2.2) and branch.
+    let collectionsSplit: PaymentCollectionsSplit | null = null;
+    if (collectionsTenantAdmitted(tenantId)) {
+      const fromIso = window?.from.toISOString() ?? null;
+      const toIso = window?.to.toISOString() ?? null;
+      const cWindow = fromIso && toIso
+        ? sql`AND c.rung_at >= ${fromIso}::timestamptz AND c.rung_at <= ${toIso}::timestamptz`
+        : sql``;
+      const sWindow = fromIso && toIso
+        ? sql`AND s.sale_date >= ${fromIso}::timestamptz AND s.sale_date <= ${toIso}::timestamptz`
+        : sql``;
+      const cBranch = branchId ? sql`AND c.branch_id = ${branchId}` : sql``;
+      const sBranch = branchId ? sql`AND s.branch_id = ${branchId}` : sql``;
+
+      const split = (await tx.execute(sql`
+        SELECT c.method,
+               COALESCE(sum(c.amount) FILTER (WHERE c.status = 'confirmed'), 0)::text AS confirmed,
+               COALESCE(sum(c.amount) FILTER (WHERE c.status = 'auto_confirmed'), 0)::text AS auto_confirmed,
+               COALESCE(sum(c.amount) FILTER (WHERE c.status = 'pending'), 0)::text AS pending,
+               COALESCE(sum(c.amount) FILTER (WHERE c.status = 'rejected' AND c.reject_outcome = 'debt'), 0)::text AS rejected_debt,
+               COALESCE(sum(c.amount) FILTER (WHERE c.status = 'rejected' AND c.reject_outcome = 'loss'), 0)::text AS rejected_loss
+          FROM collections c
+         WHERE c.tenant_id = ${tenantId} AND c.source_type = 'sale'
+           ${cWindow} ${cBranch}
+         GROUP BY c.method
+      `)) as unknown as Array<{
+        method: string;
+        confirmed: string;
+        auto_confirmed: string;
+        pending: string;
+        rejected_debt: string;
+        rejected_loss: string;
+      }>;
+
+      const [cash] = (await tx.execute(sql`
+        WITH inv AS (
+          SELECT s.invoice_id, sum(s.total_price::numeric) AS total
+            FROM sales s
+           WHERE s.tenant_id = ${tenantId} AND s.collection_status IS NOT NULL AND s.invoice_id IS NOT NULL
+             ${sWindow} ${sBranch}
+           GROUP BY s.invoice_id
+        )
+        SELECT COALESCE(sum(GREATEST(0, inv.total - COALESCE((
+                 SELECT sum(c.amount) FROM collections c
+                  WHERE c.tenant_id = ${tenantId} AND c.invoice_id = inv.invoice_id
+                    AND c.source_type = 'sale' AND c.status <> 'void'), 0))), 0)::text AS remainder
+          FROM inv
+      `)) as unknown as Array<{ remainder: string }>;
+
+      const [unv] = (await tx.execute(sql`
+        SELECT COALESCE(sum(s.total_price::numeric) FILTER (
+                 WHERE s.payment_method IN ('instapay', 'wallet') AND s.collection_status IS NULL), 0)::text AS unverified
+          FROM sales s
+         WHERE s.tenant_id = ${tenantId} ${sWindow} ${sBranch}
+      `)) as unknown as Array<{ unverified: string }>;
+
+      const zero = () => ({ confirmed: 0, autoConfirmed: 0, pending: 0, rejectedDebt: 0, rejectedLoss: 0 });
+      const byMethod = { instapay: zero(), wallet: zero() };
+      for (const r of split) {
+        if (r.method !== "instapay" && r.method !== "wallet") continue;
+        byMethod[r.method] = {
+          confirmed: egp2(r.confirmed),
+          autoConfirmed: egp2(r.auto_confirmed),
+          pending: egp2(r.pending),
+          rejectedDebt: egp2(r.rejected_debt),
+          rejectedLoss: egp2(r.rejected_loss),
+        };
+      }
+      collectionsSplit = {
+        byMethod,
+        cashRemainder: egp2(cash?.remainder),
+        unverified: egp2(unv?.unverified),
+      };
+    }
+
     return {
       window: window
         ? { from: window.from.toISOString(), to: window.to.toISOString() }
@@ -295,6 +397,7 @@ export async function loadPaymentMixReport(
       methods,
       series,
       totals,
+      collections: collectionsSplit,
     };
   });
 }

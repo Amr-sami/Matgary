@@ -3,6 +3,7 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { receiptPaymentRows, type ReceiptPayment } from "@matgary/domain/receipt/payment";
 
 export interface PdfInvoiceLine {
   productName: string;
@@ -25,6 +26,11 @@ export interface PdfInvoiceData {
   note?: string;
   shopName: string;
   shopPhone: string;
+  /** Doc 15 spec 13 §4.15: method + masked account, printed in English
+   *  (the mono font has no Arabic glyphs; masks are ASCII). The send-pdf
+   *  routes pass the body through as z.unknown(), so the helper's filtering
+   *  is the validation. Never a confirmation status. */
+  payment?: ReceiptPayment | null;
 }
 
 const PT_PER_MM = 2.83465;
@@ -100,6 +106,8 @@ export async function generateReceiptPdf(data: PdfInvoiceData): Promise<Uint8Arr
   estHeight += 14 * 3;
   estHeight += 2;
   estHeight += 22; // total
+  const paymentRows = receiptPaymentRows(data.payment, "en");
+  estHeight += 13 * paymentRows.length; // payment method rows (size 9 + 4)
   estHeight += 2;
   estHeight += 14 * 2;
   if (data.customerName || data.customerPhone) estHeight += 14 * 2;
@@ -235,6 +243,7 @@ export async function generateReceiptPdf(data: PdfInvoiceData): Promise<Uint8Arr
   drawDivider();
 
   drawRowMono("TOTAL AMOUNT", fmtMoney(data.totalPrice), 11, true);
+  for (const r of paymentRows) drawRowMono(r.label, r.value);
 
   drawDivider();
 

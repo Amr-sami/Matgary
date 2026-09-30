@@ -3,7 +3,7 @@
 import type { DiscountType } from "@/lib/types";
 import type { ReceiptBlockKey, ReceiptFixedBlock } from "@/lib/settings";
 import { useShopSettings } from "@/hooks/useShopSettings";
-import { rl } from "@/lib/receipt-strings";
+import { receiptPaymentRows, rl, type ReceiptPayment } from "@/lib/receipt-strings";
 
 interface ReceiptSaleData {
   saleId?: string;
@@ -22,6 +22,9 @@ interface ReceiptSaleData {
    *  on account. Omitting (or passing a value equal to totalPrice) keeps
    *  the receipt clean for the fully-paid case. */
   amountPaid?: number;
+  /** Doc 15 spec 13 §4.15: method + masked account (instapay / wallet /
+   *  card only); never a confirmation status. Filled by 12 on reprints. */
+  payment?: ReceiptPayment;
 }
 
 interface ReceiptProps {
@@ -164,6 +167,12 @@ export function Receipt({ sale }: ReceiptProps) {
               </div>
             </>
           )}
+        {receiptPaymentRows(sale.payment, lang).map((r, i) => (
+          <div key={`pay-${i}`} className="receipt-row">
+            <span>{r.label}</span>
+            <span dir="ltr">{r.value}</span>
+          </div>
+        ))}
       </>
     ),
     // Single-item Receipt has no loyalty surface — keep the slot so the

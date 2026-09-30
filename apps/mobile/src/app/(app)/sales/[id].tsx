@@ -4,9 +4,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ArrowUUpLeftIcon as ArrowUUpLeft } from "phosphor-react-native/src/icons/ArrowUUpLeft";
 import { UserIcon as User } from "phosphor-react-native/src/icons/User";
-import { ApiError, sales as salesApi } from "@matgary/api-client";
+import { ApiError, collections, sales as salesApi } from "@matgary/api-client";
 
 import { api } from "@/api/client";
+import { collectionKeys, useCollectionAccess, useCollectionsFeatures } from "@/collections/queries";
+import { canDecide } from "@/collections/rules";
+import { CollectionBadge } from "@/components/collections/CollectionBadge";
+import { useCollectionDecisions } from "@/components/collections/useCollectionDecisions";
 import { isRTL, t } from "@/i18n";
 import { Screen } from "@/components/layout/Screen";
 import { ReceiptActions } from "@/components/receipt/ReceiptActions";
@@ -142,6 +146,23 @@ export default function SaleDetailScreen() {
   const returnedAmount = inv ? Math.max(0, inv.total - inv.netTotal) : 0;
   const customerLabel = inv?.customerName?.trim() || inv?.customerPhone || null;
 
+  // Digital collections (doc 15 spec 08 §4.9): the invoice's transfer
+  // status from its lines, and the parts behind it. GET /api/collections
+  // gives a cashier without view_collections only the rows they recorded
+  // (never a 403) — so someone else's cashier sees the badge alone.
+  const features = useCollectionsFeatures();
+  const access = useCollectionAccess();
+  const collectionStatus = inv?.collectionStatus ?? null;
+  const partsQ = useQuery({
+    queryKey: collectionKeys.byInvoice(inv?.invoiceId ?? ""),
+    enabled: Boolean(inv?.invoiceId && collectionStatus && features.collections && (access.canView || access.canRecord)),
+    queryFn: () => collections.listCollections(api, { invoiceId: inv!.invoiceId!, sourceType: "sale", order: "asc" }),
+  });
+  const decisions = useCollectionDecisions(() => {
+    void lineQ.refetch();
+    void linesQ.refetch();
+  });
+
   return (
     <Screen onRefresh={refresh} refreshing={lineQ.isRefetching || linesQ.isRefetching}>
       <Pressable
@@ -180,6 +201,9 @@ export default function SaleDetailScreen() {
                 <Badge label={t("app.sales.status.returned")} variant="outofstock" />
               ) : inv.hasReturn ? (
                 <Badge label={t("mobile.salesHistory.partialReturn")} variant="lowstock" />
+              ) : null}
+              {collectionStatus === "pending" || collectionStatus === "rejected" ? (
+                <CollectionBadge status={collectionStatus} />
               ) : null}
               {inv.paymentMethod === "deferred" ? (
                 inv.outstanding > 0 ? (
@@ -274,6 +298,73 @@ export default function SaleDetailScreen() {
                 <Text style={styles.noteText}>{inv.note}</Text>
               </View>
             ) : null}
+            {collectionStatus && inv.invoiceId ? (
+              <View style={styles.transfer} testID="sale-detail-collection" collapsable={false}>
+                <View style={styles.transferHead}>
+                  <Text style={styles.noteLabel}>{t("app.collections.detail.blockTitle")}</Text>
+                  <CollectionBadge status={collectionStatus} />
+                </View>
+                {(partsQ.data?.data ?? []).map((c) => {
+                  const decide = canDecide(access, c);
+                  return (
+                    <View key={c.id} style={styles.part} testID={`sale-detail-collection-${c.id}`}>
+                      <View style={styles.partTop}>
+                        <View style={styles.partText}>
+                          <Text style={styles.partAccount} numberOfLines={1}>
+                            {c.account?.label ?? t("app.collections.inbox.row.noAccount")}
+                          </Text>
+                          <Text style={styles.lineSub} numberOfLines={1}>
+                            {[
+                              c.partsCount > 1 ? t("app.collections.inbox.row.part", { n: c.partNo, total: c.partsCount }) : null,
+                              c.payerPhoneLast4 ? `${t("app.collections.detail.payerLast4")} ${ltr(c.payerPhoneLast4)}` : null,
+                              c.payerReference ? `${t("app.collections.detail.reference")} ${ltr(c.payerReference)}` : null,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </Text>
+                        </View>
+                        <View style={styles.partEnd}>
+                          <Text style={styles.partAmount}>{money(c.amount)}</Text>
+                          <CollectionBadge status={c.status} />
+                        </View>
+                      </View>
+                      <View style={styles.partActions}>
+                        {decide === "ok" || decide === "self" ? (
+                          <>
+                            <View testID={c.partsCount > 1 ? `collection-confirm-${c.partNo}` : "collection-confirm"} collapsable={false} style={styles.partAction}>
+                              <Button
+                                label={t("app.collections.detail.confirm")}
+                                onPress={() => decisions.open("confirm", c)}
+                                disabled={decide === "self" || !decisions.online}
+                              />
+                            </View>
+                            <View testID={c.partsCount > 1 ? `collection-reject-${c.partNo}` : "collection-reject"} collapsable={false} style={styles.partAction}>
+                              <Button
+                                label={t("app.collections.detail.reject")}
+                                variant="outline"
+                                onPress={() => decisions.open("reject", c)}
+                                disabled={decide === "self" || !decisions.online}
+                              />
+                            </View>
+                          </>
+                        ) : null}
+                      </View>
+                      {decide === "self" ? (
+                        <Text style={styles.warn}>{t("app.collections.detail.selfDecisionBlocked")}</Text>
+                      ) : null}
+                      <Pressable
+                        accessibilityRole="button"
+                        onPress={() => router.push(`/collections/${encodeURIComponent(c.id)}`)}
+                        hitSlop={6}
+                        style={styles.openLink}
+                      >
+                        <Text style={styles.openLinkText}>{t("app.collections.detail.openInCollections")}</Text>
+                      </Pressable>
+                    </View>
+                  );
+                })}
+              </View>
+            ) : null}
           </Card>
 
           {/* Customer */}
@@ -330,6 +421,7 @@ export default function SaleDetailScreen() {
           ) : null}
         </>
       )}
+      {decisions.sheets}
     </Screen>
   );
 }
@@ -427,5 +519,17 @@ const styles = StyleSheet.create({
   customerPhone: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },
   walkIn: { alignSelf: "flex-start", fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary, ...RTL_TEXT },
   returnedNote: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.xs },
+  transfer: { marginTop: spacing.md, paddingTop: spacing.md, gap: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  transferHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
+  part: { gap: spacing.sm, paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  partTop: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
+  partText: { flex: 1, minWidth: 0, gap: 2, alignItems: "flex-start" },
+  partAccount: { ...RTL_TEXT, fontFamily: fonts.semibold, fontSize: 14, color: colors.text },
+  partEnd: { alignItems: "flex-end", gap: spacing.xs },
+  partAmount: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 15, color: colors.text, fontVariant: ["tabular-nums"] },
+  partActions: { flexDirection: "row", gap: spacing.sm },
+  partAction: { flex: 1 },
+  openLink: { alignSelf: "flex-start", minHeight: MIN_TOUCH, justifyContent: "center" },
+  openLinkText: { ...RTL_TEXT, fontFamily: fonts.semibold, fontSize: 14, color: colors.accent },
   returnedNoteText: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary },
 });

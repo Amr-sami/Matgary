@@ -20,6 +20,25 @@ import { ApiError, catalog, sales as salesApi } from "@matgary/api-client";
 import { calcLineDiscount } from "@matgary/domain";
 
 import { api } from "@/api/client";
+import {
+  accountsForMethod,
+  collectionOptionsFromCart,
+  defaultAccountFor,
+  isDigitalMethod,
+  paymentSummaryOf,
+  posPaymentMethods,
+  validateTransfer,
+  type CartPaymentFields,
+  type TransferErrorCode,
+} from "@/collections/checkout";
+import {
+  useCollectionAccess,
+  useCollectionAccounts,
+  useCollectionSettings,
+  useCollectionsFeatures,
+} from "@/collections/queries";
+import { CollectionBadge } from "@/components/collections/CollectionBadge";
+import { TransferPanel } from "@/components/collections/TransferPanel";
 import { Screen } from "@/components/layout/Screen";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -64,16 +83,28 @@ interface LastSale {
 const TRASH_ICON = 18;
 
 /**
- * The four methods the cart route accepts. Labels come from ONE namespace —
+ * The methods the cart route accepts: today's four, plus `wallet` between
+ * InstaPay and card when digital collections are on for the branch (doc 15
+ * spec 08 §4.2). Labels come from ONE namespace —
  * app.activityLabels.paymentMethods — the same one the dashboard badge,
  * sales history and the invoice detail read, so a sale is never "كاش" on the
  * POS and "نقدي" on the home screen a minute later.
  */
-const PAYMENTS = (): { key: Payment; label: string }[] =>
-  (["cash", "instapay", "card", "deferred"] as const).map((key) => ({
+const PAYMENTS = (collectionsOn: boolean): { key: Payment; label: string }[] =>
+  posPaymentMethods(collectionsOn).map((key) => ({
     key,
     label: t(`app.activityLabels.paymentMethods.${key}`),
   }));
+
+/** The first validation error, worded (spec 08 §4.4); shown above the record button. */
+const TRANSFER_ERROR_KEY: Record<TransferErrorCode, string> = {
+  account_required: "app.collections.pos.accountRequired",
+  part_amount_invalid: "app.collections.pos.partAmountInvalid",
+  parts_exceed_total: "app.collections.pos.partsExceedTotal",
+  too_many_parts: "app.collections.pos.maxParts",
+  payer_last4_invalid: "app.collections.pos.payerLast4Invalid",
+  reference_invalid: "app.collections.pos.referenceInvalid",
+};
 
 /** Arabic counts 1 / 2 / 3–10 / 11+ differently; the dictionary carries One/Two/Few beside the default. */
 function countForm(n: number): string {
@@ -102,7 +133,6 @@ function countForm(n: number): string {
 export default function SalesScreen() {
   const qc = useQueryClient();
   const [query, setQuery] = useState("");
-  const [payment, setPayment] = useState<Payment>("cash");
   // The server result (what was booked) plus the receipt built from the cart
   // as it was rung up — gross prices, per-line discounts and brands do not
   // survive `cart.reset()`, and the result alone carries only net line totals.
@@ -143,6 +173,52 @@ export default function SalesScreen() {
     [cart.lines, cart.orderDiscountType, cart.orderDiscountValue],
   );
   const itemCount = useCart(selectItemCount);
+
+  // Digital collections (doc 15 spec 08). The method lives in the cart store:
+  // reset() returns it to cash (sticky-chip fix) and offline Edit restores it.
+  const features = useCollectionsFeatures();
+  const collectionsOn = features.collections;
+  const access = useCollectionAccess();
+  const shopName = useSession((s) => s.me?.tenant.name ?? "");
+  const accountsQ = useCollectionAccounts();
+  const settingsQ = useCollectionSettings();
+  const payment = cart.paymentMethod;
+  const paymentFields: CartPaymentFields = {
+    paymentMethod: cart.paymentMethod,
+    collectionAccountId: cart.collectionAccountId,
+    payerPhoneLast4: cart.payerPhoneLast4,
+    payerReference: cart.payerReference,
+    collectionParts: cart.collectionParts,
+  };
+  const digital = collectionsOn && isDigitalMethod(payment);
+  const listedAccounts = useMemo(
+    () => accountsForMethod(payment, accountsQ.accounts, accountsQ.branchId),
+    [payment, accountsQ.accounts, accountsQ.branchId],
+  );
+  const requireAccount = settingsQ.data?.collectionsRequireAccount ?? true;
+  // Cheap and pure: recomputed every render (a manual memo over the cart's
+  // fields only fought the React Compiler).
+  const validation = validateTransfer(paymentFields, {
+    total: totals.afterOrderDiscount,
+    collectionsOn,
+    requireAccount,
+    accounts: accountsQ.state === "unknown" ? null : listedAccounts,
+  });
+  const pickMethod = (m: Payment) =>
+    cart.setPaymentMethod(m, defaultAccountFor(m, accountsQ.accounts, accountsQ.branchId));
+  // The feature went off (flag, branch switch) while `wallet` was picked:
+  // the chip is gone, so the method must not linger (§4.2 item 10).
+  useEffect(() => {
+    if (!collectionsOn && payment === "wallet") cart.setPaymentMethod("cash", null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collectionsOn, payment]);
+  // Accounts arrived after the chip was tapped (first load): preselect then.
+  useEffect(() => {
+    if (!digital || cart.collectionAccountId || cart.collectionParts.length > 0) return;
+    const d = defaultAccountFor(payment, accountsQ.accounts, accountsQ.branchId);
+    if (d) cart.setCollectionAccount(d);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [digital, accountsQ.accounts]);
 
   const products = useQuery({
     queryKey: ["products"],
@@ -196,6 +272,16 @@ export default function SalesScreen() {
       // actually sent.
       const byId = new Map((products.data ?? []).map((p) => [p.id, p]));
       const rungAt = new Date();
+      // Payment snapshot too: the store resets on success.
+      const paySnapshot: CartPaymentFields = { ...paymentFields };
+      const isDigital = collectionsOn && isDigitalMethod(paySnapshot.paymentMethod);
+      // The receipt prints the method + the receiving accounts' ASCII masks
+      // (never a status; doc 15 spec 13 §4.15 / ARCH CR 6 hand-off to 08).
+      const payIds = isDigital ? paymentSummaryOf(collectionOptionsFromCart(paySnapshot, 0, true)).collectionAccountIds : [];
+      const accountMasks = payIds
+        .map((id) => accountsQ.accounts?.find((a) => a.id === id)?.mask)
+        .filter((m): m is string => typeof m === "string" && m.length > 0);
+      const receiptExtra = accountMasks.length > 0 ? { accountMasks } : {};
       const snapshot = {
         lines: cart.lines.map((l) => ({ ...l, brand: byId.get(l.productId)?.brand ?? null })),
         orderDiscountType: cart.orderDiscountType,
@@ -213,7 +299,10 @@ export default function SalesScreen() {
             : {}),
         })),
         {
-          paymentMethod: payment,
+          paymentMethod: paySnapshot.paymentMethod,
+          // Account / payer hints / parts — nothing for a non-digital method
+          // or with the feature off (spec 08 §4.3).
+          ...collectionOptionsFromCart(paySnapshot, totals.afterOrderDiscount, collectionsOn),
           invoiceId: cart.invoiceId,
           // Book it under the moment it was rung, not the moment it drains:
           // a sale rung offline at 22:00 and synced at 09:00 belongs to
@@ -239,10 +328,13 @@ export default function SalesScreen() {
           lineTotal: l.quantity * l.pricePerUnit - calcLineDiscount(l.quantity, l.pricePerUnit, l.lineDiscountType, l.lineDiscountValue),
         })),
         total: totals.afterOrderDiscount,
-        paymentMethod: payment,
+        paymentMethod: paySnapshot.paymentMethod,
         customerName: body.options.customerName ?? null,
         customerPhone: body.options.customerPhone ?? null,
         note: body.options.note ?? null,
+        // A queued digital sale shows "awaiting confirmation" at once; the
+        // drained row's server answer replaces it (null = feature off there).
+        collectionStatus: isDigital ? "pending" : null,
       };
       // Product names ride along in the outbox row (client-only sidecar) so the
       // sync screen can list the lines and Edit can rebuild the cart offline.
@@ -261,7 +353,7 @@ export default function SalesScreen() {
       );
       const queued = (reason: "offline" | "network"): LastSale => ({
         result: localResult,
-        receipt: toReceiptSale(snapshot, localResult),
+        receipt: toReceiptSale(snapshot, localResult, receiptExtra),
         rowId: enqueueSale(body, cart.invoiceId, names, catalogUpdatedAt),
         queuedReason: reason,
         rungAt,
@@ -272,7 +364,7 @@ export default function SalesScreen() {
 
       try {
         const result = await salesApi.sendCartSale(api, body, cart.invoiceId);
-        return { result, receipt: toReceiptSale(snapshot, result), rowId: null, queuedReason: null, rungAt };
+        return { result, receipt: toReceiptSale(snapshot, result, receiptExtra), rowId: null, queuedReason: null, rungAt };
       } catch (e) {
         // Never reached the server / server failed: the outbox owns it from
         // here under the SAME key, so a half-sent sale cannot double-post.
@@ -298,6 +390,8 @@ export default function SalesScreen() {
       void qc.invalidateQueries({ queryKey: ["sales"] });
       void qc.invalidateQueries({ queryKey: ["dashboard"] });
       void qc.invalidateQueries({ queryKey: ["insights-overview"] });
+      void qc.invalidateQueries({ queryKey: ["collections"] });
+      void qc.invalidateQueries({ queryKey: ["collection-summary"] });
     },
     onError: (e) => {
       clearMark("pos.checkout-tap");
@@ -333,7 +427,8 @@ export default function SalesScreen() {
           ? "failed"
           : "pending";
 
-  const canCheckout = canRecord && cart.lines.length > 0 && !checkout.isPending;
+  const canCheckout = canRecord && cart.lines.length > 0 && !checkout.isPending && validation.ok;
+  const firstTransferError = validation.errors[0] ? t(TRANSFER_ERROR_KEY[validation.errors[0]]) : null;
 
   const resolveCode = useCallback(
     async (raw: string) => {
@@ -463,6 +558,14 @@ export default function SalesScreen() {
             </>
           ) : null}
           {syncState === "removed" ? <Text style={styles.successHint}>{t("mobile.pos.removedHint")}</Text> : null}
+          {shownResult.collectionStatus ? (
+            <View style={styles.collectionResult}>
+              <View testID="pos-collection-badge" collapsable={false}>
+                <CollectionBadge status={shownResult.collectionStatus} />
+              </View>
+              <Text style={[styles.successHint, styles.collectionHint]}>{t("app.collections.pos.resultHint")}</Text>
+            </View>
+          ) : null}
           {syncState === "failed" ? (
             <Pressable onPress={() => router.push("/sync")} hitSlop={8}>
               <Text style={[styles.successHint, styles.successHintDanger]}>
@@ -680,12 +783,13 @@ export default function SalesScreen() {
 
           <Text style={styles.label}>{t("app.sales.form.payment.label")}</Text>
           <View style={styles.pillRow}>
-            {PAYMENTS().map((p) => (
+            {PAYMENTS(collectionsOn).map((p) => (
               <Chip
                 key={p.key}
                 label={p.label}
                 active={payment === p.key}
-                onPress={() => setPayment(p.key)}
+                onPress={() => pickMethod(p.key)}
+                testID={`pos-pay-${p.key}`}
               />
             ))}
           </View>
@@ -693,6 +797,26 @@ export default function SalesScreen() {
             <Text style={styles.muted}>
               {t("app.sales.form.payment.deferredNote")}
             </Text>
+          ) : null}
+          {digital && isDigitalMethod(payment) ? (
+            <>
+              <Text style={styles.muted}>{t("app.sales.form.payment.transferNote")}</Text>
+              <TransferPanel
+                method={payment}
+                total={totals.afterOrderDiscount}
+                accounts={listedAccounts}
+                accountsState={accountsQ.state}
+                loading={accountsQ.isLoading}
+                requireAccount={requireAccount}
+                canManageAccounts={access.canManage}
+                value={paymentFields}
+                onChange={cart.setPayment}
+                customerPhone={cart.customerPhone}
+                shopName={shopName}
+                defaultAccountId={defaultAccountFor(payment, accountsQ.accounts, accountsQ.branchId)}
+                validation={validation}
+              />
+            </>
           ) : null}
 
           <View style={styles.customer}>
@@ -713,6 +837,11 @@ export default function SalesScreen() {
           {error ? (
             <View style={styles.errorBox}>
               <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : null}
+          {firstTransferError && cart.lines.length > 0 ? (
+            <View style={styles.errorBox} testID="pos-collection-error">
+              <Text style={styles.errorText}>{firstTransferError}</Text>
             </View>
           ) : null}
 
@@ -887,6 +1016,8 @@ const styles = StyleSheet.create({
   successMeta: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm, flexWrap: "wrap", marginBottom: spacing.md },
   successHint: { fontFamily: fonts.regular, fontSize: 13, color: colors.textSecondary, marginTop: -spacing.xs, ...RTL_TEXT },
   successHintDanger: { color: colors.danger },
+  collectionResult: { gap: spacing.xs, marginTop: spacing.xs, marginBottom: spacing.sm, alignItems: "flex-start" },
+  collectionHint: { marginTop: 0 },
   receipt: { gap: 6, marginBottom: spacing.lg, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
   receiptRow: { flexDirection: "row", justifyContent: "space-between", gap: spacing.md },
   receiptName: { flexShrink: 1, fontFamily: fonts.regular, fontSize: 14, color: colors.text, ...RTL_TEXT },

@@ -133,7 +133,10 @@ export function formatRelative(
   if (Number.isNaN(d.getTime())) return "—";
   const diffSec = Math.round((d.getTime() - now.getTime()) / 1000);
   const abs = Math.abs(diffSec);
-  const rtf = new Intl.RelativeTimeFormat(intlLocale(locale), {
+  // Latin digits in both locales (§4 above): RelativeTimeFormat takes the
+  // numbering system from the locale tag, so force `nu-latn` there — plain
+  // "ar-EG" renders "قبل ١٤ دقيقة".
+  const rtf = new Intl.RelativeTimeFormat(`${intlLocale(locale)}-u-nu-latn`, {
     numeric: "auto",
   });
   if (abs < 60) return rtf.format(diffSec, "second");

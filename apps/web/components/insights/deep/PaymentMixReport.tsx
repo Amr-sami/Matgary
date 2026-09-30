@@ -20,16 +20,33 @@ import { CHART_PALETTE, type DeepReportProps } from "./types";
 // on which channel is carrying the store (cash vs InstaPay vs card vs
 // deferred). Totals per method are surfaced as tiles above the chart.
 
+interface CollectionsSplitBucket {
+  confirmed: number;
+  autoConfirmed: number;
+  pending: number;
+  rejectedDebt: number;
+  rejectedLoss: number;
+}
+
+/** Doc 15 spec 13 §4.11 — null when Collections is off for the tenant. */
+interface PaymentCollectionsSplit {
+  byMethod: Record<"instapay" | "wallet", CollectionsSplitBucket>;
+  cashRemainder: number;
+  unverified: number;
+}
+
 interface PaymentMixResponse {
   report: "payments";
   methods: string[];
   series: Array<Record<string, string | number>>;
   totals: Record<string, number>;
+  collections?: PaymentCollectionsSplit | null;
 }
 
 const METHOD_COLOR: Record<string, string> = {
   cash: "#22C55E",
   instapay: "#1203E3",
+  wallet: "#7C3AED",
   card: "#0EA5E9",
   deferred: "#F59E0B",
   unknown: "#9CA3AF",
@@ -158,7 +175,69 @@ export function PaymentMixReport({
           </BarChart>
         </ResponsiveContainer>
       </div>
+
+      {data.collections && (
+        <CollectionsStrip split={data.collections} locale={locale} t={t} />
+      )}
     </ReportShell>
+  );
+}
+
+/** The "digital Z" strip (13 §4.11): transfer money by verification state,
+ *  both digital methods summed. Confirmed includes auto-confirmed. */
+function CollectionsStrip({
+  split,
+  locale,
+  t,
+}: {
+  split: PaymentCollectionsSplit;
+  locale: DeepReportProps["locale"];
+  t: {
+    collectionTitle: string;
+    collectionConfirmed: string;
+    collectionPending: string;
+    collectionRejectedDebt: string;
+    collectionRejectedLoss: string;
+    collectionCashRemainder: string;
+    collectionUnverified: string;
+  };
+}) {
+  const both = (k: keyof CollectionsSplitBucket) =>
+    split.byMethod.instapay[k] + split.byMethod.wallet[k];
+  const cells: Array<{ key: string; label: string; value: number; tone: string }> = [
+    {
+      key: "confirmed",
+      label: t.collectionConfirmed,
+      value: both("confirmed") + both("autoConfirmed"),
+      tone: "text-success",
+    },
+    { key: "pending", label: t.collectionPending, value: both("pending"), tone: "text-orange-700" },
+    { key: "rejectedDebt", label: t.collectionRejectedDebt, value: both("rejectedDebt"), tone: "text-danger" },
+    { key: "rejectedLoss", label: t.collectionRejectedLoss, value: both("rejectedLoss"), tone: "text-danger" },
+    { key: "cashRemainder", label: t.collectionCashRemainder, value: split.cashRemainder, tone: "text-text-primary" },
+  ];
+  return (
+    <div className="mt-5 border-t border-border pt-4" data-testid="insights-payments-collections">
+      <p className="text-xs font-semibold text-text-primary mb-2">{t.collectionTitle}</p>
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        {cells.map((c) => (
+          <div
+            key={c.key}
+            className="rounded-lg border border-border bg-bg-main/40 p-3"
+          >
+            <p className="text-[10px] uppercase tracking-wider text-text-secondary">{c.label}</p>
+            <p className={`text-base font-bold mt-0.5 tabular-nums ${c.tone}`}>
+              {formatCurrency(c.value, locale)}
+            </p>
+          </div>
+        ))}
+      </div>
+      {split.unverified > 0 && (
+        <p className="text-[11px] text-text-secondary mt-2">
+          {t.collectionUnverified.replace("{amount}", formatCurrency(split.unverified, locale))}
+        </p>
+      )}
+    </div>
   );
 }
 

@@ -19,8 +19,9 @@
 //     that lives in lib/sales/cart-math.ts and is computed by the
 //     orchestrator from cart + order-discount + wallet state.
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { PaymentMethod } from "@/lib/types";
+import { EMPTY_TRANSFER, type TransferDraft } from "@/components/collections/rules";
 
 export interface UseCustomerPaymentOptions {
   /** Whether the active branch's loyalty programme is enabled. When
@@ -43,6 +44,13 @@ export interface UseCustomerPaymentResult {
    *  to a number at submit. */
   amountPaidNowInput: string;
   setAmountPaidNowInput: (s: string) => void;
+  /** Digital collections (doc 15 spec 12 §4.3): receiving account, payer
+   *  hints and split parts of an InstaPay / wallet sale. */
+  transfer: TransferDraft;
+  setTransfer: (d: TransferDraft) => void;
+  /** After every sale: method back to cash, transfer and partial fields
+   *  cleared (08 §4.1 — no sticky method chip). */
+  resetPayment: () => void;
 
   // Loyalty
   walletPoints: number;
@@ -60,6 +68,12 @@ export function useCustomerPayment({
   const [customerPhone, setCustomerPhone] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
   const [amountPaidNowInput, setAmountPaidNowInput] = useState("");
+  const [transfer, setTransfer] = useState<TransferDraft>(EMPTY_TRANSFER);
+  const resetPayment = useCallback(() => {
+    setPaymentMethod("cash");
+    setTransfer(EMPTY_TRANSFER);
+    setAmountPaidNowInput("");
+  }, []);
 
   const [walletPoints, setWalletPoints] = useState(0);
   const [walletCredit, setWalletCredit] = useState(0);
@@ -122,6 +136,9 @@ export function useCustomerPayment({
     setPaymentMethod,
     amountPaidNowInput,
     setAmountPaidNowInput,
+    transfer,
+    setTransfer,
+    resetPayment,
     walletPoints,
     walletCredit,
     redeemPointsInput,

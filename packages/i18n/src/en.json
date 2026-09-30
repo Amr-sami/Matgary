@@ -210,8 +210,16 @@
             "instapay": "InstaPay",
             "card": "Card",
             "deferred": "Deferred",
-            "unknown": "Unknown"
-          }
+            "unknown": "Unknown",
+            "wallet": "Mobile wallet"
+          },
+          "collectionTitle": "Transfer money",
+          "collectionConfirmed": "Confirmed",
+          "collectionPending": "Awaiting",
+          "collectionRejectedDebt": "Rejected — customer debt",
+          "collectionRejectedLoss": "Rejected — shortfall",
+          "collectionCashRemainder": "Cash remainder",
+          "collectionUnverified": "{amount} of InstaPay and wallet sales were recorded before Collections was on"
         },
         "branches": {
           "title": "Branch comparison",
@@ -318,6 +326,12 @@
           "sold": "Sold",
           "returned": "Returned"
         }
+      },
+      "collections": {
+        "title": "Transfers awaiting confirmation",
+        "summary": "{count} · {amount}",
+        "stale": "{n} late",
+        "open": "Open Collections"
       }
     },
     "sales": {
@@ -609,7 +623,8 @@
           "partialPaidNow": "Paid now",
           "partialPayAll": "Pay full",
           "partialPaidLabel": "Paid",
-          "partialBalanceLabel": "Remaining"
+          "partialBalanceLabel": "Remaining",
+          "transferNote": "The sale is recorded as \"awaiting confirmation\" until the owner checks the money arrived."
         },
         "note": {
           "label": "Note (optional)",
@@ -1263,7 +1278,8 @@
             "cash": "Cash",
             "card": "Card",
             "instapay": "InstaPay",
-            "deferred": "Deferred"
+            "deferred": "Deferred",
+            "wallet": "Mobile wallet"
           },
           "noBranches": "No branch sales this month.",
           "noProducts": "No products sold this month."
@@ -2409,6 +2425,11 @@
         },
         "sampleCustomer": "Amr Sami",
         "sampleProducts": "Naviforce watch, Ray-Ban sunglasses"
+      },
+      "collectionsTile": {
+        "title": "Collections",
+        "subtitle": "Receiving accounts for transfers and wallets, and confirmation settings.",
+        "off": "Off for this branch"
       }
     },
     "team": {
@@ -3554,7 +3575,8 @@
         "team": "Team",
         "whatsapp": "WhatsApp",
         "activity": "Activity",
-        "settings": "Settings"
+        "settings": "Settings",
+        "collections": "Collections"
       },
       "more": "More",
       "moreA11y": "More items",
@@ -3715,7 +3737,462 @@
         "INVALID_BRANCH": "This branch is not available. Pick another branch.",
         "INVALID_CURSOR": "The list changed. Refresh and try again.",
         "ALL_BRANCHES_OWNER_ONLY": "Only the owner can view all branches together."
+      },
+      "web": {
+        "nav": {
+          "badgeA11y": "{n} transfers awaiting confirmation"
+        },
+        "inbox": {
+          "branchScope": {
+            "this": "This branch",
+            "all": "All branches"
+          },
+          "invoiceFilter": "Invoice {invoice}",
+          "clearFilter": "Show all",
+          "loadMore": "Load more",
+          "retry": "Try again",
+          "branch": "Branch",
+          "oldestFirst": "Oldest first"
+        },
+        "detail": {
+          "close": "Close",
+          "historyTitle": "History",
+          "system": "TheStoro (automatic)",
+          "openCustomer": "Open customer",
+          "events": {
+            "created": "Recorded",
+            "matched": "Matched to a bank message",
+            "auto_confirmed": "Confirmed automatically",
+            "confirmed": "Confirmed",
+            "rejected": "Rejected",
+            "reopened": "Reopened",
+            "voided": "Cancelled with the sale",
+            "amount_changed": "Amount changed",
+            "account_changed": "Account changed",
+            "evidence_attached": "Bank message attached",
+            "stale_alerted": "Late alert sent",
+            "note": "Note"
+          }
+        },
+        "totals": {
+          "date": "Day",
+          "account": "Account",
+          "noAccount": "No account",
+          "allAccounts": "All accounts"
+        },
+        "salesFilter": {
+          "pay": "Payment",
+          "payAll": "All payment methods",
+          "collection": "Transfer status",
+          "collectionAll": "Any status",
+          "collectionAny": "Any transfer"
+        },
+        "settle": {
+          "title": "Record a payment — {invoice}",
+          "total": "Total",
+          "paid": "Paid",
+          "remaining": "Remaining",
+          "payRest": "Pay the rest",
+          "amount": "Amount received",
+          "method": "Payment method",
+          "overpay": "More than the remaining balance. Only {amount} will be recorded.",
+          "historyTitle": "Earlier payments",
+          "historyShow": "Show",
+          "historyLoading": "Loading…",
+          "historyEmpty": "No payments on this invoice yet.",
+          "amountRequired": "Enter an amount above zero",
+          "failed": "Couldn't record the payment",
+          "cancel": "Cancel",
+          "submit": "Record {amount}",
+          "done": "Recorded {amount}"
+        },
+        "ledger": {
+          "invoicesTitle": "Invoices",
+          "paymentsTitle": "Payments",
+          "recordPayment": "Record payment",
+          "initialPayment": "Earlier payment",
+          "voided": "Voided — the transfer never arrived",
+          "status": {
+            "paid": "Paid",
+            "partial": "Partly paid",
+            "deferred": "On account"
+          }
+        },
+        "settings": {
+          "branch": "Branch",
+          "automationTitle": "Automatic confirmation",
+          "automationOnPhone": "Set this up on the phone that receives the bank or wallet messages: TheStoro app → Settings → Collections → Automatic confirmation."
+        },
+        "devices": {
+          "title": "Linked phones",
+          "subtitle": "Phones that pass bank and wallet messages to TheStoro.",
+          "empty": "No linked phones yet.",
+          "recentlyUnlinked": "Unlinked in the last 30 days",
+          "token": "Code {prefix}…",
+          "accountsAll": "All accounts",
+          "linkedBy": "Linked by {name} on {date}",
+          "lastMessage": "Last message {date}",
+          "lastCredit": "Last transfer {date}",
+          "never": "No message yet",
+          "health": {
+            "ok": "Working",
+            "never_seen": "Waiting for the first message",
+            "silent": "Stopped forwarding",
+            "heartbeat_late": "Not checked in lately",
+            "listener_off": "Notification access is off",
+            "revoked": "Unlinked"
+          },
+          "platform": {
+            "ios_shortcut": "iPhone — shortcut",
+            "ios_app_intent": "iPhone — TheStoro action",
+            "android_listener": "Android — notifications",
+            "android_collector": "Android — Collector app"
+          },
+          "revoke": "Unlink",
+          "revokeTitle": "Unlink \"{label}\"?",
+          "revokeBody": "TheStoro will stop accepting messages from this phone. On an iPhone, also delete the shortcut from the Shortcuts app.",
+          "revoked": "Unlinked",
+          "revokeFailed": "Couldn't unlink"
+        },
+        "credits": {
+          "showRaw": "Show the message text",
+          "rawNote": "Only the owner sees this, and viewing it is logged.",
+          "selfRecorded": "You recorded this sale — someone else has to match it.",
+          "templateStatus": {
+            "published_sample": "Format from published samples",
+            "pilot_verified": "Format checked in shops",
+            "fallback": "Unknown format"
+          }
+        },
+        "unrecognised": {
+          "title": "Unrecognised messages",
+          "hint": "Messages TheStoro couldn't read; they are deleted after 30 days.",
+          "share": "Send to TheStoro to add support",
+          "shareNote": "Names and all but the last 4 digits are hidden before anyone at TheStoro reads it.",
+          "shared": "Sent — kept until {date}",
+          "empty": "No unrecognised messages.",
+          "expires": "Deleted on {date}"
+        }
+      },
+      "pos": {
+        "panelTitle": "Transfer",
+        "pickAccount": "Receiving account",
+        "accountRequired": "Choose the account the customer paid into",
+        "noAccounts": "No receiving accounts are set up for this branch.",
+        "noAccountsOwnerHint": "Add an InstaPay account or a wallet in Settings → Collections.",
+        "accountsUnknown": "Accounts aren't available right now — the sale is recorded without one.",
+        "offlineAccounts": "Offline — accounts from the last sync",
+        "scanHint": "Ask the customer to scan this with the InstaPay app",
+        "sendToNumber": "Ask the customer to send to this number",
+        "checkName": "The customer should see the name: {name}",
+        "noScreenshot": "Don't accept a screenshot. The owner confirms.",
+        "payerLast4Label": "Customer's phone, last 4 digits (optional)",
+        "referenceLabel": "Transfer reference — last 4 to 8 characters (optional)",
+        "referenceHint": "From the receipt on the customer's phone",
+        "split": "Part in cash",
+        "addPart": "Add another transfer",
+        "partTitle": "Transfer {n}",
+        "partAmount": "Amount",
+        "removePart": "Remove",
+        "cashRemainder": "Rest in cash: {amount}",
+        "partAmountInvalid": "Enter an amount for each transfer",
+        "partsExceedTotal": "The transfers add up to more than the total",
+        "maxParts": "Up to 4 transfers",
+        "payerLast4Invalid": "Enter exactly 4 digits",
+        "referenceInvalid": "4 to 16 letters or digits",
+        "instapayOverLimit": "InstaPay allows up to EGP 70,000 per transfer — split it into two",
+        "share": "Send the payment link on WhatsApp",
+        "shareText": "To pay {shop} with InstaPay: {link}",
+        "resultHint": "Money is confirmed in the bank or wallet app, not on the customer's phone.",
+        "syncLine": "Payment: {method}",
+        "syncLineAccount": "Payment: {method} → {account}",
+        "settlePending": "{amount} recorded — awaiting the owner's confirmation",
+        "posDefault": "Default",
+        "showAllAccounts": "Show all accounts ({n})"
+      },
+      "inbox": {
+        "title": "Collections",
+        "subtitle": "Transfers and wallet payments the shop received",
+        "tabs": {
+          "pending": "Awaiting",
+          "confirmed": "Confirmed",
+          "rejected": "Rejected",
+          "totals": "Daily totals"
+        },
+        "staleOnly": "Late only",
+        "staleBadge": "Late",
+        "row": {
+          "recordedBy": "Recorded by {name}",
+          "part": "Transfer {n} of {total}",
+          "settlement": "Debt payment",
+          "noAccount": "No account"
+        },
+        "empty": {
+          "pending": {
+            "title": "Nothing awaiting confirmation",
+            "hint": "Every InstaPay or wallet sale shows up here."
+          },
+          "confirmed": {
+            "title": "No confirmed transfers yet"
+          },
+          "rejected": {
+            "title": "No rejected transfers"
+          }
+        },
+        "offline": {
+          "title": "Collections need a connection",
+          "hint": "Connect and try again."
+        },
+        "denied": {
+          "title": "You can't view collections",
+          "hint": "Ask the owner for the view-collections permission."
+        },
+        "featureOff": {
+          "title": "Collections are off for this branch",
+          "ownerHint": "Turn them on in Settings → Collections.",
+          "staffHint": "Ask the owner to turn them on."
+        },
+        "loadFailed": "Couldn't load collections"
+      },
+      "detail": {
+        "title": "Transfer details",
+        "amount": "Amount",
+        "method": "Method",
+        "account": "Account",
+        "invoice": "Invoice",
+        "openInvoice": "Open invoice",
+        "customer": "Customer",
+        "payerLast4": "Last 4 digits",
+        "reference": "Reference",
+        "rungAt": "Rung at",
+        "recordedBy": "Recorded by",
+        "decidedBy": "Decided by",
+        "decidedAt": "Decided at",
+        "reason": "Reason",
+        "outcome": "Outcome",
+        "note": "Note",
+        "flags": "Flags",
+        "matchedCredit": "Bank message",
+        "settlement": "Debt payment",
+        "openInCollections": "Open in Collections",
+        "blockTitle": "Transfer",
+        "payer": "Payer",
+        "decision": "Decision",
+        "confirm": "Confirm received",
+        "reject": "Reject",
+        "reopen": "Reopen",
+        "edit": "Edit",
+        "save": "Save",
+        "selfDecisionBlocked": "You recorded this sale — someone else has to confirm it.",
+        "onlineOnly": "Confirming and rejecting need a connection",
+        "actionFailed": "Couldn't save the decision",
+        "reopenUntil": "Can be reopened until {date}",
+        "confirmSheet": {
+          "title": "Check your bank or wallet app first",
+          "check": "Open {account} and check that {amount} really arrived.",
+          "noScreenshot": "A screenshot from the customer is not proof.",
+          "submit": "It arrived — confirm"
+        },
+        "rejectSheet": {
+          "title": "Transfer not received",
+          "reason": "Reason",
+          "outcome": "The sale becomes",
+          "debtHint": "The amount becomes the customer's debt.",
+          "lossHint": "Recorded as a loss against {name}, who rang the sale.",
+          "lossHintUnknown": "Recorded as a loss against whoever rang the sale.",
+          "settlementHint": "The payment is voided and the debt restored.",
+          "phone": "Customer phone",
+          "phoneRequired": "Enter the customer's phone to record the debt",
+          "note": "Note (optional)",
+          "submit": "Reject transfer"
+        },
+        "reopenSheet": {
+          "title": "Reopen this transfer",
+          "body": "It goes back to awaiting confirmation and any debt it created is undone.",
+          "submit": "Reopen"
+        },
+        "editSheet": {
+          "title": "Edit transfer details"
+        },
+        "done": {
+          "confirmed": "Transfer confirmed",
+          "rejected": "Transfer rejected",
+          "reopened": "Reopened",
+          "saved": "Saved"
+        }
+      },
+      "totals": {
+        "title": "Per account for the day",
+        "prevDay": "Previous day",
+        "nextDay": "Next day",
+        "today": "Today",
+        "confirmed": "Confirmed",
+        "autoConfirmed": "Auto-confirmed",
+        "pending": "Pending",
+        "rejectedDebt": "Rejected — debt",
+        "rejectedLoss": "Rejected — loss",
+        "cashRemainder": "Cash with transfers",
+        "total": "Total",
+        "count": "{n} payments",
+        "countOne": "1 payment",
+        "countTwo": "2 payments",
+        "countFew": "{n} payments",
+        "empty": "Nothing on this day",
+        "limit": {
+          "day_80": "Near the daily limit",
+          "month_80": "Near the monthly limit",
+          "new_wallet_day_80": "New wallet: near its daily limit",
+          "balance_90": "Balance near the wallet's cap"
+        }
       }
+    },
+    "collectionsSettings": {
+      "title": "Collections",
+      "tileHint": "Record and confirm money you receive by InstaPay and wallets.",
+      "branchLine": "Settings for branch: {branch}",
+      "intro": "TheStoro records the transfers your shop receives and helps you confirm them. TheStoro never sends or holds money.",
+      "switches": {
+        "enabled": {
+          "label": "Record transfers at checkout",
+          "hint": "InstaPay and Wallet appear at checkout, and the sale stays \"awaiting confirmation\" until you confirm it."
+        },
+        "requireAccount": {
+          "label": "Cashier must pick the receiving account",
+          "hint": "Only asked when the branch has an active account of that kind."
+        },
+        "staleAfter": {
+          "label": "Alert for unconfirmed transfers after (minutes)",
+          "hint": "15 to 1440 minutes. Default 120.",
+          "invalid": "Enter a number from 15 to 1440."
+        },
+        "autoConfirm": {
+          "label": "Allow automatic confirmation",
+          "hint": "Works only for accounts where you turn it on. We recommend waiting for a week of correct suggestions."
+        },
+        "payerNames": {
+          "label": "Keep the payer's full name",
+          "hint": "By default part of the name is hidden (like AHMED M****)."
+        }
+      },
+      "saved": "Settings saved",
+      "saveFailed": "Couldn't save the settings",
+      "accounts": {
+        "heading": "Receiving accounts",
+        "add": "Add account",
+        "addChooseTitle": "What kind of account?",
+        "addInstapay": "InstaPay account",
+        "addWallet": "Wallet",
+        "empty": {
+          "title": "No receiving accounts yet",
+          "hint": "Most shops start with one InstaPay account and one wallet."
+        },
+        "noneWhileEnabled": "Recording is on but there is no account, so the cashier will record transfers without one.",
+        "otherBranchesNote": "Accounts of other branches appear when you switch to that branch.",
+        "badges": {
+          "allBranches": "All branches",
+          "posDefault": "Checkout default",
+          "mobileDefault": "Mobile-number account",
+          "autoConfirm": "Auto-confirm"
+        }
+      },
+      "form": {
+        "newTitleInstapay": "New InstaPay account",
+        "newTitleWallet": "New wallet",
+        "editTitle": "Edit account",
+        "fields": {
+          "provider": {
+            "bank": "Bank",
+            "wallet": "Wallet",
+            "pickTitle": "Choose from the list"
+          },
+          "label": {
+            "label": "Account name",
+            "placeholder": "e.g. CIB business"
+          },
+          "holderName": {
+            "label": "Holder name as the payer sees it",
+            "hint": "The cashier reads it to the customer so they check they are paying the right account."
+          },
+          "ipaLink": {
+            "label": "InstaPay payment link",
+            "hint": "In the InstaPay app open your payment address (IPA), tap Share, then paste the text here.",
+            "derived": "Address: {handle}",
+            "invalid": "This is not an InstaPay payment link. It starts with https://ipn.eg/S/",
+            "missingWarning": "Without a link the checkout cannot show a QR code; the customer will pay to your mobile number."
+          },
+          "accountLast4": {
+            "label": "Last 4 digits of the account or card",
+            "hint": "They appear in the bank's messages and tie a transfer to this account.",
+            "invalid": "Enter 4 digits."
+          },
+          "isPrepaidCard": {
+            "label": "This account is a prepaid card",
+            "hint": "NBE prepaid-card messages carry no digits."
+          },
+          "iban": {
+            "label": "IBAN (optional)",
+            "invalid": "An Egyptian IBAN is EG followed by 27 digits.",
+            "checksum": "This IBAN is not valid. Check the digits."
+          },
+          "walletMsisdn": {
+            "label": "Wallet number",
+            "invalid": "Enter an 11-digit Egyptian mobile number starting with 010, 011, 012 or 015."
+          },
+          "walletOpenedOn": {
+            "label": "Wallet opening date (optional)",
+            "hint": "New wallets have lower limits for the first 90 days."
+          },
+          "branch": {
+            "label": "Branch",
+            "all": "All branches"
+          },
+          "isPosDefault": {
+            "label": "Default at checkout",
+            "hint": "Preselected at checkout for this kind in this branch."
+          },
+          "isDefaultForMobile": {
+            "label": "Transfers to my mobile number land here",
+            "hint": "InstaPay transfers to your mobile number go to your default InstaPay account."
+          },
+          "autoConfirmEnabled": {
+            "label": "Automatic confirmation for this account",
+            "hint": "Off until you turn it on.",
+            "branchOff": "Automatic confirmation is off in the branch settings.",
+            "confirmTitle": "Turn on automatic confirmation?",
+            "confirmBody": "TheStoro will confirm transfers up to EGP {amount} when a trusted message matches the sale exactly. We recommend turning it on after a week of correct suggestions."
+          },
+          "reviewThreshold": {
+            "label": "Largest amount to auto-confirm (EGP)",
+            "hint": "Larger transfers wait until you check the bank or wallet app.",
+            "invalid": "Enter a valid amount."
+          },
+          "balanceCheckEnabled": {
+            "label": "Balance check",
+            "hint": "Compares the new balance in the wallet message with the last one to catch fake messages."
+          }
+        },
+        "l2Heading": "Automatic confirmation",
+        "providerRequired": "Choose the bank or wallet.",
+        "labelRequired": "Give the account a name.",
+        "labelTooLong": "The name is longer than 60 characters.",
+        "holderNameTooLong": "The name is longer than 80 characters.",
+        "identityRequired": "Add an InstaPay link, the last 4 digits or an IBAN.",
+        "save": "Save",
+        "create": "Add account",
+        "saved": "Account saved",
+        "created": "Account added",
+        "saveFailed": "Couldn't save the account",
+        "duplicate": "This number is already on another account.",
+        "archive": "Archive account",
+        "archiveConfirmTitle": "Archive \"{label}\"?",
+        "archiveConfirmBody": "It will no longer appear at checkout. Past transfers stay as they are.",
+        "archived": "Account archived",
+        "cancel": "Cancel",
+        "notFound": "This account is not in this branch."
+      },
+      "unavailable": "Collections are not available for your shop yet.",
+      "noPermission": "Collections settings are only available to people who may manage receiving accounts.",
+      "webNote": "The same settings are on the TheStoro website."
     }
   },
   "common": {

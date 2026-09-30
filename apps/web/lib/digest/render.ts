@@ -8,7 +8,14 @@ import type { DigestPayload } from "@/lib/repo/digest";
 export interface RenderOpts {
   locale: Locale;
   dashboardUrl: string;
+  /** Doc 15 spec 13 §4.13 / D13-7: print the per-account Transfers block
+   *  (owners, the digest owner_phone, managers holding view_collections;
+   *  never extra recipients). Default false. */
+  includeCollections?: boolean;
 }
+
+/** At most this many account rows in the Transfers block, then "+N". */
+const MAX_COLLECTION_ROWS = 5;
 
 const CURRENCY_SYMBOL = "₤"; // EGP symbol used by the rest of the app
 
@@ -32,8 +39,10 @@ const T = {
       `💰 المبيعات: ${gross} (${count} فاتورة)`,
     deltaSame: "مقارنة بنفس اليوم الأسبوع اللي فات",
     deltaUnknown: "—",
-    byMethod: (cash: string, card: string, instapay: string, deferred: string) =>
-      `   نقدًا ${cash} · فيزا ${card} · إنستا ${instapay} · آجل ${deferred}`,
+    // The wallet segment prints only when > 0 (13 §4.13), so a shop with no
+    // wallet sales gets byte-identical text.
+    byMethod: (cash: string, card: string, instapay: string, deferred: string, wallet: string | null) =>
+      `   نقدًا ${cash} · فيزا ${card} · إنستا ${instapay}${wallet ? ` · محفظة موبايل ${wallet}` : ""} · آجل ${deferred}`,
     top: (name: string, qty: string, revenue: string) =>
       `🥇 الأعلى مبيعًا: ${name} (${qty}×, ${revenue})`,
     lowStockHead: (count: string) => `⚠ مخزون منخفض: ${count} منتجات`,
@@ -45,6 +54,12 @@ const T = {
     tasksPending: (count: string) =>
       `⚠ ${count} مهام موكلة بدون قراءة من الموظف`,
     openDashboard: "افتح اللوحة",
+    collectionsHead: "📲 التحويلات:",
+    collectionsRow: (label: string, c: string, p: string, r: string) => `   • ${label}: ✅ ${c} | ⏳ ${p} | ❌ ${r}`,
+    collectionsMore: (k: string) => `   +${k}`,
+    collectionsNoAccount: "بدون حساب",
+    collectionsCash: (amt: string) => `   💵 المتبقي نقدًا: ${amt}`,
+    collectionsPendingAll: (k: string, amt: string) => `⏳ ما زال في انتظار التأكيد: ${k} (${amt})`,
   },
   en: {
     branchHeader: (b: string, d: string) => `🏪 ${b} · ${d}`,
@@ -52,8 +67,8 @@ const T = {
       `💰 Sales: ${gross} (${count} invoices)`,
     deltaSame: "vs same day last week",
     deltaUnknown: "—",
-    byMethod: (cash: string, card: string, instapay: string, deferred: string) =>
-      `   Cash ${cash} · Card ${card} · InstaPay ${instapay} · Deferred ${deferred}`,
+    byMethod: (cash: string, card: string, instapay: string, deferred: string, wallet: string | null) =>
+      `   Cash ${cash} · Card ${card} · InstaPay ${instapay}${wallet ? ` · Mobile wallet ${wallet}` : ""} · Deferred ${deferred}`,
     top: (name: string, qty: string, revenue: string) =>
       `🥇 Top seller: ${name} (${qty}×, ${revenue})`,
     lowStockHead: (count: string) => `⚠ Low stock: ${count} SKUs`,
@@ -64,6 +79,12 @@ const T = {
     tasksOk: "✅ Tasks: no unacknowledged tasks",
     tasksPending: (count: string) => `⚠ ${count} tasks assigned but not yet seen`,
     openDashboard: "Open dashboard",
+    collectionsHead: "📲 Transfers:",
+    collectionsRow: (label: string, c: string, p: string, r: string) => `   • ${label}: ✅ ${c} | ⏳ ${p} | ❌ ${r}`,
+    collectionsMore: (k: string) => `   +${k} more`,
+    collectionsNoAccount: "No account",
+    collectionsCash: (amt: string) => `   💵 Cash remainder: ${amt}`,
+    collectionsPendingAll: (k: string, amt: string) => `⏳ Still awaiting confirmation: ${k} (${amt})`,
   },
 } as const;
 
@@ -87,8 +108,33 @@ export function renderDigestMessage(
       money(payload.sales.byMethod.card, opts.locale),
       money(payload.sales.byMethod.instapay, opts.locale),
       money(payload.sales.byMethod.deferred, opts.locale),
+      Number(payload.sales.byMethod.wallet ?? 0) > 0
+        ? money(payload.sales.byMethod.wallet, opts.locale)
+        : null,
     ),
   );
+
+  const col = opts.includeCollections ? payload.collections : null;
+  if (col) {
+    const lines: string[] = [];
+    const bucket = (b: { count: number; amount: string }) => `${n(b.count, opts.locale)} · ${money(b.amount, opts.locale)}`;
+    for (const a of col.accounts.slice(0, MAX_COLLECTION_ROWS)) {
+      const label = [a.label ?? t.collectionsNoAccount, a.mask].filter(Boolean).join(" ");
+      lines.push(t.collectionsRow(label, bucket(a.confirmed), bucket(a.pending), bucket(a.rejected)));
+    }
+    if (col.accounts.length > MAX_COLLECTION_ROWS) {
+      lines.push(t.collectionsMore(n(col.accounts.length - MAX_COLLECTION_ROWS, opts.locale)));
+    }
+    if (Number(col.cashRemainder) > 0) lines.push(t.collectionsCash(money(col.cashRemainder, opts.locale)));
+    if (col.pendingAll.count > 0) {
+      lines.push(t.collectionsPendingAll(n(col.pendingAll.count, opts.locale), money(col.pendingAll.amount, opts.locale)));
+    }
+    if (lines.length > 0) {
+      out.push("");
+      out.push(t.collectionsHead);
+      out.push(...lines);
+    }
+  }
 
   if (payload.topSku) {
     out.push("");

@@ -108,3 +108,52 @@ export async function decrementSnapshotStock(
 export function isStale(snapshot: PosSnapshot): boolean {
   return Date.now() - snapshot.fetchedAt > SNAPSHOT_TTL_MS;
 }
+
+// ---------------------------------------------------------------------------
+// Digital collections (doc 15 spec 12 §4.4): the POS reads the receiving
+// accounts and the collections config offline from the same `snapshot` table.
+// Keys are free strings (db.ts `&key`), so `collections-<kind>:<tenant>:<branch>`
+// needs no Dexie version bump and never collides with `<tenant>:<branch>`.
+// Best-effort: every Dexie error is swallowed (a private window, a blocked
+// IndexedDB) — the caller simply has no cache.
+// ---------------------------------------------------------------------------
+
+export type CollectionsSnapshotKind = "accounts" | "config";
+
+function collectionsSnapshotKey(kind: CollectionsSnapshotKind, tenantId: string, branchId: string): string {
+  return `collections-${kind}:${tenantId}:${branchId}`;
+}
+
+export async function writeCollectionsSnapshot(
+  kind: CollectionsSnapshotKind,
+  tenantId: string,
+  branchId: string,
+  payload: unknown,
+): Promise<void> {
+  try {
+    const db = getOfflineDb();
+    await db.snapshot.put({
+      key: collectionsSnapshotKey(kind, tenantId, branchId),
+      tenantId,
+      branchId,
+      fetchedAt: Date.now(),
+      payload,
+    });
+  } catch {
+    // best-effort
+  }
+}
+
+export async function readCollectionsSnapshot<T = unknown>(
+  kind: CollectionsSnapshotKind,
+  tenantId: string,
+  branchId: string,
+): Promise<T | null> {
+  try {
+    const db = getOfflineDb();
+    const row = await db.snapshot.get(collectionsSnapshotKey(kind, tenantId, branchId));
+    return row ? (row.payload as T) : null;
+  } catch {
+    return null;
+  }
+}

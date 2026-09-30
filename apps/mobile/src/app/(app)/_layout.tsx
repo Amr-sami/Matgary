@@ -48,6 +48,8 @@ export default function AppLayout() {
 
       <Tabs.Screen name="tasks" />
       <Tabs.Screen name="customers" />
+      {/* Digital collections inbox (doc 15 spec 08) — reached from More. */}
+      <Tabs.Screen name="collections" />
       <Tabs.Screen name="expenses" />
       <Tabs.Screen name="suppliers" />
       <Tabs.Screen name="returns" />

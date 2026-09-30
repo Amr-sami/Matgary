@@ -34,6 +34,9 @@ interface Recipient {
   phone: string | null;
   email: string | null;
   locale: "ar" | "en";
+  /** Doc 15 spec 13 §4.13 / D13-7: may see the Transfers block — owners and
+   *  the digest owner_phone, managers holding view_collections; never extras. */
+  seesCollections: boolean;
 }
 
 export async function POST(req: NextRequest) {
@@ -96,6 +99,7 @@ export async function POST(req: NextRequest) {
           role: tenantMembers.role,
           branchId: tenantMembers.branchId,
           phone: tenantMembers.phone,
+          permissions: tenantMembers.permissions,
         })
         .from(tenantMembers)
         .where(eq(tenantMembers.tenantId, t.id));
@@ -137,6 +141,7 @@ export async function POST(req: NextRequest) {
             // menu and that flips users.locale, but for the explicit
             // phone path we don't have a user record.
             locale: "ar",
+            seesCollections: true,
           });
         } else {
           // Fallback: any owner-role member with a phone on tenant_members.
@@ -148,6 +153,7 @@ export async function POST(req: NextRequest) {
               phone: phoneByMember.get(u.id) ?? null,
               email: u.email ?? null,
               locale: (u.locale as "ar" | "en" | null) ?? "ar",
+              seesCollections: true,
             });
           }
         }
@@ -165,6 +171,7 @@ export async function POST(req: NextRequest) {
             phone: phoneByMember.get(u.id) ?? null,
             email: u.email ?? null,
             locale: (u.locale as "ar" | "en" | null) ?? "ar",
+            seesCollections: (m.permissions ?? []).includes("view_collections"),
           });
         }
         // Extras.
@@ -174,6 +181,7 @@ export async function POST(req: NextRequest) {
             phone: extra.phone ?? null,
             email: extra.email ?? null,
             locale: (extra.locale as "ar" | "en" | null) ?? "ar",
+            seesCollections: false,
           });
         }
 
@@ -193,7 +201,7 @@ export async function POST(req: NextRequest) {
             recipientUserId: recipients[0]?.userId ?? null,
             recipientPhone: recipients[0]?.phone ?? null,
             recipientEmail: recipients[0]?.email ?? null,
-            payload,
+            payload: recipients[0]?.seesCollections ? payload : { ...payload, collections: null },
             messageText: null,
             status: "skipped_empty",
           });
@@ -207,6 +215,7 @@ export async function POST(req: NextRequest) {
           const messageText = renderDigestMessage(payload, {
             locale: r.locale,
             dashboardUrl,
+            includeCollections: r.seesCollections,
           });
 
           const insertResult = await insertDigestRun({
@@ -217,7 +226,9 @@ export async function POST(req: NextRequest) {
             recipientPhone: r.phone,
             recipientEmail: r.email,
             channel: "whatsapp",
-            payload,
+            // D13-7: the stored payload follows the text — no totals kept on
+            // a run whose recipient may not see them.
+            payload: r.seesCollections ? payload : { ...payload, collections: null },
             messageText,
             status: r.phone ? "pending" : "skipped_no_channel",
           });

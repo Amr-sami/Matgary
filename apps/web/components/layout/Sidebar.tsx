@@ -14,6 +14,7 @@ import {
   Users,
   UsersGroup,
   Settings,
+  ArrowLeftRight,
   Truck,
   Receipt,
   ListChecks,
@@ -27,6 +28,8 @@ import { UserMenu } from "./UserMenu";
 import { useSession } from "next-auth/react";
 import { can, canAny, type Permission } from "@/lib/permissions";
 import { useUnreadTaskCount } from "@/hooks/useUnreadTaskCount";
+import { useCollectionsAccess, usePendingCollectionsCount } from "@/hooks/useCollections";
+import { ShellNotificationBell } from "@/components/notifications/ShellNotificationBell";
 import { useLeaveUnread } from "@/hooks/useLeaveUnread";
 import { useBranches } from "@/hooks/useBranches";
 import { useDictionary } from "@/components/i18n/DictionaryProvider";
@@ -52,6 +55,9 @@ const primaryItems: NavItem[] = [
 const secondaryItems: NavItem[] = [
   { href: "/tasks", labelKey: "tasks", icon: ListChecks, requires: "view_dashboard" },
   { href: "/customers", labelKey: "customers", icon: Users, requires: "view_customers" },
+  // Digital collections inbox (doc 15 spec 12 §4.9): only for feature-on
+  // tenants with view_collections (keeps the list from overflowing).
+  { href: "/collections", labelKey: "collections", icon: ArrowLeftRight, requires: "view_collections" },
   { href: "/expenses", labelKey: "expenses", icon: Wallet, requires: "view_expenses" },
   { href: "/suppliers", labelKey: "suppliers", icon: Truck, requires: "view_suppliers" },
   { href: "/returns", labelKey: "returns", icon: RotateCcw, requires: "view_returns" },
@@ -83,7 +89,12 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     ? { role: session.user.role, permissions: session.user.permissions }
     : null;
   const visiblePrimary = primaryItems.filter((i) => can(principal, i.requires));
+  const { features: collectionFeatures } = useCollectionsAccess();
+  const { count: pendingCollections } = usePendingCollectionsCount();
   const visibleSecondary = secondaryItems.filter((i) => {
+    if (i.href === "/collections") {
+      return collectionFeatures.collections && can(principal, "view_collections");
+    }
     // /tasks is reachable by every logged-in member (their assigned tasks),
     // not gated by a real permission.
     if (i.href === "/tasks") return !!principal;
@@ -128,6 +139,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
   const badgeFor = (href: string): number | null => {
     if (href === "/tasks" && unreadTasks > 0) return unreadTasks;
+    if (href === "/collections") return pendingCollections > 0 ? pendingCollections : null;
     if (href === "/team") {
       // Team page hosts the leaves tab — surface the same combined unread
       // count here so employees and managers don't lose the badge.
@@ -147,6 +159,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       <Link
         key={item.href}
         href={item.href}
+        data-testid={`nav-${item.labelKey}`}
         title={collapsed ? label : undefined}
         className={cn(
           "relative flex items-center gap-2.5 h-9 rounded-lg transition-colors mx-2",
@@ -167,7 +180,11 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           <Icon className={cn("w-4 h-4", isActive && "text-accent")} />
           {badge !== null && collapsed && (
             <span
-              aria-label={`${badge} ${shellT.newItems}`}
+              aria-label={
+                item.href === "/collections"
+                  ? dict.app.collections.web.nav.badgeA11y.replace("{n}", String(badge))
+                  : `${badge} ${shellT.newItems}`
+              }
               className="absolute -top-1.5 -end-1.5 min-w-[14px] h-[14px] rounded-full bg-danger text-white text-[9px] font-bold flex items-center justify-center px-0.5"
             >
               {badge > 9 ? "9+" : badge}
@@ -183,7 +200,13 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           {label}
         </span>
         {badge !== null && !collapsed && (
-          <span className="ms-auto min-w-[20px] h-5 rounded-full bg-danger text-white text-[10px] font-bold flex items-center justify-center px-1.5">
+          <span
+            aria-label={
+              item.href === "/collections"
+                ? dict.app.collections.web.nav.badgeA11y.replace("{n}", String(badge))
+                : undefined
+            }
+            className="ms-auto min-w-[20px] h-5 rounded-full bg-danger text-white text-[10px] font-bold flex items-center justify-center px-1.5">
             {badge > 99 ? "99+" : badge}
           </span>
         )}
@@ -203,11 +226,11 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         {collapsed ? <PanelRightOpen className="w-3.5 h-3.5" /> : <PanelRightClose className="w-3.5 h-3.5" />}
       </button>
 
-      {/* Store name header */}
+      {/* Store name header (+ the notification bell, doc 15 spec 12 §4.9) */}
       <div
         className={cn(
           "mb-3 flex",
-          collapsed ? "justify-center px-0" : "px-4",
+          collapsed ? "flex-col items-center gap-2 px-0" : "items-start gap-1 ps-4 pe-2",
         )}
         title={collapsed ? storeName : undefined}
       >
@@ -231,7 +254,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           // 19 treats structural mismatches as recoverable errors even with
           // suppressHydrationWarning, so we sidestep that by keeping every
           // child node stable across renders.
-          <div suppressHydrationWarning>
+          <div suppressHydrationWarning className="min-w-0 flex-1">
             <h2
               dir="auto"
               className="font-display font-extrabold text-text-primary text-lg truncate leading-tight tracking-tight"
@@ -250,6 +273,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             <span className="mt-1.5 block h-[3px] w-8 rounded-full bg-accent" />
           </div>
         )}
+        <ShellNotificationBell place="sidebar" className="shrink-0" />
       </div>
 
       {/* Scrollable middle section — primary + secondary nav. Wrapping both

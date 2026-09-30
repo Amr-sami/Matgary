@@ -390,6 +390,8 @@ describe.skipIf(!hasTestDb)("decisions (05 §4.9–§4.11, acceptance 5–9)", (
       customerPhone: phone,
     });
     expect(out.dto).toMatchObject({ status: "rejected", rejectOutcome: "debt", rejectReason: "not_received" });
+    // The typed phone reaches the collection's own snapshot too (the detail's customer link).
+    expect(out.dto.customerPhone).toBe(phone);
     const after = await lineRows(res.invoiceId);
     expect(after.map((l) => l.payment_method)).toEqual(["deferred", "deferred"]);
     expect(after.map((l) => l.customer_phone)).toEqual([phone, phone]);
@@ -405,6 +407,7 @@ describe.skipIf(!hasTestDb)("decisions (05 §4.9–§4.11, acceptance 5–9)", (
     const reopened = await reopenCollection(tenantId, res.collectionIds[0]!, owner(), {});
     expect(reopened.dto.status).toBe("pending");
     expect(reopened.fromStatus).toBe("rejected");
+    expect(reopened.dto.customerPhone).toBeNull();
     const restored = await lineRows(res.invoiceId);
     expect(restored).toEqual(before);
   });

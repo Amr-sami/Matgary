@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Platform, Pressable, StyleSheet, Switch, Text, View } from "react-native";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { ArrowCounterClockwiseIcon as ArrowCounterClockwise } from "phosphor-react-native/src/icons/ArrowCounterClockwise";
 import { CloudSlashIcon as CloudSlash } from "phosphor-react-native/src/icons/CloudSlash";
@@ -9,7 +9,7 @@ import { PencilSimpleIcon as PencilSimple } from "phosphor-react-native/src/icon
 import { ShoppingCartSimpleIcon as ShoppingCartSimple } from "phosphor-react-native/src/icons/ShoppingCartSimple";
 import { TrashIcon as Trash } from "phosphor-react-native/src/icons/Trash";
 import { WarningCircleIcon as WarningCircle } from "phosphor-react-native/src/icons/WarningCircle";
-import { catalog } from "@matgary/api-client";
+import { catalog, type collections as collectionsApi } from "@matgary/api-client";
 
 import { api } from "@/api/client";
 
@@ -88,6 +88,23 @@ export default function SyncScreen() {
   const productName = useCallback(
     (id: string) => products.data?.find((p) => p.id === id)?.name ?? null,
     [products.data],
+  );
+  // Receiving-account labels for the "Payment: … → …" line (doc 15 spec 08
+  // §4.6), from ANY cached accounts list — the snapshot keeps them offline,
+  // and a row may have been rung at another branch. Same fallback pattern as
+  // productName: unknown → the line shows the method alone.
+  const qc = useQueryClient();
+  const accountLabel = useCallback(
+    (id: string) => {
+      for (const [, data] of qc.getQueriesData<unknown>({ queryKey: ["collection-accounts"] })) {
+        const rows = (data as { data?: unknown } | undefined)?.data;
+        if (!Array.isArray(rows)) continue; // the settings entry shares the root
+        const hit = (rows as collectionsApi.CollectionAccountDTO[]).find((a) => a.id === id);
+        if (hit) return hit.label;
+      }
+      return null;
+    },
+    [qc],
   );
   const [lastResult, setLastResult] = useState<DrainResult | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -300,7 +317,7 @@ export default function SyncScreen() {
               busy={busyId === item.id || off.draining}
               branchName={branchName(item.branchId)}
               otherUser={!!myUserId && !!item.userId && item.userId !== myUserId}
-              productName={productName}
+              productName={productName} accountLabel={accountLabel}
               onRetry={onRetry}
               onEdit={item.kind === SALE_KIND ? onEdit : undefined}
               onSellAnyway={canSellAnyway(item) ? onSellAnyway : undefined}
@@ -321,7 +338,7 @@ export default function SyncScreen() {
               busy={busyId === item.id || off.draining}
               branchName={branchName(item.branchId)}
               otherUser={!!myUserId && !!item.userId && item.userId !== myUserId}
-              productName={productName}
+              productName={productName} accountLabel={accountLabel}
               onRetry={onRetry}
               onDiscard={onDiscard}
             />
@@ -333,7 +350,7 @@ export default function SyncScreen() {
         <>
           <Text style={styles.section}>{t("mobile.sync.section.done")}</Text>
           {done.map((item) => (
-            <OutboxCard key={item.id} item={item} now={now} busy={false} branchName={branchName(item.branchId)} otherUser={false} productName={productName} />
+            <OutboxCard key={item.id} item={item} now={now} busy={false} branchName={branchName(item.branchId)} otherUser={false} productName={productName} accountLabel={accountLabel} />
           ))}
         </>
       ) : null}
@@ -391,6 +408,23 @@ function Stat({ label, value, tone, small, testID }: { label: string; value: str
   );
 }
 
+/**
+ * "Payment: Mobile wallet → Vodafone" — or "Payment: Cash" when no account
+ * rode the body or its label is not cached (spec 08 §4.6, closes code-mobile
+ * §15.3: /sync never said how a queued sale was paid).
+ */
+function paymentLine(
+  method: string,
+  accountIds: string[],
+  accountLabel: (id: string) => string | null,
+): string {
+  const m = t(`app.activityLabels.paymentMethods.${method}`);
+  const labels = accountIds.map(accountLabel).filter((l): l is string => !!l);
+  return labels.length > 0
+    ? t("app.collections.pos.syncLineAccount", { method: m, account: labels.join(" + ") })
+    : t("app.collections.pos.syncLine", { method: m });
+}
+
 function OutboxCard({
   item,
   now,
@@ -398,6 +432,7 @@ function OutboxCard({
   branchName,
   otherUser,
   productName,
+  accountLabel,
   onRetry,
   onEdit,
   onSellAnyway,
@@ -410,6 +445,7 @@ function OutboxCard({
   /** Rung by a different account on this device than the one signed in. */
   otherUser: boolean;
   productName: (id: string) => string | null;
+  accountLabel: (id: string) => string | null;
   onRetry?: (item: OutboxItem) => void;
   onEdit?: (item: OutboxItem) => void;
   /** §6.5 oversell resolution — only passed for INSUFFICIENT_STOCK rows. */
@@ -470,6 +506,11 @@ function OutboxCard({
         </View>
       ) : null}
       {customer ? <Text style={styles.itemDetail}>{t("mobile.sync.customer", { who: customer })}</Text> : null}
+      {isSale && sale.paymentMethod ? (
+        <Text style={styles.itemDetail} testID={`sync-payment-${item.id}`}>
+          {paymentLine(sale.paymentMethod, sale.collectionAccountIds, accountLabel)}
+        </Text>
+      ) : null}
       {branchName ? <Text style={styles.itemDetail}>{t("mobile.sync.branch", { name: branchName })}</Text> : null}
       {otherUser ? <Text style={styles.itemDetail}>{t("mobile.sync.otherCashier")}</Text> : null}
 

@@ -4,16 +4,21 @@
 // branch, business_date) and returns a compact payload the renderer
 // turns into the WhatsApp message. All numerics travel as strings.
 
-import { and, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { withTenant } from "@/lib/db";
 import {
   attendanceEvents,
   branches,
+  collectionAccounts,
   products,
   sales,
   tasks,
   tenants,
 } from "@/lib/db/schema";
+import { collectionsTenantAdmitted, resolveCollectionsFeatures } from "@/lib/collections/flags";
+import { getCollectionsSummary } from "@/lib/repo/collections";
+import { loadAwaitingCollections } from "@/lib/repo/insights";
+import { accountMask } from "@matgary/domain/collections/normalize";
 
 export interface DigestPayload {
   branchId: string;
@@ -27,6 +32,8 @@ export interface DigestPayload {
       cash: string;
       card: string;
       instapay: string;
+      /** Digital collections (doc 15 spec 13 §4.13): the mobile-wallet bucket. */
+      wallet: string;
       deferred: string;
     };
   };
@@ -38,6 +45,86 @@ export interface DigestPayload {
   deferredOverdue: { count: number; totalOutstanding: string };
   attendanceReviewCount: number;
   unreadTaskCount: number;
+  /** The per-account "Transfers" block (13 §4.13); null unless Collections is
+   *  admitted for the tenant AND on for the branch. Rendered only for
+   *  recipients who may see collection totals (D13-7). */
+  collections: DigestCollections | null;
+}
+
+/** 13 §4.13 — the digital "Z" of one branch-day, from 05's summary, so the
+ *  numbers equal the inbox Totals tab (02 US-M1-17). Amounts are strings. */
+export interface DigestCollections {
+  accounts: Array<{
+    /** null = the "no account" row. */
+    label: string | null;
+    mask: string | null;
+    /** confirmed + autoConfirmed */
+    confirmed: { count: number; amount: string };
+    pending: { count: number; amount: string };
+    /** rejectedDebt + rejectedLoss */
+    rejected: { count: number; amount: string };
+    /** {0,"0"} until 07 fills the summary. */
+    unmatchedCredits: { count: number; amount: string };
+  }>;
+  cashRemainder: string;
+  /** Every still-pending item of the branch, any day. */
+  pendingAll: { count: number; amount: string };
+}
+
+/** Piaster-exact sum of two EGP numbers, as a string. */
+function addEgp(a: number, b: number): string {
+  return String((Math.round(a * 100) + Math.round(b * 100)) / 100);
+}
+
+/** 13 §4.13: the collections block of one (tenant, branch, business_date). */
+export async function computeDigestCollections(
+  tenantId: string,
+  branchId: string,
+  businessDate: string,
+): Promise<DigestCollections | null> {
+  if (!collectionsTenantAdmitted(tenantId)) return null;
+  if (!(await resolveCollectionsFeatures(tenantId, branchId)).collections) return null;
+
+  const summary = await getCollectionsSummary(tenantId, { date: businessDate, branchId });
+  const ids = summary.accounts.map((a) => a.accountId).filter((x): x is string => !!x);
+  const accRows = ids.length
+    ? await withTenant(tenantId, (tx) =>
+        tx
+          .select({
+            id: collectionAccounts.id,
+            accountLast4: collectionAccounts.accountLast4,
+            walletMsisdn: collectionAccounts.walletMsisdn,
+            ipaHandle: collectionAccounts.ipaHandle,
+            isPrepaidCard: collectionAccounts.isPrepaidCard,
+          })
+          .from(collectionAccounts)
+          .where(and(eq(collectionAccounts.tenantId, tenantId), inArray(collectionAccounts.id, ids))),
+      )
+    : [];
+  const maskById = new Map(accRows.map((a) => [a.id, accountMask(a)] as const));
+
+  const accounts: DigestCollections["accounts"] = [];
+  for (const a of summary.accounts) {
+    const confirmed = { count: a.confirmed.count + a.autoConfirmed.count, amount: addEgp(a.confirmed.amount, a.autoConfirmed.amount) };
+    const pending = { count: a.pending.count, amount: String(a.pending.amount) };
+    const rejected = { count: a.rejectedDebt.count + a.rejectedLoss.count, amount: addEgp(a.rejectedDebt.amount, a.rejectedLoss.amount) };
+    const unmatchedCredits = { count: a.unmatchedCredits.count, amount: String(a.unmatchedCredits.amount) };
+    if (confirmed.count + pending.count + rejected.count + unmatchedCredits.count === 0) continue;
+    accounts.push({
+      label: a.label,
+      mask: a.accountId ? maskById.get(a.accountId) ?? null : null,
+      confirmed,
+      pending,
+      rejected,
+      unmatchedCredits,
+    });
+  }
+  const awaiting = await loadAwaitingCollections(tenantId, branchId);
+  return {
+    accounts,
+    cashRemainder: String(summary.totals.cashRemainder),
+    pendingAll: { count: awaiting.count, amount: String(awaiting.amount) },
+  };
 }
 
 /** Compute the digest payload for one (tenant, branch, business_date). */
@@ -46,6 +133,16 @@ export async function computeDigest(
   branchId: string,
   businessDate: string,
 ): Promise<DigestPayload> {
+  const base = await computeDigestBase(tenantId, branchId, businessDate);
+  const collections = await computeDigestCollections(tenantId, branchId, businessDate);
+  return { ...base, collections };
+}
+
+async function computeDigestBase(
+  tenantId: string,
+  branchId: string,
+  businessDate: string,
+): Promise<Omit<DigestPayload, "collections">> {
   return withTenant(tenantId, async (tx) => {
     // Pull tenant timezone for the day-boundary math.
     const [tenant] = await tx
@@ -100,6 +197,7 @@ export async function computeDigest(
         cash: sql<string>`coalesce(sum(${sales.totalPrice}::numeric) filter (where ${sales.paymentMethod} = 'cash'), 0)::text`,
         card: sql<string>`coalesce(sum(${sales.totalPrice}::numeric) filter (where ${sales.paymentMethod} = 'card'), 0)::text`,
         instapay: sql<string>`coalesce(sum(${sales.totalPrice}::numeric) filter (where ${sales.paymentMethod} = 'instapay'), 0)::text`,
+        wallet: sql<string>`coalesce(sum(${sales.totalPrice}::numeric) filter (where ${sales.paymentMethod} = 'wallet'), 0)::text`,
         deferred: sql<string>`coalesce(sum(${sales.totalPrice}::numeric) filter (where ${sales.paymentMethod} = 'deferred'), 0)::text`,
       })
       .from(sales)
@@ -230,6 +328,7 @@ export async function computeDigest(
           cash: salesAgg.cash,
           card: salesAgg.card,
           instapay: salesAgg.instapay,
+          wallet: salesAgg.wallet,
           deferred: salesAgg.deferred,
         },
       },
@@ -252,6 +351,9 @@ export function isDigestEmpty(p: DigestPayload): boolean {
     p.lowStock.totalCount === 0 &&
     p.deferredOverdue.count === 0 &&
     p.attendanceReviewCount === 0 &&
-    p.unreadTaskCount === 0
+    p.unreadTaskCount === 0 &&
+    // 13 §4.13: a pending transfer (any day) or a transfer row today is news.
+    !((p.collections?.pendingAll.count ?? 0) > 0) &&
+    !((p.collections?.accounts.length ?? 0) > 0)
   );
 }

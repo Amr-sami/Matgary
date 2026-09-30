@@ -16,6 +16,8 @@ import {
 } from "@/lib/icons";
 import { useNotifications, type NotificationKind } from "@/hooks/useNotifications";
 import { cn } from "@/lib/utils";
+import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
+import { formatRelative } from "@/lib/i18n/format";
 
 const KIND_ICON: Record<NotificationKind, typeof Bell> = {
   low_stock: Package,
@@ -55,16 +57,11 @@ interface Props {
   variant?: "default" | "compact";
 }
 
-function formatRelative(date: Date): string {
-  const diffSec = Math.max(0, (Date.now() - date.getTime()) / 1000);
-  if (diffSec < 60) return "الآن";
-  if (diffSec < 3600) return `منذ ${Math.floor(diffSec / 60)} دقيقة`;
-  if (diffSec < 86400) return `منذ ${Math.floor(diffSec / 3600)} ساعة`;
-  if (diffSec < 86400 * 7) return `منذ ${Math.floor(diffSec / 86400)} يوم`;
-  return date.toLocaleDateString("ar-EG");
-}
-
 export function NotificationBell({ variant = "default" }: Props) {
+  // Texts follow the user's language (doc 15 spec 12 §4.9); the kind maps
+  // above are spec 13's.
+  const t = useDictionary().app.shell.notifications;
+  const locale = useLocale();
   const { items, unread, markRead, markAllRead } = useNotifications();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -85,7 +82,8 @@ export function NotificationBell({ variant = "default" }: Props) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        aria-label="الإشعارات"
+        aria-label={t.title}
+        data-testid="notification-bell"
         className={cn(
           "relative inline-flex items-center justify-center rounded-lg transition-colors",
           variant === "compact"
@@ -98,7 +96,7 @@ export function NotificationBell({ variant = "default" }: Props) {
         {unread > 0 && (
           <span
             className="absolute -top-1 -end-1 min-w-[18px] h-[18px] rounded-full bg-danger text-white text-[10px] font-bold flex items-center justify-center px-1"
-            aria-label={`${unread} إشعار جديد`}
+            aria-label={t.unreadCount.replace("{count}", String(unread))}
           >
             {unread > 99 ? "99+" : unread}
           </span>
@@ -111,14 +109,14 @@ export function NotificationBell({ variant = "default" }: Props) {
           className="absolute end-0 top-full mt-2 w-[320px] sm:w-[360px] bg-white rounded-xl border border-border shadow-lg z-50 overflow-hidden"
         >
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-            <h3 className="font-semibold text-text-primary">الإشعارات</h3>
+            <h3 className="font-semibold text-text-primary">{t.title}</h3>
             {unread > 0 && (
               <button
                 type="button"
                 onClick={markAllRead}
                 className="text-xs text-accent hover:underline"
               >
-                تأشير الكل كمقروء
+                {t.markAllRead}
               </button>
             )}
           </div>
@@ -127,7 +125,7 @@ export function NotificationBell({ variant = "default" }: Props) {
             {items.length === 0 ? (
               <div className="px-4 py-10 text-center">
                 <Bell className="w-8 h-8 text-text-secondary mx-auto mb-2" />
-                <p className="text-sm text-text-secondary">لا توجد إشعارات</p>
+                <p className="text-sm text-text-secondary">{t.empty}</p>
               </div>
             ) : (
               items.map((n) => {
@@ -177,7 +175,7 @@ export function NotificationBell({ variant = "default" }: Props) {
                         </p>
                       )}
                       <p className="text-[10px] text-text-secondary mt-1">
-                        {formatRelative(n.createdAt)}
+                        {formatRelative(n.createdAt, locale)}
                       </p>
                     </div>
                   </Wrapper>

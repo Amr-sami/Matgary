@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -17,9 +17,28 @@ import { ReceiptIcon as Receipt } from "phosphor-react-native/src/icons/Receipt"
 import { ShoppingCartIcon as ShoppingCart } from "phosphor-react-native/src/icons/ShoppingCart";
 import { StarIcon as Star } from "phosphor-react-native/src/icons/Star";
 import { WalletIcon as Wallet } from "phosphor-react-native/src/icons/Wallet";
-import { ApiError, catalog } from "@matgary/api-client";
+import { ApiError, catalog, type collections as collectionsApi } from "@matgary/api-client";
 
 import { api } from "@/api/client";
+import {
+  accountsForMethod,
+  cleanLast4Input,
+  collectionOptionsFromCart,
+  defaultAccountFor,
+  isDigitalMethod,
+  validateTransfer,
+} from "@/collections/checkout";
+import {
+  invalidateCollections,
+  newIdempotencyKey,
+  useCollectionAccess,
+  useCollectionAccounts,
+  useCollectionSettings,
+  useCollectionsFeatures,
+  type AccountsState,
+} from "@/collections/queries";
+import { AccountPicker } from "@/components/collections/AccountPicker";
+import { CollectionBadge } from "@/components/collections/CollectionBadge";
 import { Screen } from "@/components/layout/Screen";
 import { ChevronBack } from "@/components/ui/Chevron";
 import { Badge } from "@/components/ui/Badge";
@@ -56,11 +75,18 @@ type Method = catalog.SettlementMethod;
 const METHOD_LABELS = (): Record<string, string> => ({
   cash: t("app.activityLabels.paymentMethods.cash"),
   instapay: t("app.activityLabels.paymentMethods.instapay"),
+  wallet: t("app.activityLabels.paymentMethods.wallet"),
   card: t("app.activityLabels.paymentMethods.card"),
 });
 
-const METHODS = (): { key: Method; label: string }[] =>
-  (["cash", "instapay", "card"] as const).map((key) => ({ key, label: METHOD_LABELS()[key] ?? key }));
+/** `wallet` only while digital collections are on for the branch (doc 15 spec 08 §4.10). */
+const METHODS = (collectionsOn: boolean): { key: Method; label: string; testID: string }[] =>
+  (collectionsOn ? (["cash", "instapay", "wallet", "card"] as const) : (["cash", "instapay", "card"] as const)).map(
+    (key) => ({ key, label: METHOD_LABELS()[key] ?? key, testID: `settle-method-${key}` }),
+  );
+
+/** What the settle sheet adds for a digital payment (settle body additions, 03 §B.17). */
+type SettleExtras = Pick<catalog.SettleCustomerInput, "collectionAccountId" | "payerPhoneLast4" | "payerReference">;
 
 /** Arabic counts 1 / 2 / 3–10 / 11+ differently; the dictionary carries One/Two/Few beside the default. */
 function countForm(n: number): string {
@@ -94,6 +120,12 @@ export default function CustomerDetailScreen() {
   const isOwner = useSession((s) => s.me?.isOwner ?? false);
   const permissions = useSession((s) => s.me?.permissions);
   const canModifySales = isOwner || Boolean(permissions?.includes("modify_sales"));
+  // Digital collections (doc 15 spec 08 §4.10): settle by InstaPay / wallet
+  // books a pending `settlement` collection the owner confirms.
+  const collectionsOn = useCollectionsFeatures().collections;
+  const collectionAccess = useCollectionAccess();
+  const accountsQ = useCollectionAccounts();
+  const settingsQ = useCollectionSettings();
 
   const ledgerQ = useQuery({
     queryKey: ["customer-ledger", phone],
@@ -156,17 +188,31 @@ export default function CustomerDetailScreen() {
   const [settleTarget, setSettleTarget] = useState<LedgerInvoice | null>(null);
 
   const settle = useMutation({
-    mutationFn: (input: { invoice: LedgerInvoice; amount: number; method: Method }) =>
-      catalog.settleCustomer(api, {
-        customerPhone: phone,
-        amount: input.amount,
-        method: input.method,
-        invoiceIds: [input.invoice.invoiceId],
-      }),
-    onSuccess: async (result) => {
+    mutationFn: (input: { invoice: LedgerInvoice; amount: number; method: Method; extras: SettleExtras; key: string }) =>
+      catalog.settleCustomer(
+        api,
+        {
+          customerPhone: phone,
+          amount: input.amount,
+          method: input.method,
+          invoiceIds: [input.invoice.invoiceId],
+          ...input.extras,
+        },
+        // Minted when the sheet opened (code-mobile §15.6): a lost response
+        // or a double tap replays instead of settling twice.
+        input.key,
+      ),
+    onSuccess: async (result, input) => {
       setSettleTarget(null);
-      setNotice({ kind: "success", text: t("mobile.customers.settleDone", { amount: money(result.appliedAmount) }) });
+      setNotice({
+        kind: "success",
+        text:
+          collectionsOn && isDigitalMethod(input.method)
+            ? t("app.collections.pos.settlePending", { amount: money(result.appliedAmount) })
+            : t("mobile.customers.settleDone", { amount: money(result.appliedAmount) }),
+      });
       await invalidateAll();
+      if (result.collectionId) await invalidateCollections(qc);
     },
   });
 
@@ -489,33 +535,59 @@ export default function CustomerDetailScreen() {
                     {events.length > 0 ? (
                       <View style={styles.timeline}>
                         <Text style={styles.timelineTitle}>{t("mobile.customers.paymentLog")}</Text>
-                        {events.map((p) => (
-                          <View key={p.id} style={styles.eventRow}>
-                            <View style={styles.eventMain}>
-                              <Text style={styles.eventDate}>
-                                {shortDate(p.recordedAt)}
-                              </Text>
-                              <Badge
-                                label={METHOD_LABELS()[p.method] ?? t("mobile.customers.previousPayment")}
-                                variant={
-                                  p.method === "cash"
-                                    ? "success"
-                                    : p.method === "initial"
-                                      ? "neutral"
-                                      : "accent"
-                                }
-                              />
-                              {p.recordedByName ? (
-                                <Text numberOfLines={1} style={styles.eventBy}>
-                                  {p.recordedByName}
+                        {events.map((p) => {
+                          // A rejected transfer voids its payment: struck
+                          // through, excluded from every sum (03 §F).
+                          const voided = Boolean(p.voidedAt);
+                          const openable = Boolean(p.collectionId) && collectionAccess.canView;
+                          const body = (
+                            <>
+                              <View style={styles.eventMain}>
+                                <Text style={[styles.eventDate, voided && styles.eventVoided]}>
+                                  {shortDate(p.recordedAt)}
                                 </Text>
-                              ) : null}
+                                <Badge
+                                  label={METHOD_LABELS()[p.method] ?? t("mobile.customers.previousPayment")}
+                                  variant={
+                                    p.method === "cash"
+                                      ? "success"
+                                      : p.method === "initial"
+                                        ? "neutral"
+                                        : "accent"
+                                  }
+                                />
+                                {voided ? (
+                                  <CollectionBadge status="rejected" />
+                                ) : p.collectionStatus === "pending" ? (
+                                  <CollectionBadge status="pending" />
+                                ) : null}
+                                {p.recordedByName ? (
+                                  <Text numberOfLines={1} style={styles.eventBy}>
+                                    {p.recordedByName}
+                                  </Text>
+                                ) : null}
+                              </View>
+                              <Text numberOfLines={1} style={[styles.eventAmount, voided && styles.eventVoided]}>
+                                {money(p.amount)}
+                              </Text>
+                            </>
+                          );
+                          return openable ? (
+                            <Pressable
+                              key={p.id}
+                              style={styles.eventRow}
+                              accessibilityRole="button"
+                              onPress={() => router.push(`/collections/${encodeURIComponent(p.collectionId!)}`)}
+                              testID={`customer-payment-${p.id}`}
+                            >
+                              {body}
+                            </Pressable>
+                          ) : (
+                            <View key={p.id} style={styles.eventRow} testID={`customer-payment-${p.id}`}>
+                              {body}
                             </View>
-                            <Text numberOfLines={1} style={styles.eventAmount}>
-                              {money(p.amount)}
-                            </Text>
-                          </View>
-                        ))}
+                          );
+                        })}
                       </View>
                     ) : null}
 
@@ -536,14 +608,19 @@ export default function CustomerDetailScreen() {
         invoice={settleTarget}
         busy={settle.isPending}
         error={settle.isError ? settleErrorMessage(settle.error) : null}
+        collectionsOn={collectionsOn}
+        accounts={accountsQ.accounts}
+        accountsState={accountsQ.state}
+        branchId={accountsQ.branchId}
+        requireAccount={settingsQ.data?.collectionsRequireAccount ?? true}
         onClose={() => {
           if (settle.isPending) return;
           settle.reset();
           setSettleTarget(null);
         }}
-        onSubmit={(amount, method) => {
+        onSubmit={(amount, method, extras, key) => {
           if (!settleTarget) return;
-          settle.mutate({ invoice: settleTarget, amount, method });
+          settle.mutate({ invoice: settleTarget, amount, method, extras, key });
         }}
       />
     </Screen>
@@ -560,24 +637,45 @@ function SettleSheet({
   invoice,
   busy,
   error,
+  collectionsOn,
+  accounts,
+  accountsState,
+  branchId,
+  requireAccount,
   onClose,
   onSubmit,
 }: {
   invoice: LedgerInvoice | null;
   busy: boolean;
   error: string | null;
+  collectionsOn: boolean;
+  accounts: readonly collectionsApi.CollectionAccountDTO[] | null;
+  accountsState: AccountsState;
+  branchId: string | null;
+  requireAccount: boolean;
   onClose: () => void;
-  onSubmit: (amount: number, method: Method) => void;
+  onSubmit: (amount: number, method: Method, extras: SettleExtras, idempotencyKey: string) => void;
 }) {
   const [amountInput, setAmountInput] = useState("");
   const [method, setMethod] = useState<Method>("cash");
+  const [accountId, setAccountId] = useState<string | null>(null);
+  const [payerLast4, setPayerLast4] = useState("");
+  const [payerRef, setPayerRef] = useState("");
+  // Idempotency-Key minted when the sheet opens (per invoice). An identical
+  // retry reuses it (replay, never a second payment); a CHANGED body gets a
+  // fresh one — the route answers 409 IDEMPOTENCY_MISMATCH otherwise.
+  const keyRef = useRef<{ sig: string | null; key: string } | null>(null);
 
   // Reset per invoice, not per render: reopening for a different invoice must
-  // not carry the previous amount over.
+  // not carry the previous amount — or method, account, payer — over.
   useEffect(() => {
     if (invoice) {
       setAmountInput(String(invoice.balance));
       setMethod("cash");
+      setAccountId(null);
+      setPayerLast4("");
+      setPayerRef("");
+      keyRef.current = { sig: null, key: newIdempotencyKey() };
     }
   }, [invoice]);
 
@@ -585,6 +683,36 @@ function SettleSheet({
   const typed = Number(amountInput.replace(/[^\d.]/g, "")) || 0;
   const amount = Math.max(0, Math.min(typed, balance));
   const wouldOverpay = typed > balance;
+
+  const digital = collectionsOn && isDigitalMethod(method);
+  const listed = digital ? accountsForMethod(method, accounts, branchId) : [];
+  const fields = {
+    paymentMethod: method,
+    collectionAccountId: accountId,
+    payerPhoneLast4: payerLast4,
+    payerReference: payerRef,
+    collectionParts: [],
+  };
+  const validation = validateTransfer(fields, {
+    total: amount,
+    collectionsOn,
+    requireAccount,
+    accounts: accountsState === "unknown" ? null : listed,
+  });
+  const extras: SettleExtras = collectionOptionsFromCart(fields, amount, collectionsOn);
+  const pickMethod = (m: Method) => {
+    setMethod(m);
+    setAccountId(collectionsOn && isDigitalMethod(m) ? defaultAccountFor(m, accounts, branchId) : null);
+    setPayerLast4("");
+    setPayerRef("");
+  };
+  const submit = () => {
+    const sig = JSON.stringify([amount, method, extras]);
+    if (!keyRef.current) keyRef.current = { sig: null, key: newIdempotencyKey() };
+    if (keyRef.current.sig !== null && keyRef.current.sig !== sig) keyRef.current = { sig, key: newIdempotencyKey() };
+    keyRef.current.sig = sig;
+    onSubmit(amount, method, extras, keyRef.current.key);
+  };
 
   return (
     <Sheet
@@ -595,9 +723,9 @@ function SettleSheet({
       bodyStyle={styles.sheetBody}
       primaryAction={{
         label: `${t("app.customers.settle.submit")} · ${money(amount)}`,
-        onPress: () => onSubmit(amount, method),
+        onPress: submit,
         loading: busy,
-        disabled: amount <= 0,
+        disabled: amount <= 0 || !validation.ok,
         testID: "settle-submit",
       }}
       secondaryAction={{ label: t("app.common.cancel"), onPress: onClose, disabled: busy }}
@@ -628,7 +756,58 @@ function SettleSheet({
       ) : null}
 
       <Text style={styles.fieldLabel}>{t("app.customers.settle.methodLabel")}</Text>
-      <Segmented items={METHODS()} value={method} onChange={setMethod} />
+      <Segmented items={METHODS(collectionsOn)} value={method} onChange={pickMethod} />
+
+      {digital ? (
+        <View style={styles.transfer} testID="settle-transfer" collapsable={false}>
+          {listed.length > 0 ? (
+            <>
+              <Text style={styles.fieldLabel}>{t("app.collections.pos.pickAccount")}</Text>
+              <AccountPicker
+                accounts={listed}
+                value={accountId}
+                onChange={setAccountId}
+                testIDPrefix="settle-collection-account-"
+              />
+              {validation.errors.includes("account_required") ? (
+                <Text style={styles.errorText}>{t("app.collections.pos.accountRequired")}</Text>
+              ) : null}
+            </>
+          ) : (
+            <Text style={styles.hint}>
+              {accountsState === "unknown" ? t("app.collections.pos.accountsUnknown") : t("app.collections.pos.noAccounts")}
+            </Text>
+          )}
+          <Field
+            label={t("app.collections.pos.payerLast4Label")}
+            value={payerLast4}
+            onChangeText={(v) => setPayerLast4(cleanLast4Input(v))}
+            keyboardType="number-pad"
+            maxLength={4}
+            ltr
+            editable={!busy}
+            testID="settle-payer"
+          />
+          {validation.errors.includes("payer_last4_invalid") ? (
+            <Text style={styles.errorText}>{t("app.collections.pos.payerLast4Invalid")}</Text>
+          ) : null}
+          <Field
+            label={t("app.collections.pos.referenceLabel")}
+            value={payerRef}
+            onChangeText={setPayerRef}
+            autoCapitalize="none"
+            autoCorrect={false}
+            maxLength={16}
+            ltr
+            editable={!busy}
+            testID="settle-ref"
+          />
+          {validation.errors.includes("reference_invalid") ? (
+            <Text style={styles.errorText}>{t("app.collections.pos.referenceInvalid")}</Text>
+          ) : null}
+          <Text style={styles.warnText}>{t("app.collections.pos.noScreenshot")}</Text>
+        </View>
+      ) : null}
 
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </Sheet>
@@ -819,4 +998,7 @@ const styles = StyleSheet.create({
   fieldLabel: { fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },
   hint: { fontFamily: fonts.regular, fontSize: 12, color: colors.warningStrong, ...RTL_TEXT },
   errorText: { fontFamily: fonts.medium, fontSize: 13, color: colors.danger, ...RTL_TEXT },
+  transfer: { gap: spacing.sm },
+  warnText: { fontFamily: fonts.medium, fontSize: 13, color: colors.warningStrong, ...RTL_TEXT },
+  eventVoided: { textDecorationLine: "line-through", color: colors.textSecondary },
 });

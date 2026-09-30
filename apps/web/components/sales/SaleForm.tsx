@@ -27,6 +27,20 @@ import { Printer, Percent, DollarSign, Calendar, Plus, Trash2, ShoppingCart } fr
 import { CustomerAutocomplete, type CustomerSuggestion } from "./CustomerAutocomplete";
 import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
 import { formatCurrency } from "@/lib/i18n/format";
+import { useQueryClient } from "@tanstack/react-query";
+import { useOffline } from "@/hooks/useOffline";
+import { invalidateAfterDecision, useCollectionsAccess } from "@/hooks/useCollections";
+import { useCollectionAccounts } from "@/hooks/useCollectionAccounts";
+import { TransferPanel } from "@/components/collections/TransferPanel";
+import { CollectionPill } from "@/components/collections/CollectionPill";
+import {
+  accountsForMethod,
+  collectionOptionsFromDraft,
+  isDigital,
+  methodsFor,
+  validateTransfer,
+} from "@/components/collections/rules";
+import { receiptPaymentInfo, type ReceiptPayment } from "@/lib/receipt-strings";
 
 export interface ReceiptSaleData {
   saleId?: string;
@@ -40,6 +54,10 @@ export interface ReceiptSaleData {
   discountAmount: number;
   totalPrice: number;
   saleDate: Date;
+  /** Doc 15 spec 12 §4.3 / 13 §4.15: the method row (instapay / wallet /
+   *  card) with the receiving account's mask — never a confirmation status.
+   *  Reprints from the sales list carry the method only. */
+  payment?: ReceiptPayment;
 }
 
 export interface ReceiptInvoiceData {
@@ -70,6 +88,9 @@ export interface ReceiptInvoiceData {
   loyaltyPointsEarned?: number;
   loyaltyPointsBalance?: number;
   loyaltyCreditBalance?: number;
+  /** Doc 15 spec 12 §4.3 / 13 §4.15: method + receiving-account masks
+   *  (13's `receiptPaymentInfo`); spec 13's renderers print it. */
+  payment?: ReceiptPayment;
 }
 
 interface CartLineState {
@@ -195,9 +216,46 @@ export function SaleForm({
     setRedeemPointsInput,
     applyCreditInput,
     setApplyCreditInput,
+    transfer,
+    setTransfer,
+    resetPayment,
   } = useCustomerPayment({ loyaltyEnabled: !!settings.loyaltyEnabled });
 
   const [loading, setLoading] = useState(false);
+
+  // Digital collections (doc 15 spec 12 §4.3). With the feature off (or an
+  // unknown / old server) the grid is exactly today's four chips.
+  const queryClient = useQueryClient();
+  // Drain the offline outbox from the POS itself: its only other caller,
+  // OfflineIndicator, lives in components/layout/Header.tsx, which AppShell
+  // does not render — so a queued (e.g. digital) sale never synced on the
+  // web (doc 15 spec 12 §4.4, acceptance 4). Row claims are atomic, so a
+  // second drainer elsewhere stays safe.
+  useOffline();
+  const collections = useCollectionsAccess();
+  const collectionsOn = collections.features.collections;
+  const {
+    accounts: collectionAccounts,
+    branchId: accountsBranchId,
+    state: accountsState,
+  } = useCollectionAccounts({ enabled: collectionsOn });
+  const digitalSelected = collectionsOn && isDigital(paymentMethod);
+  const listedAccounts = digitalSelected
+    ? accountsForMethod(collectionAccounts, paymentMethod, accountsBranchId ?? branchId)
+    : [];
+  /** The result line under the submit button: "awaiting confirmation". */
+  const [lastCollectionStatus, setLastCollectionStatus] = useState<"pending" | null>(null);
+  // The feature flipped off while `wallet` was picked → back to cash.
+  useEffect(() => {
+    if (!collectionsOn && paymentMethod === "wallet") setPaymentMethod("cash");
+  }, [collectionsOn, paymentMethod, setPaymentMethod]);
+  // Cleared as soon as the next sale starts (a line lands in the cart);
+  // adjusted during render, React's "reset state on prop change" pattern.
+  const [prevCartLength, setPrevCartLength] = useState(cart.length);
+  if (cart.length !== prevCartLength) {
+    setPrevCartLength(cart.length);
+    if (cart.length > 0 && lastCollectionStatus) setLastCollectionStatus(null);
+  }
 
   // Last invoice for receipt
   const [lastInvoice, setLastInvoice] = useState<ReceiptInvoiceData | null>(null);
@@ -312,6 +370,16 @@ export function SaleForm({
 
   const cartTotal = Math.max(0, cartAfterOrderDiscount - loyaltyDiscountAmount);
 
+  const transferCheck = validateTransfer({
+    method: digitalSelected ? paymentMethod : "cash",
+    draft: transfer,
+    total: cartTotal,
+    listed: listedAccounts,
+    accountsKnown: accountsState !== "unknown",
+    // 08 §4.4: default true when the branch setting is unknown.
+    requireAccount: collections.config?.requireAccount ?? true,
+  });
+
   const handleSubmit = async () => {
     // Auto-add the current in-progress line to the cart if any
     let lines: CartLineState[] = cart;
@@ -367,6 +435,9 @@ export function SaleForm({
           customerName: customerName.trim() || undefined,
           customerPhone: customerPhone.trim() || undefined,
           paymentMethod,
+          // Digital collections: account / payer hints / split parts. The
+          // same object feeds the live POST and the outbox (one key).
+          ...collectionOptionsFromDraft(paymentMethod, transfer, collectionsOn),
           // Loyalty redemption — server validates against current wallet
           // and refuses if balance is short or programme is disabled.
           redeemPoints: Math.max(0, Math.floor(Number(redeemPointsInput) || 0)),
@@ -464,6 +535,15 @@ export function SaleForm({
         loyaltyPointsEarned: pointsEarned || undefined,
         loyaltyPointsBalance: customerPhone.trim() ? finalPoints : undefined,
         loyaltyCreditBalance: customerPhone.trim() ? finalCredit : undefined,
+        // The receiving account(s) of a digital sale, as masks.
+        payment: receiptPaymentInfo(
+          paymentMethod,
+          digitalSelected
+            ? (transfer.parts.length > 0 ? transfer.parts.map((p) => p.accountId) : [transfer.accountId])
+                .map((id) => collectionAccounts.find((a) => a.id === id))
+                .filter((a): a is (typeof collectionAccounts)[number] => !!a)
+            : [],
+        ),
       };
       setLastInvoice(invoiceForReceipt);
 
@@ -735,8 +815,12 @@ export function SaleForm({
       setCustomDate(new Date().toISOString().slice(0, 10));
       setCustomerName("");
       setCustomerPhone("");
-      setPaymentMethod("cash");
-      setAmountPaidNowInput("");
+      setLastCollectionStatus(
+        result.synced ? result.collectionStatus : digitalSelected ? "pending" : null,
+      );
+      // A new pending transfer: refresh the inbox, the nav count and totals.
+      if (result.synced && result.collectionStatus) void invalidateAfterDecision(queryClient);
+      resetPayment();
       onSuccess();
     } catch (error: any) {
       alert(error.message);
@@ -1096,13 +1180,19 @@ export function SaleForm({
               <label className="block text-sm font-medium text-text-secondary mb-1.5">
                 {t.payment.label}
               </label>
-              <div className="grid grid-cols-4 gap-1 rounded-lg overflow-hidden border border-border">
-                {(["cash", "instapay", "card", "deferred"] as PaymentMethod[]).map((m) => (
+              <div
+                className={`grid ${
+                  collectionsOn ? "grid-cols-3 sm:grid-cols-5" : "grid-cols-4"
+                } gap-1 rounded-lg overflow-hidden border border-border`}
+              >
+                {methodsFor(collectionsOn).map((m: PaymentMethod) => (
                   <button
                     key={m}
                     type="button"
+                    data-testid={`pos-pay-${m}`}
+                    aria-pressed={paymentMethod === m}
                     onClick={() => setPaymentMethod(m)}
-                    className={`py-2 text-xs font-medium ${
+                    className={`py-2 ${collectionsOn ? "min-h-11" : ""} text-xs font-medium ${
                       paymentMethod === m
                         ? m === "deferred"
                           ? "bg-orange-500 text-white"
@@ -1114,6 +1204,26 @@ export function SaleForm({
                   </button>
                 ))}
               </div>
+              {digitalSelected && (
+                <>
+                  <p className="mt-2 text-xs text-text-secondary leading-relaxed">
+                    {t.payment.transferNote}
+                  </p>
+                  <TransferPanel
+                    method={paymentMethod as "instapay" | "wallet"}
+                    total={cartTotal}
+                    accounts={listedAccounts}
+                    accountsState={accountsState}
+                    canManageAccounts={collections.canManage}
+                    value={transfer}
+                    onChange={setTransfer}
+                    customerPhone={customerPhone}
+                    shopName={settings.shopName}
+                    errors={transferCheck.errors}
+                    warnings={transferCheck.warnings}
+                  />
+                </>
+              )}
               {paymentMethod === "deferred" && (
                 <div className="mt-2 rounded-lg border border-orange-200 bg-orange-50/60 p-3 space-y-2">
                   <p className="text-xs text-orange-700 leading-relaxed">
@@ -1201,15 +1311,34 @@ export function SaleForm({
 
             <Button
               onClick={handleSubmit}
-              disabled={loading || (cart.length === 0 && !canAddCurrentLine)}
+              disabled={
+                loading ||
+                (cart.length === 0 && !canAddCurrentLine) ||
+                transferCheck.errors.length > 0
+              }
               loading={loading}
               className="w-full"
             >
               {t.submit}
             </Button>
+
           </>
         )}
       </div>
+
+      {/* Digital collections: the last sale awaits confirmation (shown after
+          the form resets, so outside the line-builder block). */}
+      {lastCollectionStatus && (
+        <div
+          data-testid="pos-collection-badge"
+          className="mt-4 flex items-start gap-2 rounded-lg border border-orange-200 bg-orange-50/60 p-2.5"
+        >
+          <CollectionPill status={lastCollectionStatus} />
+          <p className="text-[11px] text-text-secondary leading-relaxed">
+            {dict.app.collections.pos.resultHint}
+          </p>
+        </div>
+      )}
 
       {/* Print last invoice */}
       {lastInvoice && (

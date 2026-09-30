@@ -6,6 +6,7 @@ import { db, withTenant } from "@/lib/db";
 import { branches, tenants } from "@/lib/db/schema";
 import { computeDigest } from "@/lib/repo/digest";
 import { renderDigestMessage } from "@/lib/digest/render";
+import { can } from "@/lib/permissions";
 
 // Returns today's digest as it would be sent right now. Used by the
 // "Preview" button on /settings/digest and by the native client. Read-only;
@@ -71,11 +72,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "tz resolution failed" }, { status: 500 });
   }
 
-  const payload = await computeDigest(r.ctx.tenantId, branchId, today);
+  const computed = await computeDigest(r.ctx.tenantId, branchId, today);
+  // Doc 15 spec 13 §4.13 / D13-7: collection totals only for the owner or a
+  // view_collections holder — in the text AND in the returned payload.
+  const includeCollections = r.ctx.role === "owner" || can(r.ctx, "view_collections");
+  const payload = includeCollections ? computed : { ...computed, collections: null };
   const dashboardBase = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const message = renderDigestMessage(payload, {
     locale,
     dashboardUrl: `${dashboardBase}/?branch=${branchId}`,
+    includeCollections,
   });
   return NextResponse.json({ payload, message, branchId });
 }

@@ -319,6 +319,10 @@ export interface Invoice {
   fullyReturned: boolean;
   /** Deferred and not settled. */
   outstanding: number;
+  /** Digital-collection status of the invoice: the first non-null line value
+   *  (the server writes `sales.collection_status` on every line in one
+   *  transaction, 03 §B.2.4); null = not a digital sale or an older server. */
+  collectionStatus: "pending" | "confirmed" | "rejected" | null;
 }
 
 /**
@@ -349,6 +353,7 @@ export function groupInvoices(rows: SaleRecord[]): Invoice[] {
         hasReturn: false,
         fullyReturned: true,
         outstanding: 0,
+        collectionStatus: null,
       };
       byKey.set(key, inv);
       order.push(inv);
@@ -367,6 +372,7 @@ export function groupInvoices(rows: SaleRecord[]): Invoice[] {
     if (!inv.customerPhone && r.customerPhone) inv.customerPhone = r.customerPhone;
     if (!inv.note && r.note) inv.note = r.note;
     if (!inv.paymentMethod && r.paymentMethod) inv.paymentMethod = r.paymentMethod;
+    if (!inv.collectionStatus && r.collectionStatus) inv.collectionStatus = r.collectionStatus;
   }
   for (const inv of order) {
     if (inv.lines.length === 0) inv.fullyReturned = false;

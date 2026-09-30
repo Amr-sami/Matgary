@@ -7,6 +7,7 @@
 //    80mm) blitted with GS v 0. Whatever rendered the bitmap did the Arabic
 //    shaping, so this is the path that works on every printer.
 
+import { receiptPaymentRows, type ReceiptPayment } from "../receipt/payment";
 import {
   type Align,
   type CodeTableNumbering,
@@ -221,6 +222,8 @@ export interface TicketSale {
   loyaltyPointsEarned?: number;
   loyaltyPointsBalance?: number;
   loyaltyCreditBalance?: number;
+  /** Doc 15 spec 13 §4.15: method + masked receiving account; never a status. */
+  payment?: ReceiptPayment | null;
 }
 
 export interface TicketShop {
@@ -308,6 +311,8 @@ export function saleToTicket(sale: TicketSale, shop: TicketShop, language: Ticke
     const change = sale.amountPaid - sale.totalPrice;
     if (change > 0.004) row(label("change", language), ticketMoney(change));
   }
+  // Payment method + masked account (13 §4.15): instapay / wallet / card only.
+  for (const r of receiptPaymentRows(sale.payment, language, " / ", "ar-en")) row(r.label, r.value);
 
   if (shop.showLoyalty !== false && (sale.loyaltyPointsEarned || sale.loyaltyPointsBalance !== undefined || sale.loyaltyCreditBalance)) {
     rule();
