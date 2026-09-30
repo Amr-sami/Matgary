@@ -632,7 +632,8 @@
         "cash": "كاش",
         "instapay": "انستاباي",
         "card": "بطاقة",
-        "deferred": "آجل"
+        "deferred": "آجل",
+        "wallet": "محفظة موبايل"
       },
       "uncategorized": "غير مصنّف",
       "expenseCategory": {
@@ -778,7 +779,8 @@
         "cash": "نقدي",
         "instapay": "إنستاباي",
         "card": "كارت",
-        "deferred": "آجل"
+        "deferred": "آجل",
+        "wallet": "محفظة موبايل"
       },
       "payTypes": {
         "fixed": "ثابت",
@@ -816,7 +818,8 @@
         "expense": "المصاريف",
         "supplier": "الموردون",
         "purchase": "المشتريات",
-        "attendance": "الحضور"
+        "attendance": "الحضور",
+        "collection": "التحويلات"
       },
       "actions": {
         "auth.login": "تسجيل الدخول",
@@ -873,7 +876,22 @@
         "branch.disable": "إيقاف فرع",
         "branch.enable": "تفعيل فرع",
         "branch.delete": "حذف فرع",
-        "branch.switch": "تبديل الفرع الحالي"
+        "branch.switch": "تبديل الفرع الحالي",
+        "collection.account_create": "إضافة حساب استلام",
+        "collection.account_update": "تعديل حساب استلام",
+        "collection.account_archive": "أرشفة حساب استلام",
+        "collection.settings_update": "تعديل إعدادات التحويلات",
+        "collection.confirm": "تأكيد تحويل",
+        "collection.reject": "رفض تحويل",
+        "collection.reopen": "إعادة فتح تحويل",
+        "collection.auto_confirm": "تأكيد تحويل تلقائيًا",
+        "collection.credit_match": "ربط رسالة بنك أو محفظة بعملية",
+        "collection.credit_ignore": "تجاهل رسالة بنك أو محفظة",
+        "collection.credit_paste": "لصق رسالة بنك أو محفظة",
+        "collection.device_create": "ربط هاتف للتأكيد التلقائي",
+        "collection.device_revoke": "فصل هاتف",
+        "collection.raw_view": "عرض رسالة غير معروفة",
+        "collection.raw_share": "إرسال رسالة غير معروفة إلى ستورو"
       },
       "listSeparator": "، "
     },
@@ -904,7 +922,10 @@
         "request_leave": "تقديم طلبات إجازة",
         "manage_leave": "الموافقة على طلبات الإجازة",
         "view_activity_log": "عرض سجل النشاط",
-        "manage_digest_settings": "إعدادات الملخص اليومي"
+        "manage_digest_settings": "إعدادات الملخص اليومي",
+        "view_collections": "عرض التحويلات",
+        "confirm_collections": "تأكيد ورفض التحويلات",
+        "manage_collection_accounts": "إدارة حسابات الاستلام"
       },
       "groups": {
         "pages": "الوصول للصفحات",
@@ -912,7 +933,8 @@
         "suppliersPurchases": "الموردين والمشتريات",
         "tasksLeaves": "المهام والإجازات",
         "audit": "المراقبة والتدقيق",
-        "attendance": "الحضور والانصراف"
+        "attendance": "الحضور والانصراف",
+        "collections": "التحويلات"
       }
     },
     "ui": {
@@ -3546,6 +3568,129 @@
         "viewAll": "عرض الكل",
         "loading": "جارٍ تحميل الإشعارات…",
         "unreadCount": "{count} غير مقروءة"
+      }
+    },
+    "collections": {
+      "vocab": {
+        "status": {
+          "pending": "في انتظار التأكيد",
+          "confirmed": "مؤكد",
+          "auto_confirmed": "مؤكد تلقائيًا",
+          "rejected": "مرفوض",
+          "void": "ملغي"
+        },
+        "sourceTypes": {
+          "sale": "بيع",
+          "settlement": "سداد دين"
+        },
+        "reasons": {
+          "not_received": "لم يصل التحويل",
+          "wrong_amount": "المبلغ غير صحيح",
+          "wrong_account": "وصل لحساب آخر",
+          "duplicate": "مكرر",
+          "other": "سبب آخر"
+        },
+        "outcomes": {
+          "debt": "يُسجَّل دينًا على العميل",
+          "loss": "خسارة، تُسجَّل على الكاشير"
+        },
+        "rails": {
+          "instapay": "إنستاباي",
+          "wallet": "محفظة"
+        },
+        "providers": {
+          "nbe": "البنك الأهلي المصري",
+          "cib": "البنك التجاري الدولي",
+          "qnb": "بنك QNB",
+          "banque_misr": "بنك مصر",
+          "bdc": "بنك القاهرة",
+          "aaib": "البنك العربي الأفريقي الدولي",
+          "alexbank": "بنك الإسكندرية",
+          "hsbc": "HSBC مصر",
+          "faisal": "بنك فيصل الإسلامي",
+          "adib": "مصرف أبوظبي الإسلامي",
+          "other_bank": "بنك آخر",
+          "vodafone_cash": "فودافون كاش",
+          "etisalat_money": "إي آند موني",
+          "orange_cash": "أورنج كاش",
+          "we_pay": "وي باي",
+          "nbe_phone_cash": "فون كاش الأهلي",
+          "bm_wallet": "محفظة بنك مصر",
+          "other_wallet": "محفظة أخرى"
+        },
+        "channels": {
+          "ios_notification": "إشعار آيفون",
+          "ios_sms": "رسالة آيفون",
+          "android_notification": "إشعار أندرويد",
+          "android_sms": "رسالة أندرويد",
+          "manual_paste": "لصق يدوي",
+          "statement": "كشف حساب"
+        },
+        "holdReasons": {
+          "ambiguous": "أكثر من عملية تطابق",
+          "untrusted_source": "مصدر غير موثوق",
+          "balance_mismatch": "الرصيد لا يطابق",
+          "no_balance_baseline": "لا يوجد رصيد مرجعي بعد",
+          "above_review_limit": "أكبر من حد المراجعة",
+          "no_account": "حساب الاستلام غير معروف",
+          "unverified_format": "صيغة الرسالة لم تُعتمد بعد",
+          "manual_source": "أُضيفت يدويًا",
+          "suspicious_link": "بها رابط مريب",
+          "too_old": "رسالة قديمة",
+          "amount_mismatch": "المبلغ مختلف",
+          "auto_confirm_off": "التأكيد التلقائي متوقف",
+          "matches_rejected": "تطابق تحويلًا مرفوضًا",
+          "test": "رسالة تجريبية"
+        },
+        "flags": {
+          "account_inactive": "الحساب مؤرشف",
+          "account_missing": "بدون حساب استلام",
+          "parts_clamped": "عُدّلت الأجزاء لتساوي الإجمالي",
+          "total_changed": "تغيّر إجمالي الفاتورة",
+          "returned": "فيها مرتجع",
+          "offline_rung": "سُجِّلت بدون إنترنت",
+          "via_provider": "مدفوع عبر شركة دفع"
+        },
+        "ignoreReasons": {
+          "personal": "تحويل شخصي",
+          "not_a_sale": "ليس بيعًا",
+          "duplicate": "مكرر",
+          "other": "سبب آخر"
+        }
+      },
+      "errors": {
+        "COLLECTIONS_DISABLED": "خاصية التحويلات غير مفعّلة لهذا المتجر.",
+        "COLLECTION_NOT_FOUND": "هذا التحويل غير موجود.",
+        "COLLECTION_NOT_PENDING": "تم البتّ في هذا التحويل بالفعل. حدّث الصفحة.",
+        "SELF_CONFIRM_FORBIDDEN": "أنت من سجّل هذا البيع، لذلك يؤكده شخص آخر.",
+        "REJECT_OUTCOME_REQUIRES_PHONE": "أدخل رقم العميل لتسجيل المبلغ دينًا عليه.",
+        "REOPEN_WINDOW_CLOSED": "يمكن إعادة فتح التحويل خلال ٧ أيام فقط من القرار.",
+        "REOPEN_BLOCKED_SETTLED": "تغيّرت الفاتورة بعد الرفض (دفعة أو تعديل)، فلا يمكن إعادة فتحه.",
+        "COLLECTION_ACCOUNT_NOT_FOUND": "حساب الاستلام هذا غير موجود.",
+        "INVALID_IPA_LINK": "الصق رابط إنستاباي كما يشاركه تطبيق إنستاباي (https://ipn.eg/S/…).",
+        "INVALID_WALLET_NUMBER": "أدخل رقم موبايل مصري من ١١ رقمًا (01…).",
+        "INVALID_IBAN": "رقم الآيبان يبدأ بـ EG ويليه ٢٧ رقمًا.",
+        "CREDIT_NOT_FOUND": "هذه الرسالة غير موجودة.",
+        "CREDIT_ALREADY_MATCHED": "هذه الرسالة مرتبطة بعملية بالفعل.",
+        "DEVICE_LIMIT_REACHED": "يمكن ربط ١٠ هواتف كحد أقصى. احذف واحدًا أولًا.",
+        "INGEST_TOKEN_INVALID": "اتصال هذا الهاتف غير صالح. أعد إعداده.",
+        "INGEST_DEVICE_REVOKED": "تم فصل هذا الهاتف. أعد إعداده.",
+        "INGEST_DISABLED": "التأكيد التلقائي غير متاح لهذا المتجر بعد.",
+        "INGEST_PAYLOAD_TOO_LARGE": "الرسالة أطول من المسموح.",
+        "RATE_LIMITED": "طلبات كثيرة. انتظر دقيقة وحاول مرة أخرى.",
+        "IDEMPOTENCY_KEY_REQUIRED": "حدّث التطبيق وحاول مرة أخرى.",
+        "ACCOUNT_IDENTITY_REQUIRED": "أضف رابط إنستاباي أو رقم المحفظة أو الآيبان أو آخر ٤ أرقام من الحساب.",
+        "PROVIDER_RAIL_MISMATCH": "البنك أو المحفظة لا يطابق نوع الحساب.",
+        "COLLECTION_ACCOUNT_DUPLICATE": "هذا الحساب مضاف بالفعل.",
+        "COLLECTION_NOT_REOPENABLE": "يمكن إعادة فتح التحويل المؤكد أو المرفوض فقط.",
+        "INVALID_REQUEST": "بعض البيانات ناقصة أو غير صحيحة.",
+        "GENERIC": "حدث خطأ. حاول مرة أخرى.",
+        "CREDIT_NOT_MATCHABLE": "لا يمكن ربط هذه الرسالة بعملية بيع لأنها ليست مبلغًا واردًا.",
+        "DEVICE_NOT_FOUND": "هذا الهاتف لم يعد مربوطًا.",
+        "NOT_FOUND": "غير موجود. حدّث الصفحة وحاول مرة أخرى.",
+        "FORBIDDEN_BRANCH": "ليست لديك صلاحية على هذا الفرع.",
+        "TENANT_SUSPENDED": "حساب هذا المتجر موقوف.",
+        "IDEMPOTENCY_MISMATCH": "أُرسل هذا الطلب من قبل ببيانات مختلفة. حدّث الصفحة وحاول مرة أخرى."
       }
     }
   },

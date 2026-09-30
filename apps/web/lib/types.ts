@@ -98,11 +98,15 @@ export interface Product {
 
 export type DiscountType = "percentage" | "fixed";
 
-export type PaymentMethod = "cash" | "instapay" | "card" | "deferred";
+/** `wallet` = a mobile-wallet transfer (Vodafone Cash, e& money, …), digital
+ *  collections M1 (mobile-dev-docs/15-digital-collections/03 §B.1). */
+export type PaymentMethod = "cash" | "instapay" | "wallet" | "card" | "deferred";
 
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   cash: "كاش",
   instapay: "انستاباي",
+  // Never bare «محفظة»: the loyalty store-credit wallet owns that word (03 §B.9).
+  wallet: "محفظة موبايل",
   card: "بطاقة",
   deferred: "آجل",
 };
@@ -139,6 +143,9 @@ export interface Sale {
   /** Timestamp of the most-recent partial payment (not a full settlement).
    *  Null/undefined when paid in full or never paid. */
   partialPaidAt?: Date;
+  /** Digital-collection verification axis (migration 0055): null = not a
+   *  digital sale (or collections off when it was rung). */
+  collectionStatus?: "pending" | "confirmed" | "rejected" | null;
 }
 
 export interface CartLine {

@@ -104,6 +104,10 @@ const PERMISSION_GROUPS = (): { title: string; permissions: string[] }[] => [
   { title: t("app.permissions.groups.audit"), permissions: ["view_activity_log"] },
   { title: t("app.permissions.groups.attendance"), permissions: ["attendance_self_manual"] },
   { title: t("app.digestSettings.title"), permissions: ["manage_digest_settings"] },
+  {
+    title: t("app.permissions.groups.collections"),
+    permissions: ["view_collections", "confirm_collections", "manage_collection_accounts"],
+  },
 ];
 
 const PAY_TYPES = (): { key: PayType; label: string }[] => [

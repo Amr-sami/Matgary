@@ -632,7 +632,8 @@
         "cash": "Cash",
         "instapay": "InstaPay",
         "card": "Card",
-        "deferred": "On account"
+        "deferred": "On account",
+        "wallet": "Mobile wallet"
       },
       "uncategorized": "Uncategorized",
       "expenseCategory": {
@@ -778,7 +779,8 @@
         "cash": "Cash",
         "instapay": "InstaPay",
         "card": "Card",
-        "deferred": "On account"
+        "deferred": "On account",
+        "wallet": "Mobile wallet"
       },
       "payTypes": {
         "fixed": "Fixed",
@@ -816,7 +818,8 @@
         "expense": "Expenses",
         "supplier": "Suppliers",
         "purchase": "Purchases",
-        "attendance": "Attendance"
+        "attendance": "Attendance",
+        "collection": "Collections"
       },
       "actions": {
         "auth.login": "Signed in",
@@ -873,7 +876,22 @@
         "branch.disable": "Disabled branch",
         "branch.enable": "Enabled branch",
         "branch.delete": "Deleted branch",
-        "branch.switch": "Switched current branch"
+        "branch.switch": "Switched current branch",
+        "collection.account_create": "Added a receiving account",
+        "collection.account_update": "Edited a receiving account",
+        "collection.account_archive": "Archived a receiving account",
+        "collection.settings_update": "Changed transfer settings",
+        "collection.confirm": "Confirmed a transfer",
+        "collection.reject": "Rejected a transfer",
+        "collection.reopen": "Reopened a transfer",
+        "collection.auto_confirm": "Transfer confirmed automatically",
+        "collection.credit_match": "Matched a bank or wallet message",
+        "collection.credit_ignore": "Ignored a bank or wallet message",
+        "collection.credit_paste": "Pasted a bank or wallet message",
+        "collection.device_create": "Connected a phone for automatic confirmation",
+        "collection.device_revoke": "Disconnected a phone",
+        "collection.raw_view": "Viewed an unrecognised message",
+        "collection.raw_share": "Sent an unrecognised message to TheStoro"
       },
       "listSeparator": ", "
     },
@@ -904,7 +922,10 @@
         "request_leave": "Submit leave requests",
         "manage_leave": "Approve leave requests",
         "view_activity_log": "View activity log",
-        "manage_digest_settings": "Daily digest settings"
+        "manage_digest_settings": "Daily digest settings",
+        "view_collections": "View transfers",
+        "confirm_collections": "Confirm or reject transfers",
+        "manage_collection_accounts": "Manage receiving accounts"
       },
       "groups": {
         "pages": "Page access",
@@ -912,7 +933,8 @@
         "suppliersPurchases": "Suppliers & purchases",
         "tasksLeaves": "Tasks & leaves",
         "audit": "Audit & monitoring",
-        "attendance": "Attendance"
+        "attendance": "Attendance",
+        "collections": "Collections"
       }
     },
     "ui": {
@@ -3546,6 +3568,129 @@
         "viewAll": "View all",
         "loading": "Loading notifications…",
         "unreadCount": "{count} unread"
+      }
+    },
+    "collections": {
+      "vocab": {
+        "status": {
+          "pending": "Awaiting confirmation",
+          "confirmed": "Confirmed",
+          "auto_confirmed": "Confirmed automatically",
+          "rejected": "Rejected",
+          "void": "Void"
+        },
+        "sourceTypes": {
+          "sale": "Sale",
+          "settlement": "Debt payment"
+        },
+        "reasons": {
+          "not_received": "Money never arrived",
+          "wrong_amount": "Wrong amount",
+          "wrong_account": "Went to another account",
+          "duplicate": "Duplicate",
+          "other": "Other"
+        },
+        "outcomes": {
+          "debt": "Becomes customer debt",
+          "loss": "Loss, noted on the cashier"
+        },
+        "rails": {
+          "instapay": "InstaPay",
+          "wallet": "Wallet"
+        },
+        "providers": {
+          "nbe": "National Bank of Egypt",
+          "cib": "CIB",
+          "qnb": "QNB",
+          "banque_misr": "Banque Misr",
+          "bdc": "Banque du Caire",
+          "aaib": "AAIB",
+          "alexbank": "Alexbank",
+          "hsbc": "HSBC Egypt",
+          "faisal": "Faisal Islamic Bank",
+          "adib": "ADIB Egypt",
+          "other_bank": "Other bank",
+          "vodafone_cash": "Vodafone Cash",
+          "etisalat_money": "e& money",
+          "orange_cash": "Orange Cash",
+          "we_pay": "WE Pay",
+          "nbe_phone_cash": "NBE Phone Cash",
+          "bm_wallet": "BM Wallet",
+          "other_wallet": "Other wallet"
+        },
+        "channels": {
+          "ios_notification": "iPhone notification",
+          "ios_sms": "iPhone SMS",
+          "android_notification": "Android notification",
+          "android_sms": "Android SMS",
+          "manual_paste": "Pasted by hand",
+          "statement": "Statement"
+        },
+        "holdReasons": {
+          "ambiguous": "More than one sale matches",
+          "untrusted_source": "Sender not trusted",
+          "balance_mismatch": "Balance does not add up",
+          "no_balance_baseline": "No trusted balance yet",
+          "above_review_limit": "Above your review limit",
+          "no_account": "Receiving account unknown",
+          "unverified_format": "Message format not verified yet",
+          "manual_source": "Added by hand",
+          "suspicious_link": "Contains a suspicious link",
+          "too_old": "Message too old",
+          "amount_mismatch": "Amount differs",
+          "auto_confirm_off": "Automatic confirmation is off",
+          "matches_rejected": "Matches a rejected transfer",
+          "test": "Test message"
+        },
+        "flags": {
+          "account_inactive": "Account archived",
+          "account_missing": "No receiving account",
+          "parts_clamped": "Parts trimmed to the total",
+          "total_changed": "Invoice total changed",
+          "returned": "Has a return",
+          "offline_rung": "Recorded offline",
+          "via_provider": "Paid through a payment company"
+        },
+        "ignoreReasons": {
+          "personal": "Personal transfer",
+          "not_a_sale": "Not a sale",
+          "duplicate": "Duplicate",
+          "other": "Other"
+        }
+      },
+      "errors": {
+        "COLLECTIONS_DISABLED": "Transfers are not turned on for this shop.",
+        "COLLECTION_NOT_FOUND": "This transfer no longer exists.",
+        "COLLECTION_NOT_PENDING": "Someone already decided this transfer. Refresh to see it.",
+        "SELF_CONFIRM_FORBIDDEN": "You recorded this sale, so someone else must confirm it.",
+        "REJECT_OUTCOME_REQUIRES_PHONE": "Enter the customer's phone to record this as debt.",
+        "REOPEN_WINDOW_CLOSED": "A transfer can be reopened only within 7 days of the decision.",
+        "REOPEN_BLOCKED_SETTLED": "The invoice changed after the rejection (a payment or an edit), so it can't be reopened.",
+        "COLLECTION_ACCOUNT_NOT_FOUND": "This receiving account no longer exists.",
+        "INVALID_IPA_LINK": "Paste the InstaPay link exactly as the InstaPay app shares it (https://ipn.eg/S/…).",
+        "INVALID_WALLET_NUMBER": "Enter an 11-digit Egyptian mobile number (01…).",
+        "INVALID_IBAN": "The IBAN must be EG followed by 27 digits.",
+        "CREDIT_NOT_FOUND": "This message no longer exists.",
+        "CREDIT_ALREADY_MATCHED": "This message is already linked to a sale.",
+        "DEVICE_LIMIT_REACHED": "You can connect up to 10 phones. Remove one first.",
+        "INGEST_TOKEN_INVALID": "This phone's connection is not valid. Set it up again.",
+        "INGEST_DEVICE_REVOKED": "This phone was disconnected. Set it up again.",
+        "INGEST_DISABLED": "Automatic confirmation is not available for this shop yet.",
+        "INGEST_PAYLOAD_TOO_LARGE": "The message is too long to send.",
+        "RATE_LIMITED": "Too many requests. Wait a minute and try again.",
+        "IDEMPOTENCY_KEY_REQUIRED": "Please update the app and try again.",
+        "ACCOUNT_IDENTITY_REQUIRED": "Add the InstaPay link, the wallet number, the IBAN or the account's last 4 digits.",
+        "PROVIDER_RAIL_MISMATCH": "This bank or wallet does not match the account type.",
+        "COLLECTION_ACCOUNT_DUPLICATE": "This account is already added.",
+        "COLLECTION_NOT_REOPENABLE": "Only a confirmed or rejected transfer can be reopened.",
+        "INVALID_REQUEST": "Some details are missing or not valid.",
+        "GENERIC": "Something went wrong. Try again.",
+        "CREDIT_NOT_MATCHABLE": "This message can't be linked to a sale: it isn't an incoming payment.",
+        "DEVICE_NOT_FOUND": "This phone is no longer connected.",
+        "NOT_FOUND": "Not found. Refresh and try again.",
+        "FORBIDDEN_BRANCH": "You don't have access to this branch.",
+        "TENANT_SUSPENDED": "This shop's account is suspended.",
+        "IDEMPOTENCY_MISMATCH": "This request was already sent with different details. Refresh and try again."
       }
     }
   },

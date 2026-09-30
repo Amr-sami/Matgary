@@ -55,7 +55,8 @@ type ActivityCategory =
   | "expense"
   | "supplier"
   | "purchase"
-  | "attendance";
+  | "attendance"
+  | "collection";
 
 /** Same order as apps/web/lib/activity-labels.ts → ACTIVITY_CATEGORIES. */
 const ACTIVITY_CATEGORIES: ActivityCategory[] = [
@@ -70,6 +71,7 @@ const ACTIVITY_CATEGORIES: ActivityCategory[] = [
   "supplier",
   "purchase",
   "attendance",
+  "collection",
 ];
 
 interface LogRow {

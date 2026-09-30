@@ -13,7 +13,8 @@ export type ActivityCategory =
   | "expense"
   | "supplier"
   | "purchase"
-  | "attendance";
+  | "attendance"
+  | "collection";
 
 export const ACTIVITY_CATEGORIES: ActivityCategory[] = [
   "auth",
@@ -27,6 +28,7 @@ export const ACTIVITY_CATEGORIES: ActivityCategory[] = [
   "supplier",
   "purchase",
   "attendance",
+  "collection",
 ];
 
 // Arabic labels for known actions. The page renders the raw key when missing,
@@ -91,6 +93,23 @@ export const ACTION_LABELS: Record<string, string> = {
   "branch.enable": "تفعيل فرع",
   "branch.delete": "حذف فرع",
   "branch.switch": "تبديل الفرع الحالي",
+  // Digital collections (03 §B.8). 05 logs account_*, settings_update,
+  // confirm, reject, reopen; 07 logs the other eight (M2).
+  "collection.account_create": "إضافة حساب استلام",
+  "collection.account_update": "تعديل حساب استلام",
+  "collection.account_archive": "أرشفة حساب استلام",
+  "collection.settings_update": "تعديل إعدادات التحويلات",
+  "collection.confirm": "تأكيد تحويل",
+  "collection.reject": "رفض تحويل",
+  "collection.reopen": "إعادة فتح تحويل",
+  "collection.auto_confirm": "تأكيد تحويل تلقائيًا",
+  "collection.credit_match": "ربط رسالة بنك أو محفظة بعملية",
+  "collection.credit_ignore": "تجاهل رسالة بنك أو محفظة",
+  "collection.credit_paste": "لصق رسالة بنك أو محفظة",
+  "collection.device_create": "ربط هاتف للتأكيد التلقائي",
+  "collection.device_revoke": "فصل هاتف",
+  "collection.raw_view": "عرض رسالة غير معروفة",
+  "collection.raw_share": "إرسال رسالة غير معروفة إلى ستورو",
 };
 
 // Arabic back-compat label for a metadata field key. The locale-aware path
@@ -162,6 +181,8 @@ const FIELD_NAME_LABELS_AR: Record<string, string> = {
 const PAY_METHOD_LABELS_AR: Record<string, string> = {
   cash: "نقدي",
   instapay: "إنستاباي",
+  // Never bare «محفظة»: the loyalty store-credit wallet owns that word (03 §B.9).
+  wallet: "محفظة موبايل",
   card: "كارت",
   deferred: "آجل",
 };
@@ -431,4 +452,5 @@ export const CATEGORY_LABELS: Record<ActivityCategory, string> = {
   supplier: "الموردون",
   purchase: "المشتريات",
   attendance: "الحضور",
+  collection: "التحويلات",
 };

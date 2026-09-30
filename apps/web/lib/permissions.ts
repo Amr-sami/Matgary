@@ -34,7 +34,12 @@ export type Permission =
   // Audit / activity log
   | "view_activity_log" // see "who did what" feed (owner-only by default)
   // Daily owner digest
-  | "manage_digest_settings"; // owner: toggle, recipients, schedule
+  | "manage_digest_settings" // owner: toggle, recipients, schedule
+  // Digital collections (InstaPay + mobile wallets). Enforced from day one
+  // (requirePermissionWithBranchEnforced), never in DEFAULT_STAFF_PERMISSIONS.
+  | "view_collections" // inbox, daily totals, credits
+  | "confirm_collections" // confirm / reject / match / ignore / paste (four-eyes)
+  | "manage_collection_accounts"; // receiving accounts, collections settings, ingest devices
 
 export const ALL_PERMISSIONS: Permission[] = [
   "view_dashboard",
@@ -63,6 +68,9 @@ export const ALL_PERMISSIONS: Permission[] = [
   "manage_leave",
   "view_activity_log",
   "manage_digest_settings",
+  "view_collections",
+  "confirm_collections",
+  "manage_collection_accounts",
 ];
 
 export const PERMISSION_LABELS: Record<Permission, string> = {
@@ -92,6 +100,9 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   manage_leave: "الموافقة على طلبات الإجازة",
   view_activity_log: "عرض سجل النشاط",
   manage_digest_settings: "إعدادات الملخص اليومي",
+  view_collections: "عرض التحويلات",
+  confirm_collections: "تأكيد ورفض التحويلات",
+  manage_collection_accounts: "إدارة حسابات الاستلام",
 };
 
 export interface PermissionGroup {
@@ -146,6 +157,10 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
   {
     title: "الملخص اليومي",
     permissions: ["manage_digest_settings"],
+  },
+  {
+    title: "التحويلات",
+    permissions: ["view_collections", "confirm_collections", "manage_collection_accounts"],
   },
 ];
 

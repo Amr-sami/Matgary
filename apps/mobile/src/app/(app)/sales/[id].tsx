@@ -36,6 +36,7 @@ type Payment = salesApi.PaymentMethod;
 const PAYMENT_LABELS = (): Record<Payment, string> => ({
   cash: t("app.activityLabels.paymentMethods.cash"),
   instapay: t("app.activityLabels.paymentMethods.instapay"),
+  wallet: t("app.activityLabels.paymentMethods.wallet"),
   card: t("app.activityLabels.paymentMethods.card"),
   deferred: t("app.activityLabels.paymentMethods.deferred"),
 });

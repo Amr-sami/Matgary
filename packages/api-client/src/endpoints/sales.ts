@@ -15,7 +15,8 @@ export interface CartLineInput {
   lineDiscountValue?: number;
 }
 
-export type PaymentMethod = "cash" | "instapay" | "card" | "deferred";
+/** `wallet` = mobile-wallet transfer (digital collections M1, 03 §B.1). */
+export type PaymentMethod = "cash" | "instapay" | "wallet" | "card" | "deferred";
 
 export interface CartOptions {
   note?: string;
@@ -152,6 +153,9 @@ export interface SaleRecord {
   paidAt?: string;
   amountPaid?: number;
   partialPaidAt?: string;
+  /** Digital-collection status of the invoice (0055); null/absent = not a
+   *  digital sale or an older server. */
+  collectionStatus?: "pending" | "confirmed" | "rejected" | null;
 }
 
 export interface SalesPage {

@@ -21,7 +21,7 @@ interface PermissionCopy {
   groups: PermissionGroupView[];
 }
 
-const GROUPS: { titleKey: "pages" | "edit" | "suppliersPurchases" | "tasksLeaves" | "audit" | "attendance"; permissions: Permission[] }[] = [
+const GROUPS: { titleKey: "pages" | "edit" | "suppliersPurchases" | "tasksLeaves" | "audit" | "attendance" | "collections"; permissions: Permission[] }[] = [
   {
     titleKey: "pages",
     permissions: [
@@ -64,6 +64,10 @@ const GROUPS: { titleKey: "pages" | "edit" | "suppliersPurchases" | "tasksLeaves
   {
     titleKey: "attendance",
     permissions: ["attendance_self_manual"],
+  },
+  {
+    titleKey: "collections",
+    permissions: ["view_collections", "confirm_collections", "manage_collection_accounts"],
   },
 ];
 

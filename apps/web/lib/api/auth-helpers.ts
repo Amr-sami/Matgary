@@ -224,6 +224,11 @@ async function resolveSession(opts: ResolveOptions = {}): Promise<SessionResult>
   const h = await headers();
   const bearer = bearerFromHeader(h.get("authorization"));
   if (bearer) {
+    // A collections ingest token (`mgi_…`, digital collections 03 §E.1) grants
+    // exactly one power — posting bank/wallet messages to its own ingest
+    // route — so it may never authenticate a user route. Refused before any
+    // JWT parse, and (like any present bearer) never downgraded to the cookie.
+    if (bearer.startsWith("mgi_")) return { kind: "none" };
     const claims = await verifyAccessToken(bearer);
     // A present-but-invalid bearer is NOT silently downgraded to the cookie
     // path: that would let an expired native token borrow a browser session
@@ -421,6 +426,36 @@ export async function requirePermissionWithBranch(perm: Permission): Promise<
   });
   if (!enforce) return auth;
 
+  return {
+    ok: false,
+    response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
+  };
+}
+
+/**
+ * `requirePermissionWithBranch`, but ALWAYS enforced: a denial answers 403
+ * `{error:"Forbidden"}` whatever PERMISSION_ENFORCE_WRITES says (it is unset in
+ * production = audit mode). New permission keys ship enforced from day one —
+ * digital collections (03 §B.5): `view_collections`, `confirm_collections`,
+ * `manage_collection_accounts`. Owners pass (`can`).
+ */
+export async function requirePermissionWithBranchEnforced(perm: Permission): Promise<
+  | { ok: true; ctx: AuthedBranchContext }
+  | { ok: false; response: NextResponse }
+> {
+  const auth = await requireTenantWithBranch();
+  if (!auth.ok) return auth;
+  if (can(auth.ctx, perm)) return auth;
+
+  logger.warn({
+    event: "permission.denied",
+    permission: perm,
+    userId: auth.ctx.userId,
+    tenantId: auth.ctx.tenantId,
+    branchId: auth.ctx.branchId,
+    role: auth.ctx.role,
+    enforced: true,
+  });
   return {
     ok: false,
     response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),

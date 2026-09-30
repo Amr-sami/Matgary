@@ -5,20 +5,11 @@ import {
   listActivityActors,
   type ActivityCategory,
 } from "@/lib/repo/activity";
+import { ACTIVITY_CATEGORIES } from "@/lib/activity-labels";
 
-const VALID_CATEGORIES: ActivityCategory[] = [
-  "auth",
-  "team",
-  "settings",
-  "leave",
-  "task",
-  "product",
-  "sale",
-  "expense",
-  "supplier",
-  "purchase",
-  "attendance",
-];
+// One list with the page's filter chips (ACTIVITY_CATEGORIES), so a new
+// category (e.g. `collection`, digital collections 05 §4.18) is filterable.
+const VALID_CATEGORIES: readonly ActivityCategory[] = ACTIVITY_CATEGORIES;
 
 function parseDate(v: string | null): Date | undefined {
   if (!v) return undefined;

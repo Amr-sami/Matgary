@@ -41,10 +41,27 @@ const BUCKETS: Record<string, TenantRateLimitBucket> = {
   "wa.send": { limit: 60, windowSec: 60 },
   // Reports & exports. Expensive queries; small per-minute budget.
   "reports.read": { limit: 30, windowSec: 60 },
+  // Digital collections L2 ingest (03 §B.4, 05 §4.15; called by spec 07).
+  // `ingest.ip` is consumed BEFORE the token lookup (cheap refusal of token
+  // guessing); `ingest.device` / `.heartbeat` / `.config` are keyed by the
+  // ingest device id through checkScopedRateLimit; `ingest.default` is the
+  // per-tenant ceiling through checkTenantRateLimit.
+  "ingest.ip": { limit: 60, windowSec: 60 },
+  "ingest.device": { limit: 120, windowSec: 60 },
+  "ingest.default": { limit: 600, windowSec: 60 },
+  "ingest.heartbeat": { limit: 12, windowSec: 3600 },
+  "ingest.config": { limit: 60, windowSec: 3600 },
 };
 
 function bucketFor(scope: string): TenantRateLimitBucket {
   return BUCKETS[scope] ?? BUCKETS["write.default"]!;
+}
+
+/** The registered bucket for a scope, or undefined (callers of the check
+ *  functions fall back to `write.default`). Read-only view for tests/ops. */
+export function rateLimitBucket(scope: string): Readonly<TenantRateLimitBucket> | undefined {
+  const b = BUCKETS[scope];
+  return b ? { ...b } : undefined;
 }
 
 export interface AllowedTenantRateLimit {
@@ -72,6 +89,29 @@ export async function checkTenantRateLimit(
   tenantId: string,
   scope: string,
 ): Promise<AllowedTenantRateLimit | BlockedTenantRateLimit> {
+  return consume(scope, tenantId, { tenantId });
+}
+
+/**
+ * `checkTenantRateLimit` with a free identifier instead of the tenant id —
+ * a client IP (`ingest.ip`, before the ingest token is looked up) or an
+ * ingest device id (`ingest.device`, `ingest.heartbeat`, `ingest.config`).
+ * Same Redis key family (`rl:tenant.<scope>:<identifier>`), same 429 body
+ * `{error:"RATE_LIMITED", scope, resetAt}` + Retry-After, same
+ * TENANT_RATE_LIMIT_DISABLED escape hatch, same fail-open.
+ */
+export async function checkScopedRateLimit(
+  scope: string,
+  identifier: string,
+): Promise<AllowedTenantRateLimit | BlockedTenantRateLimit> {
+  return consume(scope, identifier, { identifier });
+}
+
+async function consume(
+  scope: string,
+  identifier: string,
+  logFields: { tenantId: string } | { identifier: string },
+): Promise<AllowedTenantRateLimit | BlockedTenantRateLimit> {
   // Escape hatch for the load-test rig (Phase 5A). NEVER set in production.
   // The per-tenant limiter is a safety rail against runaway clients, not a
   // pricing tier — but driving sustained load against it from one tenant
@@ -80,7 +120,7 @@ export async function checkTenantRateLimit(
     return { ok: true, count: 0, resetAt: Date.now() + 60_000 };
   }
   const cfg = bucketFor(scope);
-  const res = await rateLimit(`tenant.${scope}`, tenantId, {
+  const res = await rateLimit(`tenant.${scope}`, identifier, {
     ...cfg,
     commit: true,
   });
@@ -88,7 +128,7 @@ export async function checkTenantRateLimit(
     logger.warn({
       event: "tenant.rate_limit.blocked",
       scope,
-      tenantId,
+      ...logFields,
       count: res.count,
       resetAt: res.resetAt,
     });
