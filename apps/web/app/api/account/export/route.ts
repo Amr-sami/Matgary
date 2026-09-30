@@ -21,6 +21,9 @@ const EXPORT_WINDOW_SEC = 24 * 60 * 60;
 // Tables to dump. Keep the list flat + alphabetised so a future schema
 // addition is hard to forget — the tenant-deletion cron (H12) uses the same
 // shape, so divergence is the signal.
+// Digital collections (doc 15): never list the ingest-device table (no RLS,
+// holds token hashes) or the raw-message table (ciphertext); spec 14 SI-1a
+// fails if either appears here.
 const TABLES = [
   "activity_logs",
   "attendance_events",
@@ -30,6 +33,9 @@ const TABLES = [
   "categories",
   "category_attributes",
   "category_attribute_values",
+  "collection_accounts",
+  "collection_events",
+  "collections",
   "customer_wallets",
   "customer_wallet_events",
   "employee_compensation",
@@ -54,6 +60,16 @@ const TABLES = [
   "tenant_members",
   "tenants",
 ] as const;
+
+// SEC14-F1 (doc 15 spec 14; fixed by spec 05 step 23b): `tenants` and
+// `tenant_members` have NO row-level security, so `SELECT *` under
+// `withTenant` returned every tenant's rows (staff phone, national ID,
+// address). They are read with an explicit, parameterised filter on the
+// named column instead of relying on RLS.
+const EXPLICIT_TENANT_FILTER: Partial<Record<(typeof TABLES)[number], string>> = {
+  tenants: "id",
+  tenant_members: "tenant_id",
+};
 
 export async function POST() {
   const r = await requireTenant();
@@ -81,7 +97,12 @@ export async function POST() {
         // restricts visibility to the current tenant. Tables that don't
         // have `tenant_id` (e.g. attendance_settings could conceivably be
         // global one day) are still safe — RLS is the gate.
-        const rows = await tx.execute(sql.raw(`SELECT * FROM "${t}"`));
+        const filterCol = EXPLICIT_TENANT_FILTER[t];
+        const rows = await tx.execute(
+          filterCol
+            ? sql`SELECT * FROM ${sql.identifier(t)} WHERE ${sql.identifier(filterCol)} = ${r.ctx.tenantId}`
+            : sql.raw(`SELECT * FROM "${t}"`),
+        );
         // drizzle's execute returns either a Result-like object with `.rows`
         // (postgres-js driver) or a plain array depending on the call shape.
         exported[t] = Array.isArray(rows)

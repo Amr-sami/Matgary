@@ -10,6 +10,9 @@ import {
   jsonb,
   uniqueIndex,
   check,
+  numeric,
+  smallint,
+  date,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 
@@ -344,6 +347,15 @@ export const shopSettings = pgTable(
     cashVarianceNoteThreshold: text("cash_variance_note_threshold")
       .notNull()
       .default("50"),
+    /** Digital collections (0055, doc 15) — per-branch switches. */
+    collectionsEnabled: boolean("collections_enabled").notNull().default(false),
+    collectionsRequireAccount: boolean("collections_require_account").notNull().default(true),
+    /** CHECK 15..1440 (Q15). */
+    collectionsStaleAfterMinutes: integer("collections_stale_after_minutes").notNull().default(120),
+    collectionsAutoConfirmEnabled: boolean("collections_auto_confirm_enabled")
+      .notNull()
+      .default(false),
+    collectionsStorePayerNames: boolean("collections_store_payer_names").notNull().default(false),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .default(sql`now()`),
@@ -705,6 +717,10 @@ export const sales = pgTable(
      *  Backs the durable half of POST /api/sales/cart's replay protection
      *  (migration 0054; Redis keeps the fast path). */
     idempotencyKey: text("idempotency_key"),
+    /** Digital collections (migration 0055, doc 15): 'pending' | 'confirmed' |
+     *  'rejected' (CHECK); NULL = not a digital sale or collections were off.
+     *  Orthogonal to isPaid/amountPaid; written on EVERY line of the invoice. */
+    collectionStatus: text("collection_status"),
   },
   (t) => [
     index("sales_tenant_date_idx").on(t.tenantId, t.saleDate),
@@ -716,6 +732,9 @@ export const sales = pgTable(
     uniqueIndex("sales_tenant_idempotency_key_idx")
       .on(t.tenantId, t.idempotencyKey)
       .where(sql`idempotency_key IS NOT NULL`),
+    index("sales_tenant_collection_pending_idx")
+      .on(t.tenantId, t.saleDate)
+      .where(sql`collection_status = 'pending'`),
   ],
 );
 
@@ -730,7 +749,7 @@ export const salePayments = pgTable(
     tenantId: uuid("tenant_id").notNull(),
     saleId: uuid("sale_id").notNull(),
     amount: text("amount").notNull(),
-    /** 'cash' | 'instapay' | 'card' | 'initial' (back-fill). */
+    /** 'cash' | 'instapay' | 'wallet' | 'card' | 'initial' (back-fill). */
     method: text("method").notNull(),
     recordedAt: timestamp("recorded_at", { withTimezone: true })
       .notNull()
@@ -741,10 +760,19 @@ export const salePayments = pgTable(
      *  customer-settlement to the same shift's cash drawer for Z-report. */
     cashShiftId: uuid("cash_shift_id"),
     note: text("note"),
+    /** 0055: the pending digital collection this settlement created (FK → collections,
+     *  SET NULL, declared in SQL). */
+    collectionId: uuid("collection_id"),
+    /** 0055: set when that collection was rejected — excluded from every sum,
+     *  shown struck through in the ledger. */
+    voidedAt: timestamp("voided_at", { withTimezone: true }),
   },
   (t) => [
     index("sale_payments_sale_idx").on(t.saleId, t.recordedAt),
     index("sale_payments_tenant_date_idx").on(t.tenantId, t.recordedAt),
+    index("sale_payments_collection_idx")
+      .on(t.collectionId)
+      .where(sql`collection_id IS NOT NULL`),
   ],
 );
 
@@ -2332,3 +2360,183 @@ export type PlatformPlanRow = typeof platformPlans.$inferSelect;
 export type PlatformBroadcastRow = typeof platformBroadcasts.$inferSelect;
 export type PushTokenRow = typeof pushTokens.$inferSelect;
 export type PushReceiptRow = typeof pushReceipts.$inferSelect;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Digital collections (mobile-dev-docs/15-digital-collections, spec 04).
+// Mirrors migrations 0055 (M1: accounts, collections, events) and 0056 (M2:
+// ingest devices, raw messages, credits). Names are 03-architecture.md §B.2.
+// Columns, FKs and every index are declared here; the CHECK constraints live
+// in the SQL only and tests/unit/collections-schema.test.ts pins their value
+// lists against the domain unions. Money is numeric(14,2) → string in TS.
+// Three FKs close a cycle (collections ↔ credits, events → devices/credits);
+// they are plain uuid columns here and real FKs in 0056.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** 0055. The owner's receiving accounts (InstaPay-reachable bank accounts,
+ *  wallets). Soft-deleted only (`archivedAt`): collections reference them. */
+export const collectionAccounts = pgTable(
+  "collection_accounts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    /** NULL = every branch of the tenant. */
+    branchId: uuid("branch_id").references(() => branches.id, { onDelete: "restrict" }),
+    /** CollectionRail — 'instapay' | 'wallet' (CHECK). */
+    rail: text("rail").notNull(),
+    /** CollectionProvider — domain registry, no CHECK (a bank is added without a migration). */
+    provider: text("provider").notNull(),
+    label: text("label").notNull(),
+    holderName: text("holder_name"),
+    /** lower-case `name@instapay` (CHECK). */
+    ipaHandle: text("ipa_handle"),
+    /** `https://ipn.eg/S/<handle>/instapay/<id>` — validated by domain `isValidIpaLink`, no CHECK.
+     *  UNVERIFIED (doc 15 FN-17, 03 §B.2.1): the shape comes from an unofficial community
+     *  SDK and has not been checked against a real InstaPay link yet. It is enforced in app
+     *  code only, so a corrected shape is a code change, never a migration. */
+    ipaLink: text("ipa_link"),
+    accountLast4: text("account_last4"),
+    isPrepaidCard: boolean("is_prepaid_card").notNull().default(false),
+    /** Full value only to `manage_collection_accounts`. */
+    iban: text("iban"),
+    /** E.164 `+201[0125]XXXXXXXX`. */
+    walletMsisdn: text("wallet_msisdn"),
+    walletOpenedOn: date("wallet_opened_on", { mode: "string" }),
+    isDefaultForMobile: boolean("is_default_for_mobile").notNull().default(false),
+    isPosDefault: boolean("is_pos_default").notNull().default(false),
+    autoConfirmEnabled: boolean("auto_confirm_enabled").notNull().default(false),
+    /** Credits above it never auto-confirm (Q16). */
+    reviewThreshold: numeric("review_threshold", { precision: 14, scale: 2 })
+      .notNull()
+      .default("5000.00"),
+    balanceCheckEnabled: boolean("balance_check_enabled").notNull().default(true),
+    balanceBaseline: numeric("balance_baseline", { precision: 14, scale: 2 }),
+    balanceBaselineAt: timestamp("balance_baseline_at", { withTimezone: true }),
+    balanceChainBrokenAt: timestamp("balance_chain_broken_at", { withTimezone: true }),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdByUserId: uuid("created_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("collection_accounts_tenant_branch_idx")
+      .on(t.tenantId, t.branchId)
+      .where(sql`archived_at IS NULL`),
+    uniqueIndex("collection_accounts_tenant_msisdn_uq")
+      .on(t.tenantId, t.walletMsisdn)
+      .where(sql`wallet_msisdn IS NOT NULL AND archived_at IS NULL`),
+    uniqueIndex("collection_accounts_tenant_provider_last4_uq")
+      .on(t.tenantId, t.provider, t.accountLast4)
+      .where(sql`account_last4 IS NOT NULL AND archived_at IS NULL`),
+    uniqueIndex("collection_accounts_pos_default_uq")
+      .on(
+        t.tenantId,
+        sql`COALESCE(${t.branchId}, '00000000-0000-0000-0000-000000000000'::uuid)`,
+        t.rail,
+      )
+      .where(sql`is_pos_default AND archived_at IS NULL`),
+  ],
+);
+
+/** 0055. One row per expected transfer ("part", 1..4 per sale, Q5). */
+export const collections = pgTable(
+  "collections",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branches.id, { onDelete: "restrict" }),
+    /** CollectionSourceType — 'sale' | 'settlement'. */
+    sourceType: text("source_type").notNull(),
+    invoiceId: text("invoice_id"),
+    anchorSaleId: uuid("anchor_sale_id").references(() => sales.id, { onDelete: "set null" }),
+    customerPhone: text("customer_phone"),
+    /** DigitalMethod — 'instapay' | 'wallet'. */
+    method: text("method").notNull(),
+    /** NULL only with flag `account_missing`. */
+    collectionAccountId: uuid("collection_account_id").references(() => collectionAccounts.id, {
+      onDelete: "restrict",
+    }),
+    amount: numeric("amount", { precision: 14, scale: 2 }).notNull(),
+    partNo: smallint("part_no").notNull().default(1),
+    /** CollectionStatus — pending | confirmed | auto_confirmed | rejected | void. */
+    status: text("status").notNull().default("pending"),
+    payerPhoneLast4: text("payer_phone_last4"),
+    /** lower-case, 4..16 of [0-9a-z]. */
+    payerReference: text("payer_reference"),
+    rungAt: timestamp("rung_at", { withTimezone: true }).notNull(),
+    recordedByUserId: uuid("recorded_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    /** FK → collection_credits (SET NULL) is added by 0056; plain uuid here (cycle). */
+    matchedCreditId: uuid("matched_credit_id"),
+    decidedByUserId: uuid("decided_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    rejectReason: text("reject_reason"),
+    rejectOutcome: text("reject_outcome"),
+    decisionNote: text("decision_note"),
+    staleNotifiedAt: timestamp("stale_notified_at", { withTimezone: true }),
+    /** CollectionFlag[] — zod-validated, no CHECK. */
+    flags: text("flags").array().notNull().default(sql`'{}'::text[]`),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
+  },
+  (t) => [
+    index("collections_tenant_status_rung_idx").on(t.tenantId, t.status, t.rungAt),
+    index("collections_match_idx")
+      .on(t.tenantId, t.collectionAccountId, t.amount, t.rungAt)
+      .where(sql`status = 'pending'`),
+    index("collections_tenant_invoice_idx").on(t.tenantId, t.invoiceId),
+    index("collections_tenant_branch_rung_idx").on(t.tenantId, t.branchId, t.rungAt),
+    // ON CONFLICT (tenant_id, invoice_id, part_no) WHERE source_type = 'sale' (spec 05).
+    uniqueIndex("collections_sale_part_uq")
+      .on(t.tenantId, t.invoiceId, t.partNo)
+      .where(sql`source_type = 'sale'`),
+    uniqueIndex("collections_matched_credit_uq")
+      .on(t.matchedCreditId)
+      .where(sql`matched_credit_id IS NOT NULL`),
+  ],
+);
+
+/** 0055. Append-only audit trail; code never UPDATEs or DELETEs rows. */
+export const collectionEvents = pgTable(
+  "collection_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    collectionId: uuid("collection_id")
+      .notNull()
+      .references(() => collections.id, { onDelete: "cascade" }),
+    /** CollectionEventKind (CHECK). */
+    kind: text("kind").notNull(),
+    fromStatus: text("from_status"),
+    toStatus: text("to_status"),
+    /** NULL = system. */
+    actorUserId: uuid("actor_user_id").references(() => users.id, { onDelete: "set null" }),
+    /** FK → collection_ingest_devices (SET NULL) added by 0056. */
+    actorDeviceId: uuid("actor_device_id"),
+    /** FK → collection_credits (SET NULL) added by 0056. */
+    creditId: uuid("credit_id"),
+    details: jsonb("details").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
+  },
+  (t) => [
+    index("collection_events_collection_idx").on(t.collectionId, t.createdAt),
+    index("collection_events_tenant_idx").on(t.tenantId, t.createdAt),
+  ],
+);
+
+export type CollectionAccountRow = typeof collectionAccounts.$inferSelect;
+export type CollectionRow = typeof collections.$inferSelect;
+export type CollectionEventRow = typeof collectionEvents.$inferSelect;

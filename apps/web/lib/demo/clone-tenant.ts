@@ -11,7 +11,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 
 import { getAdminDb } from "@/lib/admin/db";
 import * as s from "@/lib/db/schema";
@@ -140,6 +140,34 @@ async function copyTenantData(
       branchId: branchMap.get(ss.branchId) ?? ss.branchId,
     }));
     await tx.insert(s.shopSettings).values(rows);
+  }
+
+  // ── 6b. collection_accounts (doc 15 spec 04) ─────────────────────────────
+  // Accounts only: collections, events and (M2) devices / raw messages /
+  // credits are NOT cloned — a visitor starts with an empty Collections inbox,
+  // and an ingest token hash must never be copied. L2 state is reset.
+  const oldAccounts = await tx
+    .select()
+    .from(s.collectionAccounts)
+    .where(
+      and(eq(s.collectionAccounts.tenantId, fromTenantId), isNull(s.collectionAccounts.archivedAt)),
+    );
+  if (oldAccounts.length) {
+    const now = new Date();
+    const rows = oldAccounts.map((a) => ({
+      ...a,
+      id: randomUUID(),
+      tenantId: toTenantId,
+      branchId: a.branchId ? branchMap.get(a.branchId) ?? null : null,
+      createdByUserId: remapUser(a.createdByUserId),
+      autoConfirmEnabled: false,
+      balanceBaseline: null,
+      balanceBaselineAt: null,
+      balanceChainBrokenAt: null,
+      createdAt: now,
+      updatedAt: now,
+    }));
+    await tx.insert(s.collectionAccounts).values(rows);
   }
 
   // ── 7. cash_shifts ───────────────────────────────────────────────────────
@@ -294,6 +322,7 @@ async function copyTenantData(
         categoryId: categoryMap.get(sa.categoryId) ?? sa.categoryId,
         recordedByUserId: remapUser(sa.recordedByUserId),
         cashShiftId: sa.cashShiftId ? shiftMap.get(sa.cashShiftId) ?? null : null,
+        collectionStatus: null, // collections are not cloned (doc 15 spec 04)
       };
     });
     await tx.insert(s.sales).values(rows);
@@ -312,6 +341,7 @@ async function copyTenantData(
       saleId: saleMap.get(p.saleId) ?? p.saleId,
       recordedByUserId: remapUser(p.recordedByUserId),
       cashShiftId: p.cashShiftId ? shiftMap.get(p.cashShiftId) ?? null : null,
+      collectionId: null, // collections are not cloned
     }));
     await tx.insert(s.salePayments).values(rows);
   }
@@ -507,6 +537,11 @@ async function fetchTemplateOwnerId(db: Db, templateId: string): Promise<string 
  *  visitor's JWT — instead we preserve the tenant row and wipe under it. */
 async function wipeTenantChildRows(tx: Tx, tenantId: string): Promise<void> {
   await tx.delete(s.activityLogs).where(eq(s.activityLogs.tenantId, tenantId));
+  // Collections before sales and branches: their branch / account FKs are
+  // RESTRICT (doc 15 spec 04). Events cascade from collections; explicit anyway.
+  await tx.delete(s.collectionEvents).where(eq(s.collectionEvents.tenantId, tenantId));
+  await tx.delete(s.collections).where(eq(s.collections.tenantId, tenantId));
+  await tx.delete(s.collectionAccounts).where(eq(s.collectionAccounts.tenantId, tenantId));
   await tx.delete(s.returns).where(eq(s.returns.tenantId, tenantId));
   await tx.delete(s.salePayments).where(eq(s.salePayments.tenantId, tenantId));
   await tx.delete(s.sales).where(eq(s.sales.tenantId, tenantId));

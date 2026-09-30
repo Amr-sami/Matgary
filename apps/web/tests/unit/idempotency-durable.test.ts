@@ -210,7 +210,8 @@ describe("wiring", () => {
     const journal = JSON.parse(read("lib/db/migrations/meta/_journal.json")) as {
       entries: { idx: number; tag: string }[];
     };
-    const last = journal.entries[journal.entries.length - 1]!;
-    expect(last).toMatchObject({ idx: 54, tag: "0054_sales_idempotency_key" });
+    // Located by tag: later migrations (0055+, doc 15) append after it.
+    const entry = journal.entries.find((e) => e.tag === "0054_sales_idempotency_key");
+    expect(entry).toMatchObject({ idx: 54, tag: "0054_sales_idempotency_key" });
   });
 });

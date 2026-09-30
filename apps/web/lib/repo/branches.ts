@@ -9,6 +9,8 @@ import {
   storeLocations,
   products,
   shopSettings,
+  collectionAccounts,
+  collections,
 } from "@/lib/db/schema";
 import { cacheBustPrefix, cacheRemember, globalKey, tenantKey } from "@/lib/cache";
 
@@ -300,6 +302,18 @@ async function collectReferenceCounts(
     .select({ n: sql<number>`count(*)::int` })
     .from(storeLocations)
     .where(eq(storeLocations.branchId, branchId));
+  // Digital collections (doc 15, spec 05 step 23c): both branch_id FKs are
+  // ON DELETE RESTRICT. Accounts are counted archived included — archiving
+  // does not release the FK. Spec 07 adds collection_credits and
+  // collection_ingest_devices at M2.
+  const [collAccountsCount] = await tx
+    .select({ n: sql<number>`count(*)::int` })
+    .from(collectionAccounts)
+    .where(eq(collectionAccounts.branchId, branchId));
+  const [collectionsCount] = await tx
+    .select({ n: sql<number>`count(*)::int` })
+    .from(collections)
+    .where(eq(collections.branchId, branchId));
   return {
     sales: salesCount?.n ?? 0,
     expenses: expensesCount?.n ?? 0,
@@ -307,6 +321,8 @@ async function collectReferenceCounts(
     attendance_events: attCount?.n ?? 0,
     products: productsCount?.n ?? 0,
     store_locations: locCount?.n ?? 0,
+    collection_accounts: collAccountsCount?.n ?? 0,
+    collections: collectionsCount?.n ?? 0,
   };
 }
 

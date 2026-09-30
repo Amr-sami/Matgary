@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { db, withTenant } from "@/lib/db";
@@ -12,7 +12,11 @@ import {
   brands,
   products,
   branches,
+  collectionAccounts,
+  collections,
+  collectionEvents,
 } from "@/lib/db/schema";
+import { isUniqueViolation } from "@/lib/api/idempotency";
 import { addProduct, deleteProduct, listProducts, updateProduct } from "@/lib/repo/catalog";
 import {
   addExpense,
@@ -36,6 +40,16 @@ let userB: string;
 let productA: string;
 let branchA: string;
 let branchB: string;
+
+/** Postgres SQLSTATE of a postgres.js error, possibly wrapped by drizzle in `cause`. */
+function pgCode(err: unknown): string | undefined {
+  const e = err as { code?: string; cause?: { code?: string } } | undefined;
+  return e?.code ?? e?.cause?.code;
+}
+async function pgFails(p: Promise<unknown>): Promise<unknown> {
+  try { await p; } catch (err) { return err; }
+  throw new Error("expected the statement to fail");
+}
 
 async function freshTenant(name: string, email: string) {
   return db.transaction(async (tx) => {
@@ -255,5 +269,87 @@ describe("operations isolation", () => {
       tx.execute(sql`select id from sales`),
     );
     expect((result as unknown as { length: number }).length).toBe(0);
+  });
+});
+
+describe("collections isolation (0055)", () => {
+  let accountA: string;
+  let collectionA: string;
+  beforeAll(async () => {
+    await withTenant(tenantA, async (tx) => {
+      const [acc] = await tx.insert(collectionAccounts).values({
+        tenantId: tenantA, branchId: branchA, rail: "wallet", provider: "vodafone_cash",
+        label: "VF A", walletMsisdn: "+201001234567", isPosDefault: true,
+      }).returning({ id: collectionAccounts.id });
+      accountA = acc!.id;
+      const [col] = await tx.insert(collections).values({
+        tenantId: tenantA, branchId: branchA, sourceType: "sale", invoiceId: "ISO-COL-1",
+        method: "wallet", collectionAccountId: accountA, amount: "150.00", rungAt: new Date(),
+        recordedByUserId: userA,
+      }).returning({ id: collections.id });
+      collectionA = col!.id;
+      await tx.insert(collectionEvents).values({
+        tenantId: tenantA, collectionId: collectionA, kind: "created", toStatus: "pending", actorUserId: userA,
+      });
+    });
+  });
+
+  it("tenant B sees none of A's accounts, collections or events", async () => {
+    const [a, c, e] = await withTenant(tenantB, async (tx) => [
+      await tx.select().from(collectionAccounts),
+      await tx.select().from(collections),
+      await tx.select().from(collectionEvents),
+    ]);
+    expect([a.length, c.length, e.length]).toEqual([0, 0, 0]);
+  });
+
+  it("tenant B cannot update or delete A's collection (row invisible → 0 rows)", async () => {
+    const upd = await withTenant(tenantB, (tx) =>
+      tx.update(collections).set({ status: "confirmed" }).where(eq(collections.id, collectionA)).returning(),
+    );
+    const del = await withTenant(tenantB, (tx) =>
+      tx.delete(collectionAccounts).where(eq(collectionAccounts.id, accountA)).returning(),
+    );
+    expect([upd.length, del.length]).toEqual([0, 0]);
+    const [still] = await withTenant(tenantA, (tx) =>
+      tx.select({ status: collections.status }).from(collections).where(eq(collections.id, collectionA)),
+    );
+    expect(still?.status).toBe("pending");
+  });
+
+  it("tenant B cannot write a row carrying A's tenant_id (WITH CHECK → 42501)", async () => {
+    const err = await pgFails(withTenant(tenantB, (tx) => tx.insert(collectionAccounts).values({
+      tenantId: tenantA, rail: "instapay", provider: "cib", label: "x", accountLast4: "1234",
+    })));
+    expect(pgCode(err)).toBe("42501");
+  });
+
+  it("no app.tenant_id → 0 rows on all three tables", async () => {
+    const n = await db.transaction(async (tx) =>
+      (await tx.select().from(collections)).length +
+      (await tx.select().from(collectionAccounts)).length +
+      (await tx.select().from(collectionEvents)).length,
+    );
+    expect(n).toBe(0);
+  });
+
+  it("uniques are per tenant: the same wallet number is fine in B, a 2nd POS default in A is not", async () => {
+    await withTenant(tenantB, (tx) => tx.insert(collectionAccounts).values({
+      tenantId: tenantB, branchId: branchB, rail: "wallet", provider: "vodafone_cash",
+      label: "VF B", walletMsisdn: "+201001234567",
+    }));
+    const err = await pgFails(withTenant(tenantA, (tx) => tx.insert(collectionAccounts).values({
+      tenantId: tenantA, branchId: branchA, rail: "wallet", provider: "orange_cash",
+      label: "OC A", walletMsisdn: "+201201234567", isPosDefault: true,
+    })));
+    expect(isUniqueViolation(err, "collection_accounts_pos_default_uq")).toBe(true);
+  });
+
+  it("a replayed part is absorbed by collections_sale_part_uq (ON CONFLICT … DO NOTHING)", async () => {
+    const rows = await withTenant(tenantA, (tx) => tx.execute(sql`
+      INSERT INTO collections (tenant_id, branch_id, source_type, invoice_id, method, collection_account_id, amount, rung_at)
+      VALUES (${tenantA}, ${branchA}, 'sale', 'ISO-COL-1', 'wallet', ${accountA}, 150, now())
+      ON CONFLICT (tenant_id, invoice_id, part_no) WHERE source_type = 'sale' DO NOTHING RETURNING id`));
+    expect((rows as unknown as unknown[]).length).toBe(0);
   });
 });

@@ -77,7 +77,7 @@
     "ios:sim": "xcodebuild -workspace ios/stwrw.xcworkspace -scheme stwrw -configuration Debug -sdk iphonesimulator -destination \"id=${SIM_UDID:-AB3575BB-3B9D-4D66-85AD-DA2FA5C2F34B}\" -derivedDataPath \"$HOME/Library/Developer/Xcode/DerivedData/stwrw-sim\" CODE_SIGN_IDENTITY=- CODE_SIGNING_ALLOWED=YES CODE_SIGNING_REQUIRED=NO DEVELOPMENT_TEAM= build && xcrun simctl install \"${SIM_UDID:-AB3575BB-3B9D-4D66-85AD-DA2FA5C2F34B}\" \"$HOME/Library/Developer/Xcode/DerivedData/stwrw-sim/Build/Products/Debug-iphonesimulator/stwrw.app\"",
     "ios:prebuild": "expo prebuild --platform ios --no-install && pod-install",
     "e2e": "bash e2e/run.sh",
-    "test": "node --test --experimental-strip-types $(find src -name \"*.test.ts\" -o -name \"*.test.tsx\" | sort) ../../apps/web/app/.well-known/_lib/app-links.test.ts && tsx --test ../../packages/domain/src/escpos/__tests__/*.test.ts && node --test --experimental-strip-types ../../packages/i18n/test/*.test.ts"
+    "test": "node --test --experimental-strip-types $(find src -name \"*.test.ts\" -o -name \"*.test.tsx\" | sort) ../../apps/web/app/.well-known/_lib/app-links.test.ts && tsx --test ../../packages/domain/src/*/__tests__/*.test.ts && node --test --experimental-strip-types ../../packages/i18n/test/*.test.ts && tsx --test modules/*/__tests__/*.test.ts"
   },
   "private": true,
   "expo": {
