@@ -4,6 +4,7 @@
 # debtors by outstanding balance) → the customer's outstanding figure is
 # copied → the first settleable invoice card (unpaid, has an INV- id) opens
 # the settle sheet, amount prefilled with that invoice's remaining balance →
+# Cash (`settle-method-cash`, explicit; no account picker) →
 # Record payment → the card stops being settleable → the outstanding figure no longer
 # reads the copied value: it dropped, or the debt block disappeared because
 # it reached zero. Signs in first when the app is on the login screen. Ends
@@ -91,6 +92,13 @@ appId: com.thestoro.app
 - assertVisible:
     id: "settle-amount"
     text: "[1-9][0-9]*(\\.[0-9]+)?"
+# The method is explicit: with digital collections on for the branch, a
+# leftover digital method would silently file a pending settlement instead
+# of a cash payment (doc 15 spec 15 §4.6). Cash shows no account picker.
+- tapOn:
+    id: "settle-method-cash"
+- assertNotVisible:
+    id: "settle-collection-account-.*"
 - tapOn:
     id: "settle-submit"
 

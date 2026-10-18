@@ -1,0 +1,155 @@
+# Collections — a customer debt settled by InstaPay, then rejected (doc 15
+# spec 15 §4.5.5; spec 08 acceptance 14).
+#
+# Setup by API: the fixture accounts, and a deferred (on-account) sale to a
+# new customer phone. Then:
+#   1. open that customer, open the settle sheet on that invoice;
+#   2. InstaPay: E2E CIB (the POS default) is preselected; record;
+#   3. the debt drops at once (the card is no longer settleable) and the
+#      server holds a PENDING `settlement` collection on E2E CIB;
+#   4. the owner rejects it (by API — the inbox UI is collections-inbox.yaml);
+#   5. pull to refresh: the invoice is settleable again and the payment row
+#      is struck through with the rejected badge (08 §4.10).
+#
+# The customer screen caches its ledger for 30 s (QueryClient staleTime), so
+# step 5 refreshes by the pull gesture a person would use, not by re-opening
+# the link. Ends on the dashboard.
+appId: com.thestoro.app
+---
+# 1. Setup, and a deferred sale with a new phone.
+- runScript:
+    file: helpers/collections-api.js
+    env:
+      MODE: setup
+- runScript:
+    file: helpers/collections-api.js
+    env:
+      MODE: sale
+      METHOD: deferred
+      ACCOUNT: none
+      PHONE: new
+      KEY: s
+
+# 2. Launch, login guard, open the customer.
+- launchApp
+- runFlow: helpers/dev-launcher.yaml
+- extendedWaitUntil:
+    visible:
+      text: "المزيد|More|تسجيل الدخول|Sign in"
+    timeout: 45000
+- runFlow:
+    when:
+      visible:
+        id: "login-identifier"
+    file: login.yaml
+- runFlow: helpers/dismiss-logbox.yaml
+- openLink: "matgary://customers/${output.sPhoneEnc}"
+- extendedWaitUntil:
+    visible:
+      id: "customer-outstanding"
+    timeout: 30000
+
+# 3. The settle sheet for this run's invoice.
+- scrollUntilVisible:
+    element:
+      id: "customer-invoice-settleable"
+      text: "(?s).*${output.sInv}.*"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- tapOn:
+    id: "customer-invoice-settleable"
+    text: "(?s).*${output.sInv}.*"
+- extendedWaitUntil:
+    visible:
+      id: "settle-amount"
+    timeout: 15000
+
+# 4. InstaPay on E2E CIB (preselected POS default), record.
+- tapOn:
+    id: "settle-method-instapay"
+- extendedWaitUntil:
+    visible:
+      id: "settle-collection-account-${output.cibId}"
+    timeout: 10000
+- tapOn:
+    id: "settle-submit"
+
+# 5. The debt drops now; the server holds a pending settlement on E2E CIB.
+- extendedWaitUntil:
+    notVisible:
+      id: "settle-amount"
+    timeout: 45000
+- extendedWaitUntil:
+    visible:
+      id: "customer-invoice"
+      text: "(?s).*${output.sInv}.*"
+    timeout: 45000
+- runScript:
+    file: helpers/collections-api.js
+    env:
+      MODE: expect
+      CHECK: settlementPending
+      PHONE: "${output.sPhone}"
+      ACCOUNT: cib
+
+# 6. The owner rejects it (API): not received, back to debt.
+- runScript:
+    file: helpers/collections-api.js
+    env:
+      MODE: decide
+      ACTION: reject
+      ID: "${output.sColl}"
+      REASON: not_received
+      OUTCOME: debt
+- runScript:
+    file: helpers/collections-api.js
+    env:
+      MODE: expect
+      CHECK: ledgerUnpaid
+      PHONE: "${output.sPhone}"
+      INV: "${output.sInv}"
+
+# 7. Pull to refresh (top of the screen, then a downward drag from 30 %
+#    height, clear of any input): the invoice is settleable again and the
+#    voided payment carries the rejected badge.
+- scrollUntilVisible:
+    element:
+      text: "المتبقي على العميل|Owed by customer|محفظة العميل|Customer wallet"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- swipe:
+    start: "50%, 30%"
+    end: "50%, 85%"
+    duration: 600
+- runFlow:
+    when:
+      notVisible:
+        id: "customer-invoice-settleable"
+        text: "(?s).*${output.sInv}.*"
+    commands:
+      - swipe:
+          start: "50%, 30%"
+          end: "50%, 85%"
+          duration: 600
+- scrollUntilVisible:
+    element:
+      id: "customer-invoice-settleable"
+      text: "(?s).*${output.sInv}.*"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "collection-badge-rejected"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+
+# 8. Back to the dashboard.
+- runFlow: helpers/dismiss-logbox.yaml
+- tapOn:
+    text: "الرئيسية|Home"
+- assertVisible:
+    text: "أهلاً، .+|Welcome back, .+"

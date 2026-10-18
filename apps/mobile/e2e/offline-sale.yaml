@@ -1,7 +1,8 @@
 # Offline sale — ring a sale with the network "down", then sync it (doc 06 §6.5).
 #
 # Warm the POS caches online → /sync → flip the DEV-ONLY "Simulate
-# offline" switch → Sales → add a recent product → Cash → Record sale → the
+# offline" switch → Sales → add a recent product → Cash (`pos-pay-cash` by
+# testID, and no transfer panel) → Record sale → the
 # card says PENDING (queued, not synced) → /sync → the queued counter
 # is not 0 → flip the switch back → Sync now → queued reaches 0.
 #
@@ -103,14 +104,18 @@ appId: com.thestoro.app
 - assertVisible:
     id: "pos-cart-totals"
 
+# Cash by testID (the chip's label differs per locale; the id does not), and
+# no transfer panel: cash never books a transfer (doc 15 spec 15 §4.6).
 - scrollUntilVisible:
     element:
-      text: "نقدي|Cash"
+      id: "pos-pay-cash"
     direction: DOWN
     centerElement: true
     timeout: 20000
 - tapOn:
-    text: "نقدي|Cash"
+    id: "pos-pay-cash"
+- assertNotVisible:
+    id: "pos-collection-.*"
 - scrollUntilVisible:
     element:
       text: "تسجيل الفاتورة|Record sale"

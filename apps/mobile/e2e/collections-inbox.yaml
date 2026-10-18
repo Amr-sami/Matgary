@@ -1,0 +1,327 @@
+# Collections — the owner's inbox: confirm, reject to debt, reopen, and the
+# cashier's denial (doc 15 spec 15 §4.5.3; spec 08 acceptance 8, 9, 11, 12;
+# 13 §7 a).
+#
+# Setup by API: two digital sales rung by the API — A (InstaPay on E2E CIB) and
+# B (wallet on E2E VF, with a new customer phone). Then, as the owner:
+#   1. More → Collections → Pending; the late-only deep link
+#      (matgary://collections?stale=1) opens Pending with "late only" on;
+#   2. A: confirm through the sheet → confirmed on screen and on the server;
+#      it leaves Pending and sits under Confirmed without a manual refresh;
+#   3. B: reject "not received" → the outcome defaults to debt (the sale knows
+#      the phone, so no phone field) → rejected; the invoice is settleable
+#      debt on the customer's screen;
+#   4. B: owner reopens → pending again, the debt is undone (server);
+#   5. B is confirmed by API (hygiene, so the next run starts clean);
+#   6. the seeded cashier (record_sales only) has no Collections row on More
+#      and the deep link shows `collections-denied`;
+#   7. login.yaml signs the owner back in.
+#
+# Rows are found by the ids the helper returned, never by position.
+# Four-eyes is not exercised here (the owner is exempt; 05's repo tests own
+# it). Ends on the owner's dashboard.
+appId: com.thestoro.app
+env:
+  STAFF_ID: "cashier@amr-store"
+  STAFF_PW: "Cashier123!"
+---
+# 1. Setup and the two sales.
+- runScript:
+    file: helpers/collections-api.js
+    env:
+      MODE: setup
+- runScript:
+    file: helpers/collections-api.js
+    env:
+      MODE: sale
+      METHOD: instapay
+      ACCOUNT: cib
+      KEY: a
+- runScript:
+    file: helpers/collections-api.js
+    env:
+      MODE: sale
+      METHOD: wallet
+      ACCOUNT: vf
+      PHONE: new
+      KEY: b
+
+# 2. Launch, login guard.
+- launchApp
+- runFlow: helpers/dev-launcher.yaml
+- extendedWaitUntil:
+    visible:
+      text: "المزيد|More|تسجيل الدخول|Sign in"
+    timeout: 45000
+- runFlow:
+    when:
+      visible:
+        id: "login-identifier"
+    file: login.yaml
+
+# 3. More → Collections → Pending.
+- runFlow: helpers/dismiss-logbox.yaml
+- tapOn:
+    text: "المزيد|More"
+    retryTapIfNoChange: true
+- scrollUntilVisible:
+    element:
+      text: "التحويلات|Collections"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    text: "التحويلات|Collections"
+- extendedWaitUntil:
+    visible:
+      id: "collections-tab-pending"
+    timeout: 30000
+- tapOn:
+    id: "collections-tab-pending"
+
+# 3b. The late-only deep link (13 §7 a): Pending + "late only" both selected
+#     (Chip sets accessibilityState.selected, components/ui/Chip.tsx). Then
+#     late-only off, so step 4 finds a fresh row.
+- openLink: "matgary://collections?stale=1"
+- extendedWaitUntil:
+    visible:
+      id: "collections-stale-only"
+      selected: true
+    timeout: 30000
+- assertVisible:
+    id: "collections-tab-pending"
+    selected: true
+- tapOn:
+    id: "collections-stale-only"
+- extendedWaitUntil:
+    visible:
+      id: "collections-stale-only"
+      selected: false
+    timeout: 10000
+
+# 4. Open sale A.
+- scrollUntilVisible:
+    element:
+      id: "collections-row-${output.aColl}"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- tapOn:
+    id: "collections-row-${output.aColl}"
+
+# 5. Confirm through the sheet (the opening button and the sheet's submit have
+#    their own ids, 03 §B.12).
+- extendedWaitUntil:
+    visible:
+      id: "collection-confirm"
+    timeout: 30000
+- tapOn:
+    id: "collection-confirm"
+- extendedWaitUntil:
+    visible:
+      id: "collection-confirm-submit"
+    timeout: 10000
+- tapOn:
+    id: "collection-confirm-submit"
+
+# 6. Confirmed, on screen and on the server.
+- extendedWaitUntil:
+    visible:
+      id: "collection-badge-confirmed"
+    timeout: 30000
+- runScript:
+    file: helpers/collections-api.js
+    env:
+      MODE: expect
+      CHECK: status
+      ID: "${output.aColl}"
+      STATUS: confirmed
+
+# 7. Back on Pending the row is gone; it is under Confirmed (no pull-to-refresh).
+- tapOn:
+    id: "back-link"
+- extendedWaitUntil:
+    visible:
+      id: "collections-tab-pending"
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible:
+      id: "collections-row-${output.aColl}"
+    timeout: 20000
+- tapOn:
+    id: "collections-tab-confirmed"
+- scrollUntilVisible:
+    element:
+      id: "collections-row-${output.aColl}"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+
+# 8. Open sale B from Pending, reject: "not received".
+- scrollUntilVisible:
+    element:
+      id: "collections-tab-pending"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: "collections-tab-pending"
+- scrollUntilVisible:
+    element:
+      id: "collections-row-${output.bColl}"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- tapOn:
+    id: "collections-row-${output.bColl}"
+- extendedWaitUntil:
+    visible:
+      id: "collection-reject"
+    timeout: 30000
+- tapOn:
+    id: "collection-reject"
+- extendedWaitUntil:
+    visible:
+      id: "collection-reject-reason-not_received"
+    timeout: 10000
+- tapOn:
+    id: "collection-reject-reason-not_received"
+
+# 9. The outcome defaults to debt (the sale knows the phone) and no phone field.
+- assertVisible:
+    id: "collection-reject-outcome-debt"
+    selected: true
+- assertNotVisible:
+    id: "collection-reject-phone"
+
+# 10. Submit → rejected.
+- tapOn:
+    id: "collection-reject-submit"
+- extendedWaitUntil:
+    visible:
+      id: "collection-badge-rejected"
+    timeout: 30000
+
+# 11. The debt surfaces: unpaid on the server, settleable on the customer screen
+#     (first load of this new phone, so no stale cache).
+- runScript:
+    file: helpers/collections-api.js
+    env:
+      MODE: expect
+      CHECK: ledgerUnpaid
+      PHONE: "${output.bPhone}"
+      INV: "${output.bInv}"
+- openLink: "matgary://customers/${output.bPhoneEnc}"
+- scrollUntilVisible:
+    element:
+      id: "customer-invoice-settleable"
+      text: "(?s).*${output.bInv}.*"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+
+# 12. The owner reopens B: pending again, the debt undone.
+- openLink: "matgary://collections/${output.bColl}"
+- scrollUntilVisible:
+    element:
+      id: "collection-reopen"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- tapOn:
+    id: "collection-reopen"
+- extendedWaitUntil:
+    visible:
+      id: "collection-reopen-submit"
+    timeout: 10000
+- tapOn:
+    id: "collection-reopen-submit"
+- scrollUntilVisible:
+    element:
+      id: "collection-badge-pending"
+    direction: UP
+    centerElement: true
+    timeout: 30000
+- runScript:
+    file: helpers/collections-api.js
+    env:
+      MODE: expect
+      CHECK: ledgerPaid
+      PHONE: "${output.bPhone}"
+      INV: "${output.bInv}"
+
+# 13. Hygiene: leave B confirmed.
+- runScript:
+    file: helpers/collections-api.js
+    env:
+      MODE: decide
+      ACTION: confirm
+      ID: "${output.bColl}"
+
+# 14. The cashier sees no inbox. Sign out, sign in as the seeded cashier (the
+#     block of permission-denied.yaml:28-80), More has no Collections row
+#     (scrolled to its last row so the whole list has been on screen), and the
+#     deep link lands on the denial.
+- runFlow: helpers/dismiss-logbox.yaml
+- tapOn:
+    text: "المزيد|More"
+    retryTapIfNoChange: true
+- scrollUntilVisible:
+    element:
+      text: "تسجيل الخروج|Sign out"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    text: "تسجيل الخروج|Sign out"
+- extendedWaitUntil:
+    visible:
+      id: "login-identifier"
+    timeout: 30000
+- runFlow:
+    when:
+      visible:
+        text: "العربية"
+    commands:
+      - tapOn:
+          text: "العربية"
+      - extendedWaitUntil:
+          visible:
+            text: "تصفح المتجر التجريبي"
+          timeout: 15000
+- tapOn:
+    id: "login-identifier"
+- eraseText: 80
+- inputText: ${STAFF_ID}
+- tapOn:
+    id: "login-password"
+- eraseText: 80
+- inputText: ${STAFF_PW}
+- pressKey: Enter
+- extendedWaitUntil:
+    visible:
+      text: "أهلاً، .+"
+    timeout: 45000
+- assertVisible:
+    text: "يسعدنا وجودك معنا اليوم"
+- runFlow: helpers/dismiss-logbox.yaml
+- tapOn:
+    text: "المزيد"
+- scrollUntilVisible:
+    element:
+      text: "تسجيل الخروج"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertNotVisible:
+    text: "التحويلات|Collections"
+- openLink: matgary://collections
+- extendedWaitUntil:
+    visible:
+      id: "collections-denied"
+    timeout: 30000
+
+# 15. The owner back (login.yaml signs whoever is in out, then the owner in).
+- runFlow: login.yaml
+- assertVisible:
+    text: "أهلاً، متجر عمرو"

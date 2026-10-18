@@ -157,6 +157,7 @@ services:
       RECURRING_EXPENSES_CRON: "0 * * * *"
       ACTIVITY_CLEANUP_CRON: "30 3 * * *"
       TENANT_DELETION_CRON: "0 3 * * *"
+      COLLECTIONS_TICK_CRON: "*/15 * * * *"
     entrypoint:
       - sh
       - -c
@@ -189,10 +190,12 @@ services:
           echo "$$RECURRING_EXPENSES_CRON /usr/local/bin/poke-cron.sh /api/cron/recurring-expenses recurring-expenses >> /var/log/cron.log 2>&1"
           echo "$$ACTIVITY_CLEANUP_CRON /usr/local/bin/poke-cron.sh /api/cron/activity-log-cleanup activity-cleanup >> /var/log/cron.log 2>&1"
           echo "$$TENANT_DELETION_CRON /usr/local/bin/poke-cron.sh /api/cron/tenant-deletion tenant-deletion >> /var/log/cron.log 2>&1"
+          echo "$$COLLECTIONS_TICK_CRON /usr/local/bin/poke-cron.sh /api/cron/collections-tick collections-tick >> /var/log/cron.log 2>&1"
         } > /etc/crontabs/root
         echo "[cron] recurring-expenses schedule: $$RECURRING_EXPENSES_CRON"
         echo "[cron] activity-cleanup   schedule: $$ACTIVITY_CLEANUP_CRON"
         echo "[cron] tenant-deletion    schedule: $$TENANT_DELETION_CRON"
+        echo "[cron] collections-tick   schedule: $$COLLECTIONS_TICK_CRON"
         echo "[cron] target: $$CRON_TARGET_URL"
         # `tini` reaps zombies; crond -f keeps the container alive.
         exec tini -- crond -f -d 8

@@ -1,0 +1,360 @@
+# Collections — a digital sale at the POS (doc 15 spec 15 §4.5.1; spec 08
+# acceptance 2, 3, 4, 6; 13 §7 d).
+#
+# Setup by API (helpers/collections-api.js): the branch switch on, the two
+# fixture accounts E2E CIB (InstaPay, POS default, with a valid ipn.eg link)
+# and E2E VF (Vodafone Cash, POS default), a random payer last-4 for this run.
+# Then, through the UI:
+#   1. InstaPay chip → E2E CIB is preselected: its QR and its IPA handle are on
+#      screen, the IBAN never is;
+#   2. wallet chip → only wallet accounts, E2E VF's number instead of a QR;
+#   3. payer last-4 → Record sale → the result card says "awaiting
+#      confirmation"; the server holds exactly one pending VF part with that
+#      payer;
+#   4. New sale → the cart is back on cash with no transfer panel (the
+#      sticky-chip fix);
+#   5. InstaPay split into two parts of EGP 1 + the cash remainder → the
+#      server holds 2 pending parts (partNo 1, 2) summing EGP 2.00, below the
+#      invoice total;
+#   6. Home → the "transfers awaiting confirmation" card is there (13 §7 d).
+#
+# Selectors are testIDs (03 §B.12, 08 §4.15); text only for tab labels and the
+# New sale button, as "ar|en" regexes. The payer and part amounts are typed
+# one character per step: the POS is a controlled form that re-renders the
+# whole cart on every keystroke. Rows are found by this run's payer, never by
+# position. The run leaves 3 pending collections; the next run's setup
+# confirms them once they are older than 30 minutes. Ends on the dashboard.
+appId: com.thestoro.app
+---
+# 1. Setup before launch, so the cold start reads features + accounts fresh.
+- runScript:
+    file: helpers/collections-api.js
+    env:
+      MODE: setup
+
+# 2. Launch, dev launcher, login guard (pos-sale.yaml:9-19).
+- launchApp
+- runFlow: helpers/dev-launcher.yaml
+- extendedWaitUntil:
+    visible:
+      text: "المزيد|More|تسجيل الدخول|Sign in"
+    timeout: 45000
+- runFlow:
+    when:
+      visible:
+        id: "login-identifier"
+    file: login.yaml
+
+# 3. Sales tab, add one recent product (pos-sale.yaml:21-57).
+- runFlow: helpers/dismiss-logbox.yaml
+- tapOn:
+    text: "المبيعات|Sales"
+- extendedWaitUntil:
+    visible:
+      id: "pos-recent-chip"
+    timeout: 30000
+- tapOn:
+    id: "pos-recent-chip"
+    index: 0
+- runFlow:
+    when:
+      notVisible:
+        id: "pos-cart-totals"
+    commands:
+      - tapOn:
+          id: "pos-recent-chip"
+          index: 1
+- runFlow:
+    when:
+      notVisible:
+        id: "pos-cart-totals"
+    commands:
+      - tapOn:
+          id: "pos-recent-chip"
+          index: 2
+- runFlow:
+    when:
+      notVisible:
+        id: "pos-cart-totals"
+    commands:
+      - tapOn:
+          id: "pos-recent-chip"
+          index: 4
+- scrollUntilVisible:
+    element:
+      id: "pos-cart-totals"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+
+# 4. InstaPay chip.
+- scrollUntilVisible:
+    element:
+      id: "pos-pay-instapay"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: "pos-pay-instapay"
+
+# 5. E2E CIB preselected: its QR is drawn and the customer-facing handle is
+#    exactly its IPA handle (the LRI/PDI isolates around it are optional in the
+#    regex). The QR and the bare-handle line render only for the PICKED account,
+#    so together they prove the preselection. The picker row is there too.
+- scrollUntilVisible:
+    element:
+      id: "pos-collection-account-${output.cibId}"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: "pos-collection-qr"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    text: '\x{2066}?e2e-cib@instapay\x{2069}?'
+
+# 6. The IBAN is never on the POS (03 §E.5).
+- assertNotVisible:
+    text: ".*EG3800190005.*"
+
+# 7. Wallet chip: only wallet accounts, E2E VF preselected, its number and no QR.
+- scrollUntilVisible:
+    element:
+      id: "pos-pay-wallet"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: "pos-pay-wallet"
+- scrollUntilVisible:
+    element:
+      id: "pos-collection-account-${output.vfId}"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertNotVisible:
+    id: "pos-collection-account-${output.cibId}"
+- scrollUntilVisible:
+    element:
+      id: "pos-collection-number"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    id: "pos-collection-number"
+    text: ".*${output.vfDigits}.*"
+- assertNotVisible:
+    id: "pos-collection-qr"
+
+# 8. Payer hint: this run's random last-4, one digit per step.
+- scrollUntilVisible:
+    element:
+      id: "pos-collection-payer"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: "pos-collection-payer"
+- inputText: "${output.payer.charAt(0)}"
+- inputText: "${output.payer.charAt(1)}"
+- inputText: "${output.payer.charAt(2)}"
+- inputText: "${output.payer.charAt(3)}"
+
+# 9. Record (centred, so it sits above the iPhone number pad).
+- scrollUntilVisible:
+    element:
+      id: "pos-record"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: "pos-record"
+
+# 10. Result card: awaiting confirmation. Same swipe pair as pos-sale.yaml:99-110
+#     (the card mounts above the form; scroll up from 30 % height, never from
+#     the centre, which is the search input on the Pixel).
+- extendedWaitUntil:
+    visible:
+      text: "بيع جديد|New sale"
+    timeout: 45000
+- swipe:
+    start: "50%, 30%"
+    end: "50%, 85%"
+    duration: 400
+- swipe:
+    start: "50%, 30%"
+    end: "50%, 85%"
+    duration: 400
+- extendedWaitUntil:
+    visible:
+      id: "pos-sale-result"
+    timeout: 10000
+- assertVisible:
+    id: "pos-collection-badge"
+- assertVisible:
+    id: "collection-badge-pending"
+
+# 11. Server: exactly one pending VF part carries this payer.
+- runScript:
+    file: helpers/collections-api.js
+    env:
+      MODE: expect
+      CHECK: pendingByPayer
+      ACCOUNT: vf
+      PAYER: "${output.payer}"
+      PARTS: "1"
+
+# 12. New sale: the cart is back on cash, no transfer panel (sticky-chip fix).
+#     The cash chip is centred first so a leftover panel (it renders right
+#     under the chips) would be on screen, not hidden below the fold.
+- tapOn:
+    text: "بيع جديد|New sale"
+- extendedWaitUntil:
+    visible:
+      id: "pos-recent-chip"
+    timeout: 30000
+- tapOn:
+    id: "pos-recent-chip"
+    index: 0
+- runFlow:
+    when:
+      notVisible:
+        id: "pos-cart-totals"
+    commands:
+      - tapOn:
+          id: "pos-recent-chip"
+          index: 1
+- runFlow:
+    when:
+      notVisible:
+        id: "pos-cart-totals"
+    commands:
+      - tapOn:
+          id: "pos-recent-chip"
+          index: 2
+- runFlow:
+    when:
+      notVisible:
+        id: "pos-cart-totals"
+    commands:
+      - tapOn:
+          id: "pos-recent-chip"
+          index: 4
+- scrollUntilVisible:
+    element:
+      id: "pos-pay-cash"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertNotVisible:
+    id: "pos-collection-.*"
+
+# 13. Split: InstaPay, then "add part" (from single mode it creates part 1 =
+#     the whole total on E2E CIB and part 2 = 0 on the POS default, E2E CIB),
+#     then EGP 1 in each part.
+- tapOn:
+    id: "pos-pay-instapay"
+- scrollUntilVisible:
+    element:
+      id: "pos-collection-add-part"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: "pos-collection-add-part"
+- scrollUntilVisible:
+    element:
+      id: "pos-collection-part-1-amount"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: "pos-collection-part-1-amount"
+- eraseText: 20
+- inputText: "1"
+- runFlow:
+    when:
+      notVisible:
+        id: "pos-collection-part-2-amount"
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: "pos-collection-add-part"
+          direction: DOWN
+          centerElement: true
+          timeout: 20000
+      - tapOn:
+          id: "pos-collection-add-part"
+- scrollUntilVisible:
+    element:
+      id: "pos-collection-part-2-amount"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: "pos-collection-part-2-amount"
+- eraseText: 20
+- inputText: "1"
+
+# 14. The cash remainder line is shown. Its value is checked on the server in
+#     step 15 (recent-chip products of the rich seed cost ≥ EGP 10, so
+#     total − 2 > 0); a regex on a formatted amount is too fragile across
+#     locales.
+- scrollUntilVisible:
+    element:
+      id: "pos-collection-cash-remainder"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+
+# 15. Part 1 payer hint, record, and the server has the 2 parts.
+- scrollUntilVisible:
+    element:
+      id: "pos-collection-part-1-payer"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: "pos-collection-part-1-payer"
+- inputText: "${output.payer.charAt(0)}"
+- inputText: "${output.payer.charAt(1)}"
+- inputText: "${output.payer.charAt(2)}"
+- inputText: "${output.payer.charAt(3)}"
+- scrollUntilVisible:
+    element:
+      id: "pos-record"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: "pos-record"
+- extendedWaitUntil:
+    visible:
+      text: "بيع جديد|New sale"
+    timeout: 45000
+- runScript:
+    file: helpers/collections-api.js
+    env:
+      MODE: expect
+      CHECK: pendingByPayer
+      ACCOUNT: cib
+      PAYER: "${output.payer}"
+      PARTS: "2"
+      PART_SUM: "2"
+
+# 16. Home: steps 11 and 15 left pending rows, so the awaiting card renders
+#     (it renders nothing at count 0, 13 §4.12).
+- tapOn:
+    text: "بيع جديد|New sale"
+- runFlow: helpers/dismiss-logbox.yaml
+- tapOn:
+    text: "الرئيسية|Home"
+- scrollUntilVisible:
+    element:
+      id: "dashboard-collections-awaiting"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000

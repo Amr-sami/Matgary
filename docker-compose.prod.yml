@@ -164,9 +164,10 @@ services:
       start_period: 20s
 
   # Pokes the app's internal cron routes. Holds no DB credentials — only the
-  # shared bearer token. All six routes are scheduled here; the dev compose
-  # file wires only three, which is why admin lockouts are never applied,
-  # digests never send, and demo clones accumulate.
+  # shared bearer token. All eight routes are scheduled here (one per directory
+  # in apps/web/app/api/cron); the dev compose file wires only four, which is
+  # why admin lockouts are never applied, digests never send, and demo clones
+  # accumulate.
   cron:
     image: alpine:3.20
     container_name: matgary-cron
@@ -198,6 +199,12 @@ services:
       # period — running it hourly would turn an opt-in daily summary into an
       # hourly one. Once a day, 17:00 UTC = 20:00 Cairo (19:00 outside DST).
       NOTIFICATIONS_DIGEST_CRON: "0 17 * * *"
+      # Digital collections (mobile-dev-docs/15-digital-collections, specs 13 + 16):
+      # M1 staleSweep + limitSweep; M2 adds silentSourceSweep, rawPurge (raw-message
+      # retention: a legal duty, spec 14) and lateRematch. "*/15" lands at most 5
+      # pokes in any sliding hour, under guardCronRequest's default 6/h for the
+      # "collections-tick" bucket. Never faster; never slower than hourly (retention).
+      COLLECTIONS_TICK_CRON: "*/15 * * * *"
     entrypoint:
       - sh
       - -c
@@ -232,8 +239,9 @@ services:
           echo "$$DIGEST_TICK_CRON /usr/local/bin/poke-cron.sh /api/cron/digest-tick digest-tick >> /var/log/cron.log 2>&1"
           echo "$$DEMO_CLEANUP_CRON /usr/local/bin/poke-cron.sh /api/cron/demo-cleanup demo-cleanup >> /var/log/cron.log 2>&1"
           echo "$$NOTIFICATIONS_DIGEST_CRON /usr/local/bin/poke-cron.sh /api/cron/notifications-digest notifications-digest >> /var/log/cron.log 2>&1"
+          echo "$$COLLECTIONS_TICK_CRON /usr/local/bin/poke-cron.sh /api/cron/collections-tick collections-tick >> /var/log/cron.log 2>&1"
         } > /etc/crontabs/root
-        echo "[cron] target: $$CRON_TARGET_URL — 7 jobs scheduled"
+        echo "[cron] target: $$CRON_TARGET_URL — 8 jobs scheduled"
         exec tini -- crond -f -d 8
 
   backup:
