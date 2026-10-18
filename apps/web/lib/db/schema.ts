@@ -2475,7 +2475,7 @@ export const collections = pgTable(
     recordedByUserId: uuid("recorded_by_user_id").references(() => users.id, {
       onDelete: "set null",
     }),
-    /** FK → collection_credits (SET NULL) is added by 0056; plain uuid here (cycle). */
+    /** FK → collection_credits (SET NULL) in 0056; plain uuid here (cycle). */
     matchedCreditId: uuid("matched_credit_id"),
     decidedByUserId: uuid("decided_by_user_id").references(() => users.id, {
       onDelete: "set null",
@@ -2524,9 +2524,9 @@ export const collectionEvents = pgTable(
     toStatus: text("to_status"),
     /** NULL = system. */
     actorUserId: uuid("actor_user_id").references(() => users.id, { onDelete: "set null" }),
-    /** FK → collection_ingest_devices (SET NULL) added by 0056. */
+    /** FK → collection_ingest_devices (SET NULL) in 0056; plain uuid here (cycle). */
     actorDeviceId: uuid("actor_device_id"),
-    /** FK → collection_credits (SET NULL) added by 0056. */
+    /** FK → collection_credits (SET NULL) in 0056; plain uuid here (cycle). */
     creditId: uuid("credit_id"),
     details: jsonb("details").$type<Record<string, unknown>>().notNull().default({}),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
@@ -2540,3 +2540,173 @@ export const collectionEvents = pgTable(
 export type CollectionAccountRow = typeof collectionAccounts.$inferSelect;
 export type CollectionRow = typeof collections.$inferSelect;
 export type CollectionEventRow = typeof collectionEvents.$inferSelect;
+
+/** 0056. Phones allowed to forward bank/wallet messages. NO RLS (bootstrap
+ *  lookup by token hash, like auth_devices): every other query MUST filter
+ *  tenant_id explicitly. */
+export const collectionIngestDevices = pgTable(
+  "collection_ingest_devices",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id").references(() => branches.id, { onDelete: "restrict" }),
+    createdByUserId: uuid("created_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    label: text("label").notNull(),
+    /** IngestPlatform (CHECK). */
+    platform: text("platform").notNull(),
+    /** IngestChannel[] the device may post (CHECK: non-empty subset). */
+    channels: text("channels").array().notNull(),
+    /** Empty = all active accounts of the tenant/branch. */
+    accountIds: uuid("account_ids").array().notNull().default(sql`'{}'::uuid[]`),
+    /** SHA-256 hex of the `mgi_` token. The plaintext is shown once, never stored. */
+    tokenHash: text("token_hash").notNull().unique("collection_ingest_devices_token_hash_uq"),
+    tokenPrefix: text("token_prefix").notNull(),
+    consentVersion: text("consent_version").notNull(),
+    consentAt: timestamp("consent_at", { withTimezone: true }).notNull(),
+    consentUserId: uuid("consent_user_id").references(() => users.id, { onDelete: "set null" }),
+    appVersion: text("app_version"),
+    osVersion: text("os_version"),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+    lastMessageAt: timestamp("last_message_at", { withTimezone: true }),
+    lastCreditAt: timestamp("last_credit_at", { withTimezone: true }),
+    lastHeartbeat: jsonb("last_heartbeat").$type<Record<string, unknown>>(),
+    silentAlertedAt: timestamp("silent_alerted_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    revokedByUserId: uuid("revoked_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    /** 'owner' | 'user_removed' | 'security' | 'replaced' (CHECK). */
+    revokedReason: text("revoked_reason"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
+  },
+  (t) => [
+    index("collection_ingest_devices_tenant_live_idx")
+      .on(t.tenantId)
+      .where(sql`revoked_at IS NULL`),
+  ],
+);
+
+/** 0056. Forwarded text, AES-256-GCM encrypted, purged at `expiresAt` (03 §E.4). */
+export const collectionRawMessages = pgTable(
+  "collection_raw_messages",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    /** NULL for manual_paste. */
+    ingestDeviceId: uuid("ingest_device_id").references(() => collectionIngestDevices.id, {
+      onDelete: "set null",
+    }),
+    channel: text("channel").notNull(),
+    sourceApp: text("source_app"),
+    sender: text("sender"),
+    senderKind: text("sender_kind").notNull(),
+    clientFingerprint: text("client_fingerprint"),
+    bodySha256: text("body_sha256").notNull(),
+    /** NULL when parse_status = 'otp' (CHECK). */
+    titleEnc: text("title_enc"),
+    bodyEnc: text("body_enc"),
+    parseStatus: text("parse_status").notNull(),
+    templateId: text("template_id"),
+    /** Device time. */
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    sharedAt: timestamp("shared_at", { withTimezone: true }),
+    sharedByUserId: uuid("shared_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+  },
+  (t) => [
+    // ON CONFLICT (tenant_id, ingest_device_id, client_fingerprint) WHERE client_fingerprint IS NOT NULL (spec 07).
+    uniqueIndex("collection_raw_messages_device_fp_uq")
+      .on(t.tenantId, t.ingestDeviceId, t.clientFingerprint)
+      .where(sql`client_fingerprint IS NOT NULL`),
+    index("collection_raw_messages_expires_idx").on(t.expiresAt),
+    index("collection_raw_messages_tenant_status_idx").on(t.tenantId, t.parseStatus, t.createdAt),
+  ],
+);
+
+/** 0056. One row per real-world credit/debit after dedupe (SMS + notification collapse). */
+export const collectionCredits = pgTable(
+  "collection_credits",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id").references(() => branches.id, { onDelete: "restrict" }),
+    collectionAccountId: uuid("collection_account_id").references(() => collectionAccounts.id, {
+      onDelete: "restrict",
+    }),
+    ingestDeviceId: uuid("ingest_device_id").references(() => collectionIngestDevices.id, {
+      onDelete: "set null",
+    }),
+    /** Survives the raw purge as NULL. */
+    rawMessageId: uuid("raw_message_id").references(() => collectionRawMessages.id, {
+      onDelete: "set null",
+    }),
+    /** CreditDirection (CHECK). */
+    direction: text("direction").notNull(),
+    channels: text("channels").array().notNull(),
+    templateId: text("template_id").notNull(),
+    amount: numeric("amount", { precision: 14, scale: 2 }).notNull(),
+    payerPhoneLast4: text("payer_phone_last4"),
+    /** HMAC-SHA256 (purpose key `collections.phone`), equality only. */
+    payerPhoneHmac: text("payer_phone_hmac"),
+    payerNameMasked: text("payer_name_masked"),
+    /** Only when shop_settings.collections_store_payer_names. */
+    payerName: text("payer_name"),
+    balanceAfter: numeric("balance_after", { precision: 14, scale: 2 }),
+    operatorReference: text("operator_reference"),
+    receivingHint: text("receiving_hint"),
+    sender: text("sender"),
+    senderKind: text("sender_kind").notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+    deviceReceivedAt: timestamp("device_received_at", { withTimezone: true }).notNull(),
+    /** CreditState (CHECK). */
+    state: text("state").notNull(),
+    /** HoldReason (CHECK). */
+    holdReason: text("hold_reason"),
+    suggestedCollectionId: uuid("suggested_collection_id").references(() => collections.id, {
+      onDelete: "set null",
+    }),
+    matchedCollectionId: uuid("matched_collection_id").references(() => collections.id, {
+      onDelete: "set null",
+    }),
+    ignoredReason: text("ignored_reason"),
+    decidedByUserId: uuid("decided_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    /** 03 §C.9: r:… | b:… | f:… */
+    dedupeKey: text("dedupe_key").notNull(),
+    seenCount: integer("seen_count").notNull().default(1),
+    isTest: boolean("is_test").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
+  },
+  (t) => [
+    uniqueIndex("collection_credits_dedupe_uq").on(t.tenantId, t.dedupeKey),
+    uniqueIndex("collection_credits_matched_uq")
+      .on(t.matchedCollectionId)
+      .where(sql`matched_collection_id IS NOT NULL`),
+    index("collection_credits_tenant_state_idx").on(t.tenantId, t.state, t.occurredAt),
+    index("collection_credits_match_idx").on(
+      t.tenantId,
+      t.collectionAccountId,
+      t.amount,
+      t.occurredAt,
+    ),
+  ],
+);
+
+export type CollectionIngestDeviceRow = typeof collectionIngestDevices.$inferSelect;
+export type CollectionRawMessageRow = typeof collectionRawMessages.$inferSelect;
+export type CollectionCreditRow = typeof collectionCredits.$inferSelect;

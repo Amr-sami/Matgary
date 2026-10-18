@@ -149,5 +149,42 @@ test(
   () => {
     assert.ok(termsAr.at(-1)!.title.startsWith("13. ") && termsEn.at(-1)!.title.startsWith("13. "));
     assert.ok(termsEn.at(-1)!.title.includes("on your behalf"));
+    assert.ok(termsAr.at(-1)!.title.includes("نيابةً عنك"));
+  },
+);
+
+// Terms §11 promises 14 days' notice of a material change, so the lead names the day §13 takes effect,
+// at least 14 days after "Last updated". Both dates are a placeholder (UNVERIFIED) until the text is live
+// in production: whoever deploys it sets "Last updated" to the deploy day and the effective day to ≥ 14
+// days later, in both files (spec 14 step 4 "As landed"); this test then keeps the gap and the locales honest.
+const MONTHS_EN = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const MONTHS_AR = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+function leadDates(lead: string, months: string[]): number[] {
+  const re = new RegExp(`(\\d{1,2}) (${months.join("|")}) (\\d{4})`, "g");
+  return [...lead.matchAll(re)].map((m) => Date.UTC(Number(m[3]), months.indexOf(m[2]), Number(m[1])));
+}
+test(
+  "T-terms-3: the terms lead gives §13's effective date, ≥ 14 days after the update, the same in ar and en",
+  { skip: termsAr.length < 13 ? "terms §13 lands with spec 14 step 4 (README §3 order 16)" : false },
+  () => {
+    const leadAr = String(at(arDict, "marketing.terms.lead")), leadEn = String(at(enDict, "marketing.terms.lead"));
+    assert.match(leadEn, /^Last updated: .+\. Section 13 takes effect on .+\.$/);
+    assert.match(leadAr, /^آخر تحديث: .+\. يسري البند 13 اعتبارًا من .+\.$/);
+    const en = leadDates(leadEn, MONTHS_EN), ar = leadDates(leadAr, MONTHS_AR);
+    assert.equal(en.length, 2, `en lead needs two dates: "${leadEn}"`);
+    assert.deepEqual(ar, en, "ar and en terms leads name different dates");
+    assert.ok(en[1] - en[0] >= 14 * 86_400_000, "§13 must take effect at least 14 days after the update (terms §11)");
+  },
+);
+
+test(
+  "T-privacy-3: from 14 sections, §13 forwarded messages sits right after §12 receiving accounts, in both",
+  { skip: privAr.length < 14 ? "privacy §13 lands with spec 14 step 5 (README §3 order 16)" : false },
+  () => {
+    for (const [secs, s12, s13] of [[privAr, "حسابات الاستلام", "المُمرَّرة"], [privEn, "Receiving accounts", "Forwarded bank and wallet messages"]] as const) {
+      const i12 = secs.indexOf(find(secs, s12)!), i13 = secs.indexOf(find(secs, s13)!);
+      assert.equal(i12, 11, "§12 must stay at index 11");
+      assert.equal(i13, 12, "§13 must be at index 12, before Updates");
+    }
   },
 );

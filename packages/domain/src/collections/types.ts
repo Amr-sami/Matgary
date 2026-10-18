@@ -379,3 +379,47 @@ export interface GateResult {
   reason: HoldReason | null;
   reasons: HoldReason[];
 }
+
+// Additional matcher I/O (spec 06 §4.13; additive, 06 ARCH CR 1) — the inputs
+// of routeCredit / balanceCheck and the result of classifyLateArrival, kept
+// here so spec 07 imports every type from one path.
+
+/** An active, non-archived receiving account as routeCredit sees it. */
+export interface RouteAccount {
+  id: string;
+  provider: CollectionProvider;
+  rail: CollectionRail;
+  accountLast4: string | null;
+  walletMsisdn: string | null;
+  isPrepaidCard: boolean;
+}
+
+export interface RouteCreditInput {
+  /** null = a fallback credit (no template hit). */
+  template: CollectionTemplate | null;
+  receivingHint: string | null;
+  accounts: readonly RouteAccount[];
+  /** The device's `account_ids`; [] = every account. */
+  deviceAccountIds: readonly string[];
+}
+
+export type RouteResult = { accountId: string } | { accountId: null; reason: "no_account" };
+
+export interface BalanceCheckInput {
+  /** collection_accounts.balance_check_enabled */
+  enabled: boolean;
+  template: CollectionTemplate | null;
+  direction: CreditDirection;
+  amount: string;
+  balanceAfter: string | null;
+  /** collection_accounts.balance_baseline */
+  baseline: string | null;
+  baselineAt: Date | string | null;
+  /** collection_accounts.balance_chain_broken_at */
+  chainBrokenAt: Date | string | null;
+}
+
+export type LateArrival =
+  | { kind: "evidence"; collectionId: string }
+  | { kind: "matches_rejected"; collectionId: string }
+  | { kind: "none" };

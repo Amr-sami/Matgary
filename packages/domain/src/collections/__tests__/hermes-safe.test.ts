@@ -18,7 +18,7 @@ import path from "node:path";
 import ts from "typescript";
 
 const DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-// filter.ts arrives with part B (order 18); it is skipped until it exists.
+// filter.ts landed with part B (order 18, 2026-10-18); mobile may import it.
 const FILES = ["types", "normalize", "providers", "limits", "ipa", "qr", "eta", "filter"];
 
 const FORBIDDEN_SUBSTRINGS = ["(?<=", "(?<!", "(?<", "\\p{", "\\P{", "Intl.", ".normalize("];
@@ -75,8 +75,8 @@ function scanAst(file: string, src: string): Finding[] {
 
 const present = FILES.filter((f) => existsSync(path.join(DIR, `${f}.ts`)));
 
-test("the part A files exist", () => {
-  for (const f of ["types", "normalize", "providers", "limits", "ipa", "qr", "eta"]) {
+test("the mobile-importable files exist (part A + filter.ts)", () => {
+  for (const f of ["types", "normalize", "providers", "limits", "ipa", "qr", "eta", "filter"]) {
     assert.ok(present.includes(f), `${f}.ts`);
   }
 });

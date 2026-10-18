@@ -22,17 +22,22 @@
 // (03 §D.6 forbids it); an over-masked word is recovered by --allow-word after
 // the owner confirms it (§4.9.7 step 2). It fails safe.
 //
-// M1 NOTE (as landed 2026-10-18): spec 06 part B (order 18: __fixtures__/
-// samples.ts, filter.ts, templates/) has not landed. Three inputs it will own
-// are therefore copied here, verbatim from the research notes / 06 §4.9–4.10,
-// and marked INTERIM. When order 18 lands, replace them with imports:
-//   INTERIM_PUBLISHED_SAMPLES  → SAMPLES.filter(kind === "published").map(published)
-//   INTERIM_CANDIDATE_KEYWORDS → CANDIDATE_KEYWORDS (filter.ts)
-//   INTERIM_FOOTER_DOMAINS     → COLLECTION_TEMPLATES.flatMap(footerDomains)
-//   INTERIM_FILL_NAMES         → SAMPLES.flatMap(fills).map(replacement) words
-//   applyFillsLocal            → applyFills (__fixtures__/samples.ts)
+// The vocabulary inputs come from spec 06 part B (order 18, landed
+// 2026-10-18), which replaced the INTERIM copies order 12 carried
+// (spec 15 §4.10.4):
+//   published sample texts → SAMPLES.filter(kind === "published").map(published)
+//   candidate keywords     → CANDIDATE_KEYWORDS (filter.ts)
+//   footer domains         → COLLECTION_TEMPLATES.flatMap(footerDomains)
+//   synthetic fill names   → the words of SAMPLES.flatMap(fills) replacements
+//                            + this module's own <Wn> fills (R5)
+//   applyFills             → re-exported from __fixtures__/samples.ts
 
+import { SAMPLES } from "@matgary/domain/collections/__fixtures__/samples";
+import { CANDIDATE_KEYWORDS } from "@matgary/domain/collections/filter";
 import { normalizeDigits, normalizeText } from "@matgary/domain/collections/normalize";
+import { COLLECTION_TEMPLATES } from "@matgary/domain/collections/templates/index";
+
+export { applyFills } from "@matgary/domain/collections/__fixtures__/samples";
 
 // ---------------------------------------------------------------------------
 // Public types (§4.10.1)
@@ -67,72 +72,43 @@ export interface Redacted {
 }
 
 // ---------------------------------------------------------------------------
-// INTERIM inputs owned by spec 06 part B (see the header)
+// Vocabulary inputs owned by spec 06 part B (see the header)
 // ---------------------------------------------------------------------------
 
 /**
- * = SAMPLES.filter(s => s.kind === "published").map(s => s.published)
- * The masked texts of 06 §4.14, verbatim from _research/wallets.md §5.1 and
- * instapay.md §4.3 (research annotations such as "(12 digits)" dropped).
- * They contain no personal data: every name / number is a mask.
+ * The masked published texts of 06 §4.14 (verbatim from _research/wallets.md
+ * §5.1 and instapay.md §4.3). They contain no personal data: every name /
+ * number is a mask.
  */
-export const INTERIM_PUBLISHED_SAMPLES: readonly string[] = [
-  // VF-1
-  "تم استلام مبلغ 2700.00 جنيه من رقم 0112xxxxx05 المسجل بإسم <NAME> على رقم محفظتك  0100xxxxx65.\nرصيدك الحالي: 2724.51 جنيه\nتاريخ العملية: 17:36 26-07-27\nرقم العملية: 0221xxxxxxxx\nتابع كل مصروفاتك من تاريخ المعاملات على أبلكيشن أنا فودافون http://vf.eg/vfcash",
-  // VF-2
-  "تم تحويل مبلغ 500.00 جنيه الى رقم 0106xxxxx46 بنجاح. رصيدك الحالي: 10.00 جنيه",
-  // EM-1
-  "تم إستلام مبلغ 200.00 ج.م من رقم 0106xxxxx46 المسجل باسم<NAME> بنجاح. رصيد محفظتك الحالى 429.90 ج.م.استخدم e& money هتكسب و العب هتكسب هدايا تانية كتير http://spr.ly/Spin_The_Wheel وكمان تقدر تستمتع بخصم %30على وجبة كومبو من Buffalo Burger ب 160 جنيه بدل225 لما تدفع ب http://spr.ly/BuffaloBurger2 e& money",
-  // EM-2
-  "تم إيداع مبلغ 1.00  في حسابك بنجاح من رقم حساب 00201000xxxxx المسجل باسم <NAME>\n استخدم e& money هتكسب و العب هتكسب هدايا تانية كتير http://spr.ly/Spin_The_Wheel",
-  // OC-1
-  "تم إستلام عملية تحويل أموال بمبلغ 150.00 جنيه من <NAME>، رصيدك الحالي 366.22 جنيه. رقم المعاملة 19082xxxxx\n100 جنيه كاش باك لما تحول، تدفع او تودع فلوس في محفظة اورنچ كاش",
-  // OC-2
-  "تم إستلام عملية تحويل اموال بمبلغ ٢٠٠٠.٠٠ جنيه من <NAME> ، رقم المعاملة ٢٠٥٢٧xxxxx\nكاش باك أو دقائق أو ميجابايتس كل ما تستعلم ...",
-  // OC-3
-  "Successful cash-in with amount EGP 6.43.\nYour current balance is EGP 6.43\n… Dial #71# to join the gold Competition … https://myo.orange.eg/OC-IN",
-  // IP-NBE-1
-  "تم إضافة تحويل لحظي لحسابكم رقم 0150 بمبلغ 5000.00 جم من <SENDER NAME, Latin caps, cut: 25 chars> رقم مرجعي 125073164743 يوم 05-04 الساعة 12:25 للمزيد اتصل بـ 19623",
-  // IP-NBE-2a, IP-NBE-2b
-  "تم إضافة تحويل لحظي لبطاقتكم مسبقة الدفع بمبلغ 10000.00 جم من <SENDER NAME, Latin caps, 38 chars> رقم مرجعي 937478492117 يوم 07-02 الساعة 15:59 للمزيد اتصل بـ 19623",
-  "تم إضافة تحويل لحظي لبطاقتكم مسبقة الدفع بمبلغ 300.00 جم من <SENDER NAME, Arabic, 6 words> رقم مرجعي 509818302771 يوم 08-12 الساعة 23:27 للمزيد اتصل بـ 19623",
-  // IP-NBE-3
-  "تم تنفيذ تحويل لحظي من حسابكم رقم 0150 بمبلغ 150.00 جم إلى <RECEIVER NAME MASKED BY BANK> رقم مرجعي 885841387872 يوم 05-13 الساعة 23:17 للمزيد اتصل بـ 19623",
-  // IP-NBE-4
-  "تم خصم مبلغ 433.80 جم لحظيا باستخدام (شبكة المدفوعات اللحظية) من حسابكم رقم 0150 عند Home Internet يوم 05-02 الساعة11:42 مرجع التاجر 1215624709 للمزيد اتصل بـ 19623.",
-  // IP-CIB-1, IP-CIB-1-D
-  "يرجى العلم انه تم تنفيذ تحويل لحظي بمبلغ 64500.00 جم إلى حسابك المنتهي بـ ********0018 من <SENDER NAME, Latin caps, cut: 23 chars> برقم مرجعي 9951576c بتاريخ 15-06-2025 22:49 للمزيد، برجاء الاتصال بـ 19666",
-  "يرجى العلم انه تم تنفيذ تحويل لحظي بمبلغ 1000.00 جم من حسابك المنتهي بـ ****1065 برقم مرجعي 819a53fa بتاريخ 26-05-2026 19:35 للمزيد، برجاء الاتصال بـ 19666",
-  // IP-QNB-1, IP-QNB-1-D, IP-QNB-PAIR-D
-  "IPN transfer received with amount of EGP 500.00 on 5597 on 06/05 at 08:34 PM. Ref# ff961e35. For more details call 19700.",
-  "IPN transfer sent with amount of EGP 100.00 from 5597 on 07/05 at 09:16 PM. Ref# e8819e2c. For more details call 19700.",
-  "IPN transfer sent with amount of EGP 350.00 from 0694 on 18/09 at 07:32 AM. Ref# 43f3ef2a. For more details call 19700",
-  // IP-BDC-1
-  "تم إستقبال تحويل لحظي إلى حسابكم 4113 بمبلغ 350.00 جم من <SENDER NAME, Latin caps, 30 chars> في 07:32 يوم 9/18/26 رقم المعاملة 43f3ef2a للمزيد أتصل ب 16990",
-  // IP-UNK-1
-  "تم اضافة مبلغ 20000EGP الى حساب رقم xxx6201 فى 19-AUG-2026 عن طريق التحويل اللحظي",
-  // IP-ADIB-1
-  "Your account ending in 9596 has been charged the amount of 500.5 for an IPN transfer on 2026-08-18 17:56 Txn Ref: 1be731da For further details please call 19951",
-];
+export const PUBLISHED_SAMPLE_TEXTS: readonly string[] = SAMPLES.filter((s) => s.kind === "published").map(
+  (s) => s.published,
+);
 
-/** = CANDIDATE_KEYWORDS (06 §4.9), copied verbatim. */
-export const INTERIM_CANDIDATE_KEYWORDS = {
-  ar: ["استلام", "إستلام", "استقبال", "إستقبال", "إضافة", "اضافة", "إيداع", "ايداع", "تحويل لحظي", "تم تحويل"],
-  en: ["received", "credited", "IPN", "cash-in"],
-} as const;
+/** The union of every template's footerDomains (06 §4.10). */
+export const FOOTER_DOMAINS: readonly string[] = [
+  ...new Set(COLLECTION_TEMPLATES.flatMap((t) => t.footerDomains.map((d) => d.toLowerCase()))),
+].sort();
 
-/** = the union of every template's footerDomains (06 §4.10 table). */
-export const INTERIM_FOOTER_DOMAINS: readonly string[] = ["vf.eg", "spr.ly", "myo.orange.eg"];
+/** The synthetic <Wn> fills of §4.10.2 (one name per script, cycled). */
+const AR_FILLS = ["محمد", "احمد", "علي", "محمود", "حسن"];
+const LATIN_FILLS = ["AHMED", "MOHAMED", "ALI", "MAHMOUD", "HASSAN"];
 
 /**
  * Every word of every fixture `fills` replacement (06 §4.14) plus the
  * synthetic words of §4.10.2. R5 (spec 15 §8): these are synthetic NAMES, so
  * they are never vocabulary, even when a published text happens to contain
  * the same spelling (e.g. the preposition "على" folds to the name "علي").
+ * Single letters (the "M" of the bank's own "ABDELAZEEZ M****") are skipped.
  */
-export const INTERIM_FILL_NAMES: readonly string[] = [
-  "محمد", "احمد", "علي", "عبد", "الرحمن", "محمود", "حسن",
-  "AHMED", "MOHAMED", "ABDELRAHMAN", "MAHMOUD", "SAYED", "ABDELRAHM", "SAID", "ABDELAZEEZ", "ALI", "HASSAN",
+export const FILL_NAMES: readonly string[] = [
+  ...new Set([
+    ...SAMPLES.flatMap((s) => s.fills.map(([, replacement]) => replacement))
+      .flatMap((r) => r.split(/\s+/))
+      .map((w) => w.replace(/[*]+$/, ""))
+      .filter((w) => w.length >= 2 && !/[0-9٠-٩]/.test(w)),
+    ...AR_FILLS,
+    ...LATIN_FILLS,
+  ]),
 ];
 
 // ---------------------------------------------------------------------------
@@ -205,14 +181,14 @@ export function buildVocabulary(extra?: Iterable<string>): Set<string> {
       if (k && HAS_LETTER_RE.test(k)) vocab.add(k);
     }
   };
-  for (const text of INTERIM_PUBLISHED_SAMPLES) for (const w of wordsOf(text)) add(w);
-  for (const w of [...INTERIM_CANDIDATE_KEYWORDS.ar, ...INTERIM_CANDIDATE_KEYWORDS.en]) {
+  for (const text of PUBLISHED_SAMPLE_TEXTS) for (const w of wordsOf(text)) add(w);
+  for (const w of [...CANDIDATE_KEYWORDS.ar, ...CANDIDATE_KEYWORDS.en]) {
     add(w);
     for (const part of w.split(/\s+/)) add(part);
   }
   for (const w of STATIC_WORDS) add(w);
   if (extra) for (const w of extra) add(w);
-  for (const name of INTERIM_FILL_NAMES) vocab.delete(vocabKey(name));
+  for (const name of FILL_NAMES) vocab.delete(vocabKey(name));
   return vocab;
 }
 
@@ -288,8 +264,6 @@ function maskDigitRuns(s: string, onMask: (rendered: string) => void): string {
   });
 }
 
-const AR_FILLS = ["محمد", "احمد", "علي", "محمود", "حسن"];
-const LATIN_FILLS = ["AHMED", "MOHAMED", "ALI", "MAHMOUD", "HASSAN"];
 const URL_FILL = "http://example.invalid/x";
 
 interface RecordState {
@@ -319,7 +293,7 @@ function redactField(input: string, st: RecordState): string {
   s = s.replace(URL_RE, (raw) => {
     const url = trimUrl(raw);
     const rest = raw.slice(url.length);
-    if (hostAllowed(urlHost(url), INTERIM_FOOTER_DOMAINS)) return protect(url) + rest;
+    if (hostAllowed(urlHost(url), FOOTER_DOMAINS)) return protect(url) + rest;
     st.counts.url++;
     return protect("<URL>") + rest;
   });
@@ -419,17 +393,4 @@ export function redactSample(input: RedactInput, vocab: Set<string>, allowWords?
       .map((kind) => ({ kind, count: st.counts[kind] })),
     unknownWords: st.words.size,
   };
-}
-
-/**
- * = 06's applyFills (__fixtures__/samples.ts, order 18) — INTERIM. Replaces
- * every occurrence of each placeholder, in order; throws when one is absent.
- */
-export function applyFillsLocal(published: string, fills: ReadonlyArray<readonly [string, string]>): string {
-  let out = published;
-  for (const [ph, rep] of fills) {
-    if (!out.includes(ph)) throw new Error(`applyFills: placeholder ${JSON.stringify(ph)} is absent`);
-    out = out.split(ph).join(rep);
-  }
-  return out;
 }

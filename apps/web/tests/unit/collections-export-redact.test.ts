@@ -1,12 +1,14 @@
 // Spec 15 §7 — the allowlist redaction of scripts/lib/collections-redact.ts
 // (§4.10.1–4.10.2). Pure: no DB, no network.
 //
-// applyFillsLocal stands in for 06's applyFills until order 18 lands (see the
-// module header); the round-trip rule is 06's fixtures.test.ts rule.
+// applyFills is 06's (__fixtures__/samples.ts, re-exported by the module since
+// order 18 replaced the INTERIM copies); the round-trip rule is 06's
+// fixtures.test.ts rule.
 
 import { describe, expect, it } from "vitest";
+import { sampleById } from "@matgary/domain/collections/__fixtures__/samples";
 import {
-  applyFillsLocal,
+  applyFills,
   buildVocabulary,
   redactSample,
   type RedactInput,
@@ -28,6 +30,13 @@ const CIB_TEXT =
   " برقم مرجعي 9951576c بتاريخ 15-06-2025 22:49 للمزيد، برجاء الاتصال بـ 19666";
 
 const vocab = buildVocabulary();
+
+describe("collections-redact — inputs come from 06 part B", () => {
+  it("the literal texts above are the 06 fixtures (no drift)", () => {
+    expect(VF1_TEXT).toBe(sampleById("VF-1")?.text);
+    expect(CIB_TEXT).toBe(sampleById("IP-CIB-1")?.text.replace("64500.00", "64,500.00"));
+  });
+});
 const sms = (body: string, extra: Partial<RedactInput> = {}): RedactInput => ({
   body,
   sender: "vf-cash",
@@ -133,7 +142,7 @@ describe("collections-redact — allowWords, determinism, fills, vocabulary, bud
   it("fills round-trip: no < placeholder and no x{5,} run (06 fixtures rule)", () => {
     for (const text of [VF1_TEXT, CIB_TEXT, "رقم 010 1234 5678 https://evil.example/x"]) {
       const r = redactSample(sms(text), vocab);
-      const filled = applyFillsLocal(r.body, r.fills);
+      const filled = applyFills(r.body, r.fills);
       expect(filled).not.toContain("<");
       expect(filled).not.toMatch(/x{5,}/);
     }

@@ -4900,7 +4900,7 @@
       },
       "eyebrow": "Privacy policy",
       "title": "Your data belongs to you",
-      "lead": "Last updated: 30 September 2026 — compliant with Law No. 151 of 2020 on Personal Data Protection.",
+      "lead": "Last updated: 18 October 2026 — compliant with Law No. 151 of 2020 on Personal Data Protection.",
       "sections": [
         {
           "title": "1. Who controls your data",
@@ -4951,7 +4951,11 @@
           "body": "If you use Collections, you register the bank and wallet accounts your customers transfer money to (such as an InstaPay payment link, the last 4 digits of an account, an IBAN or a wallet number). When a sale is paid by transfer we record the method, the receiving account, the amount and the time, and optionally the last 4 digits of the sender's phone number and the transfer reference. We use these records only to show you which transfers are waiting for confirmation and to reconcile them; the full IBAN is visible only to people you allow to manage accounts. For the personal data of the people who pay your shop, your shop decides why it is recorded and TheStoro processes it on your behalf and on your instructions. These records are kept for as long as your account exists (see section 7); if a sale is deleted, its transfer record is kept and marked as void. TheStoro does not receive or move money."
         },
         {
-          "title": "13. Updates to this policy",
+          "title": "13. Forwarded bank and wallet messages (optional)",
+          "body": "Only if you turn on automatic confirmation on a phone and agree on the consent screen, that phone sends us the text of bank, wallet and InstaPay messages and notifications about money received or sent. We skip one-time passwords on the phone and on our servers and never store their text. From each message we extract the amount, time, reference, balance and the sender's details to match it to your sales. The full text is stored encrypted and deleted automatically after 7 days (30 days for messages whose format we don't recognise yet; 90 days for messages you choose to send us so we can support them); deleted text, still encrypted, can remain in backups for up to 8 weeks. We keep the last 4 digits of the sender's phone number and a shortened name unless you choose to keep full names. Only the shop owner can read message text; our team sees a message only if you send it to us, and then with names and numbers masked. You can unlink a phone at any time, which stops forwarding and deletes its stored messages immediately; confirming transfers by hand keeps working. We never ask for the PIN, password or verification code of your bank account or wallet."
+        },
+        {
+          "title": "14. Updates to this policy",
           "body": "We may update this policy from time to time. For any material change, we'll notify you via your registered email or in-app notice a reasonable time before it takes effect."
         }
       ]
@@ -4963,7 +4967,7 @@
       },
       "eyebrow": "Terms of use",
       "title": "TheStoro terms of use",
-      "lead": "Last updated: 7 May 2026.",
+      "lead": "Last updated: 18 October 2026. Section 13 takes effect on 1 November 2026.",
       "sections": [
         {
           "title": "1. Acceptance of terms",
@@ -5012,6 +5016,10 @@
         {
           "title": "12. Governing law and jurisdiction",
           "body": "These terms are governed by the laws of the Arab Republic of Egypt, and any dispute arising from them falls under the exclusive jurisdiction of the courts of Cairo."
+        },
+        {
+          "title": "13. Processing your customers' data on your behalf",
+          "body": "For the personal data you record in TheStoro about your customers, your staff and the people who pay you, you are the controller and TheStoro acts as your processor: we process it only to provide the Service and on your instructions, given through your settings and actions in the Service. We keep it confidential, protect it with the measures described in the privacy policy, use service providers (hosting, error reporting and notification delivery) only under equivalent obligations, tell you without undue delay — and within 72 hours of discovering it — about a breach that affects it, help you answer requests from the people concerned, and delete it when your account ends as described in the privacy policy. You are responsible for having a lawful basis to record that data and for informing the people concerned where the law requires it."
         }
       ]
     }

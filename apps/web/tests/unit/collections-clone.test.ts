@@ -4,8 +4,9 @@
  *   1. createDemoClone copies non-archived collection accounts (branch remapped,
  *      creator remapped, L2 state reset) and no collections / events; cloned
  *      sales and sale_payments never carry the template's collection link;
- *   2. resetDemoClone survives the RESTRICT FKs (collections → accounts and
- *      branches) once the visitor has recorded a collection;
+ *   2. resetDemoClone survives the RESTRICT FKs (collections, credits and
+ *      ingest devices → accounts and branches) once the visitor has recorded a
+ *      collection and (M2, 0056) linked a phone that reported a credit;
  *   3. the template is untouched.
  *
  * DB-backed through the BYPASSRLS admin pool (clone-tenant.ts runs there).
@@ -23,7 +24,10 @@ import {
   branches,
   categories,
   collectionAccounts,
+  collectionCredits,
   collectionEvents,
+  collectionIngestDevices,
+  collectionRawMessages,
   collections,
   products,
   salePayments,
@@ -49,7 +53,13 @@ describe.skipIf(!hasTestDb)("demo clone × collection tables (spec 04 §7.3)", (
 
   const db = () => getAdminDb();
   const count = async (
-    table: typeof collectionAccounts | typeof collections | typeof collectionEvents,
+    table:
+      | typeof collectionAccounts
+      | typeof collections
+      | typeof collectionEvents
+      | typeof collectionIngestDevices
+      | typeof collectionRawMessages
+      | typeof collectionCredits,
     tenantId: string,
   ) => (await db().select({ id: table.id }).from(table).where(eq(table.tenantId, tenantId))).length;
 
@@ -267,11 +277,77 @@ describe.skipIf(!hasTestDb)("demo clone × collection tables (spec 04 §7.3)", (
       actorUserId: visitorId,
     });
 
+    // M2 (0056): a linked phone on the clone's branch, one forwarded message
+    // and the credit it produced, matched to the collection above. The device
+    // and credit branch / account FKs are RESTRICT, so the wipe order matters.
+    const [dev] = await adb
+      .insert(collectionIngestDevices)
+      .values({
+        tenantId: cloneId!,
+        branchId: acc!.branchId!,
+        createdByUserId: visitorId,
+        label: "Visitor iPhone",
+        platform: "ios_shortcut",
+        channels: ["ios_sms"],
+        accountIds: [acc!.id],
+        tokenHash: randomUUID().replace(/-/g, "").padEnd(64, "0"),
+        tokenPrefix: "clonetst",
+        consentVersion: "2026-10-01",
+        consentAt: new Date(),
+        consentUserId: visitorId,
+      })
+      .returning({ id: collectionIngestDevices.id });
+    const [raw] = await adb
+      .insert(collectionRawMessages)
+      .values({
+        tenantId: cloneId!,
+        ingestDeviceId: dev!.id,
+        channel: "ios_sms",
+        senderKind: "alphanumeric",
+        clientFingerprint: `clone_${tag}_0123456789`,
+        bodySha256: "d".repeat(64),
+        parseStatus: "parsed",
+        receivedAt: new Date(),
+        expiresAt: new Date(Date.now() + 7 * 864e5),
+      })
+      .returning({ id: collectionRawMessages.id });
+    const [credit] = await adb
+      .insert(collectionCredits)
+      .values({
+        tenantId: cloneId!,
+        branchId: acc!.branchId!,
+        collectionAccountId: acc!.id,
+        ingestDeviceId: dev!.id,
+        rawMessageId: raw!.id,
+        direction: "credit",
+        channels: ["ios_sms"],
+        templateId: "vodafone_cash.sms.credit.v1",
+        amount: "75.00",
+        senderKind: "alphanumeric",
+        occurredAt: new Date(),
+        deviceReceivedAt: new Date(),
+        state: "matched",
+        matchedCollectionId: col!.id,
+        dedupeKey: `b:clone-${tag}:7500:1`,
+      })
+      .returning({ id: collectionCredits.id });
+    await adb.update(collections).set({ matchedCreditId: credit!.id }).where(eq(collections.id, col!.id));
+    await adb.insert(collectionEvents).values({
+      tenantId: cloneId!,
+      collectionId: col!.id,
+      kind: "matched",
+      actorDeviceId: dev!.id,
+      creditId: credit!.id,
+    });
+
     await expect(resetDemoClone({ cloneId: cloneId!, ownerUserId: visitorId })).resolves.toBeUndefined();
 
     expect(await count(collectionAccounts, cloneId!)).toBe(1);
     expect(await count(collections, cloneId!)).toBe(0);
     expect(await count(collectionEvents, cloneId!)).toBe(0);
+    expect(await count(collectionIngestDevices, cloneId!)).toBe(0);
+    expect(await count(collectionRawMessages, cloneId!)).toBe(0);
+    expect(await count(collectionCredits, cloneId!)).toBe(0);
   });
 
   it("the template is untouched: 2 accounts, 1 collection, 1 event", async () => {

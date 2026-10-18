@@ -537,10 +537,13 @@ async function fetchTemplateOwnerId(db: Db, templateId: string): Promise<string 
  *  visitor's JWT — instead we preserve the tenant row and wipe under it. */
 async function wipeTenantChildRows(tx: Tx, tenantId: string): Promise<void> {
   await tx.delete(s.activityLogs).where(eq(s.activityLogs.tenantId, tenantId));
-  // Collections before sales and branches: their branch / account FKs are
-  // RESTRICT (doc 15 spec 04). Events cascade from collections; explicit anyway.
+  // Collections before sales and branches: branch / account FKs are RESTRICT
+  // (doc 15 spec 04). Credits first (they point at accounts and branches).
+  await tx.delete(s.collectionCredits).where(eq(s.collectionCredits.tenantId, tenantId));
+  await tx.delete(s.collectionRawMessages).where(eq(s.collectionRawMessages.tenantId, tenantId));
   await tx.delete(s.collectionEvents).where(eq(s.collectionEvents.tenantId, tenantId));
   await tx.delete(s.collections).where(eq(s.collections.tenantId, tenantId));
+  await tx.delete(s.collectionIngestDevices).where(eq(s.collectionIngestDevices.tenantId, tenantId));
   await tx.delete(s.collectionAccounts).where(eq(s.collectionAccounts.tenantId, tenantId));
   await tx.delete(s.returns).where(eq(s.returns.tenantId, tenantId));
   await tx.delete(s.salePayments).where(eq(s.salePayments.tenantId, tenantId));

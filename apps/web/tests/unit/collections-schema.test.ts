@@ -174,3 +174,93 @@ describe("demo clone (lib/demo/clone-tenant.ts) knows the new tables", () => {
     expect(src).toContain("collectionId: null");
   });
 });
+
+const M56 = `${MIG}/0056_collection_ingest.sql`;
+const CHANNELS = ["ios_notification", "ios_sms", "android_notification", "android_sms", "manual_paste", "statement"];
+const CHECKS_0056: Record<string, readonly string[]> = {
+  collection_ingest_devices_platform_check: ["ios_shortcut", "ios_app_intent", "android_listener", "android_collector"],
+  collection_ingest_devices_revoked_reason_check: ["owner", "user_removed", "security", "replaced"],
+  collection_raw_messages_channel_check: CHANNELS,
+  collection_raw_messages_sender_kind_check: ["alphanumeric", "numeric", "app"],
+  collection_raw_messages_parse_status_check: ["parsed", "fallback", "unknown_format", "not_credit", "otp", "too_old", "duplicate"],
+  collection_credits_direction_check: ["credit", "debit", "cash_in"],
+  collection_credits_sender_kind_check: ["alphanumeric", "numeric", "app"],
+  collection_credits_state_check: ["unmatched", "held", "matched", "ignored", "info"],
+  collection_credits_hold_reason_check: [
+    "ambiguous", "untrusted_source", "balance_mismatch", "no_balance_baseline", "above_review_limit",
+    "no_account", "unverified_format", "manual_source", "suspicious_link", "too_old", "amount_mismatch",
+    "auto_confirm_off", "matches_rejected", "test",
+  ],
+  collection_credits_ignored_reason_check: ["personal", "not_a_sale", "duplicate", "other"],
+};
+
+describe("0056 ↔ schema.ts", () => {
+  const sql = read(M56);
+
+  it("journal idx 56, when above every earlier entry", () => {
+    const entries = journal();
+    expect(entries[56]).toEqual({
+      idx: 56, version: "7", when: 1781901100000, tag: "0056_collection_ingest", breakpoints: true,
+    });
+    expect(entries[56]!.when).toBeGreaterThan(Math.max(...entries.slice(0, 56).map((e) => e.when)));
+  });
+
+  it("the three tables agree with schema.ts; the token hash is a named UNIQUE", () => {
+    agrees(schema.collectionIngestDevices, "collection_ingest_devices", sql);
+    agrees(schema.collectionRawMessages, "collection_raw_messages", sql);
+    agrees(schema.collectionCredits, "collection_credits", sql);
+    const dev = getTableConfig(schema.collectionIngestDevices);
+    expect(dev.columns.filter((c) => c.isUnique).map((c) => c.uniqueName)).toEqual([
+      "collection_ingest_devices_token_hash_uq",
+    ]);
+    expect(sql).toContain('CONSTRAINT "collection_ingest_devices_token_hash_uq" UNIQUE');
+  });
+
+  it("enum CHECKs and channel arrays carry exactly the 03 §B.1 values", () => {
+    for (const [name, values] of Object.entries(CHECKS_0056)) expect(checkList(sql, name)).toEqual(values);
+    expect(arrayCheckList(sql, "collection_ingest_devices_channels_check")).toEqual(CHANNELS);
+    expect(arrayCheckList(sql, "collection_credits_channels_check")).toEqual(CHANNELS);
+  });
+
+  it("RLS on raw messages and credits, NEVER on devices; the deferred FKs are added", () => {
+    hasRls(sql, "collection_raw_messages");
+    hasRls(sql, "collection_credits");
+    expect(sql).not.toMatch(/"collection_ingest_devices" (ENABLE|FORCE) ROW LEVEL SECURITY/);
+    for (const fk of [
+      "collections_matched_credit_id_fkey",
+      "collection_events_actor_device_id_fkey",
+      "collection_events_credit_id_fkey",
+    ]) expect(sql).toContain(`ADD CONSTRAINT "${fk}"`);
+    expect(sql).toMatch(/"collection_raw_messages_device_fp_uq"\s+ON "collection_raw_messages" \("tenant_id", "ingest_device_id", "client_fingerprint"\)\s+WHERE "client_fingerprint" IS NOT NULL;/);
+    expect(sql).not.toMatch(/INDEX\s+CONCURRENTLY/);
+  });
+
+  it("the PDPL export never SELECT *s the NO-RLS devices table (it would leak every tenant)", () => {
+    const route = read("app/api/account/export/route.ts");
+    expect(route).not.toContain('"collection_ingest_devices"');
+    expect(route).not.toContain('"collection_raw_messages"');
+  });
+
+  it("the demo wipe deletes credits and devices before accounts", () => {
+    const src = read("lib/demo/clone-tenant.ts");
+    const at = (n: string) => src.indexOf(n);
+    expect(at("tx.delete(s.collectionCredits)")).toBeGreaterThan(-1);
+    expect(at("tx.delete(s.collectionCredits)")).toBeLessThan(at("tx.delete(s.collectionAccounts)"));
+    // indexOf is -1 when a line is missing, which would pass toBeLessThan on its own.
+    expect(at("tx.delete(s.collectionIngestDevices)")).toBeGreaterThan(-1);
+    expect(at("tx.delete(s.collectionIngestDevices)")).toBeLessThan(at("tx.delete(s.collectionAccounts)"));
+    expect(src).not.toContain("tx.insert(s.collectionIngestDevices)");
+  });
+
+  it.skipIf(!existsSync(abs(DOMAIN_TYPES)))("CHECK lists equal spec 06's domain unions", async () => {
+    const d = await import("@matgary/domain/collections/types");
+    expect(checkList(sql, "collection_raw_messages_channel_check")).toEqual([...d.INGEST_CHANNEL_VALUES]);
+    expect(checkList(sql, "collection_ingest_devices_platform_check")).toEqual([...d.INGEST_PLATFORM_VALUES]);
+    expect(checkList(sql, "collection_credits_sender_kind_check")).toEqual([...d.SENDER_KIND_VALUES]);
+    expect(checkList(sql, "collection_credits_direction_check")).toEqual([...d.CREDIT_DIRECTION_VALUES]);
+    expect(checkList(sql, "collection_credits_state_check")).toEqual([...d.CREDIT_STATE_VALUES]);
+    expect(checkList(sql, "collection_credits_hold_reason_check")).toEqual([...d.HOLD_REASON_VALUES]);
+    expect(checkList(sql, "collection_credits_ignored_reason_check")).toEqual([...d.IGNORE_REASON_VALUES]);
+    expect(checkList(sql, "collection_raw_messages_parse_status_check")).toEqual([...d.PARSE_STATUS_VALUES]);
+  });
+});

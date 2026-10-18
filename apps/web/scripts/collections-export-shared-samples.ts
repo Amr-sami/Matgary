@@ -24,14 +24,19 @@
 //
 // Exit codes: 0 ok · 1 bad input · 2 TTY stdout · 3 DB mode before M2 · 4 review.
 //
-// M1 NOTE (as landed 2026-10-18): 06 part B (order 18) has not landed, so
-// `parserSaid` is null and the OTP patterns are an INTERIM verbatim copy of
-// 06 §4.9 OTP_PATTERNS. When order 18 lands: import isOtp + parseMessage and
-// fill parserSaid / fixtureDraft.expect from the parse (spec 15 §4.10.3).
+// Since order 18 (06 part B, 2026-10-18) the OTP drop is 06's isOtp and every
+// record is re-parsed in memory with 06's parseMessage (the INTERIM copies of
+// order 12 are gone, spec 15 §4.10.4). The parse runs with now = receivedAt,
+// so the reviewer sees the FORMAT verdict even for a sample older than the
+// 48 h age gate. `parserSaid` carries no payer phone / name, and its reference
+// is masked to its last 4 exactly as the redaction masks it (x), so
+// `fixtureDraft.expect.reference` (x → 7) matches the filled text.
 
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { normalizeDigits, normalizeSender, senderKindOf } from "@matgary/domain/collections/normalize";
+import { isOtp } from "@matgary/domain/collections/filter";
+import { normalizeSender, senderKindOf } from "@matgary/domain/collections/normalize";
+import { messageText, parseMessage } from "@matgary/domain/collections/parse";
 import { packagesForProviders, sendersForProviders } from "@matgary/domain/collections/providers";
 import {
   COLLECTION_PROVIDER_VALUES,
@@ -41,13 +46,6 @@ import {
 } from "@matgary/domain/collections/types";
 import { buildVocabulary, redactSample, type Redacted } from "./lib/collections-redact";
 
-// = OTP_PATTERNS (06 §4.9) — INTERIM copy until order 18 lands.
-const INTERIM_OTP_PATTERNS: readonly string[] = [
-  "(^|[^a-z])otp([^a-z]|$)", "one[ -]?time (pass|code|pin)", "verification code", "passcode",
-  "do not share", "don'?t share", "[كق]ود (ال)?(تحقق|تفعيل|سري)", "رمز (ال)?(تحقق|تفعيل|سري|المرور)",
-  "كلم[ةه] (ال)?(مرور|سر)", "الرقم السري", "لا تشارك", "لا تفصح", "لمر[ةه] واحد[ةه]",
-];
-const OTP_RES = INTERIM_OTP_PATTERNS.map((p) => new RegExp(p, "i"));
 const UNKNOWN_WORDS_REVIEW = 20;
 
 function stderr(msg: string): void {
@@ -121,11 +119,39 @@ function sha256(s: string): string {
   return createHash("sha256").update(s).digest("hex");
 }
 
-function isOtp(...texts: Array<string | null>): boolean {
-  const joined = normalizeDigits(texts.filter(Boolean).join("\n"))
-    .replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069\u061C\uFEFF\u0640]/g, "")
-    .replace(/\s+/g, " ");
-  return OTP_RES.some((re) => re.test(joined));
+function isOtpRecord(r: Pick<SourceRecord, "title" | "subtitle" | "body">): boolean {
+  return isOtp(messageText(r));
+}
+
+/** A parsed reference masked like the redaction does: all but the last 4 → x. */
+function maskReference(ref: string | null): string | null {
+  if (ref == null) return null;
+  return ref.length > 4 ? "x".repeat(ref.length - 4) + ref.slice(-4) : ref;
+}
+
+/** What 06's parser concluded, without any personal field (spec 15 §4.10.3). */
+function parserSaid(r: SourceRecord) {
+  const p = parseMessage(
+    {
+      channel: r.channel,
+      sender: r.sender,
+      sourceApp: r.sourceApp,
+      title: r.title,
+      subtitle: r.subtitle,
+      body: r.body,
+      receivedAt: r.receivedAt,
+    },
+    { now: new Date(r.receivedAt) },
+  );
+  return {
+    status: p.status,
+    templateId: p.templateId,
+    direction: p.direction,
+    amount: p.fields?.amount ?? null,
+    balanceAfter: p.fields?.balanceAfter ?? null,
+    reference: maskReference(p.fields?.reference ?? null),
+    receivingHint: p.fields?.receivingHint ?? null,
+  };
 }
 
 function optString(v: unknown, field: string, line: number): string | null {
@@ -194,6 +220,7 @@ function exportRecord(r: SourceRecord, vocab: Set<string>, allowWords: string[])
     allowWords,
   );
   const exportId = `SHR-${sha256(r.rawKey).slice(0, 8)}`;
+  const said = parserSaid(r);
   return {
     exportId,
     tenantRef: r.tenantRef,
@@ -204,7 +231,7 @@ function exportRecord(r: SourceRecord, vocab: Set<string>, allowWords: string[])
     senderKind,
     receivedAt: r.receivedAt,
     storedParseStatus: r.storedParseStatus,
-    parserSaid: null, // 06 parseMessage lands with order 18 (M2)
+    parserSaid: said,
     redacted: { title: red.title, subtitle: red.subtitle, body: red.body, sender: red.sender },
     redactions: red.redactions,
     unknownWords: red.unknownWords,
@@ -220,7 +247,17 @@ function exportRecord(r: SourceRecord, vocab: Set<string>, allowWords: string[])
       published: red.body,
       fills: red.fills,
       receivedAt: r.receivedAt,
-      expect: { needsHumanCheck: true },
+      // From parserSaid, marked: a human checks every field against the phone's app (06 §4.15 step 1).
+      expect: {
+        status: said.status,
+        templateId: said.templateId,
+        ...(said.direction ? { direction: said.direction } : {}),
+        ...(said.amount ? { amount: said.amount } : {}),
+        balanceAfter: said.balanceAfter,
+        reference: said.reference === null ? null : said.reference.replace(/x/g, "7"),
+        receivingHint: said.receivingHint,
+        needsHumanCheck: true,
+      },
       pilot: { phoneId: r.deviceRef, observedSender: red.sender, observedPackage: r.sourceApp, capturedAt: r.receivedAt },
     },
   };
@@ -243,7 +280,7 @@ function main(): void {
 
   let records = readJsonl(args.input as string, args);
   const read = records.length;
-  records = records.filter((r) => !isOtp(r.title, r.subtitle, r.body));
+  records = records.filter((r) => !isOtpRecord(r));
   const otp = read - records.length;
   if (args.since) records = records.filter((r) => r.receivedAt.slice(0, 10) >= (args.since as string));
   if (args.provider) records = records.filter((r) => matchesProvider(r, args.provider as CollectionProvider));

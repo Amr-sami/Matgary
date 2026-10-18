@@ -15,6 +15,9 @@ import {
   collectionAccounts,
   collections,
   collectionEvents,
+  collectionIngestDevices,
+  collectionRawMessages,
+  collectionCredits,
 } from "@/lib/db/schema";
 import { isUniqueViolation } from "@/lib/api/idempotency";
 import { addProduct, deleteProduct, listProducts, updateProduct } from "@/lib/repo/catalog";
@@ -351,5 +354,52 @@ describe("collections isolation (0055)", () => {
       VALUES (${tenantA}, ${branchA}, 'sale', 'ISO-COL-1', 'wallet', ${accountA}, 150, now())
       ON CONFLICT (tenant_id, invoice_id, part_no) WHERE source_type = 'sale' DO NOTHING RETURNING id`));
     expect((rows as unknown as unknown[]).length).toBe(0);
+  });
+});
+
+describe("collections isolation (0056)", () => {
+  let deviceA: string;
+  beforeAll(async () => {
+    await withTenant(tenantA, async (tx) => {
+      const [dev] = await tx.insert(collectionIngestDevices).values({
+        tenantId: tenantA, label: "Owner iPhone", platform: "ios_shortcut", channels: ["ios_sms"],
+        tokenHash: "a".repeat(64), tokenPrefix: "abcdefgh", consentVersion: "v1", consentAt: new Date(),
+      }).returning({ id: collectionIngestDevices.id });
+      deviceA = dev!.id;
+      await tx.insert(collectionRawMessages).values({
+        tenantId: tenantA, ingestDeviceId: deviceA, channel: "ios_sms", senderKind: "alphanumeric",
+        clientFingerprint: "fp_0123456789abcdef", bodySha256: "b".repeat(64), parseStatus: "parsed",
+        receivedAt: new Date(), expiresAt: new Date(Date.now() + 7 * 864e5),
+      });
+      await tx.insert(collectionCredits).values({
+        tenantId: tenantA, ingestDeviceId: deviceA, direction: "credit", channels: ["ios_sms"],
+        templateId: "vodafone_cash.sms.credit.v1", amount: "150.00", senderKind: "alphanumeric",
+        occurredAt: new Date(), deviceReceivedAt: new Date(), state: "unmatched", dedupeKey: "b:iso:15000:1",
+      });
+    });
+  });
+
+  it("tenant B sees none of A's raw messages or credits", async () => {
+    const [r, c] = await withTenant(tenantB, async (tx) => [
+      await tx.select().from(collectionRawMessages),
+      await tx.select().from(collectionCredits),
+    ]);
+    expect([r.length, c.length]).toEqual([0, 0]);
+  });
+
+  it("collection_ingest_devices has NO RLS by design — code must filter tenant_id", async () => {
+    const all = await withTenant(tenantB, (tx) => tx.select({ id: collectionIngestDevices.id }).from(collectionIngestDevices));
+    expect(all.map((d) => d.id)).toContain(deviceA); // visible: the token lookup needs this
+    const scoped = await withTenant(tenantB, (tx) => tx.select().from(collectionIngestDevices)
+      .where(eq(collectionIngestDevices.tenantId, tenantB)));
+    expect(scoped).toHaveLength(0);
+  });
+
+  it("an OTP row can never carry a body (collection_raw_messages_otp_no_body_chk)", async () => {
+    const err = await pgFails(withTenant(tenantA, (tx) => tx.insert(collectionRawMessages).values({
+      tenantId: tenantA, channel: "manual_paste", senderKind: "numeric", bodySha256: "c".repeat(64),
+      bodyEnc: "v1:x", parseStatus: "otp", receivedAt: new Date(), expiresAt: new Date(),
+    })));
+    expect(pgCode(err)).toBe("23514");
   });
 });
