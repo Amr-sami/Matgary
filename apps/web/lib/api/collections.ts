@@ -6,6 +6,9 @@
 
 import type * as api from "@matgary/api-client/endpoints/collections";
 import { NO_FEATURES } from "@/components/collections/rules";
+import type { CreditDTO, CreditDetailDTO, PasteResult, UnrecognisedDTO } from "@/lib/repo/collection-credits";
+import type { DeviceDTO } from "@/lib/repo/collection-devices";
+import type { CollectionStatus as CandidateStatus, CreditState, IgnoreReason } from "@matgary/domain/collections/types";
 
 type Result<F extends (...args: never[]) => Promise<unknown>> = Awaited<ReturnType<F>>;
 
@@ -173,6 +176,117 @@ export function reopenCollection(id: string, body: api.ReopenCollectionBody, key
 
 export function getSummary(params: { date?: string; branchId?: string | "all" } = {}): Promise<CollectionsSummary> {
   return jsonFetch(withQuery("/api/collections/summary", { date: params.date, branchId: params.branchId }));
+}
+
+// ---- M2: credits, paste, unrecognised, devices (07 §4.5) ---------------------
+//
+// Types: 12 §4.2 takes them from @matgary/api-client/endpoints/collection-credits
+// (07 step 16). That file is not written yet (order 19 in progress), so they
+// come TYPE-ONLY from 07's server modules — the same interfaces the routes
+// serialise (erased at build; nothing server-side reaches the bundle). Switch
+// these imports to the api-client file once it lands; the names are 07 §4.6's.
+
+export type {
+  AccountRef as CreditAccountRef,
+  CollectionCandidate,
+  CreditDTO,
+  CreditDetailDTO,
+  PasteResult,
+  UnrecognisedDTO,
+} from "@/lib/repo/collection-credits";
+export type { DeviceDTO } from "@/lib/repo/collection-devices";
+
+export interface CreditsPage {
+  data: CreditDTO[];
+  nextCursor: string | null;
+}
+
+export interface ListCreditsParams {
+  /** Comma list of CreditState, e.g. "unmatched,held" (ARCH CR 3). */
+  state?: string | CreditState[];
+  accountId?: string;
+  branchId?: string | "all";
+  from?: string;
+  to?: string;
+  cursor?: string | null;
+  limit?: number;
+}
+
+export interface MatchCreditResult {
+  credit: CreditDTO;
+  collection: { id: string; status: CandidateStatus };
+  warnings: ("amount_differs" | "account_differs")[];
+}
+
+export interface UnrecognisedPage {
+  data: UnrecognisedDTO[];
+  nextCursor: string | null;
+}
+
+export function listCredits(q: ListCreditsParams = {}): Promise<CreditsPage> {
+  return jsonFetch(
+    withQuery("/api/collections/credits", {
+      state: Array.isArray(q.state) ? q.state.join(",") : q.state,
+      accountId: q.accountId,
+      branchId: q.branchId,
+      from: q.from,
+      to: q.to,
+      cursor: q.cursor,
+      limit: q.limit,
+    }),
+  );
+}
+
+export function getCredit(id: string, opts: { includeRaw?: boolean } = {}): Promise<CreditDetailDTO> {
+  return jsonFetch(withQuery(`/api/collections/credits/${encodeURIComponent(id)}`, { includeRaw: opts.includeRaw }));
+}
+
+export function matchCredit(id: string, body: { collectionId: string }, key: string): Promise<MatchCreditResult> {
+  return jsonFetch(`/api/collections/credits/${encodeURIComponent(id)}/match`, {
+    method: "POST",
+    body: JSON.stringify(body),
+    headers: { "Idempotency-Key": key },
+  });
+}
+
+export function ignoreCredit(
+  id: string,
+  body: { reason: IgnoreReason; note?: string },
+  key: string,
+): Promise<{ credit: CreditDTO }> {
+  return jsonFetch(`/api/collections/credits/${encodeURIComponent(id)}/ignore`, {
+    method: "POST",
+    body: JSON.stringify(body),
+    headers: { "Idempotency-Key": key },
+  });
+}
+
+export function pasteCredits(
+  body: { text: string; sender?: string; accountId?: string },
+  key: string,
+): Promise<{ results: PasteResult[] }> {
+  return jsonFetch("/api/collections/credits/paste", {
+    method: "POST",
+    body: JSON.stringify(body),
+    headers: { "Idempotency-Key": key },
+  });
+}
+
+export function listUnrecognised(q: { cursor?: string | null; limit?: number } = {}): Promise<UnrecognisedPage> {
+  return jsonFetch(withQuery("/api/collections/unrecognised", { cursor: q.cursor, limit: q.limit }));
+}
+
+export function shareUnrecognised(id: string): Promise<{ id: string; sharedAt: string; expiresAt: string }> {
+  return jsonFetch(`/api/collections/unrecognised/${encodeURIComponent(id)}/share`, { method: "POST" });
+}
+
+export function listDevices(): Promise<{ devices: DeviceDTO[]; maxDevices: number }> {
+  return jsonFetch("/api/collections/devices");
+}
+
+/** DELETE /api/collections/devices/[id] — the web lists and revokes, never creates (Q8). */
+export function revokeDevice(id: string): Promise<{ ok: true; revokedAt: string }> {
+  return jsonFetch(`/api/collections/devices/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
 /** A fresh key for one dialog / modal session (03 §C.8 rule 12). */

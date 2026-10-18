@@ -35,6 +35,7 @@ import {
   reverseMatch,
   type MatchEffects,
 } from "@/lib/repo/collection-matching";
+import { loadCreditSummaries } from "@/lib/repo/collection-credits";
 import type { TenantTx } from "@/lib/collections/flags";
 import {
   allocateRejection,
@@ -78,7 +79,8 @@ export const COLLECTIONS_PAGE_DEFAULT = 50;
 // Wire shapes (03 §B.17, 05 §4.13)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Defined by 05, filled by 07 from M2; always null in M1. */
+/** Defined by 05, filled by 07 from M2 (`loadCreditSummaries`); 07's
+ *  superset adds state, sender and payerPhoneLast4 (07 ARCH CR 5). */
 export interface CreditSummary {
   id: string;
   amount: number;
@@ -87,6 +89,9 @@ export interface CreditSummary {
   templateId: string;
   payerNameMasked: string | null;
   operatorReference: string | null;
+  state: string;
+  sender: string | null;
+  payerPhoneLast4: string | null;
 }
 
 export interface CollectionAccountRef {
@@ -329,9 +334,19 @@ export function toCollectionDTO(r: DtoRow): CollectionDTO {
   };
 }
 
+/** 07's hook (07 §4.3): `matchedCredit` from the linked credit (M2). */
+async function withMatchedCredits(tx: TenantTx, tenantId: string, list: DtoRow[]): Promise<CollectionDTO[]> {
+  const ids = list.map((r) => r.matched_credit_id).filter((x): x is string => !!x);
+  const summaries = ids.length > 0 ? await loadCreditSummaries(tx, tenantId, ids) : new Map<string, CreditSummary>();
+  return list.map((r) => {
+    const dto = toCollectionDTO(r);
+    return r.matched_credit_id ? { ...dto, matchedCredit: summaries.get(r.matched_credit_id) ?? null } : dto;
+  });
+}
+
 async function readDto(tx: TenantTx, tenantId: string, id: string): Promise<CollectionDTO | null> {
   const r = rows<DtoRow>(await tx.execute(dtoQuery(tenantId, sql`c.id = ${id}`)));
-  return r[0] ? toCollectionDTO(r[0]) : null;
+  return r[0] ? (await withMatchedCredits(tx, tenantId, [r[0]]))[0]! : null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -426,7 +441,7 @@ export async function listCollections(tenantId: string, input: ListCollectionsIn
       `),
     );
     return {
-      data: page.map(toCollectionDTO),
+      data: await withMatchedCredits(tx, tenantId, page),
       nextCursor: hasMore && last ? encodeCollectionCursor(last.rung_at_key, last.id) : null,
       counts: { pending: Number(counts?.pending ?? 0), stale: Number(counts?.stale ?? 0) },
     };
@@ -936,7 +951,10 @@ export const NO_SALE_COLLECTIONS: Readonly<SaleCollectionsResult> = Object.freez
   amountEgp: 0,
   partsCount: 0,
   accountLabel: null,
-  matchEffects: EMPTY_EFFECTS,
+  // A local literal, not EMPTY_EFFECTS: collection-matching imports this
+  // module, so reading its export at load time throws a TDZ ReferenceError
+  // when collection-matching loads first (SEC14-F5).
+  matchEffects: Object.freeze({ autoConfirmed: [], notify: [], bust: false }) as MatchEffects,
 }) as SaleCollectionsResult;
 
 /**

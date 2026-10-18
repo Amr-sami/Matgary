@@ -2,9 +2,12 @@
  * Digital collections — the web's pure rules (doc 15 spec 12 §4.2, §7).
  * components/collections/rules.ts: method grids, POS accounts, the transfer
  * draft (split / validate / wire options), inbox URL state, the four-eyes and
- * reopen gates, pills, the ledger timeline, and the account form.
+ * reopen gates, pills, the ledger timeline, and the account form; M2 (§5 step
+ * 22): device health tones, the match / ignore / paste / raw / unrecognised
+ * gates, and the credits tab URL.
  */
 import { describe, expect, it } from "vitest";
+import { DEVICE_HEALTH_VALUES } from "@matgary/domain/collections/types";
 import type { PermissionPrincipal, Permission } from "@/lib/permissions";
 import {
   EMPTY_TRANSFER,
@@ -13,23 +16,29 @@ import {
   accountPatchBody,
   accountsForMethod,
   addPart,
+  HEALTH_TONE_CLASS,
   canDecide,
+  canMatch,
   cashRemainder,
   changedFields,
   collectionOptionsFromDraft,
   collectionsAccess,
+  creditsAccess,
   defaultAccountFor,
+  deviceHealthTone,
   defaultRejectOutcome,
   emptyAccountDraft,
   listQueryFor,
   methodsFor,
   parseInboxParams,
+  pastedCount,
   paymentEventView,
   pillTone,
   removePart,
   reopenAllowed,
   salePills,
   settleMethodsFor,
+  splitDevices,
   startSplit,
   validateAccountDraft,
   validateTransfer,
@@ -522,5 +531,83 @@ describe("validateAccountDraft / changedFields", () => {
     const after = { ...before, label: "VF 2", isPosDefault: true };
     const r = accountPatchBody(before, after, false, today);
     expect(r).toEqual({ ok: true, body: { label: "VF 2", isPosDefault: true }, warnings: [] });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// M2 (12 §5 step 22)
+// ---------------------------------------------------------------------------
+
+describe("deviceHealthTone (07's six DeviceHealth values)", () => {
+  it("maps every value as the §4.2 row says", () => {
+    expect(deviceHealthTone("ok")).toBe("success");
+    expect(deviceHealthTone("never_seen")).toBe("neutral");
+    expect(deviceHealthTone("heartbeat_late")).toBe("warning");
+    expect(deviceHealthTone("silent")).toBe("danger");
+    expect(deviceHealthTone("listener_off")).toBe("danger");
+    expect(deviceHealthTone("revoked")).toBe("neutral");
+  });
+  it("covers the whole union with a class (warning = the orange tone)", () => {
+    expect(DEVICE_HEALTH_VALUES).toHaveLength(6);
+    for (const h of DEVICE_HEALTH_VALUES) expect(HEALTH_TONE_CLASS[deviceHealthTone(h)]).toBeTruthy();
+    expect(HEALTH_TONE_CLASS.warning).toBe("bg-orange-100 text-orange-700");
+  });
+});
+
+describe("match / ignore / paste / raw / unrecognised (the §4.2 table, M2 rows)", () => {
+  const owner = collectionsAccess(principal("owner"), "o1");
+  const viewConfirm = collectionsAccess(principal("staff", ["view_collections", "confirm_collections"]), "s1");
+  const viewOnly = collectionsAccess(principal("staff", ["view_collections"]), "s2");
+  const confirmNoView = collectionsAccess(principal("staff", ["confirm_collections"]), "s3");
+  const own = { selfRecorded: true };
+  const other = { selfRecorded: false };
+
+  it("owner matches every candidate, including a sale they recorded", () => {
+    expect(canMatch(other, owner)).toBe(true);
+    expect(canMatch(own, owner)).toBe(true);
+  });
+  it("view + confirm staff match others' sales but never their own (four-eyes)", () => {
+    expect(canMatch(other, viewConfirm)).toBe(true);
+    expect(canMatch(own, viewConfirm)).toBe(false);
+  });
+  it("view only and confirm-without-view never match", () => {
+    expect(canMatch(other, viewOnly)).toBe(false);
+    expect(canMatch(other, confirmNoView)).toBe(false);
+  });
+  it("paste / ignore follow canConfirm", () => {
+    expect(creditsAccess(owner)).toMatchObject({ canPaste: true, canIgnore: true });
+    expect(creditsAccess(viewConfirm)).toMatchObject({ canPaste: true, canIgnore: true });
+    expect(creditsAccess(viewOnly)).toMatchObject({ canPaste: false, canIgnore: false });
+    expect(creditsAccess(confirmNoView)).toMatchObject({ canPaste: false, canIgnore: false });
+  });
+  it("show message text and Unrecognised messages are owner only", () => {
+    expect(creditsAccess(owner)).toMatchObject({ canShowRaw: true, canSeeUnrecognised: true });
+    for (const who of [viewConfirm, viewOnly, confirmNoView]) {
+      expect(creditsAccess(who)).toMatchObject({ canShowRaw: false, canSeeUnrecognised: false });
+    }
+    const nobody = collectionsAccess(null, null);
+    expect(creditsAccess(nobody)).toEqual({ canPaste: false, canIgnore: false, canShowRaw: false, canSeeUnrecognised: false });
+  });
+  it("tab=credits renders with ingest on, falls back to pending with it off; credit= only with ingest", () => {
+    const sp = new URLSearchParams("tab=credits&credit=c1");
+    expect(parseInboxParams(sp, true)).toMatchObject({ tab: "credits", credit: "c1" });
+    expect(parseInboxParams(sp, false)).toMatchObject({ tab: "pending", credit: null });
+  });
+});
+
+describe("splitDevices / pastedCount", () => {
+  it("live first, revoked apart, order kept", () => {
+    const ds = [
+      { id: "a", revokedAt: null },
+      { id: "b", revokedAt: "2026-10-18T21:00:00Z" },
+      { id: "c", revokedAt: null },
+    ];
+    const { live, revoked } = splitDevices(ds);
+    expect(live.map((d) => d.id)).toEqual(["a", "c"]);
+    expect(revoked.map((d) => d.id)).toEqual(["b"]);
+  });
+  it("counts accepted pieces only", () => {
+    expect(pastedCount([{ status: "accepted" }, { status: "duplicate" }, { status: "dropped" }, { status: "accepted" }])).toBe(2);
+    expect(pastedCount([])).toBe(0);
   });
 });

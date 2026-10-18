@@ -10,6 +10,8 @@ import {
   products,
   shopSettings,
   collectionAccounts,
+  collectionCredits,
+  collectionIngestDevices,
   collections,
 } from "@/lib/db/schema";
 import { cacheBustPrefix, cacheRemember, globalKey, tenantKey } from "@/lib/cache";
@@ -314,6 +316,16 @@ async function collectReferenceCounts(
     .select({ n: sql<number>`count(*)::int` })
     .from(collections)
     .where(eq(collections.branchId, branchId));
+  // Spec 07 step 8c (M2): credits (RLS) and ingest devices (NO RLS → the
+  // tenant filter is explicit as well as the branch).
+  const [collCreditsCount] = await tx
+    .select({ n: sql<number>`count(*)::int` })
+    .from(collectionCredits)
+    .where(eq(collectionCredits.branchId, branchId));
+  const [collDevicesCount] = await tx
+    .select({ n: sql<number>`count(*)::int` })
+    .from(collectionIngestDevices)
+    .where(and(eq(collectionIngestDevices.tenantId, _tenantId), eq(collectionIngestDevices.branchId, branchId)));
   return {
     sales: salesCount?.n ?? 0,
     expenses: expensesCount?.n ?? 0,
@@ -323,6 +335,8 @@ async function collectReferenceCounts(
     store_locations: locCount?.n ?? 0,
     collection_accounts: collAccountsCount?.n ?? 0,
     collections: collectionsCount?.n ?? 0,
+    collection_credits: collCreditsCount?.n ?? 0,
+    collection_ingest_devices: collDevicesCount?.n ?? 0,
   };
 }
 

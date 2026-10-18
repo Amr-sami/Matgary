@@ -3917,7 +3917,8 @@
           "pending": "Awaiting",
           "confirmed": "Confirmed",
           "rejected": "Rejected",
-          "totals": "Daily totals"
+          "totals": "Daily totals",
+          "credits": "Bank messages"
         },
         "staleOnly": "Late only",
         "staleBadge": "Late",
@@ -3937,6 +3938,9 @@
           },
           "rejected": {
             "title": "No rejected transfers"
+          },
+          "credits": {
+            "title": "No messages waiting"
           }
         },
         "offline": {
@@ -4043,6 +4047,34 @@
           "month_80": "Near the monthly limit",
           "new_wallet_day_80": "New wallet: near its daily limit",
           "balance_90": "Balance near the wallet's cap"
+        },
+        "unmatchedCredits": "Messages with no sale"
+      },
+      "credits": {
+        "title": "Bank messages",
+        "suggested": "Likely: {invoice}",
+        "candidates": "Possible sales",
+        "noCandidates": "No pending sale with this amount",
+        "match": "Match to sale",
+        "ignore": "Ignore",
+        "amountDiffers": "Amount differs from the sale",
+        "accountDiffers": "Different account",
+        "channels": "Received via",
+        "occurredAt": "Time",
+        "ignoreSheet": {
+          "title": "Ignore this message",
+          "submit": "Ignore"
+        },
+        "pasteSheet": {
+          "title": "Paste a message",
+          "hint": "Paste the bank or wallet message as it is — several are fine.",
+          "account": "Account (optional)",
+          "submit": "Add"
+        },
+        "done": {
+          "matched": "Matched to the sale",
+          "ignored": "Ignored",
+          "pasted": "{n} messages added"
         }
       }
     },

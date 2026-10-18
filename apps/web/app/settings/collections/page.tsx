@@ -15,6 +15,7 @@ import { useCollectionAccounts } from "@/hooks/useCollectionAccounts";
 import { CollectionSwitchesCard } from "@/components/collections/CollectionSwitchesCard";
 import { AccountsCard } from "@/components/collections/AccountsCard";
 import { AccountFormModal } from "@/components/collections/AccountFormModal";
+import { DevicesCard } from "@/components/collections/DevicesCard";
 import type { CollectionAccount } from "@/lib/api/collections";
 import type { CollectionRail } from "@matgary/domain/collections/types";
 import { cn } from "@/lib/utils";
@@ -145,6 +146,18 @@ function CollectionsSettingsInner() {
         />
         {!multiBranch && branches.length > 1 && (
           <p className="text-xs text-text-secondary">{t.accounts.otherBranchesNote}</p>
+        )}
+        {features.collectionsIngest && (
+          <>
+            <section
+              data-testid="collections-settings-automation-web"
+              className="bg-white rounded-2xl border border-border px-4 py-3 space-y-1"
+            >
+              <h2 className="text-sm font-semibold text-text-primary">{dict.app.collections.web.settings.automationTitle}</h2>
+              <p className="text-xs text-text-secondary">{dict.app.collections.web.settings.automationOnPhone}</p>
+            </section>
+            <DevicesCard accounts={accountsQ.accounts} onToast={(type, message) => setToast({ type, message })} />
+          </>
         )}
       </div>
     );

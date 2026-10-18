@@ -19,7 +19,11 @@ import {
 import { CollectionRow } from "@/components/collections/CollectionRow";
 import { CollectionDetailModal, useOnline } from "@/components/collections/CollectionDetailModal";
 import { DailyTotalsTable } from "@/components/collections/DailyTotalsTable";
-import { localYmd, listQueryFor, parseInboxParams, type InboxTab } from "@/components/collections/rules";
+import { CreditsList } from "@/components/collections/CreditsList";
+import { CreditDetailModal } from "@/components/collections/CreditDetailModal";
+import { PasteDialog } from "@/components/collections/PasteDialog";
+import { UnrecognisedList } from "@/components/collections/UnrecognisedList";
+import { creditsAccess, localYmd, listQueryFor, parseInboxParams, type InboxTab } from "@/components/collections/rules";
 import { cn } from "@/lib/utils";
 
 // The Collections inbox (doc 15 spec 12 §4.7). The URL is the state, so the
@@ -99,7 +103,9 @@ function CollectionsPageInner() {
   );
 
   const [toast, setToast] = useState<string | null>(null);
+  const [pasteOpen, setPasteOpen] = useState(false);
   const online = useOnline();
+  const creditRights = creditsAccess(access);
 
   const rows = useMemo(() => {
     const all = list.data?.pages.flatMap((p) => p.data) ?? [];
@@ -157,7 +163,7 @@ function CollectionsPageInner() {
   const tabLabels = inbox.tabs as Record<string, string>;
   const tabs: TabItem<InboxTab>[] = [
     { key: "pending", label: tabLabels.pending, badge: counts && counts.pending > 0 ? counts.pending : undefined },
-    ...(ingestOn ? [{ key: "credits" as const, label: tabLabels.credits ?? "credits" }] : []),
+    ...(ingestOn ? [{ key: "credits" as const, label: tabLabels.credits }] : []),
     { key: "confirmed", label: tabLabels.confirmed },
     { key: "rejected", label: tabLabels.rejected },
     { key: "totals", label: tabLabels.totals },
@@ -173,7 +179,7 @@ function CollectionsPageInner() {
         <Tabs
           items={tabs}
           active={params.tab}
-          onChange={(k) => setParams({ tab: k === "pending" ? null : k, stale: null, id: null })}
+          onChange={(k) => setParams({ tab: k === "pending" ? null : k, stale: null, id: null, credit: null })}
           testIdPrefix="collections-tab-"
           className="[&>button]:min-h-11 lg:[&>button]:min-h-0"
         />
@@ -289,7 +295,18 @@ function CollectionsPageInner() {
               <DailyTotalsTable summary={summary.data} showCredits={ingestOn} />
             )}
           </div>
-        ) : params.tab === "credits" ? null : (
+        ) : params.tab === "credits" ? (
+          <div className="space-y-4">
+            <CreditsList
+              allBranches={params.allBranches}
+              canPaste={creditRights.canPaste}
+              online={online}
+              onOpen={(credit) => setParams({ credit })}
+              onPaste={() => setPasteOpen(true)}
+            />
+            {creditRights.canSeeUnrecognised && <UnrecognisedList online={online} />}
+          </div>
+        ) : (
           <div className="bg-white rounded-2xl border border-border overflow-hidden">
             {list.isPending ? (
               <PageSkeleton variant="list" />
@@ -345,6 +362,28 @@ function CollectionsPageInner() {
           if (done === "confirmed" || done === "rejected") setParams({ id: null });
         }}
       />
+      {ingestOn && params.credit && (
+        <CreditDetailModal
+          key={params.credit}
+          id={params.credit}
+          access={access}
+          onClose={() => setParams({ credit: null })}
+          onDone={(message) => {
+            setToast(message);
+            setParams({ credit: null });
+          }}
+        />
+      )}
+      {ingestOn && creditRights.canPaste && (
+        <PasteDialog
+          open={pasteOpen}
+          onClose={() => setPasteOpen(false)}
+          onDone={(n) => {
+            setPasteOpen(false);
+            setToast(dict.app.collections.credits.done.pasted.replace("{n}", String(n)));
+          }}
+        />
+      )}
       {toast && <Toast type="success" message={toast} onClose={() => setToast(null)} />}
     </AppShell>
   );

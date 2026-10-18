@@ -18,7 +18,7 @@ import type {
   SaleCollectionStatus,
 } from "@matgary/api-client/endpoints/collections";
 import type { CollectionsFeatures } from "@matgary/api-client/endpoints/me";
-import type { CollectionProvider, CollectionRail } from "@matgary/domain/collections/types";
+import type { CollectionProvider, CollectionRail, DeviceHealth } from "@matgary/domain/collections/types";
 import {
   normalizeDigits,
   normalizeIban,
@@ -833,4 +833,81 @@ export function accountPatchBody(before: AccountDraft, after: AccountDraft, incl
     for (const k of ["ipaHandle", "ipaLink", "accountLast4", "isPrepaidCard", "iban", "isDefaultForMobile"]) delete diff[k];
   }
   return { ok: true as const, body: diff, warnings: a.warnings };
+}
+
+// ---------------------------------------------------------------------------
+// M2 — credits, unrecognised messages, linked phones (12 §4.2, §4.7, §4.8)
+// ---------------------------------------------------------------------------
+
+/**
+ * `credit-match-<collectionId>` gate: `confirm_collections` (with view) and
+ * the four-eyes hint of 07's candidate — nobody matches a credit to a sale
+ * they recorded; the owner is exempt. The server re-checks (403
+ * SELF_CONFIRM_FORBIDDEN).
+ */
+export function canMatch(
+  candidate: { selfRecorded: boolean },
+  who: Pick<CollectionsAccess, "canConfirm" | "isOwner">,
+): boolean {
+  return who.canConfirm && (who.isOwner || !candidate.selfRecorded);
+}
+
+export interface CreditsAccess {
+  /** `credits-paste` and `credit-ignore` (confirm_collections, 07 §4.5). */
+  canPaste: boolean;
+  canIgnore: boolean;
+  /** `credit-show-raw` — owner only (07 §4.10; the server returns raw: null otherwise). */
+  canShowRaw: boolean;
+  /** The Unrecognised messages section and its share action — owner only. */
+  canSeeUnrecognised: boolean;
+}
+
+/** The M2 rows of the §4.2 access table, from `collectionsAccess()`. */
+export function creditsAccess(who: Pick<CollectionsAccess, "canConfirm" | "isOwner">): CreditsAccess {
+  return {
+    canPaste: who.canConfirm,
+    canIgnore: who.canConfirm,
+    canShowRaw: who.isOwner,
+    canSeeUnrecognised: who.isOwner,
+  };
+}
+
+export type HealthTone = "success" | "neutral" | "warning" | "danger";
+
+/** 07's server-computed `DeviceHealth` → chip tone (never recomputed here). */
+export function deviceHealthTone(h: DeviceHealth): HealthTone {
+  switch (h) {
+    case "ok":
+      return "success";
+    case "heartbeat_late":
+      return "warning";
+    case "silent":
+    case "listener_off":
+      return "danger";
+    case "never_seen":
+    case "revoked":
+    default:
+      return "neutral";
+  }
+}
+
+export const HEALTH_TONE_CLASS: Readonly<Record<HealthTone, string>> = Object.freeze({
+  success: "bg-success-light text-success",
+  neutral: "bg-gray-100 text-text-secondary",
+  warning: "bg-orange-100 text-orange-700",
+  danger: "bg-danger-light text-danger",
+});
+
+/** Live devices first (newest first, as the server sends), then the ones
+ *  revoked in the last 30 days (shown greyed under `recentlyUnlinked`). */
+export function splitDevices<T extends { revokedAt: string | null }>(devices: readonly T[]): { live: T[]; revoked: T[] } {
+  const live: T[] = [];
+  const revoked: T[] = [];
+  for (const d of devices) (d.revokedAt ? revoked : live).push(d);
+  return { live, revoked };
+}
+
+/** Accepted pieces of a paste (the `credits.done.pasted` {n}). */
+export function pastedCount(results: ReadonlyArray<{ status: string }>): number {
+  return results.filter((r) => r.status === "accepted").length;
 }

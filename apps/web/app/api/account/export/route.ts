@@ -34,6 +34,7 @@ const TABLES = [
   "category_attributes",
   "category_attribute_values",
   "collection_accounts",
+  "collection_credits",
   "collection_events",
   "collections",
   "customer_wallets",

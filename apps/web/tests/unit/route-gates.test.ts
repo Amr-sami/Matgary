@@ -85,6 +85,18 @@ const GATES: Array<[string, string, string[]]> = [
   ["collections/settings", "GET", ["requireTenantWithBranch()", COLL]],
   ["collections/settings", "PATCH", [ENFORCED("manage_collection_accounts"), COLL]],
   ["collections/config", "GET", ["requireTenantWithBranch()", "resolveCollectionsFeatures("]],
+  // Doc 15 spec 07 §4.5 (M2). Devices GET/DELETE carry no flag (D07-2); POST
+  // devices and paste need features.collectionsIngest.
+  ["collections/credits", "GET", [ENFORCED("view_collections"), COLL]],
+  ["collections/credits/[id]", "GET", [ENFORCED("view_collections"), "isOwner(r.ctx)", COLL]],
+  ["collections/credits/[id]/match", "POST", [ENFORCED("confirm_collections"), "IDEMPOTENCY_KEY_REQUIRED", COLL]],
+  ["collections/credits/[id]/ignore", "POST", [ENFORCED("confirm_collections"), "IDEMPOTENCY_KEY_REQUIRED", COLL]],
+  ["collections/credits/paste", "POST", [ENFORCED("confirm_collections"), "IDEMPOTENCY_KEY_REQUIRED", "INGEST_DISABLED"]],
+  ["collections/devices", "GET", [ENFORCED("manage_collection_accounts")]],
+  ["collections/devices", "POST", [ENFORCED("manage_collection_accounts"), "INGEST_DISABLED"]],
+  ["collections/devices/[id]", "DELETE", [ENFORCED("manage_collection_accounts")]],
+  ["collections/unrecognised", "GET", ["requireTenantWithBranch()", "isOwner(r.ctx)", COLL]],
+  ["collections/unrecognised/[id]/share", "POST", ["requireTenantWithBranch()", "isOwner(r.ctx)", COLL]],
   // Doc 15 spec 13 §7 T7 — the collections tick is a bearer-guarded cron.
   ["cron/collections-tick", "POST", ['guardCronRequest(req, { bucket: "collections-tick" })']],
 ];

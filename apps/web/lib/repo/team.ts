@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { finishDeviceRevocations, revokeDevicesCreatedBy } from "@/lib/repo/collection-devices";
 import { users, tenantMembers, tenants } from "@/lib/db/schema";
 import type { Permission } from "@/lib/permissions";
 import { ALL_PERMISSIONS } from "@/lib/permissions";
@@ -320,7 +321,7 @@ export async function removeTeamMember(
     throw new TeamConflictError("لا يمكن حذف المالك");
   }
 
-  await db.transaction(async (tx) => {
+  const revokedDevices = await db.transaction(async (tx) => {
     await tx
       .delete(tenantMembers)
       .where(
@@ -329,9 +330,16 @@ export async function removeTeamMember(
           eq(tenantMembers.userId, userId),
         ),
       );
+    // Digital collections (doc 15 spec 07 §4.11): the ingest devices this
+    // member registered are revoked `user_removed` in the same transaction,
+    // before the user row goes (created_by_user_id would go NULL).
+    const revoked = await revokeDevicesCreatedBy(tx, tenantId, userId);
     // Also delete the user — sub-accounts are scoped to one tenant in v1.
     await tx.delete(users).where(eq(users.id, userId));
+    return revoked;
   });
+  // After the commit: drop the cached tokens, purge their raw messages.
+  await finishDeviceRevocations(tenantId, revokedDevices);
 
   // Best-effort photo cleanup outside the transaction (filesystem is not txnal).
   if (member.profilePhotoPath) {

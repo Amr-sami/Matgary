@@ -88,3 +88,73 @@ describe("collections web i18n", () => {
     expect(at(ar, "app.catalog.payment.wallet")).toBe("محفظة موبايل");
   });
 });
+
+// M2 leaves (12 §5 step 22): credits / devices / unrecognised under
+// app.collections.web, and 08's credits subtree the paste dialog reuses.
+describe("collections web i18n — M2", () => {
+  const TEMPLATE_STATUS = ["published_sample", "pilot_verified", "fallback"] as const;
+
+  for (const sub of ["app.collections.web.credits", "app.collections.web.devices", "app.collections.web.unrecognised"]) {
+    it(`${sub}: present, non-empty, same leaves in ar and en`, () => {
+      const a = leaves(at(ar, sub), sub);
+      const e = leaves(at(en, sub), sub);
+      expect(a.size).toBeGreaterThan(0);
+      expect([...a.keys()].sort()).toEqual([...e.keys()].sort());
+      for (const [k, v] of [...a, ...e]) expect(v.trim(), k).not.toBe("");
+    });
+  }
+
+  it("every credit templateStatus has a label", () => {
+    for (const dict of [ar, en]) {
+      const ts = at(dict, "app.collections.web.credits.templateStatus") as Tree;
+      for (const s of TEMPLATE_STATUS) expect(typeof ts[s], s).toBe("string");
+    }
+  });
+
+  it("the web M2 UI copy it reads exists in both languages (08's credits.*, tabs, totals)", () => {
+    const keys = [
+      "app.collections.inbox.tabs.credits",
+      "app.collections.inbox.empty.credits.title",
+      "app.collections.totals.unmatchedCredits",
+      "app.collections.credits.title",
+      "app.collections.credits.suggested",
+      "app.collections.credits.candidates",
+      "app.collections.credits.noCandidates",
+      "app.collections.credits.match",
+      "app.collections.credits.ignore",
+      "app.collections.credits.amountDiffers",
+      "app.collections.credits.accountDiffers",
+      "app.collections.credits.channels",
+      "app.collections.credits.occurredAt",
+      "app.collections.credits.ignoreSheet.title",
+      "app.collections.credits.ignoreSheet.submit",
+      "app.collections.credits.pasteSheet.title",
+      "app.collections.credits.pasteSheet.hint",
+      "app.collections.credits.pasteSheet.account",
+      "app.collections.credits.pasteSheet.submit",
+      "app.collections.credits.done.matched",
+      "app.collections.credits.done.ignored",
+      "app.collections.credits.done.pasted",
+    ];
+    for (const k of keys) {
+      for (const dict of [ar, en]) {
+        const v = at(dict, k);
+        expect(typeof v, k).toBe("string");
+        expect((v as string).trim(), k).not.toBe("");
+      }
+    }
+    expect(at(ar, "app.collections.credits.done.pasted")).toContain("{n}");
+    expect(at(en, "app.collections.credits.done.pasted")).toContain("{n}");
+    expect(at(en, "app.collections.credits.suggested")).toContain("{invoice}");
+    expect(at(ar, "app.collections.credits.suggested")).toContain("{invoice}");
+  });
+
+  it("08's credits subtree has the same leaves in ar and en and no banned copy", () => {
+    const a = leaves(at(ar, "app.collections.credits"), "c");
+    const e = leaves(at(en, "app.collections.credits"), "c");
+    expect([...a.keys()].sort()).toEqual([...e.keys()].sort());
+    const enBad = /accept payments|payment gateway|process payments|refund the transfer|reverse the transfer/i;
+    for (const v of e.values()) expect(enBad.test(v), v).toBe(false);
+    for (const v of a.values()) for (const bad of ["استقبال المدفوعات", "بوابة دفع", "استرجاع التحويل"]) expect(v.includes(bad), v).toBe(false);
+  });
+});

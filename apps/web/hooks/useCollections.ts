@@ -26,14 +26,25 @@ import {
   getConfig,
   getSettings,
   getSummary,
+  getCredit,
+  ignoreCredit,
   listCollections,
+  listCredits,
+  listDevices,
+  listUnrecognised,
+  matchCredit,
+  pasteCredits,
+  revokeDevice,
+  shareUnrecognised,
   rejectCollection,
   reopenCollection,
   updateCollection,
   updateSettings,
   type CollectionsConfig,
   type CollectionSettings,
+  type ListCreditsParams,
 } from "@/lib/api/collections";
+import type { IgnoreReason } from "@matgary/domain/collections/types";
 import { readCollectionsSnapshot, writeCollectionsSnapshot } from "@/lib/offline/snapshot";
 import { NO_FEATURES, collectionsAccess, type CollectionsAccess } from "@/components/collections/rules";
 import { useDeferred } from "./useDeferred";
@@ -245,4 +256,95 @@ export function useUpdateCollectionSettings(branchId: string | null) {
       }
     },
   });
+}
+
+// ---- M2: credits, unrecognised messages, linked phones ------------------------
+// Keys (12 §4.2): ["collection-credits", filters] · ["collection-credits",
+// "detail", id] · ["collection-unrecognised"] · ["collection-devices"].
+
+export function useCredits(filters: ListCreditsParams | null, enabled = true) {
+  return useInfiniteQuery({
+    queryKey: ["collection-credits", filters ?? {}],
+    enabled: enabled && filters != null,
+    initialPageParam: null as string | null,
+    queryFn: ({ pageParam }) => listCredits({ ...(filters ?? {}), cursor: pageParam, limit: 50 }),
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+    staleTime: 15_000,
+  });
+}
+
+/** The credit detail with its ≤ 10 ranked candidates. `includeRaw` (owner,
+ *  on demand) is a separate key: each fetch logs one `collection.raw_view`. */
+export function useCredit(id: string | null, opts: { includeRaw?: boolean } = {}) {
+  const includeRaw = opts.includeRaw === true;
+  return useQuery({
+    queryKey: includeRaw ? ["collection-credits", "detail", id, "raw"] : ["collection-credits", "detail", id],
+    queryFn: () => getCredit(id as string, { includeRaw }),
+    enabled: !!id,
+    staleTime: includeRaw ? Infinity : 5_000,
+  });
+}
+
+/** Match / ignore / paste — online-only, one Idempotency-Key per opening
+ *  (minted by the dialog). A success refreshes every view a decision can
+ *  change (the matched collection leaves Pending). */
+export function useCreditActions() {
+  const qc = useQueryClient();
+  const done = useCallback(() => invalidateAfterDecision(qc), [qc]);
+  const match = useMutation({
+    mutationFn: (v: { id: string; collectionId: string; key: string }) =>
+      matchCredit(v.id, { collectionId: v.collectionId }, v.key),
+    onSuccess: done,
+  });
+  const ignore = useMutation({
+    mutationFn: (v: { id: string; reason: IgnoreReason; key: string }) => ignoreCredit(v.id, { reason: v.reason }, v.key),
+    onSuccess: done,
+  });
+  const paste = useMutation({
+    mutationFn: (v: { text: string; accountId?: string; key: string }) =>
+      pasteCredits({ text: v.text, ...(v.accountId ? { accountId: v.accountId } : {}) }, v.key),
+    onSuccess: async () => {
+      await Promise.all([done(), qc.invalidateQueries({ queryKey: ["collection-unrecognised"] })]);
+    },
+  });
+  return { match, ignore, paste };
+}
+
+/** The owner's "Unrecognised messages" (decrypted server-side; the page
+ *  logs one `collection.raw_view`). */
+export function useUnrecognised(enabled: boolean) {
+  const qc = useQueryClient();
+  const list = useInfiniteQuery({
+    queryKey: ["collection-unrecognised"],
+    enabled,
+    initialPageParam: null as string | null,
+    queryFn: ({ pageParam }) => listUnrecognised({ cursor: pageParam }),
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+    staleTime: 60_000,
+  });
+  const share = useMutation({
+    mutationFn: (id: string) => shareUnrecognised(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["collection-unrecognised"] }),
+  });
+  return { list, share };
+}
+
+/** Linked phones: the web lists and revokes, never creates (Q8). */
+export function useCollectionDevices(enabled: boolean) {
+  const qc = useQueryClient();
+  const list = useQuery({
+    queryKey: ["collection-devices"],
+    queryFn: () => listDevices(),
+    enabled,
+    staleTime: 30_000,
+  });
+  const revoke = useMutation({
+    mutationFn: (id: string) => revokeDevice(id),
+    onSuccess: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: ["collection-devices"] }),
+        qc.invalidateQueries({ queryKey: ["collections-config"] }),
+      ]),
+  });
+  return { list, revoke };
 }
