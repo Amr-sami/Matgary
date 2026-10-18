@@ -6334,6 +6334,76 @@
         "dev": {
           "simulateTest": "Simulate the test (dev)"
         }
+      },
+      "ios": {
+        "shortcutName": "ستورو — تأكيد التحويلات",
+        "shortcutNameGloss": "the “ستورو — تأكيد التحويلات” shortcut (TheStoro — confirm transfers)",
+        "install": {
+          "http": {
+            "s1": "Copy the link code with the button above.",
+            "s2": "Tap “Add the shortcut”. Your iPhone opens the shortcut's page.",
+            "s3": "Tap Set Up Shortcut, paste the code into the “Link code” box, then tap Add Shortcut.",
+            "s4": "Don't rename the shortcut. Then come back to TheStoro."
+          },
+          "intent": {
+            "s1": "If you already have an older “{name}” shortcut, delete it first.",
+            "s2": "Tap “Add the shortcut”. This one needs no code: TheStoro keeps the link on this iPhone.",
+            "s3": "Tap Add Shortcut without renaming it, then come back to TheStoro."
+          }
+        },
+        "enable": {
+          "ios27": {
+            "s1": "Open the shortcut with the “Open the shortcut” button.",
+            "s2": "At the top of the shortcut the automation arrives switched off. Turn it on.",
+            "s3": "Tap Edit, then Info, then Privacy, and turn on Allow Running When Locked.",
+            "s4": "Don't save your bank or wallet sender as a contact. If its texts land in Unknown Senders, open the chat and tap Mark as Known."
+          },
+          "legacy": {
+            "s1": "Open the Shortcuts app, tap Automation, then +, and choose Message.",
+            "s2": "Leave Sender empty, and in Message Contains type: {keyword}",
+            "s3": "Choose Run Immediately, then Next.",
+            "s4": "Choose New Blank Automation, add the Run Shortcut action, and pick “{name}”.",
+            "s5": "Tap the action's input, choose Shortcut Input, then Done.",
+            "s6": "If your bank texts you in English, repeat the same steps with the word {keyword}."
+          },
+          "legacy27": {
+            "s1": "Open the shortcut with the “Open the shortcut” button and tap Edit.",
+            "s2": "Add an automation at the top of the shortcut and choose Message. Leave Sender empty and type in Message Contains: {keyword}",
+            "s3": "Turn the automation on, then Info → Privacy → Allow Running When Locked.",
+            "s4": "If your bank texts you in English, add a second automation with the word {keyword}."
+          },
+          "alwaysAllow": {
+            "http": "The first time the shortcut runs, your iPhone asks to allow a connection to thestoro.com. Choose Always Allow.",
+            "intent": "The first time, your iPhone may ask to let the shortcut use TheStoro. Choose Always Allow."
+          },
+          "optionalNotification": {
+            "s1": "Optional: if your bank or wallet app sends a notification when money arrives, add a Notification automation at the top of the shortcut and pick that app.",
+            "s2": "Keep that app's notifications on and out of Scheduled Summary."
+          }
+        },
+        "runningNote": "A small banner appears every time the shortcut runs. That's normal.",
+        "troubleshoot": {
+          "common": {
+            "s1": "Check the automation is switched on in the Shortcuts app.",
+            "s2": "The shortcut's name must stay “{name}”.",
+            "s3": "If your iPhone asked for permission, choose Always Allow.",
+            "s4": "If you changed or restored this iPhone, set it up again.",
+            "s5": "Check this iPhone is online."
+          },
+          "legacy": {
+            "s1": "Message Contains must be exactly {keyword}, and the action must be Run Shortcut with Shortcut Input."
+          },
+          "ios27": {
+            "s1": "Check that Allow Running When Locked is on."
+          },
+          "http": {
+            "s1": "If this phone was unlinked, delete the shortcut and set up again with a new code."
+          },
+          "intent": {
+            "s1": "After restarting the iPhone, unlock it at least once.",
+            "s2": "If messages didn't arrive, open TheStoro once so it sends what it saved on the phone."
+          }
+        }
       }
     }
   }

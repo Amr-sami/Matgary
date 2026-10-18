@@ -1,5 +1,6 @@
+import { useCallback, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { ArrowsLeftRightIcon as ArrowsLeftRight } from "phosphor-react-native/src/icons/ArrowsLeftRight";
 import { BellIcon as Bell } from "phosphor-react-native/src/icons/Bell";
 import { ChatCircleIcon as ChatCircle } from "phosphor-react-native/src/icons/ChatCircle";
@@ -21,6 +22,8 @@ import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { Segmented } from "@/components/ui/Segmented";
 import { collectionsTileVisible } from "@/components/collections/setup/access";
+import * as collectionsSetupStore from "@/components/collections/setup/device-store";
+import { forwardsLineVisible, type SetupRecord } from "@/components/collections/setup/wizard";
 import { useCollectionsAccess } from "@/components/collections/setup/useCollectionsAccess";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
@@ -216,6 +219,11 @@ export default function SettingsScreen() {
         />
       </Card>
 
+      {/* Doc 15 spec 09 §4.2 (US-M4-04): shown to ANY signed-in user while this
+          phone forwards bank/wallet messages — a cashier on the counter phone
+          sees it too, but not the hub. */}
+      <ThisPhoneForwards />
+
       <View style={styles.list}>
         {visible.map((tile) => {
           const Icon = tile.icon;
@@ -266,7 +274,34 @@ export default function SettingsScreen() {
   );
 }
 
+/**
+ * "This phone forwards messages for {accounts}" — from the non-secret
+ * `collections-setup` MMKV record, re-read on focus. No request, no gate:
+ * forwarding survives sign-out and a user switch (09 §4.2).
+ */
+function ThisPhoneForwards() {
+  const [rec, setRec] = useState<SetupRecord | null>(() => collectionsSetupStore.read());
+  useFocusEffect(
+    useCallback(() => {
+      setRec(collectionsSetupStore.read());
+    }, []),
+  );
+  if (!forwardsLineVisible(rec)) return null;
+  const labels = rec?.accountLabels ?? [];
+  const accounts = labels.length ? labels.join("، ") : t("mobile.collections.setup.devices.accountsAll");
+  return (
+    <Card>
+      <View style={styles.forwardsRow} testID="collection-this-phone-forwards" collapsable={false}>
+        <ArrowsLeftRight size={18} color={colors.successStrong} />
+        <Text style={styles.forwardsText}>{t("mobile.collections.setup.hub.thisPhoneForwards", { accounts })}</Text>
+      </View>
+    </Card>
+  );
+}
+
 const styles = StyleSheet.create({
+  forwardsRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  forwardsText: { ...RTL_TEXT, flex: 1, fontFamily: fonts.medium, fontSize: 14, lineHeight: 22, color: colors.text },
   store: { fontFamily: fonts.bold, fontSize: 18, color: colors.text, ...RTL_TEXT },
   meta: {
     fontFamily: fonts.regular,

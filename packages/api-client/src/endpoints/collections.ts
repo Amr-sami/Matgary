@@ -1,5 +1,6 @@
 import type { ApiClient } from "../http";
 import type { CollectionsFeatures } from "./me";
+import type { IngestConfigBlock } from "./collection-credits";
 
 /**
  * Digital collections (InstaPay + mobile wallets), L1 — the routes of
@@ -404,14 +405,15 @@ export const updateSettings = (c: ApiClient, patch: CollectionSettingsPatch, bra
     query: { branchId },
   });
 
-/** 03 §B.17 CollectionsConfigDTO; `ingest` is null until M2 (07 fills it). */
+/** 03 §B.17 CollectionsConfigDTO; `ingest` (07 §4.6) is null while
+ *  features.collectionsIngest is off. */
 export interface CollectionsConfig {
   features: CollectionsFeatures;
   branchId: string;
   requireAccount: boolean;
   staleAfterMinutes: number;
   limits: { maxParts: number; reopenDays: number; noteMaxLength: number };
-  ingest: Record<string, unknown> | null;
+  ingest: IngestConfigBlock | null;
 }
 
 /** GET /api/collections/config — answers 200 (flags all false) even when the

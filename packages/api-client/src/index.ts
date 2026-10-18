@@ -21,3 +21,4 @@ export * as branches from "./endpoints/branches";
 export * as legal from "./endpoints/legal";
 export * as taxonomy from "./endpoints/taxonomy";
 export * as collections from "./endpoints/collections";
+export * as collectionCredits from "./endpoints/collection-credits";

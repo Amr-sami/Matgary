@@ -15,6 +15,9 @@ import { collectionsErrorText } from "@/components/collections/setup/errors";
 import { useSetupNotice, type SetupNotice } from "@/components/collections/setup/notice";
 import { COLLECTION_ACCOUNTS_ROOT, collectionSettingsKey } from "@/components/collections/setup/queries";
 import { useCollectionsAccess } from "@/components/collections/setup/useCollectionsAccess";
+import { listStateOf, useCollectionDevices, useSetupRecord } from "@/components/collections/setup/useDevices";
+import { entryHint } from "@/components/collections/setup/wizard";
+import { Badge } from "@/components/ui/Badge";
 import { Screen } from "@/components/layout/Screen";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -40,9 +43,11 @@ type Rail = collections.CollectionRail;
  * Top to bottom: header (active branch), the positioning intro, the branch
  * switches (`GET` → `PATCH /api/collections/settings`, one PATCH per change,
  * optimistic with rollback), the branch's receiving accounts, and the web
- * note. The L2 rows ("Automatic confirmation", "Linked phones") arrive with
- * M2 (09 step 15); the L2 switches below already hide unless
- * `features.collectionsIngest`.
+ * note. With `features.collectionsIngest` (M2, 09 step 15): the two L2 entry
+ * rows ("Automatic confirmation" with this phone's hint, "Linked phones"
+ * with the live count and a silent warning) and the reconcile of this
+ * phone's link record against the devices list (09 §4.6.6: cleared only
+ * when a fresh 200 list no longer has the device).
  *
  * Gates (09 §4.2): the screen needs `canManage` (owner or
  * manage_collection_accounts) and `features.collectionsAvailable`
@@ -62,6 +67,9 @@ export default function CollectionsSettingsScreen() {
 
   const settingsQ = useCollectionSettings(enabled);
   const accountsQ = useCollectionAccounts(enabled);
+  const ingestRows = enabled && access.ingest;
+  const devicesQ = useCollectionDevices(ingestRows);
+  const { record } = useSetupRecord(listStateOf(devicesQ));
   const settings = settingsQ.data ?? null;
   const accounts = accountsQ.accounts;
 
@@ -77,7 +85,10 @@ export default function CollectionsSettingsScreen() {
     useCallback(() => {
       const n = useSetupNotice.getState().take();
       if (n) setNotice(n);
-    }, []),
+      // Back from the wizard / devices screen: refresh the live list (and the reconcile).
+      if (ingestRows) void devicesQ.refetch();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [ingestRows]),
   );
 
   const settingsKey = collectionSettingsKey(branchId);
@@ -135,6 +146,7 @@ export default function CollectionsSettingsScreen() {
   const refresh = () => {
     void settingsQ.refetch();
     void accountsQ.query.refetch();
+    if (ingestRows) void devicesQ.refetch();
   };
 
   const openForm = (rail: Rail) => {
@@ -171,7 +183,11 @@ export default function CollectionsSettingsScreen() {
   const hasAccounts = (accounts?.length ?? 0) > 0;
 
   return (
-    <Screen header={header} onRefresh={refresh} refreshing={settingsQ.isRefetching || accountsQ.query.isRefetching}>
+    <Screen
+      header={header}
+      onRefresh={refresh}
+      refreshing={settingsQ.isRefetching || accountsQ.query.isRefetching || devicesQ.isRefetching}
+    >
       {notice ? (
         <Pressable onPress={() => setNotice(null)} testID="collections-settings-notice">
           <Text style={[styles.notice, notice.tone === "ok" ? styles.noticeOk : styles.noticeErr]}>{notice.text}</Text>
@@ -358,6 +374,32 @@ export default function CollectionsSettingsScreen() {
         ) : null}
       </Card>
 
+      {/* L2 entries (09 §4.3 item 5, M2) */}
+      {ingestRows ? (
+        <Card>
+          <EntryRow
+            testID="collections-settings-automation"
+            title={t("mobile.collections.setup.entry.title")}
+            hint={t(`mobile.collections.setup.entry.${entryHint(record)}`)}
+            onPress={() => router.push("/settings/collections/automation" as never)}
+          />
+          <View style={styles.divider} />
+          <EntryRow
+            testID="collections-settings-devices"
+            title={t("mobile.collections.setup.devicesEntry.title")}
+            hint={t("mobile.collections.setup.devicesEntry.hint")}
+            count={devicesQ.data ? devicesQ.data.devices.filter((d) => !d.revokedAt).length : null}
+            onPress={() => router.push("/settings/collections/devices" as never)}
+          />
+          {devicesQ.data?.devices.some((d) => !d.revokedAt && d.health === "silent") ? (
+            <View style={styles.warnRow} testID="collections-settings-devices-silent">
+              <Warning size={16} color={colors.danger} />
+              <Text style={[styles.warnText, styles.dangerText]}>{t("mobile.collections.setup.devicesEntry.silentWarning")}</Text>
+            </View>
+          ) : null}
+        </Card>
+      ) : null}
+
       <Text style={styles.webNote}>{t("app.collectionsSettings.webNote")}</Text>
 
       <Sheet
@@ -380,6 +422,37 @@ export default function CollectionsSettingsScreen() {
         </View>
       </Sheet>
     </Screen>
+  );
+}
+
+/** An L2 entry row on the hub: title, hint, optional bare-number badge, chevron. */
+function EntryRow({
+  title,
+  hint,
+  count,
+  onPress,
+  testID,
+}: {
+  title: string;
+  hint: string;
+  count?: number | null;
+  onPress: () => void;
+  testID: string;
+}) {
+  return (
+    <Pressable
+      testID={testID}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.entryRow, pressed && styles.entryRowPressed]}
+    >
+      <View style={styles.addRowBody}>
+        <Text style={styles.addRowLabel}>{title}</Text>
+        <Text style={styles.fieldHint}>{hint}</Text>
+      </View>
+      {count != null ? <Badge label={String(count)} variant="neutral" /> : null}
+      <ChevronForward size={20} color={colors.textSecondary} />
+    </Pressable>
   );
 }
 
@@ -414,6 +487,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
   },
   addRowPressed: { borderColor: colors.accent, backgroundColor: colors.accentLight },
+  entryRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: MIN_TOUCH + spacing.lg, borderRadius: radius.md },
+  entryRowPressed: { backgroundColor: colors.accentLight },
   addRowBody: { flex: 1, minWidth: 0, gap: 2 },
   addRowLabel: { ...RTL_TEXT, fontFamily: fonts.semibold, fontSize: 15, color: colors.text },
   notice: {
@@ -466,6 +541,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   warnText: { ...RTL_TEXT, flex: 1, fontFamily: fonts.medium, fontSize: 13, color: colors.warningStrong },
+  dangerText: { color: colors.danger },
   gap: { gap: spacing.md },
   list: { gap: spacing.sm },
   emptyActions: { flexDirection: "row", gap: spacing.sm },
