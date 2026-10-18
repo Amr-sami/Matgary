@@ -11,10 +11,18 @@
 //   {v:1, channel, sender?, sourceApp?, title?, subtitle?, body, receivedAt, phoneRef}
 // deviceRef = the line's phoneRef (else --phone-ref). OTP lines are dropped.
 //
-// DB mode (--tenant) reads shared, unexpired collection_raw_messages rows per
-// named tenant through withTenant (RLS on, no BYPASSRLS path) and decrypts
-// them with 07's decryptRawText. Both land at M2 (0056, order 19); until then
-// DB mode refuses with exit 3.
+// DB mode (--tenant, M2; README §3 order 25) reads shared, unexpired
+// collection_raw_messages rows (shared_at IS NOT NULL AND expires_at > now(),
+// [created_at >= --since]) per named tenant through @/lib/db's withTenant on
+// the APP_DATABASE_URL NOSUPERUSER role — RLS stays on and there is no
+// cross-tenant / BYPASSRLS path (03 §D.6, ARCH CR 4). title_enc ([title,
+// subtitle] JSON) and body_enc are decrypted in memory with 07's
+// decryptRawText; tenantRef = "T-" + sha256(tenantId)[0:6], deviceRef =
+// "D-" + sha256(ingest_device_id)[0:8], or --phone-ref / null for a paste
+// (a paste never counts towards "≥ 2 phones" without --phone-ref). The DB
+// imports are dynamic, so file mode needs no database or SECRET_KEY. Env comes
+// from the process (the migrator image), else apps/web/.env (dotenv, no
+// override).
 //
 // Safety (§4.10.3):
 //   - stdout carries JSON only; progress and counts go to stderr, never text;
@@ -22,7 +30,7 @@
 //   - refuses a TTY stdout (exit 2) unless --i-know-stdout-is-a-terminal;
 //   - exits 4 (after writing the JSON) when a record has unknownWords > 20.
 //
-// Exit codes: 0 ok · 1 bad input · 2 TTY stdout · 3 DB mode before M2 · 4 review.
+// Exit codes: 0 ok · 1 bad input · 2 TTY stdout · 3 DB unavailable / read failed · 4 review.
 //
 // Since order 18 (06 part B, 2026-10-18) the OTP drop is 06's isOtp and every
 // record is re-parsed in memory with 06's parseMessage (the INTERIM copies of
@@ -32,6 +40,7 @@
 // is masked to its last 4 exactly as the redaction masks it (x), so
 // `fixtureDraft.expect.reference` (x → 7) matches the filled text.
 
+import "dotenv/config";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { isOtp } from "@matgary/domain/collections/filter";
@@ -206,6 +215,86 @@ function readJsonl(path: string, args: Args): SourceRecord[] {
   return out;
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+interface RawRow {
+  id: string;
+  ingest_device_id: string | null;
+  channel: string;
+  source_app: string | null;
+  sender: string | null;
+  title_enc: string | null;
+  body_enc: string | null;
+  parse_status: string;
+  received_at: string | Date;
+}
+
+/** DB mode: the shared rows of each named tenant, decrypted in memory only. */
+async function readShared(args: Args): Promise<{ records: SourceRecord[]; undecryptable: number }> {
+  for (const t of args.tenants) if (!UUID_RE.test(t)) die(1, "--tenant must be a uuid");
+  let dbMod: typeof import("@/lib/db");
+  let rawText: typeof import("@/lib/collections/raw-text");
+  let sqlTag: typeof import("drizzle-orm").sql;
+  try {
+    dbMod = await import("@/lib/db");
+    rawText = await import("@/lib/collections/raw-text");
+    sqlTag = (await import("drizzle-orm")).sql;
+  } catch (e) {
+    die(3, `DB mode needs APP_DATABASE_URL (or DATABASE_URL) and SECRET_KEY (${(e as Error).message.split("\n")[0]})`);
+  }
+  const out: SourceRecord[] = [];
+  let undecryptable = 0;
+  try {
+    for (const tenantId of args.tenants) {
+      const since = args.since ? `${args.since}T00:00:00Z` : null;
+      const rows = (await dbMod.withTenant(tenantId, (tx) =>
+        tx.execute(sqlTag`
+          SELECT id, ingest_device_id, channel, source_app, sender, title_enc, body_enc, parse_status, received_at
+          FROM collection_raw_messages
+          WHERE tenant_id = ${tenantId}
+            AND shared_at IS NOT NULL
+            AND expires_at > now()
+            AND (${since}::timestamptz IS NULL OR created_at >= ${since}::timestamptz)
+          ORDER BY created_at
+        `),
+      )) as unknown as RawRow[];
+      const tenantRef = `T-${sha256(tenantId).slice(0, 6)}`;
+      for (const r of rows) {
+        let body: string | null;
+        let ts: { title: string | null; subtitle: string | null };
+        try {
+          body = rawText.decryptRawText(r.body_enc);
+          ts = rawText.decodeTitleSubtitle(rawText.decryptRawText(r.title_enc));
+        } catch {
+          undecryptable++; // another key (wrong SECRET_KEY); never print the value
+          continue;
+        }
+        if (!body) continue; // an OTP row stores no body (03 §E.4)
+        if (!(INGEST_CHANNEL_VALUES as readonly string[]).includes(r.channel)) continue;
+        out.push({
+          rawKey: r.id,
+          tenantRef,
+          deviceRef: r.ingest_device_id ? `D-${sha256(r.ingest_device_id).slice(0, 8)}` : args.phoneRef,
+          channel: r.channel as IngestChannel,
+          sender: r.sender,
+          sourceApp: r.source_app,
+          title: ts.title,
+          subtitle: ts.subtitle,
+          body,
+          receivedAt: new Date(r.received_at).toISOString(),
+          storedParseStatus: r.parse_status,
+        });
+      }
+      stderr(`tenant ${tenantRef}: ${rows.length} shared row(s)`);
+    }
+  } catch (e) {
+    die(3, `DB read failed (${(e as { code?: string }).code ?? (e as Error).name})`);
+  } finally {
+    await dbMod.db.$client.end({ timeout: 5 }).catch(() => undefined);
+  }
+  return { records: out, undecryptable };
+}
+
 function matchesProvider(r: SourceRecord, provider: CollectionProvider): boolean {
   const senders = sendersForProviders([provider]).map(normalizeSender);
   if (r.sender && senders.includes(normalizeSender(r.sender))) return true;
@@ -267,29 +356,39 @@ function exportRecord(r: SourceRecord, vocab: Set<string>, allowWords: string[])
 // Main
 // ---------------------------------------------------------------------------
 
-function main(): void {
+async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   if (process.stdout.isTTY && !args.ttyOk) {
     die(2, "refusing to print to a terminal (scrollback keeps copies); redirect stdout to a file, " +
       "or pass --i-know-stdout-is-a-terminal");
   }
-  if (args.tenants.length > 0) {
-    die(3, "DB mode (--tenant) lands at M2 with migration 0056 and 07's decryptRawText (spec 15 §4.10.3); " +
-      "use --input <file.jsonl>");
+  const fromDb = args.tenants.length > 0;
+  let records: SourceRecord[];
+  if (fromDb) {
+    const got = await readShared(args);
+    records = got.records;
+    if (got.undecryptable > 0) stderr(`skipped ${got.undecryptable} row(s) that do not decrypt with this SECRET_KEY`);
+  } else {
+    records = readJsonl(args.input as string, args);
   }
-
-  let records = readJsonl(args.input as string, args);
   const read = records.length;
   records = records.filter((r) => !isOtpRecord(r));
   const otp = read - records.length;
-  if (args.since) records = records.filter((r) => r.receivedAt.slice(0, 10) >= (args.since as string));
+  // DB mode filters --since on created_at in SQL; file mode on receivedAt.
+  if (args.since && !fromDb) records = records.filter((r) => r.receivedAt.slice(0, 10) >= (args.since as string));
   if (args.provider) records = records.filter((r) => matchesProvider(r, args.provider as CollectionProvider));
 
   const vocab = buildVocabulary();
   const out = records.map((r) => exportRecord(r, vocab, args.allowWords));
   process.stdout.write(
     JSON.stringify(
-      { exportVersion: 1, exportedAt: new Date().toISOString(), source: "file", vocabularySize: vocab.size, records: out },
+      {
+        exportVersion: 1,
+        exportedAt: new Date().toISOString(),
+        source: fromDb ? "db" : "file",
+        vocabularySize: vocab.size,
+        records: out,
+      },
       null,
       2,
     ) + "\n",
@@ -302,4 +401,4 @@ function main(): void {
   }
 }
 
-main();
+main().catch((e: unknown) => die(1, `failed (${(e as Error).name})`));

@@ -1,0 +1,239 @@
+# Collections (M2) — the automation wizard to `done` through the dev simulate
+# knob, then the device revoke (doc 15 spec 15 §4.5.7; spec 09 §4.6, §5 steps
+# 13–15; 15 acceptance 13).
+#
+# One file, both platforms. Needs :3003 with COLLECTIONS_INGEST_ENABLED=on
+# (setup NEED=ingest refuses otherwise); the fixture accounts give
+# activeAccounts ≥ 1 (09 §4.6.1 rule 2).
+#
+# - Android before M4: neither native module ships (automation.tsx MODULES),
+#   so 09 §4.6.1 rule 10 resolves `unsupported/android_pending`: the flow
+#   asserts that state, that no consent is offered and that no device was
+#   created, and stops. From M4, spec 11 replaces this branch.
+# - iOS: intro → consent (scrolled, 09 §4.6.3) → agree → device (a run-unique
+#   label "E2E wizard <stamp>") → create → install: share the token (the share
+#   sheet's Copy returns Share.sharedAction) → open the shortcut link (Safari;
+#   dev link COLLECTIONS_IOS_SHORTCUT_URL_LEGACY = the FN-6 placeholder
+#   …/shortcuts/devtest, UNVERIFIED) → `launchApp` with stopApp: false brings
+#   the SAME process back (the token lives only in memory, 09 §4.6.4, and the
+#   simulate knob needs it) → enable → verify → `collection-automation-test-
+#   simulate` (__DEV__ only) posts one `test: true` message with the token →
+#   `done` → finish → hub. Then Linked phones → unlink → gone from the list,
+#   `revokedAt` set on the server.
+#   The simulator must run iOS ≤ 26 (the legacy shortcut link is the one set
+#   in dev; on an iOS 27 runtime COLLECTIONS_IOS_SHORTCUT_URL is empty and the
+#   wizard resolves `unsupported/link_missing`).
+#
+# UNVERIFIED (first device run): that the simulator's share sheet offers Copy
+# and returns sharedAction (09 §4.6.5 `tokenDelivered`); if not, the flow stops
+# at `install` and 09 §5 step 14 stays the manual proof. That the RN Alert's
+# "Unlink" button is tapped, not the row's own "Unlink" behind it (same label,
+# the same pattern as collections-accounts' archive).
+appId: com.thestoro.app
+---
+# 1. Setup (ingest).
+- runScript:
+    file: helpers/collections-api.js
+    env:
+      MODE: setup
+      NEED: ingest
+
+# 2. Launch, login guard.
+- launchApp
+- runFlow: helpers/dev-launcher.yaml
+- extendedWaitUntil:
+    visible:
+      text: "المزيد|More|تسجيل الدخول|Sign in"
+    timeout: 45000
+- runFlow:
+    when:
+      visible:
+        id: "login-identifier"
+    file: login.yaml
+
+# 3. Open the wizard (step root testID = collection-automation-<step>).
+- runFlow: helpers/dismiss-logbox.yaml
+- openLink: "matgary://settings/collections/automation"
+- extendedWaitUntil:
+    visible:
+      id: "collection-automation-(intro|unsupported)"
+    timeout: 30000
+
+# 4. Android (before M4): unsupported/android_pending, nothing created.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - assertVisible:
+          id: "collection-automation-unsupported"
+      - assertVisible:
+          id: "collection-automation-unsupported-android_pending"
+      - assertNotVisible:
+          id: "collection-consent-agree"
+      - runScript:
+          file: helpers/collections-api.js
+          env:
+            MODE: expect
+            CHECK: noLiveDevice
+            SINCE: "${output.stamp}"
+
+# Steps 5–10 run on iOS only.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      # 5. intro → consent → agree (the consent text must be scrolled).
+      - assertVisible:
+          id: "collection-automation-intro"
+      - tapOn:
+          id: "collection-automation-next"
+      - extendedWaitUntil:
+          visible:
+            id: "collection-automation-consent"
+          timeout: 15000
+      - scrollUntilVisible:
+          element:
+            id: "collection-consent-agree"
+          direction: DOWN
+          centerElement: true
+          timeout: 30000
+      - tapOn:
+          id: "collection-consent-agree"
+
+      # 6. device: a run-unique label, create (the frame's primary action).
+      - extendedWaitUntil:
+          visible:
+            id: "collection-device-label"
+          timeout: 15000
+      - tapOn:
+          id: "collection-device-label"
+      - eraseText: 80
+      - inputText: "E2E wizard ${output.stamp}"
+      - scrollUntilVisible:
+          element:
+            id: "collection-automation-next"
+          direction: DOWN
+          centerElement: true
+          timeout: 15000
+      - tapOn:
+          id: "collection-automation-next"
+      - extendedWaitUntil:
+          visible:
+            id: "collection-automation-install"
+          timeout: 30000
+      - runScript:
+          file: helpers/collections-api.js
+          env:
+            MODE: expect
+            CHECK: deviceByLabel
+            LABEL: "E2E wizard ${output.stamp}"
+
+      # 7. install: share the token (system share sheet → Copy), open the
+      #    link (Safari), come back to the same process, then enable → verify.
+      - tapOn:
+          id: "collection-automation-share-token"
+      - extendedWaitUntil:
+          visible:
+            text: "(?i)copy|نسخ"
+          timeout: 15000
+      - tapOn:
+          text: "(?i)copy|نسخ"
+      - extendedWaitUntil:
+          visible:
+            id: "collection-automation-open-link"
+          timeout: 15000
+      - tapOn:
+          id: "collection-automation-open-link"
+      - launchApp:
+          stopApp: false
+      - extendedWaitUntil:
+          visible:
+            id: "collection-automation-install"
+          timeout: 30000
+      - scrollUntilVisible:
+          element:
+            id: "collection-automation-next"
+          direction: DOWN
+          centerElement: true
+          timeout: 15000
+      - tapOn:
+          id: "collection-automation-next"
+      - extendedWaitUntil:
+          visible:
+            id: "collection-automation-enable"
+          timeout: 15000
+      - scrollUntilVisible:
+          element:
+            id: "collection-automation-next"
+          direction: DOWN
+          centerElement: true
+          timeout: 15000
+      - tapOn:
+          id: "collection-automation-next"
+      - extendedWaitUntil:
+          visible:
+            id: "collection-automation-verify"
+          timeout: 15000
+
+      # 8. Simulate the test message (dev only), reach done (verify.ok within
+      #    8 s, then done 1.2 s later).
+      - scrollUntilVisible:
+          element:
+            id: "collection-automation-test-simulate"
+          direction: DOWN
+          centerElement: true
+          timeout: 15000
+      - tapOn:
+          id: "collection-automation-test-simulate"
+      - extendedWaitUntil:
+          visible:
+            id: "collection-automation-done"
+          timeout: 15000
+      - runScript:
+          file: helpers/collections-api.js
+          env:
+            MODE: expect
+            CHECK: deviceSeen
+            ID: "${output.devId}"
+
+      # 9. Finish → back on the collections hub.
+      - tapOn:
+          id: "collection-automation-finish"
+      - extendedWaitUntil:
+          visible:
+            id: "collections-settings-enabled"
+          timeout: 30000
+
+      # 10. Revoke this phone's device on Linked phones.
+      - openLink: "matgary://settings/collections/devices"
+      - scrollUntilVisible:
+          element:
+            id: "collection-device-revoke-${output.devId}"
+          direction: DOWN
+          centerElement: true
+          timeout: 30000
+      - tapOn:
+          id: "collection-device-revoke-${output.devId}"
+      - extendedWaitUntil:
+          visible:
+            text: "(?s)(إلغاء ربط «E2E wizard .*|Unlink .E2E wizard .*)"
+          timeout: 10000
+      - tapOn:
+          text: "(?i)إلغاء الربط|unlink"
+      - extendedWaitUntil:
+          notVisible:
+            id: "collection-device-${output.devId}"
+          timeout: 30000
+      - runScript:
+          file: helpers/collections-api.js
+          env:
+            MODE: expect
+            CHECK: deviceRevoked
+            ID: "${output.devId}"
+
+# End on the dashboard (both platforms).
+- runFlow: helpers/dismiss-logbox.yaml
+- tapOn:
+    text: "الرئيسية|Home"
+- assertVisible:
+    text: "أهلاً، .+|Welcome back, .+"
