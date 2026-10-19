@@ -140,8 +140,32 @@ appId: com.thestoro.app
     timeout: 30000
 
 # 6. One-tap match: the credit screen lists the sale's collection.
+#    The row tap can land while the centring scroll is still moving and miss
+#    (T2 Android: still on the list afterwards), so settle first and re-tap
+#    until the credit screen (credit-detail) is up.
+- waitForAnimationToEnd
 - tapOn:
     id: "credit-row-${output.cCredit}"
+- repeat:
+    while:
+      notVisible:
+        id: "credit-detail"
+    times: 3
+    commands:
+      - waitForAnimationToEnd
+      - scrollUntilVisible:
+          element:
+            id: "credit-row-${output.cCredit}"
+          direction: DOWN
+          centerElement: true
+          timeout: 10000
+      - waitForAnimationToEnd
+      - tapOn:
+          id: "credit-row-${output.cCredit}"
+- extendedWaitUntil:
+    visible:
+      id: "credit-detail"
+    timeout: 10000
 - scrollUntilVisible:
     element:
       id: "credit-match-${output.cColl}"
