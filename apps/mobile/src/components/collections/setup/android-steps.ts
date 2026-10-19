@@ -166,3 +166,21 @@ export function configPathOf(ingestUrl: string): string {
   const path = ingestUrl.replace(/^[a-z][a-z0-9+.-]*:\/\/[^/]+/i, "") || "/api/v1/collections/ingest";
   return `${path.replace(/\/+$/, "")}/config`;
 }
+
+/** The slice of React Native's `AppState` that {@link refreshNowAndOnActive} needs (kept structural so Node tests it). */
+export type AppStateLike = {
+  addEventListener(type: "change", listener: (state: string) => void): { remove(): void };
+};
+
+/**
+ * 09 step 20: run `refresh` now and again every time the app comes back to the foreground, until the
+ * returned cleanup runs. Coming back from Android's notification-access screen does not change
+ * navigation focus, so a focus effect alone would keep showing the stale health badge.
+ */
+export function refreshNowAndOnActive(appState: AppStateLike, refresh: () => void): () => void {
+  refresh();
+  const sub = appState.addEventListener("change", (state) => {
+    if (state === "active") refresh();
+  });
+  return () => sub.remove();
+}

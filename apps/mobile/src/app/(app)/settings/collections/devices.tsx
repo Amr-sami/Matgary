@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, AppState, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { collectionCredits } from "@matgary/api-client";
@@ -8,6 +8,7 @@ import { PlusIcon as Plus } from "phosphor-react-native/src/icons/Plus";
 import * as listener from "../../../../../modules/collection-listener";
 import { api } from "@/api/client";
 import { collectionKeys, useCollectionAccounts } from "@/collections/queries";
+import { refreshNowAndOnActive } from "@/components/collections/setup/android-steps";
 import { DeviceRow } from "@/components/collections/setup/DeviceRow";
 import * as store from "@/components/collections/setup/device-store";
 import { collectionsErrorText } from "@/components/collections/setup/errors";
@@ -50,19 +51,25 @@ export default function CollectionDevicesScreen() {
   const [accessGranted, setAccessGranted] = useState<boolean | undefined>(undefined);
   const androidThisPhone = Platform.OS === "android" && record?.platform === "android_listener" && listener.isListenerModuleAvailable();
 
+  // On focus AND on every return to the foreground while focused: coming back from Android's
+  // notification-access screen does not change navigation focus (t1-m4 step 6, 21b).
   useFocusEffect(
-    useCallback(() => {
-      if (enabled) void devicesQ.refetch();
-      if (androidThisPhone) {
-        void listener.getStatus().then(async (st) => {
-          // Only a configured listener has an opinion; an unconfigured one leaves the server's health alone.
-          setAccessGranted(st.configured ? await listener.isAccessGranted() : undefined);
-        });
-      } else {
-        setAccessGranted(undefined);
-      }
+    useCallback(
+      () =>
+        refreshNowAndOnActive(AppState, () => {
+          if (enabled) void devicesQ.refetch();
+          if (androidThisPhone) {
+            void listener.getStatus().then(async (st) => {
+              // Only a configured listener has an opinion; an unconfigured one leaves the server's health alone.
+              setAccessGranted(st.configured ? await listener.isAccessGranted() : undefined);
+            });
+          } else {
+            setAccessGranted(undefined);
+          }
+        }),
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [enabled, androidThisPhone]),
+      [enabled, androidThisPhone],
+    ),
   );
 
   const accountLabels = useMemo(() => {

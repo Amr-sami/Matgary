@@ -121,6 +121,28 @@ const at = (d: unknown, path: string): unknown =>
   path.split(".").reduce<unknown>((o, k) => (o && typeof o === "object" ? (o as Dict)[k] : undefined), d);
 const ph = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort();
 
+test("refreshNowAndOnActive: runs now, again on each return to active, never after cleanup (09 step 20)", () => {
+  let listener: ((s: string) => void) | null = null;
+  let removed = 0;
+  const appState = {
+    addEventListener(_type: "change", cb: (s: string) => void) {
+      listener = cb;
+      return { remove: () => { removed++; listener = null; } };
+    },
+  };
+  let runs = 0;
+  const cleanup = a.refreshNowAndOnActive(appState, () => { runs++; });
+  assert.equal(runs, 1);
+  listener!("background");
+  listener!("inactive");
+  assert.equal(runs, 1);
+  listener!("active");
+  assert.equal(runs, 2);
+  cleanup();
+  assert.equal(removed, 1);
+  assert.equal(listener, null);
+});
+
 test("every key the Android branch renders exists in ar AND en with the same placeholders", () => {
   const ar = load("ar");
   const en = load("en");
