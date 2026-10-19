@@ -5,6 +5,7 @@ import { t } from "@/i18n";
 import { RTL_TEXT } from "@/theme/rtl";
 import { colors, fonts, spacing } from "@/theme/tokens";
 
+import { AndroidSteps } from "./AndroidSteps";
 import { IosSteps } from "./IosSteps";
 import type { IosVariantId } from "./wizard";
 
@@ -15,7 +16,7 @@ export type VerifyState = "idle" | "waiting" | "ok" | "timeout";
  * (`collection-automation-test`) is the caller's: it reads the baseline,
  * runs the shortcut by name with the marker, and polls. This shows the
  * state — waiting, ok, or timeout with the frame check and 10's
- * troubleshooting list — and, in `__DEV__` only, the simulate button
+ * troubleshooting list (11's on Android, M4) — and, in `__DEV__` only, the simulate button
  * (`collection-automation-test-simulate`; stripped from release, doc 14
  * §6.3). Never shows `done` itself: the caller moves on only after `ok`.
  */
@@ -27,7 +28,9 @@ export function VerifyStep({
   variant,
   iosMajor,
   error,
+  platform = "ios",
 }: {
+  platform?: "ios" | "android";
   state: VerifyState;
   onSend: () => void;
   onSimulate?: () => void;
@@ -42,7 +45,9 @@ export function VerifyStep({
       <Text accessibilityRole="header" style={styles.heading}>
         {t("mobile.collections.setup.verify.heading")}
       </Text>
-      <Text style={styles.body}>{t("mobile.collections.setup.verify.body")}</Text>
+      <Text style={styles.body}>
+        {platform === "android" ? t("mobile.collections.setup.verify.bodyAndroid") : t("mobile.collections.setup.verify.body")}
+      </Text>
 
       <View testID="collection-automation-test" collapsable={false}>
         <Button
@@ -70,7 +75,11 @@ export function VerifyStep({
           <Text style={[styles.body, styles.err]}>{t("mobile.collections.setup.verify.timeout")}</Text>
           <Text style={styles.sub}>{t("mobile.collections.setup.verify.checks.title")}</Text>
           <Text style={styles.body}>{`• ${t("mobile.collections.setup.verify.checks.online")}`}</Text>
-          <IosSteps phase="troubleshoot" mode={mode} variant={variant} iosMajor={iosMajor} />
+          {platform === "android" ? (
+            <AndroidSteps phase="troubleshoot" />
+          ) : (
+            <IosSteps phase="troubleshoot" mode={mode} variant={variant} iosMajor={iosMajor} />
+          )}
         </View>
       ) : null}
 

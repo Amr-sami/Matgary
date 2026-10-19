@@ -164,6 +164,30 @@ export const sendIngestTest = (c: ApiClient, ingestUrl: string, token: string, m
     headers: { Authorization: `Bearer ${token}` },
   });
 
+/** GET /api/v1/collections/ingest/config (03 §B.17) — the device-scoped filter config. */
+export interface IngestDeviceConfig {
+  configVersion: string;
+  /** = 06 FILTER_CONFIG_VERSION. */
+  filterVersion: string;
+  packages: string[];
+  senders: string[];
+  keywords: { ar: string[]; en: string[] };
+  otpPatterns: string[];
+  maxAgeHours: number;
+}
+
+/**
+ * GET <ingestUrl>/config with the DEVICE token — read by the Android wizard
+ * before the listener's `configure()` (09 step 19). Same transport as
+ * sendIngestTest: no user bearer, no branch header.
+ */
+export const getIngestConfig = (c: ApiClient, ingestUrl: string, token: string) =>
+  c.request<IngestDeviceConfig>(`${pathOf(ingestUrl).replace(/\/+$/, "")}/config`, {
+    auth: false,
+    noBranch: true,
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
 // ---- Credits ----------------------------------------------------------------
 
 export interface AccountRef {

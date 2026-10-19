@@ -13,6 +13,7 @@ import { useFocusEffect } from "expo-router";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { collectionCredits, collections } from "@matgary/api-client";
 
+import * as listener from "../../../../modules/collection-listener";
 import { api } from "@/api/client";
 import { collectionKeys } from "@/collections/queries";
 import { useSession } from "@/stores/session";
@@ -51,8 +52,9 @@ export function listStateOf(q: UseQueryResult<collectionCredits.DevicesResponse>
 
 /**
  * The MMKV record, re-read on focus, and cleared when a fresh list no longer
- * has this phone's device (revoked from the web, `user_removed`). M3/M4 add
- * `clearIngestCredential()` / `clearCredentials()` here (09 steps 18, 20).
+ * has this phone's device (revoked from the web, `user_removed`). On an
+ * Android listener record the native credential goes too (`clearCredentials()`,
+ * 09 §4.6.6, M4 / order 29). M3 adds `clearIngestCredential()` here (09 step 18).
  */
 export function useSetupRecord(list: DevicesListState) {
   const [record, setRecord] = useState<SetupRecord | null>(() => store.read());
@@ -68,6 +70,7 @@ export function useSetupRecord(list: DevicesListState) {
     if (!list.ok) return;
     const cur = store.read();
     if (resumeAction(cur, list).kind === "clear") {
+      if (cur?.platform === "android_listener") void listener.clearCredentials();
       store.clear();
       setRecord(null);
     }

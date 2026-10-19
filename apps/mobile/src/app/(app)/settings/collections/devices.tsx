@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { collectionCredits } from "@matgary/api-client";
 import { PlusIcon as Plus } from "phosphor-react-native/src/icons/Plus";
 
+import * as listener from "../../../../../modules/collection-listener";
 import { api } from "@/api/client";
 import { collectionKeys, useCollectionAccounts } from "@/collections/queries";
 import { DeviceRow } from "@/components/collections/setup/DeviceRow";
@@ -44,12 +45,24 @@ export default function CollectionDevicesScreen() {
   const { record, refresh } = useSetupRecord(listStateOf(devicesQ));
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
+  // 09 step 20 (M4): this Android phone's notification access, read on focus, overlays the
+  // server's health (§4.7 row 2) before the next heartbeat reaches the server.
+  const [accessGranted, setAccessGranted] = useState<boolean | undefined>(undefined);
+  const androidThisPhone = Platform.OS === "android" && record?.platform === "android_listener" && listener.isListenerModuleAvailable();
 
   useFocusEffect(
     useCallback(() => {
       if (enabled) void devicesQ.refetch();
+      if (androidThisPhone) {
+        void listener.getStatus().then(async (st) => {
+          // Only a configured listener has an opinion; an unconfigured one leaves the server's health alone.
+          setAccessGranted(st.configured ? await listener.isAccessGranted() : undefined);
+        });
+      } else {
+        setAccessGranted(undefined);
+      }
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [enabled]),
+    }, [enabled, androidThisPhone]),
   );
 
   const accountLabels = useMemo(() => {
@@ -70,7 +83,9 @@ export default function CollectionDevicesScreen() {
     try {
       await collectionCredits.revokeDevice(api, d.id);
       if (d.id === store.read()?.deviceId) {
-        store.clear(); // M3: clearIngestCredential(); M4: clearCredentials()
+        // This phone: the native credential goes with the record (M4; M3 adds clearIngestCredential()).
+        if (d.platform === "android_listener") await listener.clearCredentials();
+        store.clear();
         refresh();
       }
       setNotice({ tone: "ok", text: t("mobile.collections.setup.devices.revoked") });
@@ -159,7 +174,7 @@ export default function CollectionDevicesScreen() {
               <DeviceRow
                 key={d.id}
                 device={d}
-                health={deviceHealth(d, Date.now(), { thisDeviceId: thisId, os: Platform.OS })}
+                health={deviceHealth(d, Date.now(), { thisDeviceId: thisId, os: Platform.OS, accessGranted })}
                 isThisPhone={isThisPhone}
                 accountLabels={accountLabels}
                 onRevoke={() => confirmRevoke(d)}

@@ -6,16 +6,26 @@ import * as Crypto from "expo-crypto";
 import * as Device from "expo-device";
 import { useQueryClient } from "@tanstack/react-query";
 import { collectionCredits } from "@matgary/api-client";
+import { COLLECTION_PROVIDERS } from "@matgary/domain/collections/providers";
 
-import { api } from "@/api/client";
+import * as listener from "../../../../../modules/collection-listener";
+import { API_BASE_URL, api } from "@/api/client";
 import { IOS_SHORTCUT_NAME } from "@/collections/ios/steps";
 import { collectionKeys, useCollectionAccounts } from "@/collections/queries";
+import { AndroidSteps } from "@/components/collections/setup/AndroidSteps";
+import {
+  androidVerifyPassed,
+  appRows,
+  listenerIngestUrl,
+  requiredApps,
+} from "@/components/collections/setup/android-steps";
 import { ConsentScreen } from "@/components/collections/setup/ConsentScreen";
 import { DeviceStep } from "@/components/collections/setup/DeviceStep";
 import * as store from "@/components/collections/setup/device-store";
 import { collectionsErrorText, errorCode } from "@/components/collections/setup/errors";
 import { IosSteps } from "@/components/collections/setup/IosSteps";
 import { useSetupNotice } from "@/components/collections/setup/notice";
+import { OemChecklist } from "@/components/collections/setup/OemChecklist";
 import { StepFrame } from "@/components/collections/setup/StepFrame";
 import { TokenCard } from "@/components/collections/setup/TokenCard";
 import { useCollectionDevices, useCollectionsConfig, listStateOf } from "@/components/collections/setup/useDevices";
@@ -51,27 +61,45 @@ import { RTL_TEXT } from "@/theme/rtl";
 import { colors, fonts, radius, spacing } from "@/theme/tokens";
 
 /**
- * M2: neither native module is imported (09 §4.6.1): the App Intent branch
- * arrives with 10's `modules/collections-ingest` (09 step 17, M3) and the
- * Android branch with 11's listener (09 step 19, M4). Until then the app
- * builds without their folders.
+ * 09 §4.6.1 `modules`: the Android branch is on when 11's listener module is
+ * linked AND supported on this phone (09 step 19, M4; `isSupported()` is
+ * sync and never throws). The App Intent branch arrives with 10's
+ * `modules/collections-ingest` wiring (09 step 17, M3 — not this row), so
+ * `iosIntent` stays false here.
  */
-const MODULES = { iosIntent: false, androidListener: false } as const;
+function wizardModules() {
+  return { iosIntent: false, androidListener: Platform.OS === "android" && listener.isSupported() };
+}
+
+/** Android install state (09 §4.6.5 `android_listener` items 1–5). */
+type AndroidState = {
+  delivering: boolean;
+  delivered: boolean;
+  error: string | null;
+  accessGranted: boolean | null;
+  connected: boolean;
+  installed: string[];
+};
+const ANDROID_IDLE: AndroidState = { delivering: false, delivered: false, error: null, accessGranted: null, connected: false, installed: [] };
 
 const TONE_VARIANT = { danger: "outofstock", warning: "lowstock", neutral: "neutral", success: "success" } as const;
 const HUB = "/settings/collections" as const;
 
 /**
  * "Confirm transfers automatically" — the automation wizard (doc 15 spec 09
- * §4.6, M2 frame + spec 10's iOS shortcut branch; one PR, README §3 order 24).
+ * §4.6, M2 frame + spec 10's iOS shortcut branch, README §3 order 24; the
+ * Android branch on spec 11's `collection-listener` module, 09 step 19,
+ * order 29).
  *
  * intro → consent → device → install → enable → verify → done, or
  * `unsupported` alone (§4.6.2). The device POST is sent only after
  * `collection-consent-agree`; declining or going back on consent sends
  * nothing. The ingest token lives ONLY in `tokenRef` (never MMKV, the query
- * cache, logs or params, 09 §4.6.4); it leaves the app once, through the
- * share sheet, into the shortcut's import question. `done` is reachable
- * only after the server recorded a newer `lastMessageAt` for this device.
+ * cache, logs or params, 09 §4.6.4); it leaves the app once — through the
+ * share sheet into the shortcut's import question (iOS), or into the
+ * listener's Keystore-encrypted store via `configure()` (Android). `done` is
+ * reachable only after the server recorded a newer `lastMessageAt` (iOS) or
+ * `lastSeenAt` with the listener connected (Android) for this device.
  *
  * Resume (§4.6.6): the non-secret MMKV record + the devices list decide where
  * a relaunch lands — a lost token restarts at consent with
@@ -89,6 +117,9 @@ export default function AutomationWizardScreen() {
   const accountsQ = useCollectionAccounts(enabled);
   const accounts = useMemo(() => (accountsQ.accounts ?? []).filter((a) => !a.archivedAt), [accountsQ.accounts]);
 
+  const modules = useMemo(() => wizardModules(), []);
+  // 11 §4.9 note to 09: the module is linked but `isSupported()` is false (low-RAM, Android ≤ 10).
+  const listenerLinkedButUnsupported = Platform.OS === "android" && listener.isListenerModuleAvailable() && !modules.androidListener;
   const ingest = configQ.data?.ingest ?? null;
   const major = Platform.OS === "ios" ? iosMajor(Platform.Version) : 0;
   const ready = configQ.isSuccess && accountsQ.accounts != null;
@@ -101,9 +132,9 @@ export default function AutomationWizardScreen() {
       ingest: access.ingest && configQ.data?.features?.collectionsIngest !== false,
       activeAccounts: accounts.length,
       config: ingest ?? {},
-      modules: MODULES,
+      modules,
     });
-  }, [enabled, ready, access.ingest, configQ.data, accounts.length, ingest]);
+  }, [enabled, ready, access.ingest, configQ.data, accounts.length, ingest, modules]);
 
   const steps = path ? stepsFor(path) : [];
   const [step, setStep] = useState<WizardStep | null>(null);
@@ -116,6 +147,7 @@ export default function AutomationWizardScreen() {
   const [prefix, setPrefix] = useState<string | null>(null);
   const [replacesId, setReplacesId] = useState<string | null>(null);
   const consentVersionRef = useRef<string | null>(null);
+  const [android, setAndroid] = useState<AndroidState>(ANDROID_IDLE);
   useEffect(() => () => {
     tokenRef.current = null;
   }, []);
@@ -144,6 +176,8 @@ export default function AutomationWizardScreen() {
     decided.current = true;
     switch (a.kind) {
       case "clear":
+        // Absent on a fresh 200 list: the native credential goes too (09 §4.6.6; 11 §4.5.5).
+        if (rec?.platform === "android_listener") void listener.clearCredentials();
         store.clear();
         setStep("intro");
         break;
@@ -154,7 +188,14 @@ export default function AutomationWizardScreen() {
         setStep("consent");
         break;
       case "resume_enable":
-        setStep("enable");
+        if (path.kind === "android_listener") {
+          // Android re-checks access first (§4.6.6): install shows the access state; the token is
+          // already inside the module (tokenDelivered), so nothing is configured again.
+          setAndroid({ ...ANDROID_IDLE, delivered: true });
+          setStep("install");
+        } else {
+          setStep("enable");
+        }
         break;
       case "summary":
         setSummary(true);
@@ -181,9 +222,10 @@ export default function AutomationWizardScreen() {
     const target = steps[Math.max(0, i - 1)];
     if (target === "device" || target === "consent") return leave();
     // Resumed at enable after a relaunch: the token is gone, so install has nothing to share.
-    if (target === "install" && !tokenRef.current) return leave();
+    // (Android keeps install after delivery: it is the notification-access screen, no token needed.)
+    if (target === "install" && !tokenRef.current && !(path?.kind === "android_listener" && android.delivered)) return leave();
     setStep(target);
-  }, [step, steps, leave, decline]);
+  }, [step, steps, leave, decline, path?.kind, android.delivered]);
 
   // Android hardware back moves one step back; on consent it is a decline.
   useEffect(() => {
@@ -217,7 +259,7 @@ export default function AutomationWizardScreen() {
   }, [step]);
 
   const create = async () => {
-    if (!path || path.kind === "unsupported" || path.kind === "android_listener") return;
+    if (!path || path.kind === "unsupported") return;
     const version = consentVersionRef.current;
     if (!version) return setStep("consent");
     setCreating(true);
@@ -256,7 +298,7 @@ export default function AutomationWizardScreen() {
       store.write({
         deviceId: res.device.id,
         platform: res.device.platform,
-        variant: path.variant,
+        variant: path.kind === "android_listener" ? null : path.variant,
         tokenDelivered: false,
         baselineSeenAt: res.device.lastSeenAt,
         baselineMessageAt: res.device.lastMessageAt,
@@ -270,6 +312,7 @@ export default function AutomationWizardScreen() {
       setReplacesId(null);
       setShared(false);
       setOpened(false);
+      setAndroid(ANDROID_IDLE);
       await qc.invalidateQueries({ queryKey: collectionKeys.devices() });
       setStep("install");
     } catch (e) {
@@ -330,6 +373,130 @@ export default function AutomationWizardScreen() {
     return id ? list?.devices.find((d) => d.id === id) ?? null : null;
   };
 
+  // ── install / enable (android_listener, 09 §4.6.5 items 1–6; 11's module) ──
+  const isAndroid = path?.kind === "android_listener";
+
+  const androidRows = useMemo(() => {
+    if (!isAndroid) return [];
+    const d = thisDevice(devicesQ.data);
+    const scope = d && d.accountIds.length > 0
+      ? accounts.filter((a) => d.accountIds.includes(a.id))
+      : allAccounts || picked.length === 0
+        ? accounts
+        : accounts.filter((a) => picked.includes(a.id));
+    return appRows(requiredApps(scope.map((a) => a.provider), COLLECTION_PROVIDERS), android.installed);
+  }, [isAndroid, devicesQ.data, accounts, allAccounts, picked, android.installed]);
+
+  /** `isAccessGranted()` + `getStatus()` → the install step's access / connected / installed-apps state. */
+  const refreshAndroid = useCallback(async () => {
+    const [granted, st] = await Promise.all([listener.isAccessGranted(), listener.getStatus()]);
+    setAndroid((a) => ({ ...a, accessGranted: granted, connected: st.connected, installed: st.packagesInstalled }));
+    return { granted, st };
+  }, []);
+
+  /**
+   * Items 1–3: the device-scoped config with the in-memory token, the baseline AFTER it (so the
+   * config read can never count as the test), then `configure()` — which stores the token in the
+   * Keystore-encrypted store and schedules one immediate heartbeat + the 15-min worker. The ref is
+   * dropped right after (09 §4.6.4 rule 3).
+   */
+  const deliverAndroid = useCallback(async () => {
+    const token = tokenRef.current;
+    if (!token) return;
+    setAndroid((a) => ({ ...a, delivering: true, error: null }));
+    const url = listenerIngestUrl(ingestUrlRef.current ?? ingest?.ingestUrl ?? null, API_BASE_URL, __DEV__);
+    try {
+      // The device-scoped filter config (GET <ingestUrl>/config, 03 §B.17), read with the in-memory token.
+      const cfg = await collectionCredits.getIngestConfig(api, url, token);
+      const list = await collectionCredits.listDevices(api);
+      const d = thisDevice(list);
+      store.write({ baselineSeenAt: d?.lastSeenAt ?? null, baselineMessageAt: d?.lastMessageAt ?? null });
+      await listener.configure({
+        ingestUrl: url,
+        token,
+        packages: cfg.packages ?? [],
+        keywords: { ar: cfg.keywords?.ar ?? [], en: cfg.keywords?.en ?? [] },
+        otpPatterns: cfg.otpPatterns ?? [],
+        configVersion: cfg.configVersion,
+      });
+      store.write({ tokenDelivered: true });
+      tokenRef.current = null;
+      setAndroid((a) => ({ ...a, delivering: false, delivered: true }));
+      await refreshAndroid();
+    } catch (e) {
+      const code = listener.listenerErrorCode(e);
+      if (__DEV__ && code) console.warn("[collections] listener configure rejected", code);
+      setAndroid((a) => ({
+        ...a,
+        delivering: false,
+        error: code ? t("mobile.collections.setup.install.configureFailed") : collectionsErrorText(e, t("mobile.common.serverError")),
+      }));
+    }
+  }, [ingest?.ingestUrl, refreshAndroid]);
+
+  // Entering install: deliver once (fresh device), else re-check access (resume / back).
+  useEffect(() => {
+    if (step !== "install" || !isAndroid) return;
+    if (!android.delivered && !android.delivering && tokenRef.current) void deliverAndroid();
+    else if (android.delivered) void refreshAndroid();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, isAndroid, android.delivered]);
+
+  // Back from the OS settings screen (pattern `billing.tsx:126`): re-check.
+  useEffect(() => {
+    if (!isAndroid || (step !== "install" && step !== "enable" && step !== "verify")) return;
+    const sub = AppState.addEventListener("change", (st) => {
+      if (st === "active") void refreshAndroid();
+    });
+    return () => sub.remove();
+  }, [isAndroid, step, refreshAndroid]);
+
+  // Granted but not connected yet: re-check every 2 s; at 10 s ask for a rebind (android.md §1.2, §1.7).
+  useEffect(() => {
+    if (!isAndroid || step !== "install" || !android.accessGranted || android.connected) return;
+    const started = Date.now();
+    let rebound = false;
+    const id = setInterval(() => {
+      const ms = Date.now() - started;
+      if (ms > 60_000) return clearInterval(id);
+      if (!rebound && ms >= 10_000) {
+        rebound = true;
+        void listener.requestRebind();
+      }
+      void refreshAndroid();
+    }, 2_000);
+    return () => clearInterval(id);
+  }, [isAndroid, step, android.accessGranted, android.connected, refreshAndroid]);
+
+  const openAccess = async () => {
+    try {
+      await listener.openAccessSettings();
+    } catch (e) {
+      // NOT_CONFIGURED: the module refuses the OS screen before configure() (Play disclosure order).
+      if (listener.listenerErrorCode(e)) setAndroid((a) => ({ ...a, error: t("mobile.collections.setup.install.configureFailed") }));
+    }
+  };
+
+  const openBattery = () => {
+    void listener.openBatterySettings();
+  };
+
+  /** Android "Send test" (09 §4.6.7): access must be on (else back to install); rebind when not connected; then poll. */
+  const sendTestAndroid = async () => {
+    setVerifyError(null);
+    const granted = await listener.isAccessGranted();
+    if (!granted) {
+      setAndroid((a) => ({ ...a, accessGranted: false, connected: false }));
+      setVerify("idle");
+      setStep("install");
+      return;
+    }
+    const st = await listener.getStatus();
+    if (!st.connected) void listener.requestRebind();
+    startedRef.current = Date.now();
+    setVerify("waiting");
+  };
+
   const captureBaseline = async (): Promise<boolean> => {
     try {
       const list = await collectionCredits.listDevices(api);
@@ -384,7 +551,26 @@ export default function AutomationWizardScreen() {
     try {
       const list = await collectionCredits.listDevices(api);
       const d = thisDevice(list);
-      if (d && arrived(baselineRef.current, d.lastMessageAt)) {
+      let passed = false;
+      if (d && path?.kind === "android_listener") {
+        // Android: connected locally AND the server saw this phone after the install-time baseline
+        // (the configure() heartbeat moves lastSeenAt), 09 §4.6.7.
+        const st = await listener.getStatus();
+        const rec = store.read();
+        passed = androidVerifyPassed(
+          {
+            connected: st.connected,
+            baselineSeenAt: rec?.baselineSeenAt ?? null,
+            baselineMessageAt: rec?.baselineMessageAt ?? null,
+            lastSeenAt: d.lastSeenAt,
+            lastMessageAt: d.lastMessageAt,
+          },
+          arrived,
+        );
+      } else if (d) {
+        passed = arrived(baselineRef.current, d.lastMessageAt);
+      }
+      if (passed) {
         setVerify("ok");
         store.write({ completedAt: new Date().toISOString(), tokenDelivered: true });
         tokenRef.current = null; // delivered and proven (rule 3)
@@ -396,7 +582,7 @@ export default function AutomationWizardScreen() {
     }
     if (Date.now() - startedRef.current >= VERIFY_TIMEOUT_MS) setVerify("timeout");
     return false;
-  }, [qc]);
+  }, [qc, path?.kind]);
 
   useEffect(() => {
     if (verify !== "waiting") return;
@@ -483,7 +669,9 @@ export default function AutomationWizardScreen() {
     content = (
       <StepFrame step="unsupported" n={1} total={1}>
         <Text style={styles.body} testID={`collection-automation-unsupported-${reason}`}>
-          {t(unsupportedKey(reason))}
+          {reason === "android_pending" && listenerLinkedButUnsupported
+            ? t("mobile.collections.android.unsupported.lowRam")
+            : t(unsupportedKey(reason))}
         </Text>
         {reason === "no_accounts" ? (
           <Button
@@ -558,6 +746,45 @@ export default function AutomationWizardScreen() {
         ) : null}
       </StepFrame>
     );
+  } else if (step === "install" && path.kind === "android_listener") {
+    content = (
+      <StepFrame
+        step="install"
+        n={n}
+        total={total}
+        primary={{
+          label: t("mobile.collections.setup.next"),
+          onPress: () => setStep("enable"),
+          disabled: !android.delivered || android.accessGranted !== true,
+        }}
+        onFinishLater={leave}
+      >
+        <AndroidSteps
+          phase="install"
+          delivering={android.delivering}
+          accessGranted={android.delivered ? android.accessGranted : null}
+          connected={android.connected}
+          rows={androidRows}
+          onOpenAccess={() => void openAccess()}
+          error={android.error}
+        />
+        {android.error && !android.delivered && tokenRef.current ? (
+          <Button label={t("mobile.settings.retry")} variant="outline" onPress={() => void deliverAndroid()} />
+        ) : null}
+      </StepFrame>
+    );
+  } else if (step === "enable" && path.kind === "android_listener") {
+    content = (
+      <StepFrame
+        step="enable"
+        n={n}
+        total={total}
+        primary={{ label: t("mobile.collections.setup.enable.done"), onPress: () => setStep("verify") }}
+        onFinishLater={leave}
+      >
+        <OemChecklist manufacturer={Device.manufacturer ?? null} onOpenBattery={openBattery} />
+      </StepFrame>
+    );
   } else if (step === "install") {
     const delivered = shared && opened;
     content = (
@@ -600,8 +827,9 @@ export default function AutomationWizardScreen() {
       <StepFrame step="verify" n={n} total={total} onFinishLater={leave}>
         <VerifyStep
           state={verify}
-          onSend={() => void sendTest()}
-          onSimulate={tokenRef.current ? () => void simulate() : undefined}
+          onSend={() => void (isAndroid ? sendTestAndroid() : sendTest())}
+          onSimulate={tokenRef.current && !isAndroid ? () => void simulate() : undefined}
+          platform={isAndroid ? "android" : "ios"}
           mode={mode}
           variant={variant}
           iosMajor={major}
@@ -637,7 +865,8 @@ export default function AutomationWizardScreen() {
             ) : null}
             <VerifyStep
               state={verify}
-              onSend={() => void sendTest()}
+              onSend={() => void (isAndroid ? sendTestAndroid() : sendTest())}
+              platform={isAndroid ? "android" : "ios"}
               mode={mode}
               variant={variant}
               iosMajor={major}

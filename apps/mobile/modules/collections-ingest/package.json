@@ -1,0 +1,10 @@
+{
+  "name": "collections-ingest",
+  "version": "1.0.0",
+  "description": "Local Expo module (iOS only): the ingest credential in the Keychain, the on-disk forward queue and the uploader shared with the ForwardPaymentMessageIntent App Intent (doc 15 spec 10, M3).",
+  "main": "index.ts",
+  "private": true,
+  "license": "UNLICENSED",
+  "author": "TheStoro",
+  "homepage": "https://thestoro.com"
+}

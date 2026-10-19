@@ -68,6 +68,24 @@ test("no empty value, and equal {placeholder} sets per key", () => {
   }
 });
 
+// M3 (10 §5 step 11): the App Intent strings and the HTTP → intent upgrade sheet. The intent's Swift
+// `LocalizedStringResource` keys are `collections_intent_<snake_case(name)>` (10 §4.11 step 1), so
+// every name below must exist, and the mapping must not collide.
+const M3_INTENT = ["title", "description", "paramText", "paramTitle", "paramSubtitle", "paramSender", "paramSource",
+  "paramReceivedAt", "dialogSent", "dialogQueued", "dialogNotLinked", "dialogTest", "dialogTestFailed", "dialogSkipped"];
+const snake = (s: string) => s.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
+
+test("M3 rows: intent.* (14) and upgrade.* (3) exist, and the .strings keys are unique", () => {
+  for (const n of M3_INTENT) assert.ok(ar.has(`intent.${n}`), `ar: intent.${n}`);
+  for (const n of ["title", "body", "action"]) assert.ok(ar.has(`upgrade.${n}`), `ar: upgrade.${n}`);
+  const intentNames = [...ar.keys()].filter((k) => k.startsWith("intent.")).map((k) => k.slice("intent.".length));
+  assert.deepEqual(intentNames.sort(), [...M3_INTENT].sort(), "no extra intent.* leaf (the Swift file names each one)");
+  const keys = intentNames.map((n) => `collections_intent_${snake(n)}`);
+  assert.equal(new Set(keys).size, keys.length);
+  assert.ok(keys.includes("collections_intent_param_received_at"));
+  assert.ok(keys.includes("collections_intent_dialog_test_failed"));
+});
+
 test("every intent.* value is .strings-safe (no double quote, backslash or newline)", () => {
   for (const [loc, m] of [["ar", ar], ["en", en]] as const) {
     for (const [k, v] of m) {

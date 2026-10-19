@@ -6267,7 +6267,8 @@
           "openBattery": "Open battery settings",
           "done": "I've added it",
           "connected": "Connected to app notifications.",
-          "notConnected": "Not connected yet. Make sure notification access is on for TheStoro."
+          "notConnected": "Not connected yet. Make sure notification access is on for TheStoro.",
+          "configureFailed": "Couldn't save the link on this phone. Try setting up again."
         },
         "enable": {
           "done": "It's on"
@@ -6403,6 +6404,84 @@
             "s1": "After restarting the iPhone, unlock it at least once.",
             "s2": "If messages didn't arrive, open TheStoro once so it sends what it saved on the phone."
           }
+        },
+        "upgrade": {
+          "title": "Switch to the safer setup",
+          "body": "The new shortcut holds no code. We'll unlink the old one, so delete it and its automation from the Shortcuts app.",
+          "action": "Switch now"
+        },
+        "intent": {
+          "title": "Send payment message to TheStoro",
+          "description": "Sends a bank or wallet message to TheStoro to confirm a transfer. Never sends verification codes.",
+          "paramText": "Message text",
+          "paramTitle": "Title",
+          "paramSubtitle": "Subtitle",
+          "paramSender": "Sender",
+          "paramSource": "Source",
+          "paramReceivedAt": "Received at",
+          "dialogSent": "Sent to TheStoro.",
+          "dialogQueued": "Saved on this phone. It will be sent when you're back online.",
+          "dialogNotLinked": "TheStoro isn't linked on this iPhone. Open TheStoro and set it up again.",
+          "dialogTest": "The test reached TheStoro.",
+          "dialogTestFailed": "The test didn't arrive. Check you're online and try again.",
+          "dialogSkipped": "Not a payment message. Nothing was sent."
+        }
+      },
+      "android": {
+        "instapayApp": "InstaPay",
+        "install": {
+          "heading": "Notification access",
+          "body": "Android opens the \"Notification access\" screen. Pick TheStoro, turn it on, then come back here.",
+          "systemWarning": "Android shows a general warning that the app can read notifications. TheStoro reads only notifications from the bank and wallet apps listed below and ignores the rest.",
+          "appsHeading": "Bank and wallet apps for your accounts",
+          "appInstalled": "{app}: installed on this phone",
+          "appMissing": "{app}: not installed. Install it on this phone, sign in, and keep its notifications on.",
+          "noneInstalled": "None of your accounts' bank or wallet apps is on this phone, so nothing will be forwarded until you install one.",
+          "keepNotificationsOn": "In each bank or wallet app, turn on notifications for incoming transactions in that app's own settings.",
+          "smsNote": "SMS messages are not read on Android. If your wallet sends only an SMS and no app notification, confirm its transfers by hand.",
+          "restricted": "If TheStoro's switch is greyed out: open TheStoro's App info → ⋮ → \"Allow restricted settings\", then try again."
+        },
+        "enable": {
+          "heading": "Keep TheStoro running in the background",
+          "body": "Some phones stop background apps to save battery, and forwarding stops without you noticing. Follow the steps for your phone:",
+          "stepsVary": "Menu names can differ between phone versions."
+        },
+        "oem": {
+          "xiaomi": {
+            "step1": "Settings → Apps → TheStoro → \"Autostart\": turn it on.",
+            "step2": "Open Recents, long-press TheStoro and lock it.",
+            "step3": "Tap \"Battery settings\" below and set TheStoro to no restrictions."
+          },
+          "samsung": {
+            "step1": "Settings → Battery → Background usage limits → \"Never sleeping apps\": add TheStoro.",
+            "step2": "Make sure TheStoro is not in \"Sleeping apps\" or \"Deep sleeping apps\"."
+          },
+          "oppo": {
+            "step1": "Pin TheStoro in Recents (tap the lock on its card).",
+            "step2": "Settings → App management → TheStoro: allow auto launch and running in the background.",
+            "step3": "Tap \"Battery settings\" below and turn off battery optimisation for TheStoro."
+          },
+          "realme": {
+            "step1": "Settings → Battery → App battery management → TheStoro: allow background activity.",
+            "step2": "Pin TheStoro in Recents."
+          },
+          "generic": {
+            "step1": "Tap \"Battery settings\" below and set TheStoro to \"Not optimised\" or \"Unrestricted\".",
+            "step2": "Don't swipe TheStoro away from Recents, and don't use \"Force stop\"."
+          }
+        },
+        "troubleshoot": {
+          "title": "If messages don't arrive",
+          "accessOff": "Check that notification access is still on for TheStoro.",
+          "toggleAccess": "Turn the access off and on again; this reconnects TheStoro to notifications.",
+          "bankNotifications": "Check that the bank or wallet app's notifications are on and show in the notification shade.",
+          "afterRestart": "After restarting the phone, unlock the screen at least once.",
+          "afterUpdate": "If you updated or force-stopped TheStoro, open it once.",
+          "battery": "Go through the battery steps for your phone.",
+          "workProfile": "Forwarding doesn't work when TheStoro or the bank app is inside a work profile."
+        },
+        "unsupported": {
+          "lowRam": "This phone doesn't let apps read notifications (Android 10 or older with low memory). You can confirm by hand."
         }
       }
     }

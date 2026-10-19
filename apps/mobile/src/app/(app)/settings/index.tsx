@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { ArrowsLeftRightIcon as ArrowsLeftRight } from "phosphor-react-native/src/icons/ArrowsLeftRight";
 import { BellIcon as Bell } from "phosphor-react-native/src/icons/Bell";
@@ -16,6 +16,7 @@ import { SquaresFourIcon as SquaresFour } from "phosphor-react-native/src/icons/
 import { StorefrontIcon as Storefront } from "phosphor-react-native/src/icons/Storefront";
 import { TagIcon as Tag } from "phosphor-react-native/src/icons/Tag";
 
+import * as listener from "../../../../modules/collection-listener";
 import { Screen } from "@/components/layout/Screen";
 import { ChevronForward } from "@/components/ui/Chevron";
 import { Badge } from "@/components/ui/Badge";
@@ -281,12 +282,20 @@ export default function SettingsScreen() {
  */
 function ThisPhoneForwards() {
   const [rec, setRec] = useState<SetupRecord | null>(() => collectionsSetupStore.read());
+  // M4: on an Android listener record the native module answers (`getStatus().configured`, 03 §B.10).
+  const [nativeCredential, setNativeCredential] = useState<boolean | undefined>(undefined);
   useFocusEffect(
     useCallback(() => {
-      setRec(collectionsSetupStore.read());
+      const r = collectionsSetupStore.read();
+      setRec(r);
+      if (Platform.OS === "android" && r?.platform === "android_listener" && listener.isListenerModuleAvailable()) {
+        void listener.getStatus().then((st) => setNativeCredential(st.configured));
+      } else {
+        setNativeCredential(undefined);
+      }
     }, []),
   );
-  if (!forwardsLineVisible(rec)) return null;
+  if (!forwardsLineVisible(rec, nativeCredential)) return null;
   const labels = rec?.accountLabels ?? [];
   const accounts = labels.length ? labels.join("، ") : t("mobile.collections.setup.devices.accountsAll");
   return (

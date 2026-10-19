@@ -120,6 +120,41 @@ test("T-consent-7: no forbidden phrase (02 §4.9) in the consent, the collection
   for (const f of FORBIDDEN) assert.ok(!hay.includes(f.toLowerCase()), `forbidden phrase "${f}"`);
 });
 
+// Play User Data policy, prominent disclosure (https://support.google.com/googleplay/android-developer/answer/10144311;
+// 14 §4.2 rules, §4.13): the Android variant names the data accessed, how it is used, that it works when the app is
+// closed, that SMS is never read, and the OS permission that follows; the decision is an affirmative tap. The text
+// itself is pinned by T-consent-3 — this case says WHY each sentence must stay (README §3 order 30).
+test("T-consent-8: the Android variant carries Play's prominent-disclosure elements in both languages", () => {
+  const a = (k: string) => String(at(consentAr, k)), e = (k: string) => String(at(consentEn, k));
+  const need: [string, string, string][] = [
+    // [leaf, ar, en]: data accessed + what is sent, the scenario, the purpose
+    ["android.lead", "يقرأ ستورو على هذا الهاتف إشعارات", "TheStoro reads notifications on this phone"],
+    ["android.lead", "ويرسل إلى حساب متجرك", "sends your shop account"],
+    ["android.lead", "حتى والتطبيق مغلق", "even when the app is closed"],
+    ["android.lead", "لنطابقها مع مبيعات التحويل", "so we can match them to transfer sales"],
+    // scope, SMS never, the OS permission that follows and how to withdraw it
+    ["android.reads", "لا يقرأ إشعارات أي تطبيق آخر", "never reads notifications from any other app"],
+    ["android.reads", "ولا يقرأ رسائلك النصية (SMS) أبدًا", "never reads your text messages (SMS)"],
+    ["android.reads", "السماح بالوصول إلى الإشعارات", "allow notification access"],
+    ["android.reads", "سحب هذا الإذن في أي وقت", "withdraw it at any time"],
+    // what is sent with each item; how it is used and (not) shared
+    ["android.sends", "اسم التطبيق الذي أصدره", "the name of the app that posted it"],
+    ["common.purpose", "ولا نشاركها مع أي طرف", "we don't sell or share it"],
+    // the affirmative decision; declining keeps the feature's alternative
+    ["agree", "أوافق", "I agree"],
+    ["common.control", "يدويًا متاحًا سواء وافقت أم لا", "keeps working whether you agree or not"],
+  ];
+  for (const [k, ar, en] of need) {
+    assert.ok(a(k).includes(ar), `ar ${k} lacks «${ar}»`);
+    assert.ok(e(k).includes(en), `en ${k} lacks "${en}"`);
+  }
+  assert.ok(a("agree").startsWith("أوافق") && e("agree").startsWith("I agree"), "agree must be affirmative");
+  // Not bundled with an unrelated disclosure: the Android leaves never mention the iOS shortcut.
+  for (const k of ["android.lead", "android.reads", "android.sends", "android.key"]) {
+    assert.ok(!/الاختصار|Shortcut/i.test(a(k) + e(k)), `${k} mentions the iOS shortcut`);
+  }
+});
+
 test("T-privacy-1: privacy sections pair up, titles are unique and numbered 1…N without gaps", () => {
   assert.equal(privAr.length, privEn.length);
   for (const secs of [privAr, privEn]) {

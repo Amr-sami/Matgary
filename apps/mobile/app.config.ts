@@ -154,6 +154,17 @@ const config: ExpoConfig = {
     // rows) to the user's Google account; the outbox is re-fetched from the
     // server anyway (C13 / security M2).
     allowBackup: false,
+    // Doc 15 spec 11 ARCH CHANGE REQUEST 5 (03 §I, owner 11): no dependency may ever merge an SMS
+    // permission into the POS app (Play SMS/Call Log policy; the collection-listener reads bank/wallet
+    // APP notifications only). Prebuild writes these as tools:node="remove";
+    // modules/collection-listener/scripts/check-merged-manifest.mjs checks the merged manifest either way.
+    blockedPermissions: [
+      "android.permission.READ_SMS",
+      "android.permission.RECEIVE_SMS",
+      "android.permission.SEND_SMS",
+      "android.permission.RECEIVE_MMS",
+      "android.permission.RECEIVE_WAP_PUSH",
+    ],
     // FCM config for push (expo-notifications). On EAS the file comes from a
     // secret (`eas env:create --type file GOOGLE_SERVICES_JSON`); locally it
     // is gitignored, and without it every Android push registration ends in
@@ -286,6 +297,9 @@ const config: ExpoConfig = {
         imageWidth: 120,
       },
     ],
+    // Doc 15 spec 10 M3: the ForwardPaymentMessageIntent App Intent in the app target + its
+    // Localizable.strings (ar/en from @matgary/i18n). Native change → store build only, never OTA.
+    "./plugins/with-collections-intent.js",
   ],
 
   experiments: {
