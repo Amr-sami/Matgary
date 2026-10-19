@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useKeyboardInset } from "@/components/layout/useKeyboardInset";
 import { usePullRefresh } from "@/components/layout/usePullRefresh";
 import { HeaderAccessories } from "@/components/shell/HeaderAccessories";
 import { RTL, RTL_TEXT } from "@/theme/rtl";
@@ -30,6 +31,17 @@ import { colors, fonts, spacing } from "@/theme/tokens";
  * sits above the ScrollView in the column, so scrolled rows clip at its lower
  * edge instead of sliding under it. The tab screens' own `title` header stays
  * inside the scroll on purpose: it is meant to scroll away.
+ *
+ * The keyboard: Android runs edge-to-edge, so `adjustResize` no longer
+ * shrinks the window and the IME simply covers the bottom of the ScrollView —
+ * with the soft keyboard up the last ~45% of a long form, Save included,
+ * could not be scrolled into view (Pixel 7, new InstaPay account form, doc 15
+ * T1 F1). The root therefore pads its bottom by the band the IME covers
+ * (useKeyboardInset, Android only): the ScrollView ends at the keyboard's top
+ * edge, every row stays reachable, and Android's ScrollView keeps the focused
+ * field in view as it shrinks. iOS gets the ScrollView's own
+ * `automaticallyAdjustKeyboardInsets` (as change-password.tsx), which insets
+ * the content instead of the frame.
  */
 export function Screen({
   title,
@@ -49,13 +61,15 @@ export function Screen({
 }) {
   const insets = useSafeAreaInsets();
   const pull = usePullRefresh(onRefresh, refreshing);
+  const keyboardInset = useKeyboardInset(insets.bottom);
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <View style={[styles.root, { paddingTop: insets.top, paddingBottom: keyboardInset }]}>
       {header ? <View style={styles.fixedHeader}>{header}</View> : null}
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
         refreshControl={
           pull.onRefresh ? (
             <RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />

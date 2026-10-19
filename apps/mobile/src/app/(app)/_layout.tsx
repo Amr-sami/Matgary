@@ -36,6 +36,10 @@ export default function AppLayout() {
   return (
     <Tabs
       tabBar={(props) => <BottomNav {...props} />}
+      // Detail routes (sales/[id], inventory/[id], customers/[phone], …) are
+      // sibling tabs, so the default "firstRoute" made every back link land
+      // on Home. "history" pops to the screen the user actually came from.
+      backBehavior="history"
       screenOptions={{ headerShown: false }}
     >
       <Tabs.Screen name="index" />

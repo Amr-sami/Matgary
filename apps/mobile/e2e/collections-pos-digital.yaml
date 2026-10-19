@@ -275,19 +275,10 @@ appId: com.thestoro.app
     id: "pos-collection-part-1-amount"
 - eraseText: 20
 - inputText: "1"
-- runFlow:
-    when:
-      notVisible:
-        id: "pos-collection-part-2-amount"
-    commands:
-      - scrollUntilVisible:
-          element:
-            id: "pos-collection-add-part"
-          direction: DOWN
-          centerElement: true
-          timeout: 20000
-      - tapOn:
-          id: "pos-collection-add-part"
+# Part 2 already exists (addPart from single mode always makes two parts,
+# checkout.test.ts). A "when notVisible part-2-amount → add part" guard used to
+# sit here: with part 1 centred, part 2 is merely below the fold, so the guard
+# added a THIRD part (amount 0) and Record stayed disabled (T1 F2).
 - scrollUntilVisible:
     element:
       id: "pos-collection-part-2-amount"

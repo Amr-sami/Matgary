@@ -105,20 +105,18 @@ appId: com.thestoro.app
 - tapOn:
     id: "collection-account-form-ipa_link"
 - inputText: "https://ipn.eg.evil.com/S/a/instapay/b"
-- scrollUntilVisible:
-    element:
-      id: "collection-account-save"
-    direction: DOWN
-    centerElement: true
-    timeout: 20000
+- runFlow:
+    file: helpers/swipe-to.yaml
+    env:
+      ID: "collection-account-save"
 - tapOn:
     id: "collection-account-save"
 
 # 4. Still on the form (the link's error is under the field), nothing created.
-- extendedWaitUntil:
-    visible:
-      id: "collection-account-save"
-    timeout: 10000
+#    Save is the last row, so it sits at the bottom edge when tapped; the
+#    refusal adds the notice at the TOP of the scroll content, which pushes
+#    Save below the fold — asserting Save visible here tested the scroll
+#    offset, not the screen. The field error found below proves the form.
 - scrollUntilVisible:
     element:
       id: "collection-account-form-ipa_link-error"
@@ -134,8 +132,14 @@ appId: com.thestoro.app
 
 # 5. Fix it: paste the whole InstaPay share text; the form derives the handle
 #    from its link (06 ipaLinkFromShareText). Add the last 4, save.
+# Tap the box's empty bottom-end corner, not its centre: the link is one LTR
+# line at the top of this multi-line field, so a centre tap parks the caret
+# INSIDE the URL and eraseText (backspace) then left its tail behind
+# ("…Qn8Zx2S/a/instapay/b", T1 rerun 2). Below the text, the caret goes to
+# the end of the line.
 - tapOn:
     id: "collection-account-form-ipa_link"
+    point: "95%,85%"
 - eraseText: 120
 - eraseText: 120
 - inputText: "Click the link to send money to e2eqnb@instapay https://ipn.eg/S/e2eqnb/instapay/Qn8Zx2"
@@ -160,19 +164,20 @@ appId: com.thestoro.app
 - inputText: "5"
 - inputText: "9"
 - inputText: "7"
-- scrollUntilVisible:
-    element:
-      id: "collection-account-save"
-    direction: DOWN
-    centerElement: true
-    timeout: 20000
+- runFlow:
+    file: helpers/swipe-to.yaml
+    env:
+      ID: "collection-account-save"
 - tapOn:
     id: "collection-account-save"
 
-# 6. Back on the hub, the new row is there.
+# 6. Back on the hub, the new row is there. (The hub comes back at the scroll
+#    offset it was left at — scrolled down to the add button — so its top
+#    switch is not on screen; the form leaving is the signal, the row is
+#    checked on the server and then on screen.)
 - extendedWaitUntil:
-    visible:
-      id: "collections-settings-enabled"
+    notVisible:
+      id: "collection-account-save"
     timeout: 30000
 - runScript:
     file: helpers/collections-api.js
@@ -227,17 +232,15 @@ appId: com.thestoro.app
 - tapOn:
     id: "collection-account-form-wallet_msisdn"
 - inputText: "011${output.payer}${output.payer}"
-- scrollUntilVisible:
-    element:
-      id: "collection-account-save"
-    direction: DOWN
-    centerElement: true
-    timeout: 20000
+- runFlow:
+    file: helpers/swipe-to.yaml
+    env:
+      ID: "collection-account-save"
 - tapOn:
     id: "collection-account-save"
 - extendedWaitUntil:
-    visible:
-      id: "collections-settings-enabled"
+    notVisible:
+      id: "collection-account-save"
     timeout: 30000
 - runScript:
     file: helpers/collections-api.js
@@ -253,11 +256,12 @@ appId: com.thestoro.app
     centerElement: true
     timeout: 20000
 
-# 8. Rename the QNB account.
+# 8. Rename the QNB account. The hub lists InstaPay rows before wallets, and
+#    it is still scrolled to the new wallet row, so QNB is ABOVE.
 - scrollUntilVisible:
     element:
       id: "collection-account-${output.qnbId}"
-    direction: DOWN
+    direction: UP
     centerElement: true
     timeout: 20000
 - tapOn:
@@ -266,21 +270,24 @@ appId: com.thestoro.app
     visible:
       id: "collection-account-form-label"
     timeout: 20000
+# The label is a right-aligned (Arabic) field holding a Latin run, so the
+# run's END is at the box's right edge; a centre tap parked the caret after
+# "E2E " and the rename came out "E2E QNB <stamp> v2QNB <stamp>" (T1 rerun 6);
+# at 96% it still landed before the last digit ("…v21", rerun 7), so 99%.
 - tapOn:
     id: "collection-account-form-label"
+    point: "99%,50%"
 - eraseText: 80
 - inputText: "E2E QNB ${output.stamp} v2"
-- scrollUntilVisible:
-    element:
-      id: "collection-account-save"
-    direction: DOWN
-    centerElement: true
-    timeout: 20000
+- runFlow:
+    file: helpers/swipe-to.yaml
+    env:
+      ID: "collection-account-save"
 - tapOn:
     id: "collection-account-save"
 - extendedWaitUntil:
-    visible:
-      id: "collections-settings-enabled"
+    notVisible:
+      id: "collection-account-save"
     timeout: 30000
 - runScript:
     file: helpers/collections-api.js
@@ -300,12 +307,10 @@ appId: com.thestoro.app
     timeout: 20000
 - tapOn:
     id: "collection-account-${output.qnbId}"
-- scrollUntilVisible:
-    element:
-      id: "collection-account-archive"
-    direction: DOWN
-    centerElement: true
-    timeout: 20000
+- runFlow:
+    file: helpers/swipe-to.yaml
+    env:
+      ID: "collection-account-archive"
 - tapOn:
     id: "collection-account-archive"
 - extendedWaitUntil:
@@ -315,8 +320,8 @@ appId: com.thestoro.app
 - tapOn:
     text: "(?i)أرشفة الحساب|archive account"
 - extendedWaitUntil:
-    visible:
-      id: "collections-settings-enabled"
+    notVisible:
+      id: "collection-account-archive"
     timeout: 30000
 - extendedWaitUntil:
     notVisible:
@@ -336,12 +341,10 @@ appId: com.thestoro.app
     timeout: 20000
 - tapOn:
     id: "collection-account-${output.emId}"
-- scrollUntilVisible:
-    element:
-      id: "collection-account-archive"
-    direction: DOWN
-    centerElement: true
-    timeout: 20000
+- runFlow:
+    file: helpers/swipe-to.yaml
+    env:
+      ID: "collection-account-archive"
 - tapOn:
     id: "collection-account-archive"
 - extendedWaitUntil:
@@ -351,8 +354,8 @@ appId: com.thestoro.app
 - tapOn:
     text: "(?i)أرشفة الحساب|archive account"
 - extendedWaitUntil:
-    visible:
-      id: "collections-settings-enabled"
+    notVisible:
+      id: "collection-account-archive"
     timeout: 30000
 - extendedWaitUntil:
     notVisible:

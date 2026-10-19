@@ -167,7 +167,16 @@ const styles = StyleSheet.create({
   inputLtr: { textAlign: "left" },
   // `ltr` prop: direction AND physical left alignment (see the prop doc) —
   // listed after inputRtl/inputLtr in the style array so it wins.
-  inputForceLtr: { writingDirection: "ltr", textAlign: "left" },
+  // `writingDirection` is iOS-only. On Android the paragraph direction of a
+  // value with no strong letter (digits, "+20…", an amount) comes from the
+  // EditText's layoutDirection, which Fabric sets from the node's Yoga
+  // direction — RTL under Arabic. An RTL paragraph puts offset 0 at the run's
+  // RIGHT end, so a tap to the right of "8450" (anywhere in the empty part of
+  // the box) parked the caret BEFORE the digits: backspace deleted nothing
+  // and a typed "1" made "18450" (POS split amount, doc 15 T1 F2). `direction`
+  // on the input's own node makes that EditText LTR without touching the
+  // box's row (the adornment stays at the reading end).
+  inputForceLtr: { writingDirection: "ltr", textAlign: "left", direction: "ltr" },
   inputMultiline: { paddingTop: 12, paddingBottom: 12, textAlignVertical: "top" },
   // Passive end-slot cue; shrink-wrapped, so no textAlign is needed.
   adornment: { fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary },

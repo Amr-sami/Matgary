@@ -109,6 +109,33 @@ test("addPart fills the remainder, never below 0, and stops at 4", () => {
   assert.equal(fromSingle.collectionParts[1]!.amount, 0);
 });
 
+test("T1 F2: the split state behind 'enter each amount' + 'more than the total' — validation was right", () => {
+  // The Android POS showed both errors with Record disabled. Replayed here:
+  // "add part" from single mode → [8450, 0]; the amount field's caret sat
+  // BEFORE the digits (RTL paragraph, Field.tsx inputForceLtr), so backspace
+  // deleted nothing and "1" made "18450"; the flow then added a third part
+  // (it took an off-screen part 2 for a missing one) with nothing left → 0.
+  const total = 8450;
+  let s = co.addPart(single(), total, "vf");
+  assert.deepEqual(s.collectionParts.map((p) => p.amount), [8450, 0]);
+  s = co.updatePart(s, 0, { amount: co.parseAmountInput("18450") });
+  s = co.addPart(s, total, "vf");
+  assert.deepEqual(s.collectionParts.map((p) => p.amount), [18450, 0, 0]);
+  s = co.updatePart(s, 1, { amount: co.parseAmountInput("1") });
+  const bad = co.validateTransfer(s, { total, collectionsOn: true, requireAccount: true, accounts: null });
+  assert.deepEqual(bad.errors, ["part_amount_invalid", "parts_exceed_total"]);
+  // With the caret at the end the field holds "1": two parts of EGP 1 record.
+  let ok = co.addPart(single(), total, "vf");
+  ok = co.updatePart(ok, 0, { amount: co.parseAmountInput("1") });
+  ok = co.updatePart(ok, 1, { amount: co.parseAmountInput("1") });
+  assert.equal(co.cashRemainder(total, ok.collectionParts), 8448);
+  assert.deepEqual(co.validateTransfer(ok, { total, collectionsOn: true, requireAccount: true, accounts: null }), {
+    ok: true,
+    errors: [],
+    warnings: [],
+  });
+});
+
 test("removing back to one full part collapses to single mode; a partial part stays split", () => {
   let s = co.addPart(single(), 1000, "vf");
   s = co.removePart(s, 1, 1000);

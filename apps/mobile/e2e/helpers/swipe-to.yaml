@@ -1,0 +1,35 @@
+# Scroll a form DOWN until the element with id ${ID} is on screen, dragging in
+# the side gutter (x = 8%: inside the card's padding, outside every input box)
+# instead of from the screen centre the way scrollUntilVisible does.
+#
+# Why: on Android a vertical drag that STARTS on an Arabic single-line
+# TextInput (textAlign right) never reaches the ScrollView — RN's ReactEditText
+# keeps the gesture whenever the EditText reports it can scroll horizontally,
+# and a right-gravity single-line EditText always does (T1 F4; native, needs a
+# dev-client rebuild). A form full of fields puts one under the centre sooner
+# or later, and scrollUntilVisible then swipes twelve times without moving
+# (T1 F1, collections-accounts step 59). x = 8% of 1080 px is 86 px: right of
+# Android's back-gesture strip, left of the 98 px where the input boxes start.
+#
+# One extra drag after the element shows, so a row that entered at the bottom
+# edge is lifted clear of it before the caller taps it.
+appId: com.thestoro.app
+---
+- repeat:
+    while:
+      notVisible:
+        id: ${ID}
+    times: 10
+    commands:
+      - swipe:
+          start: "8%, 75%"
+          end: "8%, 30%"
+          duration: 500
+- swipe:
+    start: "8%, 75%"
+    end: "8%, 45%"
+    duration: 500
+- extendedWaitUntil:
+    visible:
+      id: ${ID}
+    timeout: 5000
