@@ -12,7 +12,10 @@
 // fallback. No dialog ever contains an amount.
 
 import AppIntents
-import CollectionsIngest
+// `internal`: Expo's generated ExpoModulesProvider.swift imports every module
+// `internal` in this same app target, and Swift rejects mixing access levels
+// for one module (every iOS build failed from b352cfe until this).
+internal import CollectionsIngest
 import Foundation
 
 struct ForwardPaymentMessageIntent: AppIntent {
