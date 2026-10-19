@@ -238,6 +238,25 @@ describe.skipIf(!hasTestDb)("pasteCredits (§4.13; acceptance 17)", () => {
     expect(after.suggestedCollection).toBeNull();
   });
 
+  it("N-match: a pending sale of the same amount on the account wins over a late-arrival link to an older sale confirmed by hand", async () => {
+    // The phone walkthrough (2026-10-19 09:09Z): an EGP 2,700 sale confirmed by
+    // hand 3 h 44 min earlier took a pasted 2,700 credit as evidence, while the
+    // newer pending 2,700 sale (payer last 4 that differ from the SMS → a
+    // conflicting suggestion, never auto) stayed pending with no message.
+    const acc = await walletAccount(f);
+    const older = await walletCart(f, 2700, acc.id, { customDate: new Date(Date.now() - 224 * 60_000) });
+    const olderId = older.collectionIds[0]!;
+    await confirmCollection(f.tenantId, olderId, owner(), { note: null });
+    const newer = await walletCart(f, 2700, acc.id, { payerPhoneLast4: "5432" });
+    const out = await pasteCredits(f.tenantId, owner(), { text: vf1({ amount: "2700.00", receiving: acc.msisdn }), sender: null });
+    const creditId = out.results[0]!.creditId!;
+    expect(out.results[0]).toMatchObject({ status: "accepted", state: "unmatched", suggestedCollectionId: newer.collectionIds[0] });
+    expect(await creditRow(f, creditId)).toMatchObject({ state: "unmatched", matched_collection_id: null, suggested_collection_id: newer.collectionIds[0] });
+    expect(await collectionRow(f, olderId)).toMatchObject({ status: "confirmed", matched_credit_id: null });
+    expect((await eventsOf(f, olderId)).some((e) => e.kind === "evidence_attached")).toBe(false);
+    expect((await collectionRow(f, newer.collectionIds[0]!)).status).toBe("pending");
+  });
+
   it("a pasted copy of an already-ingested credit → duplicate with the same creditId (unchanged)", async () => {
     const acc = await walletAccount(f);
     const body = vf1({ amount: "380.00", receiving: acc.msisdn });

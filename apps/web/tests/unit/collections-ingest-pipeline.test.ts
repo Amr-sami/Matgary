@@ -527,6 +527,28 @@ describe.skipIf(!hasTestDb)("reverse match and late arrivals (acceptance 14, 15)
     expect((await eventsOf(f, cid)).some((e) => e.kind === "note" && e.details?.reason === "matches_rejected")).toBe(true);
   });
 
+  it("N-match: with a pending candidate in the window, a rejected (or confirmed) older sale is not a late arrival (03 §C.8 step 10)", async () => {
+    // Credit 60 min ago; the newer pending sale was rung now (60 min after the
+    // credit: suggest window, not auto). The older sales of the same amount
+    // were rung 200 min before the credit (inside the late-arrival window).
+    const acc = await walletAccount(f);
+    const at = new Date(Date.now() - 60 * 60_000);
+    const back = new Date(at.getTime() - 200 * 60_000);
+    const rejected = await walletCart(f, 275, acc.id, { customDate: back });
+    await rejectCollection(f.tenantId, rejected.collectionIds[0]!, owner(), { reason: "not_received" });
+    const confirmed = await walletCart(f, 275, acc.id, { customDate: back });
+    await confirmCollection(f.tenantId, confirmed.collectionIds[0]!, owner(), {});
+    const pending = await walletCart(f, 275, acc.id);
+    const { o } = await one(msg(vf1({ amount: "275.00", receiving: acc.msisdn, at }), { receivedAt: at.toISOString() }));
+    expect(o).toMatchObject({ state: "unmatched", suggestedCollectionId: pending.collectionIds[0] });
+    expect(await collectionRow(f, confirmed.collectionIds[0]!)).toMatchObject({ status: "confirmed", matched_credit_id: null });
+    expect((await eventsOf(f, rejected.collectionIds[0]!)).some((e) => e.kind === "note")).toBe(false);
+    // Once that sale is decided by hand, the same kind of credit IS a late arrival again.
+    await confirmCollection(f.tenantId, pending.collectionIds[0]!, owner(), {});
+    const late = await one(msg(vf1({ amount: "275.00", receiving: acc.msisdn, at }), { receivedAt: at.toISOString() }));
+    expect(late.o.state).toBe("matched");
+  });
+
   it("an unmatched credit with no suggestion notifies once; a merge into it does not re-notify", async () => {
     const acc = await walletAccount(f);
     const body = vf1({ amount: "265.00", receiving: acc.msisdn });

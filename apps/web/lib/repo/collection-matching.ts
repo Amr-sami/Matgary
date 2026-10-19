@@ -754,8 +754,12 @@ export async function evaluateCredit(
         out.suggestedCollectionId = cand.id;
       }
     } else {
-      // unmatched(C | null) → late arrivals first.
-      const decided = await loadDecided(tx, credit);
+      // unmatched(C | null) → late arrivals, but only for a credit with NO
+      // pending candidate (03 §C.8 step 10). With unmatched(C) a pending sale
+      // of this amount on this account is still waiting (a conflicting
+      // suggestion, or one outside the auto window): linking the credit to
+      // an older sale decided by hand would hide that sale's money (N-match).
+      const decided = decision.suggestedCollectionId === null ? await loadDecided(tx, credit) : [];
       const late = classifyLateArrival(toMatchCredit(credit, template, account), decided.map(toMatchCollection));
       if (late.kind === "evidence" && (await attachEvidence(tx, credit, late.collectionId, ctx))) {
         out.state = "matched";

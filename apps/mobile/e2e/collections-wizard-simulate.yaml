@@ -6,10 +6,20 @@
 # (setup NEED=ingest refuses otherwise); the fixture accounts give
 # activeAccounts ≥ 1 (09 §4.6.1 rule 2).
 #
-# - Android before M4: neither native module ships (automation.tsx MODULES),
-#   so 09 §4.6.1 rule 10 resolves `unsupported/android_pending`: the flow
-#   asserts that state, that no consent is offered and that no device was
-#   created, and stops. From M4, spec 11 replaces this branch.
+# - Android (M4 dev client, spec 11's listener module linked): 09 §4.6.1
+#   resolves `android_listener`. The flow walks every step that runs without
+#   granting real notification access: intro → consent (scrolled) → agree →
+#   device (run-unique label) → create (201 + `configure()`) → install, where
+#   it asserts the access screen (open-access button, "not connected", Next
+#   disabled until access, 09 As landed M4 deviation 4) and that "Open
+#   notification access" lands on Android's own detail screen for TheStoro,
+#   then comes back. Granting is a system toggle the flow does not flip
+#   (`cmd notification allow_listener` is adb, not Maestro; the M4 hand run
+#   covers grant → enable → verify → done, audit/t1-m4/results.md 2.4–2.6).
+#   If access is already granted on the device (a hand run left it on), the
+#   install step shows "connected" and Next enabled instead; both are
+#   accepted. Then the shared step 10 unlinks the device. The pre-M4 branch
+#   (`unsupported/android_pending`, no device) is gone with the old build.
 # - iOS: intro → consent (scrolled, 09 §4.6.3) → agree → device (a run-unique
 #   label "E2E wizard <stamp>") → create → install: share the token (the share
 #   sheet's Copy returns Share.sharedAction) → open the shortcut link (Safari;
@@ -58,38 +68,168 @@ appId: com.thestoro.app
 #    TAB (More) and step 9 never saw the hub (T1 iOS rerun 2).
 - runFlow: helpers/dismiss-logbox.yaml
 - openLink: "matgary://settings/collections"
-- scrollUntilVisible:
-    element:
-      id: "collections-settings-automation"
-    direction: DOWN
-    centerElement: true
-    timeout: 30000
-- tapOn:
-    id: "collections-settings-automation"
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: "collections-settings-automation"
+          direction: DOWN
+          centerElement: true
+          timeout: 30000
+      - tapOn:
+          id: "collections-settings-automation"
+# Android: the centring swipes moved the hub while it was still laying out,
+# and the tap landed on the late-alert minutes field (keyboard up, still on
+# the hub; T3 Android run 1). Drag in the gutter (helpers/swipe-to.yaml),
+# let it settle, tap, and once more if the wizard is not up.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - runFlow:
+          file: helpers/swipe-to.yaml
+          env:
+            ID: "collections-settings-automation"
+      - waitForAnimationToEnd:
+          timeout: 3000
+      - tapOn:
+          id: "collections-settings-automation"
+      - waitForAnimationToEnd:
+          timeout: 3000
+      - runFlow:
+          when:
+            notVisible:
+              id: "collection-automation-(intro|unsupported)"
+          commands:
+            - runFlow:
+                file: helpers/swipe-to.yaml
+                env:
+                  ID: "collections-settings-automation"
+            - tapOn:
+                id: "collections-settings-automation"
 - extendedWaitUntil:
     visible:
       id: "collection-automation-(intro|unsupported)"
     timeout: 30000
 
-# 4. Android (before M4): unsupported/android_pending, nothing created.
+# 4. Android (M4): intro → consent → device → install, without granting access.
 - runFlow:
     when:
       platform: Android
     commands:
       - assertVisible:
-          id: "collection-automation-unsupported"
-      - assertVisible:
-          id: "collection-automation-unsupported-android_pending"
-      - assertNotVisible:
+          id: "collection-automation-intro"
+      - tapOn:
+          id: "collection-automation-next"
+      - extendedWaitUntil:
+          visible:
+            id: "collection-automation-consent"
+          timeout: 15000
+      - scrollUntilVisible:
+          element:
+            id: "collection-consent-agree"
+          direction: DOWN
+          centerElement: true
+          timeout: 30000
+      - tapOn:
           id: "collection-consent-agree"
+      - extendedWaitUntil:
+          visible:
+            id: "collection-device-label"
+          timeout: 15000
+      # The prefilled "{name} — {model}" may be right- or left-aligned: tap
+      # each end and erase, so whichever end the caret lands on, the text goes.
+      - tapOn:
+          id: "collection-device-label"
+          point: "99%,50%"
+      - eraseText: 80
+      - tapOn:
+          id: "collection-device-label"
+          point: "1%,50%"
+      - eraseText: 80
+      - inputText: "E2E wizard ${output.stamp}"
+      - assertVisible:
+          id: "collection-device-label"
+          text: "E2E wizard ${output.stamp}"
+      # A drag that starts on the label field does not scroll (T1 F4): use the gutter.
+      - runFlow:
+          file: helpers/swipe-to.yaml
+          env:
+            ID: "collection-automation-next"
+      - tapOn:
+          id: "collection-automation-next"
+      - extendedWaitUntil:
+          visible:
+            id: "collection-automation-android-install"
+          timeout: 30000
       - runScript:
           file: helpers/collections-api.js
           env:
             MODE: expect
-            CHECK: noLiveDevice
-            SINCE: "${output.stamp}"
+            CHECK: deviceByLabel
+            LABEL: "E2E wizard ${output.stamp}"
+      # configure() done (the spinner gives way to the button) and the access state read.
+      - extendedWaitUntil:
+          visible:
+            id: "collection-automation-android-(not-connected|connected)"
+          timeout: 30000
+      - assertVisible:
+          id: "collection-automation-open-access"
+      - runFlow:
+          when:
+            visible:
+              id: "collection-automation-android-not-connected"
+          commands:
+            # Next stays disabled until access is on (09 As landed M4,
+            # deviation 4). The id sits on a wrapper View (StepFrame), whose
+            # `enabled` is always true, so check the behaviour: a tap leaves
+            # the wizard on install.
+            - runFlow:
+                file: helpers/swipe-to.yaml
+                env:
+                  ID: "collection-automation-next"
+            - tapOn:
+                id: "collection-automation-next"
+            - waitForAnimationToEnd:
+                timeout: 3000
+            - assertVisible:
+                id: "collection-automation-android-install"
+            - assertNotVisible:
+                id: "collection-automation-enable"
+            # "Open notification access" → Android's detail screen for our listener → back.
+            - scrollUntilVisible:
+                element:
+                  id: "collection-automation-open-access"
+                direction: UP
+                timeout: 15000
+            - tapOn:
+                id: "collection-automation-open-access"
+            - extendedWaitUntil:
+                visible:
+                  text: "(?i).*(notification access|الوصول إلى الإشعارات).*"
+                timeout: 15000
+            - assertVisible:
+                text: "TheStoro"
+            - back
+            - extendedWaitUntil:
+                visible:
+                  id: "collection-automation-android-not-connected"
+                timeout: 15000
+      - runFlow:
+          when:
+            visible:
+              id: "collection-automation-android-connected"
+          commands:
+            - runFlow:
+                file: helpers/swipe-to.yaml
+                env:
+                  ID: "collection-automation-next"
+            - assertVisible:
+                id: "collection-automation-next"
 
-# Steps 5–10 run on iOS only.
+# Steps 5–9 run on iOS only; step 10 (unlink) runs on both.
 - runFlow:
     when:
       platform: iOS
@@ -266,31 +406,35 @@ appId: com.thestoro.app
             id: "collections-settings-automation"
           timeout: 30000
 
-      # 10. Revoke this phone's device on Linked phones.
-      - openLink: "matgary://settings/collections/devices"
-      - scrollUntilVisible:
-          element:
-            id: "collection-device-revoke-${output.devId}"
-          direction: DOWN
-          centerElement: true
-          timeout: 30000
-      - tapOn:
-          id: "collection-device-revoke-${output.devId}"
-      - extendedWaitUntil:
-          visible:
-            text: "(?s)(إلغاء ربط «E2E wizard .*|Unlink .E2E wizard .*)"
-          timeout: 10000
-      # iOS keeps the row's own "إلغاء الربط" (y 411–455) in the hierarchy
-      # behind the alert, with the same attributes as the alert's button
-      # (y 510–558), and a bare text tap hit the row's (T1 iOS rerun 5).
-      # `below: id <row's revoke>` also picked the row's (Maestro's `below`
-      # compares top edges; the button's inner text starts at y 418),
-      # `rightOf: Cancel` too (its inner text starts right of Cancel), and
-      # `childOf` the alert title found nothing (direct children only).
-      # Maestro lists the row's match first and the alert's second: index 1
-      # (checked live against the open alert: it tapped [205,510][345,558]).
-      # A first tap on the open alert was once swallowed (no DELETE reached
-      # the server, the same alert stayed up); one retry while it shows.
+# 10. Both platforms: unlink this phone's device on Linked phones.
+- openLink: "matgary://settings/collections/devices"
+- scrollUntilVisible:
+    element:
+      id: "collection-device-revoke-${output.devId}"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- tapOn:
+    id: "collection-device-revoke-${output.devId}"
+- extendedWaitUntil:
+    visible:
+      text: "(?s)(إلغاء ربط «E2E wizard .*|Unlink .E2E wizard .*)"
+    timeout: 10000
+# iOS keeps the row's own "إلغاء الربط" (y 411–455) in the hierarchy
+# behind the alert, with the same attributes as the alert's button
+# (y 510–558), and a bare text tap hit the row's (T1 iOS rerun 5).
+# `below: id <row's revoke>` also picked the row's (Maestro's `below`
+# compares top edges; the button's inner text starts at y 418),
+# `rightOf: Cancel` too (its inner text starts right of Cancel), and
+# `childOf` the alert title found nothing (direct children only).
+# Maestro lists the row's match first and the alert's second: index 1
+# (checked live against the open alert: it tapped [205,510][345,558]).
+# A first tap on the open alert was once swallowed (no DELETE reached
+# the server, the same alert stayed up); one retry while it shows.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
       - tapOn:
           text: "(?i)إلغاء الربط|unlink"
           index: 1
@@ -304,16 +448,24 @@ appId: com.thestoro.app
             - tapOn:
                 text: "(?i)إلغاء الربط|unlink"
                 index: 1
-      - extendedWaitUntil:
-          notVisible:
-            id: "collection-device-${output.devId}"
-          timeout: 30000
-      - runScript:
-          file: helpers/collections-api.js
-          env:
-            MODE: expect
-            CHECK: deviceRevoked
-            ID: "${output.devId}"
+# Android's dialog is its own window: the row's button is not a twin in the
+# hierarchy (as in collections-accounts' archive), so the plain tap.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn:
+          text: "(?i)إلغاء الربط|unlink"
+- extendedWaitUntil:
+    notVisible:
+      id: "collection-device-${output.devId}"
+    timeout: 30000
+- runScript:
+    file: helpers/collections-api.js
+    env:
+      MODE: expect
+      CHECK: deviceRevoked
+      ID: "${output.devId}"
 
 # End on the dashboard (both platforms).
 - runFlow: helpers/dismiss-logbox.yaml

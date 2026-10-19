@@ -8,8 +8,9 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
+import { useCallback } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowCounterClockwiseIcon as ArrowCounterClockwise } from "phosphor-react-native/src/icons/ArrowCounterClockwise";
 import { CoinsIcon as Coins } from "phosphor-react-native/src/icons/Coins";
 import { PackageIcon as Package } from "phosphor-react-native/src/icons/Package";
@@ -32,6 +33,8 @@ import { colors, elevation, fonts, MIN_TOUCH, radius, spacing } from "@/theme/to
 import { t } from "@/i18n";
 import { errorText } from "@/lib/errors";
 import { saleBadgeKind } from "@/collections/rules";
+import { shouldRefetchOnFocus } from "@/lib/focus-refetch";
+import { useOffline } from "@/stores/offline";
 import { CollectionBadge } from "@/components/collections/CollectionBadge";
 
 type RecentSale = dashboardApi.RecentSale;
@@ -58,6 +61,20 @@ export default function DashboardScreen() {
     queryKey: ["dashboard", activeBranchId],
     queryFn: () => dashboardApi.getDashboard(api),
   });
+  // Home is a tab and stays mounted, so returning to it neither mounts a new
+  // observer nor changes AppState: without this the "awaiting confirmation"
+  // card kept a count from before sales recorded elsewhere (audit T1 N-card,
+  // lib/focus-refetch.ts). Refetch a stale dashboard when Home regains focus.
+  const qc = useQueryClient();
+  const online = useOffline((s) => s.online);
+  useFocusEffect(
+    useCallback(() => {
+      const key = ["dashboard", activeBranchId];
+      if (online && shouldRefetchOnFocus(qc.getQueryState(key), Date.now())) {
+        void qc.refetchQueries({ queryKey: key, exact: true });
+      }
+    }, [qc, activeBranchId, online]),
+  );
   // Offline the refetch fails at once (retry: false) but the hydrated
   // snapshot stays in `data`: it is shown, with its age, never hidden
   // behind the error (doc 06 §6.2 — staleness is said, not concealed).

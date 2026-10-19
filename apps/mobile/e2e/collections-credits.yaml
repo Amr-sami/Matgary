@@ -132,12 +132,25 @@ appId: com.thestoro.app
       CHECK: creditByRef
       REF: "${output.ref12}"
       ACCOUNT: vf
-- scrollUntilVisible:
-    element:
+# The list is newest first, so the pasted credit is normally the TOP row.
+# Wait for it there; scroll only when it is not on screen. No centring: a
+# centring swipe on the first row pushed it under the status bar, and the
+# tap then missed (T3 Android, step 38: still on the list).
+- extendedWaitUntil:
+    visible:
       id: "credit-row-${output.cCredit}"
-    direction: DOWN
-    centerElement: true
-    timeout: 30000
+    timeout: 15000
+    optional: true
+- runFlow:
+    when:
+      notVisible:
+        id: "credit-row-${output.cCredit}"
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: "credit-row-${output.cCredit}"
+          direction: DOWN
+          timeout: 30000
 
 # 6. One-tap match: the credit screen lists the sale's collection.
 #    The row tap can land while the centring scroll is still moving and miss
@@ -156,8 +169,7 @@ appId: com.thestoro.app
       - scrollUntilVisible:
           element:
             id: "credit-row-${output.cCredit}"
-          direction: DOWN
-          centerElement: true
+          direction: UP
           timeout: 10000
       - waitForAnimationToEnd
       - tapOn:
