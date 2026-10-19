@@ -27,6 +27,8 @@ interface ButtonProps {
    * lands on the reading side in both locales.
    */
   icon?: PhosphorIcon;
+  /** Maestro / e2e handle. */
+  testID?: string;
 }
 
 const ICON_SIZE = 16;
@@ -54,6 +56,7 @@ export function Button({
   disabled = false,
   style,
   icon: Icon,
+  testID,
 }: ButtonProps) {
   const isDisabled = disabled || loading;
   const showDisabled = disabled && !loading;
@@ -67,6 +70,7 @@ export function Button({
     <Pressable
       onPress={onPress}
       disabled={isDisabled}
+      testID={testID}
       accessibilityRole="button"
       accessibilityState={{ disabled: isDisabled, busy: loading }}
       style={({ pressed }) => [

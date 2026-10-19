@@ -2,17 +2,19 @@ import { useState } from "react";
 import {
   ActivityIndicator,
   Linking,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import * as Notifications from "expo-notifications";
 
 import { notifications } from "@matgary/api-client";
 
 import { api } from "@/api/client";
-import { forgetRegistration } from "@/effects/PushRegistrar";
+import { ensureSalesChannel, forgetRegistration } from "@/effects/PushRegistrar";
 import { Screen } from "@/components/layout/Screen";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -21,6 +23,11 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Segmented } from "@/components/ui/Segmented";
 import { SettingsHeader } from "@/components/ui/SettingsHeader";
 import { ToggleRow } from "@/components/ui/ToggleRow";
+import {
+  previewNotificationRequest,
+  saleAlertPreferenceBody,
+  splitSaleAlertRow,
+} from "@/lib/sale-alerts";
 import { usePush, type PushStatus } from "@/stores/push";
 import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
@@ -42,6 +49,13 @@ import { t } from "@/i18n";
  * switch shows the EFFECTIVE state: it dims with in-app off, the way delivery
  * dims with email off, and dims again — with a hint saying why — while the
  * event is on the daily digest.
+ *
+ * SALE ALERTS (doc 16 §7): `sale.alert` is not a per-event card. It renders
+ * first as its own card — one switch bound to `push` alone (the server forces
+ * inApp/email off and delivery instant for it, so the in-app/digest blocking
+ * above never applies), a "Play the sound" local preview, and the denied-
+ * permission hint. The `sale.created` card loses its push switch: that event
+ * can never push any more (dispatch.ts), the cha-ching is `sale.alert`.
  */
 type EventType = notifications.NotificationEventType;
 type Pref = notifications.EventPreference;
@@ -64,6 +78,10 @@ const EVENTS = (): Record<EventType, { title: string; hint: string }> => ({
   "sale.created": {
     title: t("app.notificationSettings.events.sale.created.title"),
     hint: t("app.notificationSettings.events.sale.created.hint"),
+  },
+  "sale.alert": {
+    title: t("app.notificationSettings.events.sale.alert.title"),
+    hint: t("app.notificationSettings.events.sale.alert.hint"),
   },
   "purchase.received": {
     title: t("app.notificationSettings.events.purchase.received.title"),
@@ -155,7 +173,7 @@ export default function NotificationSettingsScreen() {
     },
   });
 
-  const rows = q.data?.preferences ?? [];
+  const { saleAlert, rest: rows } = splitSaleAlertRow(q.data?.preferences ?? []);
 
   return (
     <Screen onRefresh={() => void q.refetch()} refreshing={q.isRefetching}>
@@ -206,10 +224,19 @@ export default function NotificationSettingsScreen() {
             onPress={() => void q.refetch()}
           />
         </View>
-      ) : rows.length === 0 ? (
+      ) : rows.length === 0 && !saleAlert ? (
         <EmptyState title={t("mobile.push.prefsEmpty")} />
       ) : (
-        rows.map((p) => {
+        <>
+        {saleAlert ? (
+          <SaleAlertsCard
+            pref={saleAlert}
+            saving={save.isPending && save.variables?.eventType === saleAlert.eventType}
+            onToggle={(v) => save.mutate({ ...saleAlert, ...saleAlertPreferenceBody(v) })}
+            onNotice={setNotice}
+          />
+        ) : null}
+        {rows.map((p) => {
           const meta = EVENTS()[p.eventType];
           const saving = save.isPending && save.variables?.eventType === p.eventType;
           // Mirror of dispatch.ts: a push goes out only when in-app is on AND
@@ -241,13 +268,17 @@ export default function NotificationSettingsScreen() {
                 onValueChange={(v) => save.mutate({ ...p, inApp: v })}
               />
 
-              <ToggleRow
-                label={t("mobile.push.perEvent")}
-                hint={pushHint}
-                value={!pushBlocked && p.push}
-                disabled={saving || pushBlocked}
-                onValueChange={(v) => save.mutate({ ...p, push: v })}
-              />
+              {/* sale.created never pushes (doc 16 §5) — the cha-ching is
+                  the Sale sound alerts card above — so no push switch. */}
+              {p.eventType === "sale.created" ? null : (
+                <ToggleRow
+                  label={t("mobile.push.perEvent")}
+                  hint={pushHint}
+                  value={!pushBlocked && p.push}
+                  disabled={saving || pushBlocked}
+                  onValueChange={(v) => save.mutate({ ...p, push: v })}
+                />
+              )}
 
               <ToggleRow
                 label={t("app.notificationSettings.headers.email")}
@@ -273,11 +304,85 @@ export default function NotificationSettingsScreen() {
               </View>
             </Card>
           );
-        })
+        })}
+        </>
       )}
 
       <ThisDeviceCard onNotice={setNotice} />
     </Screen>
+  );
+}
+
+/**
+ * Sale sound alerts (doc 16 §7) — the per-user switch that covers this
+ * user's phones AND open dashboard tabs (OPEN-9). Bound to `push` only.
+ * "Play the sound" posts a LOCAL notification on the `sales` channel, so it
+ * works with no FCM/APNs at all (the emulator check in §13).
+ */
+function SaleAlertsCard({
+  pref,
+  saving,
+  onToggle,
+  onNotice,
+}: {
+  pref: Pref;
+  saving: boolean;
+  onToggle: (v: boolean) => void;
+  onNotice: (n: { tone: "ok" | "err"; text: string } | null) => void;
+}) {
+  const pushStatus = usePush((s) => s.status);
+  const meta = EVENTS()["sale.alert"];
+  const preview = useMutation({
+    mutationFn: async () => {
+      // Android 13+: a local notification needs POST_NOTIFICATIONS too. Ask
+      // here (an explicit tap) when the OS still allows asking.
+      let perm = await Notifications.getPermissionsAsync();
+      if (!perm.granted && perm.canAskAgain) perm = await Notifications.requestPermissionsAsync();
+      if (!perm.granted) throw new Error("denied");
+      await ensureSalesChannel();
+      const req = previewNotificationRequest(Platform.OS, {
+        title: t("app.saleAlerts.previewTitle"),
+        body: t("app.saleAlerts.previewBody"),
+      });
+      await Notifications.scheduleNotificationAsync(req);
+    },
+    onError: () => onNotice({ tone: "err", text: t("app.saleAlerts.previewFailed") }),
+  });
+
+  return (
+    <Card testID="sale-alerts-card">
+      <View style={styles.eventHead}>
+        <Text numberOfLines={1} style={styles.eventTitle}>
+          {meta.title}
+        </Text>
+        {pref.isDefault ? <Badge label={t("app.notificationSettings.defaultBadge")} /> : null}
+      </View>
+      <Text style={styles.eventHint}>{meta.hint}</Text>
+
+      <View style={styles.divider} />
+
+      <ToggleRow
+        testID="sale-alerts-switch"
+        label={t("app.saleAlerts.switch")}
+        hint={t("app.saleAlerts.webHint")}
+        value={pref.push}
+        disabled={saving}
+        onValueChange={onToggle}
+      />
+      {pushStatus === "denied" ? (
+        <Text style={[styles.eventHint, styles.deviceError]}>{t("mobile.push.deniedHint")}</Text>
+      ) : null}
+
+      <View style={styles.deviceActions}>
+        <Button
+          testID="sale-alerts-preview"
+          label={t("app.saleAlerts.preview")}
+          variant="outline"
+          loading={preview.isPending}
+          onPress={() => preview.mutate()}
+        />
+      </View>
+    </Card>
   );
 }
 
@@ -321,7 +426,10 @@ function ThisDeviceCard({
   // our ticket errored — so MMKV must forget it or postToken() short-circuits
   // on "already registered" forever and this device silently never re-POSTs.
   const test = useMutation({
-    mutationFn: () => notifications.sendTestPush(api),
+    // `kind: "sale"` (doc 16 §8.11): a sample sale alert on channel `sales`
+    // with cha_ching — the real-device check for R1.
+    mutationFn: (kind: "sale" | undefined) =>
+      notifications.sendTestPush(api, kind ? { kind } : undefined),
     onSuccess: (r) => {
       const mine = r.tickets.find((tk) => tk.to === push.token) ?? r.tickets[0];
       const pruned = r.disabled > 0 && (!mine || mine.status === "error");
@@ -407,8 +515,19 @@ function ThisDeviceCard({
         {canTest ? (
           <Button
             label={t("mobile.push.sendTest")}
-            loading={test.isPending}
-            onPress={() => test.mutate()}
+            loading={test.isPending && test.variables !== "sale"}
+            disabled={test.isPending}
+            onPress={() => test.mutate(undefined)}
+          />
+        ) : null}
+        {canTest ? (
+          <Button
+            testID="sale-alerts-test-push"
+            label={t("mobile.push.sendTestSale")}
+            variant="outline"
+            loading={test.isPending && test.variables === "sale"}
+            disabled={test.isPending}
+            onPress={() => test.mutate("sale")}
           />
         ) : null}
       </View>

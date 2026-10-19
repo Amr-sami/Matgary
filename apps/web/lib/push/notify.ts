@@ -34,7 +34,15 @@ import { logger } from "@/lib/logger";
 import type { NotificationEventType } from "@/lib/notifications/event-types";
 import type { NotificationKind } from "@/lib/repo/notifications";
 
-import { sendPush, type PushData, type PushMessage, type PushOutcome, type SendPushOptions } from "./expo-push";
+import {
+  sendPush,
+  type PushChannelId,
+  type PushData,
+  type PushMessage,
+  type PushOutcome,
+  type PushSound,
+  type SendPushOptions,
+} from "./expo-push";
 
 // ─── Route mapping ───────────────────────────────────────────────────────────
 // `kind` → expo-router path. Mirrors what the web bell links to
@@ -108,6 +116,10 @@ export interface NotifyUserDevicesInput {
   /** When set, the send waits for this `notifications` row to be committed
    *  and skips entirely if it never is. Always pass it from the insert hook. */
   notificationId?: string | null;
+  /** Android channel override; wins over `channelForKind` (doc 16 §8.6). */
+  channelId?: PushChannelId;
+  /** Sound override; omitted → "default". */
+  sound?: PushSound;
 }
 
 export interface NotifyResult {
@@ -163,13 +175,14 @@ export async function notifyUserDevices(
     const tokens = await activeTokens(tenantId, userId);
     if (tokens.length === 0) return { status: "no_tokens", outcomes: [], disabled: [] };
 
-    const channelId = channelForKind(input.data.type);
+    const channelId = input.channelId ?? channelForKind(input.data.type);
     const messages: PushMessage[] = tokens.map((to) => ({
       to,
       title: input.title,
       body: input.body ?? undefined,
       data: input.data,
       ...(channelId ? { channelId } : {}),
+      ...(input.sound ? { sound: input.sound } : {}),
     }));
     const outcomes = await sendPush(messages, opts);
     const disabled = await handleOutcomes(tenantId, userId, outcomes);

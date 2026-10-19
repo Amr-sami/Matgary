@@ -40,7 +40,7 @@ import {
 import { sendMail } from "@/lib/mailer";
 import { fanoutEvent } from "@/lib/notifications/dispatch";
 import { notifyUserDevices } from "@/lib/push/notify";
-import { getNotificationPreferences } from "@/lib/repo/notifications";
+import { getNotificationPreferences, setNotificationPreference } from "@/lib/repo/notifications";
 
 const notifyMock = vi.mocked(notifyUserDevices);
 const mailMock = vi.mocked(sendMail);
@@ -265,10 +265,14 @@ describe("preferences GET visibility (D13-8)", () => {
     (await getNotificationPreferences(tenantId, userId)).preferences.map((p) => p.eventType);
 
   it("lists the collection events only to members who can receive them", async () => {
-    expect(await events(U.owner)).toHaveLength(10);
+    // 11 = five legacy + sale.alert (doc 16) + five collection events.
+    expect(await events(U.owner)).toHaveLength(11);
     const b = await events(U.B);
-    expect(b).toHaveLength(5);
+    // B holds view_sales → the five legacy events + sale.alert.
+    expect(b).toHaveLength(6);
+    expect(b).toContain("sale.alert");
     expect(b.some((e) => e.startsWith("collection."))).toBe(false);
+    // A has no view_sales → no sale.alert.
     expect(await events(U.A)).toEqual([
       "sale.created",
       "purchase.received",
@@ -294,10 +298,67 @@ describe("preferences GET visibility (D13-8)", () => {
     expect(byEvent["collection.source_silent"]).toMatchObject({ push: true, email: true });
   });
 
+  it("sale.alert (doc 16 §7): hidden without view_sales, default push ON, push-only rows", async () => {
+    expect(await events(U.A)).not.toContain("sale.alert");
+    const pref = async (u: string) =>
+      (await getNotificationPreferences(tenantId, u)).preferences.find((p) => p.eventType === "sale.alert");
+    expect(await pref(U.owner)).toMatchObject({ inApp: false, push: true, email: false, digestMode: "instant", isDefault: true });
+    expect(await pref(U.B)).toMatchObject({ push: true, isDefault: true });
+
+    // PUT push:false with junk in the other channels → a coerced row.
+    expect(
+      await setNotificationPreference(tenantId, U.B, {
+        eventType: "sale.alert",
+        inApp: true,
+        push: false,
+        email: true,
+        digestMode: "digest",
+      }),
+    ).toEqual({ isDefault: false });
+    const stored = await withTenant(tenantId, (tx) =>
+      tx
+        .select()
+        .from(notificationPreferences)
+        .where(eq(notificationPreferences.userId, U.B)),
+    );
+    expect(stored).toHaveLength(1);
+    expect(stored[0]).toMatchObject({ eventType: "sale.alert", inApp: false, push: false, email: false, digestMode: "instant" });
+    expect(await pref(U.B)).toMatchObject({ push: false, isDefault: false });
+
+    // PUT push:true (again with junk) → back to default, the row is deleted.
+    expect(
+      await setNotificationPreference(tenantId, U.B, {
+        eventType: "sale.alert",
+        inApp: true,
+        push: true,
+        email: true,
+        digestMode: "digest",
+      }),
+    ).toEqual({ isDefault: true });
+    const after = await withTenant(tenantId, (tx) =>
+      tx.select().from(notificationPreferences).where(eq(notificationPreferences.userId, U.B)),
+    );
+    expect(after).toHaveLength(0);
+  });
+
+  it("sale.created never pushes, even for an owner who made it instant with push on (doc 16 §5)", async () => {
+    await setNotificationPreference(tenantId, U.owner, {
+      eventType: "sale.created",
+      inApp: true,
+      push: true,
+      email: false,
+      digestMode: "instant",
+    });
+    await fanoutEvent(tenantId, branch1, "sale.created", { invoiceId: "INV-X", totalEgp: 10, lineCount: 1 });
+    const r = await rows();
+    expect(r.map((x) => x.who)).toEqual(["owner"]);
+    expect(notifyMock).not.toHaveBeenCalled();
+  });
+
   it("with COLLECTIONS_ENABLED=off everyone sees the five legacy events", async () => {
     process.env.COLLECTIONS_ENABLED = "off";
     try {
-      expect(await events(U.owner)).toHaveLength(5);
+      expect(await events(U.owner)).toHaveLength(6);
       expect(await events(U.A)).toHaveLength(5);
     } finally {
       process.env.COLLECTIONS_ENABLED = "on";
@@ -309,9 +370,9 @@ describe("preferences GET visibility (D13-8)", () => {
     process.env.COLLECTIONS_ENABLED = "pilot";
     try {
       process.env.COLLECTIONS_PILOT_TENANT_IDS = randomUUID();
-      expect(await events(U.owner)).toHaveLength(5);
+      expect(await events(U.owner)).toHaveLength(6);
       process.env.COLLECTIONS_PILOT_TENANT_IDS = ` ${tenantId.toUpperCase()} `;
-      expect(await events(U.owner)).toHaveLength(10);
+      expect(await events(U.owner)).toHaveLength(11);
     } finally {
       process.env.COLLECTIONS_ENABLED = "on";
       if (prevList === undefined) delete process.env.COLLECTIONS_PILOT_TENANT_IDS;

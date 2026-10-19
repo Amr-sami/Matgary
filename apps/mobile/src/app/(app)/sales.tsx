@@ -55,9 +55,11 @@ import { clearMark, mark, measure } from "@/observability/perf";
 import { useOffline, useOutbox } from "@/offline";
 import { applyLocalDelta } from "@/offline/local-delta-cache";
 import { enqueueSale, ensureSaleHandler, isQueueableFailure, type SaleOutboxItem } from "@/offline/sales";
+import { alertOriginHeader } from "@/offline/alert-origin";
 import type { ReceiptSale } from "@/receipt/html";
 import { toReceiptSale } from "@/receipt/share";
 import { selectItemCount, selectTotals, useCart } from "@/stores/cart";
+import { usePush } from "@/stores/push";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
@@ -363,7 +365,14 @@ export default function SalesScreen() {
       if (!useOffline.getState().online) return queued("offline");
 
       try {
-        const result = await salesApi.sendCartSale(api, body, cart.invoiceId);
+        // X-Alert-Origin (doc 16 §2): this phone rang the sale, so the server
+        // keeps its cha-ching off this device; everyone else's rings.
+        const result = await salesApi.sendCartSale(
+          api,
+          body,
+          cart.invoiceId,
+          alertOriginHeader(usePush.getState().token),
+        );
         return { result, receipt: toReceiptSale(snapshot, result, receiptExtra), rowId: null, queuedReason: null, rungAt };
       } catch (e) {
         // Never reached the server / server failed: the outbox owns it from

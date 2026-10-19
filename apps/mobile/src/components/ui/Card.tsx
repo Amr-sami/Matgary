@@ -13,13 +13,16 @@ export function Card({
   title,
   children,
   style,
+  testID,
 }: {
   title?: string;
   children: ReactNode;
   style?: ViewStyle;
+  /** Maestro / e2e handle. */
+  testID?: string;
 }) {
   return (
-    <View style={[styles.card, style]}>
+    <View style={[styles.card, style]} testID={testID}>
       {title ? <Text style={styles.title}>{title}</Text> : null}
       {children}
     </View>

@@ -14,6 +14,11 @@ import type { Permission } from "@/lib/permissions";
 
 export const NOTIFICATION_EVENT_TYPES = [
   "sale.created",
+  // Sale alerts (mobile-dev-docs/16-sale-alerts.md): the "cha-ching" push on
+  // every shop device. Not fanned out by `fanoutEvent` (no recipient roles);
+  // `lib/notifications/sale-alerts.ts` delivers it. Only its `push` column
+  // is meaningful.
+  "sale.alert",
   "purchase.received",
   "inventory.low_stock",
   "payment.deferred_settled",
@@ -42,6 +47,9 @@ export interface EventPreference {
  *  settings page, but the code default keeps their inbox quiet. */
 export const EVENT_RECIPIENT_ROLES: Record<NotificationEventType, TenantMemberRole[]> = {
   "sale.created": ["owner"],
+  // Empty: fanoutEvent returns early. alertSale (sale-alerts.ts) picks its
+  // own recipients — owner + same-branch staff holding view_sales.
+  "sale.alert": [],
   "purchase.received": ["owner"],
   "inventory.low_stock": ["owner"],
   "payment.deferred_settled": ["owner"],
@@ -74,6 +82,9 @@ export const DEFAULT_EVENT_PREFERENCE: Record<
     // Sales are the highest-volume event. In-app real-time, email as a
     // once-a-day digest so a busy store doesn't flood the owner's inbox.
     "sale.created": { inApp: true, email: true, digestMode: "digest" },
+    // Push-only (the switch is notification_preferences.push, default ON —
+    // DEFAULT_PUSH in lib/repo/notifications.ts). Never a bell row or email.
+    "sale.alert": { inApp: false, email: false, digestMode: "instant" },
     // Purchases are low-volume + operationally important — instant email.
     "purchase.received": { inApp: true, email: true, digestMode: "instant" },
     "inventory.low_stock": { inApp: true, email: true, digestMode: "instant" },
@@ -96,6 +107,7 @@ export const DEFAULT_EVENT_PREFERENCE: Record<
     // Staff get in-app pings so they can see activity in their branch UI,
     // but no email by default — email is opt-in per user.
     "sale.created": { inApp: false, email: false, digestMode: "digest" },
+    "sale.alert": { inApp: false, email: false, digestMode: "instant" },
     "purchase.received": { inApp: true, email: false, digestMode: "instant" },
     "inventory.low_stock": { inApp: true, email: false, digestMode: "instant" },
     "payment.deferred_settled": {
@@ -120,6 +132,7 @@ export const DEFAULT_EVENT_PREFERENCE: Record<
  *  event cannot be forgotten: the Record is exhaustive. */
 export const EVENT_LABELS: Record<NotificationEventType, { ar: string; en: string }> = {
   "sale.created": { ar: "المبيعات", en: "Sales" },
+  "sale.alert": { ar: "تنبيهات البيع", en: "Sale alerts" },
   "purchase.received": { ar: "التوريدات المستلمة", en: "Purchases received" },
   "inventory.low_stock": { ar: "تنبيهات مخزون منخفض", en: "Low stock alerts" },
   "payment.deferred_settled": { ar: "مدفوعات آجل مسدّدة", en: "Deferred settlements" },
@@ -156,6 +169,9 @@ export function visibleEventTypes(
   collectionsAdmitted: boolean,
 ): NotificationEventType[] {
   return NOTIFICATION_EVENT_TYPES.filter((e) => {
+    // Sale alerts carry amounts: owner, or staff who can see sales (doc 16
+    // OPEN-2). Not in EVENT_RECIPIENT_PERMISSION — that path is collections-gated.
+    if (e === "sale.alert") return role === "owner" || permissions.includes("view_sales");
     const perm = EVENT_RECIPIENT_PERMISSION[e];
     if (!perm) return true;
     return collectionsAdmitted && (role === "owner" || permissions.includes(perm));

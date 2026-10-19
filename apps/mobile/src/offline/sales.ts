@@ -18,10 +18,12 @@ import { calcLineDiscount, computeCartTotals, type DiscountType } from "@matgary
 import { api } from "@/api/client";
 import { cartPaymentFromOptions, paymentSummaryOf } from "@/collections/checkout";
 import { classifyOutcome, discard, enqueue, hasHandler, registerHandler, retry, type DrainResult, type OutboxItem } from "@/offline";
+import { outboxReplayHeaders } from "@/offline/alert-origin";
 import { isSimulatedOffline } from "@/offline/dev-offline";
 import { mintInvoiceId } from "@/offline/invoice-id";
 import { get as getRow, readMeta, replacePayload, writeMeta } from "@/offline/outbox";
 import { useCart, type CartLine } from "@/stores/cart";
+import { usePush } from "@/stores/push";
 import { useSession } from "@/stores/session";
 
 export const SALE_KIND = "sale";
@@ -82,12 +84,13 @@ export function ensureSaleHandler(): void {
     if (__DEV__ && isSimulatedOffline()) {
       return Promise.reject(new ApiError({ kind: "offline", message: "simulated offline (dev switch)" }));
     }
-    return salesApi.sendCartSale(
-      api,
-      wireBody(payload),
-      idempotencyKey,
-      row.branchId ? { "X-Outbox-Branch": row.branchId } : {},
-    );
+    // Doc 16 §1-2: X-Outbox-Replay tells the server this is a sync (an old
+    // saleDate gets the "recorded offline at …" suffix instead of being
+    // treated as back-dated), and X-Alert-Origin keeps this phone silent.
+    return salesApi.sendCartSale(api, wireBody(payload), idempotencyKey, {
+      ...outboxReplayHeaders(usePush.getState().token),
+      ...(row.branchId ? { "X-Outbox-Branch": row.branchId } : {}),
+    });
   });
 }
 

@@ -6,6 +6,7 @@ import type {
 } from "@/lib/types";
 import type { CartOptions } from "@matgary/api-client/endpoints/sales";
 import { enqueue } from "./outbox";
+import { alertOriginHeaders } from "@/lib/sale-alerts/origin";
 import { decrementSnapshotStock } from "./snapshot";
 
 // Offline-aware variant of `lib/api/sales.ts:recordCartSale`. The cashier
@@ -124,6 +125,8 @@ export async function recordCartSaleOfflineAware(
           "Content-Type": "application/json",
           "Idempotency-Key": idempotencyKey,
           "X-Outbox-Branch": ctx.branchId,
+          // Doc 16 §2: this tab rang the sale — it must not chime for it.
+          ...alertOriginHeaders(),
         },
         body: JSON.stringify(payload),
       });

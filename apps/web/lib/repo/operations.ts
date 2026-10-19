@@ -21,6 +21,7 @@ import type {
 import { calcLineDiscount, calcOrderDiscount } from "@/lib/repo/sale-discounts";
 import { bustInsightsCache } from "@/lib/repo/insights";
 import { fanoutEvent } from "@/lib/notifications/dispatch";
+import { alertSale } from "@/lib/notifications/sale-alerts";
 import { DomainError } from "@/lib/errors";
 import { withSpan } from "@/lib/observability/tracing";
 import {
@@ -429,6 +430,11 @@ export interface RecordSaleInput {
   collectionAccountId?: string;
   payerPhoneLast4?: string;
   payerReference?: string;
+  /** Sale alerts (doc 16 §2): the recording device's parsed X-Alert-Origin
+   *  — it is the one device that does not ring. */
+  alertOrigin?: string | null;
+  /** `X-Outbox-Replay: 1` — an offline sale syncing now (doc 16 §1.2). */
+  outboxReplay?: boolean;
 }
 
 export interface RecordSaleResult {
@@ -572,6 +578,21 @@ export async function recordSale(
     link: "/sales",
     actorUserId: input.recordedByUserId ?? null,
   });
+  // Sale alerts (doc 16): the cha-ching on every other shop device.
+  void alertSale({
+    tenantId,
+    branchId: input.branchId,
+    branchName,
+    saleId: result.saleId,
+    invoiceId: result.invoiceId,
+    total: result.totalPrice,
+    itemCount: input.quantitySold,
+    paymentMethod: input.paymentMethod || "cash",
+    sellerUserId: input.recordedByUserId ?? null,
+    saleDate: input.customDate ?? new Date(),
+    origin: input.alertOrigin ?? null,
+    outboxReplay: input.outboxReplay === true,
+  });
   if (
     result.priorQty > result.lowStockThreshold &&
     result.nextBranchQty <= result.lowStockThreshold
@@ -701,6 +722,11 @@ export interface CartSaleOptions {
   payerReference?: string;
   /** Split transfers (Q5): 1..4 parts; Σ below the total = cash remainder. */
   collectionParts?: CollectionPartInput[];
+  /** Sale alerts (doc 16 §2): the recording device's parsed X-Alert-Origin
+   *  — it is the one device that does not ring. */
+  alertOrigin?: string | null;
+  /** `X-Outbox-Replay: 1` — an offline sale syncing now (doc 16 §1.2). */
+  outboxReplay?: boolean;
 }
 
 export interface CartSaleLineSummary {
@@ -1249,6 +1275,24 @@ async function recordCartSaleImpl(
     link: "/sales",
     actorUserId: options.recordedByUserId ?? null,
   });
+  // Sale alerts (doc 16): the cha-ching on every other shop device. Transfer
+  // (instapay / wallet) sales book now and ring now; the body names the method.
+  if (result.saleIds[0]) {
+    void alertSale({
+      tenantId,
+      branchId: options.branchId,
+      branchName,
+      saleId: result.saleIds[0],
+      invoiceId: result.invoiceId,
+      total: result.total,
+      itemCount: result.lines.reduce((n, l) => n + l.quantity, 0),
+      paymentMethod: result.paymentMethod,
+      sellerUserId: options.recordedByUserId ?? null,
+      saleDate,
+      origin: options.alertOrigin ?? null,
+      outboxReplay: options.outboxReplay === true,
+    });
+  }
   for (const cross of result.lowStockCrossings) {
     void fanoutEvent(tenantId, options.branchId, "inventory.low_stock", {
       productName: cross.productName,

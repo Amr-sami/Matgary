@@ -142,6 +142,8 @@ export interface CollectionLimitPayload extends BaseEventPayload {
 
 export type EventPayloadMap = {
   "sale.created": SaleCreatedPayload;
+  // Never fanned out (EVENT_RECIPIENT_ROLES is empty); alertSale delivers it.
+  "sale.alert": never;
   "purchase.received": PurchaseReceivedPayload;
   "inventory.low_stock": LowStockPayload;
   "payment.deferred_settled": DeferredSettledPayload;
@@ -159,6 +161,7 @@ export type EventPayloadMap = {
 // so muting one also mutes its push (lib/push/notify.ts KIND_TO_EVENT).
 export const EVENT_TO_KIND: Record<NotificationEventType, NotificationKind> = {
   "sale.created": "info",
+  "sale.alert": "info", // unused — sale alerts write no notifications row
   "purchase.received": "info",
   "inventory.low_stock": "low_stock",
   "payment.deferred_settled": "info",
@@ -311,7 +314,11 @@ async function doFanout<E extends NotificationEventType>(
           // row the role default applies (DEFAULT_PUSH — the same value the
           // preferences GET reports; `collection.limit_warning` is instant
           // but push-off by default, 13 §4.4).
+          // `sale.created` never pushes: the phone chime is `sale.alert`
+          // (doc 16 §5) — a staff member who hand-enabled it would otherwise
+          // buzz twice per sale.
           push:
+            eventType !== "sale.created" &&
             pref.digestMode !== "digest" &&
             (storedByUser.get(r.userId)?.push ??
               (DEFAULT_PUSH[role] ?? DEFAULT_PUSH.staff)[eventType]),
@@ -379,7 +386,7 @@ function resolveMemberPref(
 // verbose. Both are per-recipient by locale so a mixed ar/en team sees
 // their own language.
 
-function fmtEgp(n: number): string {
+export function fmtEgp(n: number): string {
   const rounded = Math.round(n);
   return rounded.toLocaleString("en-US");
 }
@@ -416,7 +423,7 @@ export function durEn(min: number): string {
   return h === 1 ? "1 hour" : `${h} hours`;
 }
 
-function joinParts(parts: Array<string | null | undefined | false>): string {
+export function joinParts(parts: Array<string | null | undefined | false>): string {
   return parts.filter((p): p is string => typeof p === "string" && p.trim() !== "").join(" · ");
 }
 

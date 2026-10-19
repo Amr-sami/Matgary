@@ -3138,6 +3138,10 @@
         "collection.limit_warning": {
           "title": "Wallet near its limit",
           "hint": "Fires when a wallet reaches 80% of its day or month limit, or 90% of its balance cap."
+        },
+        "sale.alert": {
+          "title": "Sale sound alerts",
+          "hint": "Every device in the shop plays the till sound when a sale is recorded on another device."
         }
       },
       "delivery": {
@@ -4254,6 +4258,17 @@
       "unavailable": "Collections are not available for your shop yet.",
       "noPermission": "Collections settings are only available to people who may manage receiving accounts.",
       "webNote": "The same settings are on the TheStoro website."
+    },
+    "saleAlerts": {
+      "switch": "Sale alerts on my devices",
+      "preview": "Play the sound",
+      "previewTitle": "New sale · EGP 2,700",
+      "previewBody": "Sound check — this is how every sale will sound",
+      "view": "View",
+      "enableSound": "Turn on sound",
+      "soundBlocked": "Your browser muted the sale sound — tap Turn on sound",
+      "webHint": "The sound also plays in any open dashboard tab.",
+      "previewFailed": "Could not play the sound — check that notifications are allowed"
     }
   },
   "common": {
@@ -5976,7 +5991,9 @@
       "perEventDigestHint": "Daily-digest events never push — set delivery to Instant",
       "prefsLoadFailed": "Couldn't load notification settings",
       "prefsEmpty": "No events to configure",
-      "channelCollections": "Collections"
+      "channelCollections": "Collections",
+      "channelSales": "Sale alerts",
+      "sendTestSale": "Send a test sale alert"
     },
     "offline": {
       "chipOffline": "Offline",

@@ -48,12 +48,23 @@ const COLLECTION_EVENTS = [
   "collection.limit_warning",
 ] as const satisfies readonly NotificationEventType[];
 
-const LEGACY_EVENTS = NOTIFICATION_EVENT_TYPES.filter((e) => !e.startsWith("collection."));
+// The five pre-collections events. `sale.alert` (doc 16) is neither: it is
+// push-only, has no fanout recipients and is gated by view_sales.
+const LEGACY_EVENTS = NOTIFICATION_EVENT_TYPES.filter(
+  (e) => !e.startsWith("collection.") && e !== "sale.alert",
+);
+/** LEGACY_EVENTS with `sale.alert` in its registry slot (right after sale.created). */
+const withSaleAlert = (evs: readonly NotificationEventType[]): NotificationEventType[] => [
+  evs[0]!,
+  "sale.alert",
+  ...evs.slice(1),
+];
 
 describe("registry walk", () => {
   it("lists the five collection events after the five legacy ones, in 13 §4.2 order", () => {
     expect(NOTIFICATION_EVENT_TYPES).toEqual([
       "sale.created",
+      "sale.alert",
       "purchase.received",
       "inventory.low_stock",
       "payment.deferred_settled",
@@ -159,10 +170,16 @@ describe("collection defaults (03 §B.6 + D13-2)", () => {
 });
 
 describe("visibleEventTypes (D13-8)", () => {
-  it("owner, tenant not admitted → the five legacy events", () => {
-    expect(visibleEventTypes("owner", [], false)).toEqual(LEGACY_EVENTS);
+  it("owner, tenant not admitted → the five legacy events + sale alerts", () => {
+    expect(visibleEventTypes("owner", [], false)).toEqual(withSaleAlert(LEGACY_EVENTS));
   });
-  it("owner, admitted → all ten", () => {
+  it("sale.alert is listed to the owner and to staff holding view_sales only (doc 16 §7)", () => {
+    expect(visibleEventTypes("staff", ["record_sales"], false)).toEqual(LEGACY_EVENTS);
+    expect(visibleEventTypes("staff", ["record_sales", "view_sales"], false)).toEqual(withSaleAlert(LEGACY_EVENTS));
+    expect(visibleEventTypes("staff", ["view_sales", "view_collections"], true)).toContain("sale.alert");
+    expect(EVENT_RECIPIENT_PERMISSION["sale.alert"]).toBeUndefined();
+  });
+  it("owner, admitted → all eleven", () => {
     expect(visibleEventTypes("owner", [], true)).toEqual([...NOTIFICATION_EVENT_TYPES]);
   });
   it("staff with view_collections → 8", () => {

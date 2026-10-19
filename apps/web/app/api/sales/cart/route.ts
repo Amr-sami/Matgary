@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireTenantWithBranch, requirePermissionWithBranch } from "@/lib/api/auth-helpers";
 import { findCartSaleByIdempotencyKey, recordCartSale } from "@/lib/repo/operations";
+import { parseAlertOrigin } from "@/lib/notifications/sale-alerts";
 import { logActivity } from "@/lib/repo/activity";
 import { normalizeEgyptPhone } from "@/lib/validators/egypt";
 import { isDomainError, domainErrorBody } from "@/lib/errors";
@@ -158,6 +159,11 @@ export async function POST(req: NextRequest) {
       // M3: lands on the anchor sales row under a partial unique index, so
       // the replay guard survives a Redis flush / TTL expiry.
       idempotencyKey: idemp ?? undefined,
+      // Sale alerts (doc 16 §2): the recording device stays silent; an
+      // offline sale syncing late says so. An idempotent replay never gets
+      // here, so it can never ring twice.
+      alertOrigin: parseAlertOrigin(req.headers.get("X-Alert-Origin")),
+      outboxReplay: req.headers.get("X-Outbox-Replay") === "1",
     });
     const totalQty = result.lines.reduce((s, l) => s + l.quantity, 0);
     logActivity({

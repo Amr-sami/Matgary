@@ -8,6 +8,7 @@ import { requirePermissionWithBranch } from "@/lib/api/auth-helpers";
 import { resolveBranchFilter } from "@/lib/api/branch-context";
 import { resolveSinceWindow } from "@/lib/api/list-window";
 import { listSales, listSalesPage, recordSale } from "@/lib/repo/operations";
+import { parseAlertOrigin } from "@/lib/notifications/sale-alerts";
 import { logActivity } from "@/lib/repo/activity";
 import { normalizeEgyptPhone } from "@/lib/validators/egypt";
 import { isDomainError, domainErrorBody } from "@/lib/errors";
@@ -104,6 +105,9 @@ export async function POST(req: NextRequest) {
       customDate: parsed.data.customDate ? new Date(parsed.data.customDate) : undefined,
       recordedByUserId: r.ctx.userId,
       branchId: r.ctx.branchId,
+      // Sale alerts (doc 16 §2): the recording device stays silent.
+      alertOrigin: parseAlertOrigin(req.headers.get("X-Alert-Origin")),
+      outboxReplay: req.headers.get("X-Outbox-Replay") === "1",
     });
     logActivity({
       tenantId: r.ctx.tenantId,

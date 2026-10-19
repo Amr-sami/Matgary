@@ -5,6 +5,7 @@ import {
   type OutboxRow,
   type OutboxStatus,
 } from "./db";
+import { outboxReplayHeaders } from "@/lib/sale-alerts/origin";
 
 // Outbox client — the only sanctioned path for queueing and draining
 // offline mutations. Components never touch Dexie directly; they call
@@ -135,6 +136,10 @@ export async function drainOutbox(
           // shift, so we also tag the request with the branch the sale
           // was actually rung up at and the route refuses on mismatch.
           "X-Outbox-Branch": row.branchId,
+          // Doc 16 §1-2: a sync, not a live sale — an old saleDate gets the
+          // "recorded offline at …" suffix instead of being dropped as
+          // back-dated; and this tab stays silent for its own sale.
+          ...outboxReplayHeaders(),
         },
         body: JSON.stringify(row.payload),
       });

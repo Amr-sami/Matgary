@@ -1,0 +1,83 @@
+# Sale sound alerts settings (mobile-dev-docs/16-sale-alerts.md §7, §12).
+# More → Settings → Notifications → the "Sale sound alerts" card is first;
+# toggle its switch off and back on (each PUT re-reads the preferences), then
+# tap "Play the sound", which posts a LOCAL notification on the `sales`
+# channel (cha_ching) — no FCM/APNs needed, so it works on the emulator.
+#
+# WRITTEN, NOT RUN under the laptop rules (no simulators/emulators/Maestro).
+# Needs a dev client rebuilt with the expo-notifications `sounds` option, or
+# the Android channel is created with the default sound (doc 16 R2).
+# Signs in as the owner (sale.alert is listed to the owner and to staff with
+# view_sales). Ends on the notification settings screen.
+appId: com.thestoro.app
+---
+- launchApp
+- runFlow: helpers/dev-launcher.yaml
+- extendedWaitUntil:
+    visible:
+      text: "المزيد|More|تسجيل الدخول|Sign in"
+    timeout: 45000
+- runFlow:
+    when:
+      visible:
+        id: "login-identifier"
+    file: login.yaml
+- runFlow: helpers/dismiss-logbox.yaml
+
+- tapOn:
+    text: "المزيد|More"
+- scrollUntilVisible:
+    element:
+      text: "الإعدادات|Settings"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    text: "الإعدادات|Settings"
+- scrollUntilVisible:
+    element:
+      id: "settings-tile-notifications"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: "settings-tile-notifications"
+
+# The card renders first, above the per-event cards.
+- extendedWaitUntil:
+    visible:
+      id: "sale-alerts-card"
+    timeout: 30000
+- assertVisible:
+    text: "صوت البيع|Sale sound alerts"
+- assertVisible:
+    id: "sale-alerts-switch"
+
+# Off, then on again. The switch locks while the PUT + re-read is in flight.
+- tapOn:
+    id: "sale-alerts-switch-switch"
+- extendedWaitUntil:
+    visible:
+      text: "تم الحفظ|Saved"
+    timeout: 20000
+- tapOn:
+    id: "sale-alerts-switch-switch"
+- extendedWaitUntil:
+    visible:
+      text: "تم الحفظ|Saved"
+    timeout: 20000
+
+# Play the sound → a local "New sale · EGP 2,700" notification (heads-up).
+- tapOn:
+    id: "sale-alerts-preview"
+- runFlow:
+    when:
+      visible:
+        text: "Allow|السماح|سماح"
+    commands:
+      - tapOn:
+          text: "Allow|السماح|سماح"
+- extendedWaitUntil:
+    visible:
+      text: "بيع جديد · 2,700 ج.م|New sale · EGP 2,700"
+    timeout: 15000

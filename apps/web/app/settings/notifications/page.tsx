@@ -7,6 +7,10 @@ import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 type EventType =
   | "sale.created"
+  // Sale alerts (doc 16 §7): the cha-ching on every shop device. Rendered as
+  // its own card above the matrix; only `push` matters (the server forces
+  // inApp/email off and delivery instant).
+  | "sale.alert"
   | "purchase.received"
   | "inventory.low_stock"
   | "payment.deferred_settled"
@@ -22,6 +26,9 @@ type EventType =
 interface Pref {
   eventType: EventType;
   inApp: boolean;
+  /** Phone push + (for sale.alert) the dashboard chime. Omitted on PATCH for
+   *  the matrix rows, so the server keeps the stored value. */
+  push?: boolean;
   email: boolean;
   digestMode: "instant" | "digest";
   isDefault: boolean;
@@ -80,6 +87,9 @@ export default function NotificationSettingsPage() {
         body: JSON.stringify({
           eventType: patch.eventType,
           inApp: patch.inApp,
+          // Only the sale-alert card sends `push`; the matrix has no push
+          // column, and omitting it preserves the stored value server-side.
+          ...(patch.eventType === "sale.alert" ? { push: patch.push ?? true } : {}),
           email: patch.email,
           digestMode: patch.digestMode,
         }),
@@ -111,6 +121,8 @@ export default function NotificationSettingsPage() {
     EventType,
     { title: string; hint: string }
   >;
+  const saleAlert = data.preferences.find((p) => p.eventType === "sale.alert") ?? null;
+  const matrixRows = data.preferences.filter((p) => p.eventType !== "sale.alert");
 
   return (
     <AppShell title={t.title}>
@@ -123,6 +135,47 @@ export default function NotificationSettingsPage() {
           </p>
         </header>
 
+        {saleAlert && (
+          <section
+            data-testid="sale-alerts-card"
+            className="rounded-2xl border border-border bg-white px-4 py-4"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-sm font-medium flex items-center gap-2">
+                  {events["sale.alert"]?.title ?? "sale.alert"}
+                  {saleAlert.isDefault && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-bg-main text-text-secondary">
+                      {t.defaultBadge}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-text-secondary mt-0.5">
+                  {events["sale.alert"]?.hint}
+                </p>
+                <p className="text-xs text-text-secondary mt-2">
+                  {dict.app.saleAlerts.webHint}
+                </p>
+              </div>
+              <ToggleSwitch
+                testId="sale-alerts-switch"
+                label={dict.app.saleAlerts.switch}
+                value={saleAlert.push ?? true}
+                disabled={savingKey === "sale.alert"}
+                onChange={(v) =>
+                  save({
+                    ...saleAlert,
+                    inApp: false,
+                    push: v,
+                    email: false,
+                    digestMode: "instant",
+                  })
+                }
+              />
+            </div>
+          </section>
+        )}
+
         <section className="rounded-2xl border border-border bg-white overflow-hidden">
           <div className="grid grid-cols-[1fr_auto_auto_auto] gap-3 items-center px-4 py-2 border-b border-border bg-bg-main/40 text-xs font-semibold text-text-secondary">
             <div>{t.headers.event}</div>
@@ -130,7 +183,7 @@ export default function NotificationSettingsPage() {
             <div className="text-center min-w-14">{t.headers.email}</div>
             <div className="text-center min-w-24">{t.headers.delivery}</div>
           </div>
-          {data.preferences.map((p) => {
+          {matrixRows.map((p) => {
             const meta = events[p.eventType];
             return (
               <div
@@ -201,15 +254,21 @@ function ToggleSwitch({
   value,
   onChange,
   disabled,
+  testId,
+  label,
 }: {
   value: boolean;
   onChange: (v: boolean) => void;
   disabled?: boolean;
+  testId?: string;
+  label?: string;
 }) {
   return (
     <button
       type="button"
       role="switch"
+      data-testid={testId}
+      aria-label={label}
       aria-checked={value}
       disabled={disabled}
       onClick={() => onChange(!value)}

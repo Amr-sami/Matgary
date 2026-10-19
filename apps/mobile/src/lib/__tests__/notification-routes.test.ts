@@ -140,3 +140,15 @@ test("the kind tables cover the five collection kinds", () => {
   );
   assert.deepEqual(KIND_ROUTE_OVERRIDE, { collection_source_silent: "/settings/collections/devices" });
 });
+
+test("sale alerts (doc 16 §5): /sales/<lineId> opens the sale, /sales/history stays, a cashier may open both", () => {
+  const line = "0f8fad5b-d9cb-469f-a165-70867728950e";
+  assert.equal(toAppRoute(`/sales/${line}`), `/sales/${line}`);
+  assert.equal(toAppRoute("/sales/history"), "/sales/history");
+  assert.equal(toAppRoute("/sales/history?x=1"), "/sales/history");
+  assert.equal(toAppRoute("/sales"), "/sales");
+  assert.equal(canOpenRoute(`/sales/${line}`, CASHIER), true);
+  assert.equal(canOpenRoute("/sales/history", CASHIER), true);
+  assert.equal(canOpenRoute("/sales/x", OWNER), true);
+  assert.equal(canOpenRoute("/sales/x", null), false);
+});

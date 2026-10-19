@@ -4,7 +4,11 @@ import {
   listNotificationsForUser,
   unreadNotificationCount,
 } from "@/lib/repo/notifications";
-import { subscribeUserNotificationEvents } from "@/lib/notifications/events";
+import {
+  formatSaleAlertSse,
+  parseSaleAlertMessage,
+  subscribeUserNotificationEvents,
+} from "@/lib/notifications/events";
 
 // Server-Sent Events endpoint that pushes notification updates to a single
 // signed-in user. Replaces the per-tab 60 s polling that the bell used to do.
@@ -90,7 +94,14 @@ export async function GET(req: NextRequest) {
 
       // Pub/sub subscription. Falls back to polling when Redis isn't
       // configured or the subscribe call fails.
-      const sub = await subscribeUserNotificationEvents(userId, () => {
+      // A sale alert (doc 16 §6) is forwarded as its own `sale_alert` event,
+      // bypassing the snapshot dedupe; every other message is a bell marker.
+      const sub = await subscribeUserNotificationEvents(userId, (message) => {
+        const alert = parseSaleAlertMessage(message);
+        if (alert) {
+          if (!closed) controller.enqueue(encoder.encode(formatSaleAlertSse(alert)));
+          return;
+        }
         void refresh();
       });
 

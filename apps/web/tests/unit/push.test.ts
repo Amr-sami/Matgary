@@ -117,6 +117,31 @@ describe("expo-push transport", () => {
     });
     // No empty body key — Expo renders "undefined" otherwise.
     expect("body" in toExpoRequest({ to: tok(1), title: "x" })).toBe(false);
+    // No ttl key unless a producer sets one (Expo's own default applies).
+    expect("ttl" in toExpoRequest({ to: tok(1), title: "x" })).toBe(false);
+  });
+
+  it("passes a custom sound, the sales channel and a ttl through (doc 16 §8.5)", () => {
+    expect(
+      toExpoRequest({
+        to: tok(1),
+        title: "New sale · EGP 2,700",
+        body: "INV-1 · 3 items",
+        data: { type: "sale_alert", route: "/sales/abc", id: "abc" },
+        channelId: "sales",
+        sound: "cha_ching.wav",
+        ttl: 900,
+      }),
+    ).toEqual({
+      to: tok(1),
+      title: "New sale · EGP 2,700",
+      body: "INV-1 · 3 items",
+      data: { type: "sale_alert", route: "/sales/abc", id: "abc" },
+      sound: "cha_ching.wav",
+      channelId: "sales",
+      priority: "high",
+      ttl: 900,
+    });
   });
 
   it("chunks 250 messages into 100/100/50 POSTs to the Expo endpoint, in order", async () => {
@@ -306,6 +331,24 @@ async function queuedReceipts(tid = tenantId) {
 }
 
 describe("notifyUserDevices", () => {
+  it("an explicit channelId and sound win over the kind's channel (doc 16 §8.6)", async () => {
+    await registerToken(tok(90));
+    const expo = fakeExpo();
+    await notifyUserDevices(
+      tenantId,
+      userId,
+      {
+        title: "New sale · EGP 2,700",
+        body: "Test sale alert",
+        data: { type: "sale_alert_test", route: "/sales/history", id: null },
+        channelId: "sales",
+        sound: "cha_ching.wav",
+      },
+      { fetch: expo.fetch },
+    );
+    expect(expo.calls[0]!.body[0]).toMatchObject({ to: tok(90), channelId: "sales", sound: "cha_ching.wav" });
+  });
+
   it("pushes to every active token and disables the ones Expo says are dead", async () => {
     await registerToken(tok(10));
     await registerToken(tok(11), "android");

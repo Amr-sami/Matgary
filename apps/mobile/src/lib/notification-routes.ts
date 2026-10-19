@@ -73,8 +73,13 @@ const KNOWN_TOP = new Set([
   "whatsapp",
 ]);
 
-/** Routes that have a dynamic child screen on mobile (inventory/[id] …). */
-const HAS_DETAIL = new Set(["inventory", "customers", "suppliers", "team", "collections"]);
+/**
+ * Routes that have a dynamic child screen on mobile (inventory/[id] …).
+ * `sales` (doc 16 §5): a sale alert's `data.route` is `/sales/<lineId>` (the
+ * sale detail screen) or `/sales/history` (the burst summary / test push);
+ * both are real screens under app/(app)/sales/.
+ */
+const HAS_DETAIL = new Set(["inventory", "customers", "suppliers", "team", "collections", "sales"]);
 
 const SETTINGS_CHILDREN = new Set([
   "about",

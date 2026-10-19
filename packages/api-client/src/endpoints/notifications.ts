@@ -159,10 +159,18 @@ export interface TestPushResult {
   tickets: PushTicket[];
 }
 
-/** Ask the server to push a test notification to this user's registered devices. */
-export async function sendTestPush(c: ApiClient): Promise<TestPushResult> {
+/**
+ * Ask the server to push a test notification to this user's registered devices.
+ * `kind: "sale"` sends a sample sale alert instead (channel `sales`, sound
+ * `cha_ching.wav` — mobile-dev-docs/16-sale-alerts.md §8.11).
+ */
+export async function sendTestPush(
+  c: ApiClient,
+  opts?: { kind?: "sale" },
+): Promise<TestPushResult> {
   return c.request<TestPushResult>("/api/v1/devices/push-token/test", {
     method: "POST",
+    body: opts?.kind ? { kind: opts.kind } : {},
     noBranch: true,
   });
 }
@@ -174,6 +182,9 @@ export async function sendTestPush(c: ApiClient): Promise<TestPushResult> {
 
 export type NotificationEventType =
   | "sale.created"
+  // Sale alerts (doc 16): the "cha-ching" push on every shop device. Only
+  // `push` matters — the server forces inApp/email off and digestMode instant.
+  | "sale.alert"
   | "purchase.received"
   | "inventory.low_stock"
   | "payment.deferred_settled"

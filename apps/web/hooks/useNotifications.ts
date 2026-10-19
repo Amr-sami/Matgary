@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDeferred } from "./useDeferred";
+import { emitSaleAlert, parseSaleAlert } from "@/lib/sale-alerts/bus";
 
 export type NotificationKind =
   | "low_stock"
@@ -136,6 +137,12 @@ export function useNotifications() {
           setLoading(false);
         }
       };
+      // Sale alerts (doc 16 §6): a named `sale_alert` event, not a bell
+      // snapshot — hand it to <SaleAlertToaster/> via the bus.
+      source.addEventListener("sale_alert", (ev) => {
+        const alert = parseSaleAlert((ev as MessageEvent<string>).data);
+        if (alert) emitSaleAlert(alert);
+      });
       source.onerror = () => {
         // EventSource auto-reconnects, but if it keeps failing we give up
         // and fall back to polling so the bell still updates.

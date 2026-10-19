@@ -41,8 +41,14 @@ export interface PushData {
 
 /** Android notification channels the app creates at push registration
  *  (apps/mobile/src/effects/PushRegistrar.tsx). A push naming a channel the
- *  device never created may not display (13 §4.7 R3), so only these two. */
-export type PushChannelId = "default" | "collections";
+ *  device never created falls back to Expo's fallback channel (13 §4.7 R3),
+ *  so only these three. `sales` carries the cha-ching (doc 16 §4). */
+export type PushChannelId = "default" | "collections" | "sales";
+
+/** Notification sound. A custom file must ship in the app binary (the
+ *  `expo-notifications` plugin `sounds` option); on Android the channel's
+ *  sound wins, on iOS this name is `aps.sound`. */
+export type PushSound = "default" | "cha_ching.wav";
 
 export interface PushMessage {
   to: string;
@@ -52,6 +58,12 @@ export interface PushMessage {
   /** Android channel; omitted → "default". `collection_*` kinds use
    *  "collections" (lib/push/notify.ts `channelForKind`). */
   channelId?: PushChannelId;
+  /** Omitted → "default". Sale alerts use "cha_ching.wav". */
+  sound?: PushSound;
+  /** Seconds Expo/APNs/FCM keep an undelivered push; omitted → Expo's default
+   *  (about a month). Sale alerts use 900 so an offline phone does not chime
+   *  a backlog (doc 16 OPEN-10). */
+  ttl?: number;
 }
 
 /** The wire shape actually POSTed. Fields beyond `PushMessage` are fixed
@@ -63,9 +75,10 @@ export interface ExpoPushRequest {
   title: string;
   body?: string;
   data?: PushData;
-  sound: "default";
+  sound: PushSound;
   channelId: PushChannelId;
   priority: "high";
+  ttl?: number;
 }
 
 export type ExpoTicket =
@@ -108,10 +121,11 @@ export function toExpoRequest(m: PushMessage): ExpoPushRequest {
   const req: ExpoPushRequest = {
     to: m.to,
     title: m.title,
-    sound: "default",
+    sound: m.sound ?? "default",
     channelId: m.channelId ?? "default",
     priority: "high",
   };
+  if (m.ttl !== undefined) req.ttl = m.ttl;
   if (m.body) req.body = m.body;
   if (m.data) req.data = m.data;
   return req;

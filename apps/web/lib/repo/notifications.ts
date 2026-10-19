@@ -263,14 +263,18 @@ export async function markReadByKind(
 // ---------------------------------------------------------------------------
 
 /** Per-(role, event) push default — doc 06 §8.3. Owner: every event except
- *  `sale.created` (highest volume; it is on the daily digest). Staff: only
- *  the events they see in-app by default. */
+ *  `sale.created` (highest volume; it is on the daily digest, and it never
+ *  pushes — dispatch.ts). Staff: only the events they see in-app by default.
+ *  `sale.alert` (doc 16) is the one push-only event: ON for everyone who can
+ *  receive it, and its `push` column is the whole switch — alertSale reads it
+ *  directly, with no inApp/digest gate. */
 export const DEFAULT_PUSH: Record<
   TenantMemberRole,
   Record<NotificationEventType, boolean>
 > = {
   owner: {
     "sale.created": false,
+    "sale.alert": true,
     "purchase.received": true,
     "inventory.low_stock": true,
     "payment.deferred_settled": true,
@@ -286,6 +290,7 @@ export const DEFAULT_PUSH: Record<
   },
   staff: {
     "sale.created": false,
+    "sale.alert": true,
     "purchase.received": true,
     "inventory.low_stock": true,
     "payment.deferred_settled": false,
@@ -415,7 +420,14 @@ export async function setNotificationPreference(
   userId: string,
   input: SetEventPreferenceInput,
 ): Promise<{ isDefault: boolean }> {
-  const { eventType, inApp, email, digestMode } = input;
+  const { eventType } = input;
+  // `sale.alert` is push-only (doc 16 §7): whatever a client sends for the
+  // other three channels, store the fixed values so the row matches the
+  // default exactly when push is back ON and gets deleted.
+  const saleAlert = eventType === "sale.alert";
+  const inApp = saleAlert ? false : input.inApp;
+  const email = saleAlert ? false : input.email;
+  const digestMode: DigestMode = saleAlert ? "instant" : input.digestMode;
   return withTenant(tenantId, async (tx) => {
     const { role } = await memberRoleAndPermissions(tx, tenantId, userId);
     const where = and(

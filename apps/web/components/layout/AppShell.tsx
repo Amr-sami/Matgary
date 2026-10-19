@@ -9,6 +9,7 @@ import { DemoBanner } from "./DemoBanner";
 import { CatalogProvider } from "@/components/catalog-context";
 import { SettingsProvider } from "@/components/settings-context";
 import { ImpersonationBanner } from "@/components/broadcasts/ImpersonationBanner";
+import { SaleAlertToaster } from "@/components/notifications/SaleAlertToaster";
 
 interface AppShellProps {
   children: ReactNode;
@@ -86,6 +87,10 @@ export function AppShell({ children, title }: AppShellProps) {
       <div className="lg:hidden fixed bottom-0 inset-x-0 z-50 no-print pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
         <MobileBottomNav />
       </div>
+
+      {/* Sale alerts (doc 16 §6): toast + cha-ching for sales rung on other
+          devices; fed by the notification stream the bell already opens. */}
+      <SaleAlertToaster />
     </div>
     </CatalogProvider>
     </SettingsProvider>

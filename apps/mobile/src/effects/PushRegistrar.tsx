@@ -11,6 +11,12 @@ import { auth, notifications, type MeResponse } from "@matgary/api-client";
 import { api } from "@/api/client";
 import { NOTIFICATION_KEYS, canOpenRoute, toAppRoute } from "@/components/shell/NotificationBell";
 import { t } from "@/i18n";
+import {
+  SALE_ALERT_CHANNEL,
+  SALE_ALERT_SOUND,
+  refreshKeysFor,
+  saleAlertTapRoute,
+} from "@/lib/sale-alerts";
 import { usePush } from "@/stores/push";
 import { useSession } from "@/stores/session";
 
@@ -34,9 +40,22 @@ const KEY_USER = "user"; // … and the user it was registered for
 const ANDROID_CHANNEL = "default";
 /** Must equal the server's channelForKind() value (apps/web/lib/push/notify.ts). */
 const COLLECTIONS_CHANNEL = "collections";
+/**
+ * Sale alerts (doc 16 §4): must equal `SALE_ALERT_CHANNEL`/`SALE_ALERT_SOUND`
+ * in apps/web/lib/notifications/sale-alerts.ts. The `typeof` annotations make
+ * tsc fail if src/lib/sale-alerts.ts drifts; the literals stay here because
+ * the server's contract test reads this file. Android fixes a channel's sound
+ * when the channel is CREATED — to change the sound, ship a new id
+ * ("sales_v2") and deleteNotificationChannelAsync("sales").
+ */
+export const SALES_CHANNEL: typeof SALE_ALERT_CHANNEL = "sales";
+export const SALE_SOUND: typeof SALE_ALERT_SOUND = "cha_ching.wav";
 
 // Foreground presentation: banner + list + sound + badge. Set at module scope
-// so it is in place before the first notification can arrive.
+// so it is in place before the first notification can arrive. Sale alerts
+// (doc 16 §5) need nothing extra: the banner shows over whatever screen is
+// open and the sound is the push's own — cha_ching from the `sales` channel
+// on Android, `aps.sound` on iOS (the recording phone was never sent one).
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowBanner: true,
@@ -178,6 +197,9 @@ async function register(userId: string, opts: { prompt: boolean }): Promise<void
         importance: Notifications.AndroidImportance.HIGH,
         sound: "default",
       });
+      // Sale alerts (doc 16 §4): every sale push carries channelId "sales".
+      // Created unconditionally so it exists before the first sale rings.
+      await ensureSalesChannel();
     }
     let perm = await Notifications.getPermissionsAsync();
     if (!perm.granted && perm.canAskAgain && opts.prompt) {
@@ -194,6 +216,45 @@ async function register(userId: string, opts: { prompt: boolean }): Promise<void
     return;
   }
   await mintAndPost(userId);
+}
+
+/**
+ * The Android "sales" channel (doc 16 §4) — idempotent, a no-op on iOS.
+ * Called by register() and by the settings card's "Play the sound" (which
+ * must also work on an emulator, where register() stops before the channels).
+ * `sound` resolves by basename against res/raw (R.raw.cha_ching), which only
+ * exists after a native rebuild with the plugin's `sounds` option.
+ */
+export async function ensureSalesChannel(): Promise<void> {
+  if (Platform.OS !== "android") return;
+  await Notifications.setNotificationChannelAsync(SALES_CHANNEL, {
+    name: t("mobile.push.channelSales"),
+    importance: Notifications.AndroidImportance.HIGH,
+    sound: SALE_SOUND,
+    vibrationPattern: [0, 120, 80, 120],
+  });
+  if (__DEV__) void warnIfSalesChannelSilent();
+}
+
+/**
+ * R2 (doc 16 §13): a dev client built BEFORE the `sounds` plugin option runs
+ * this JS, creates "sales" with no res/raw/cha_ching, and Android locks the
+ * channel to the default sound for that install. Say so loudly in dev —
+ * the fix is Clear app data (or a reinstall) on the rebuilt binary.
+ */
+async function warnIfSalesChannelSilent(): Promise<void> {
+  try {
+    const ch = await Notifications.getNotificationChannelAsync(SALES_CHANNEL);
+    if (ch && ch.sound !== "custom") {
+      console.warn(
+        `[sale-alerts] Android channel "${SALES_CHANNEL}" has sound=${String(ch.sound)}, not ${SALE_SOUND}. ` +
+          "This binary predates the sounds plugin (or the channel was created by one that did). " +
+          "Rebuild the dev client, then Clear app data so the channel is re-created.",
+      );
+    }
+  } catch {
+    /* read-back is diagnostic only */
+  }
 }
 
 export function PushRegistrar() {
@@ -272,10 +333,15 @@ export function PushRegistrar() {
   }, [status, userId]);
 
   // A notification arriving while the app is open: the inbox and the bell are
-  // stale the instant it lands, so refresh both.
+  // stale the instant it lands, so refresh both. A sale alert (doc 16 §5) also
+  // makes Home's figures and Sales history stale — refresh them so the open
+  // screen matches the chime the user just heard.
   useEffect(() => {
-    const sub = Notifications.addNotificationReceivedListener(() => {
+    const sub = Notifications.addNotificationReceivedListener((n) => {
       void queryClient.invalidateQueries({ queryKey: NOTIFICATION_KEYS.root });
+      for (const key of refreshKeysFor(n.request.content.data)) {
+        void queryClient.invalidateQueries({ queryKey: [...key] });
+      }
     });
     return () => sub.remove();
   }, [queryClient]);
@@ -290,9 +356,13 @@ export function PushRegistrar() {
         | Partial<notifications.PushPayloadData>
         | null
         | undefined;
+      // Sale alerts (doc 16 §5) write no inbox row, so their fallback is
+      // Sales history, not /notifications; the local preview goes nowhere.
+      const sale = saleAlertTapRoute(data, toAppRoute);
+      if (sale === null) return;
       // Existence is checked here; permission is checked in flush(), once the
       // session (and therefore `me`) is known.
-      pendingRoute.current = toAppRoute(data?.route) ?? "/notifications";
+      pendingRoute.current = sale ?? toAppRoute(data?.route) ?? "/notifications";
       flush();
     };
     const flush = () => {
