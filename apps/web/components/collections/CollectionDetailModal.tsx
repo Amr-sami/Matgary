@@ -252,7 +252,7 @@ export function CollectionDetailModal({
         {c.matchedCredit && (
           <Block title={t.matchedCredit}>
             <Row label={t.amount}>{formatCurrency(c.matchedCredit.amount, locale)}</Row>
-            <Row label={t.rungAt}>{formatDateTime(c.matchedCredit.occurredAt, locale)}</Row>
+            <Row label={dict.app.collections.credits.occurredAt}>{formatDateTime(c.matchedCredit.occurredAt, locale)}</Row>
             {c.matchedCredit.payerNameMasked && <Row label={t.customer}>{c.matchedCredit.payerNameMasked}</Row>}
           </Block>
         )}

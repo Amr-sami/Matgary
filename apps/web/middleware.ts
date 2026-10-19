@@ -1,6 +1,7 @@
 import NextAuth from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { authConfig } from "@/lib/auth.config";
+import { buildCspHeader as buildCspHeaderFor } from "@/lib/csp";
 import { LOCALE_COOKIE, defaultLocale, isLocale, locales } from "@/lib/i18n/config";
 import { detectLocale, pathLocale } from "@/lib/i18n/detect";
 import {
@@ -40,29 +41,9 @@ function stripLocalePrefix(pathname: string): string {
   return pathname;
 }
 
-// H08 — Content Security Policy. Per-request nonce so we don't have to ship
-// 'unsafe-inline' for scripts. Report-Only by default until staging proves
-// the policy clean; set CSP_ENFORCE=1 to flip to enforcement.
-//
-// `style-src` keeps `'unsafe-inline'` for v1 because Tailwind 4 injects
-// runtime inline styles without a nonce hook today. Tracked in task.md §4
-// backlog "Strict CSP for styles".
+// H08 — Content Security Policy: the directives live in lib/csp.ts (pure, unit-tested).
 function buildCspHeader(nonce: string): string {
-  const isDev = process.env.NODE_ENV === "development";
-  const directives = [
-    "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}`,
-    "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https:",
-    "font-src 'self' data:",
-    "connect-src 'self' https://*.sentry.io https://o*.ingest.sentry.io",
-    "object-src 'none'",
-    "base-uri 'self'",
-    "form-action 'self'",
-    "frame-ancestors 'none'",
-    "upgrade-insecure-requests",
-  ];
-  return directives.join("; ");
+  return buildCspHeaderFor(nonce, process.env.NODE_ENV === "development");
 }
 
 const CSP_HEADER_NAME =

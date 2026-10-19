@@ -5,6 +5,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import expo.modules.collectionlistener.Rebind
 import expo.modules.collectionlistener.core.ConfigRules
+import expo.modules.collectionlistener.core.HeartbeatGate
 import expo.modules.collectionlistener.core.Payload
 import expo.modules.collectionlistener.core.ResponsePolicy
 import expo.modules.collectionlistener.core.ResponsePolicy.HeartbeatAction
@@ -27,8 +28,9 @@ import org.json.JSONObject
  * 2. Purge rows and seen entries older than `maxAgeHours`.
  * 3. Drain (every mode except `heartbeat_forced`), unless paused (403): ≤ 10 rounds of the oldest
  *    ≤ 50 rows, decrypted, byte-bounded batches (≤ 200,000 bytes), the [ResponsePolicy] per answer.
- * 4. Heartbeat: forced (≥ 60 s since the last) or ≥ 10 min since the last. A new `configVersion` in
- *    the answer → `GET …/config`, re-sanitise, store.
+ * 4. Heartbeat ([HeartbeatGate]): forced, or a periodic run's first attempt, when ≥ 60 s since the
+ *    last; a drain run or a periodic retry when ≥ 10 min since the last. A new `configVersion` in the
+ *    answer → `GET …/config`, re-sanitise, store.
  * 5. Rebind check (§4.5.7).
  * 6. success, or retry when step 3/4 recorded a network / 5xx / 429 outcome.
  *
@@ -41,8 +43,6 @@ class UploadWorker(appContext: Context, params: WorkerParameters) : CoroutineWor
   companion object {
     const val MAX_ROUNDS = 10
     const val ROWS_PER_ROUND = 50
-    const val FORCED_MIN_GAP_MS = 60_000L
-    const val PERIODIC_GAP_MS = 10 * 60_000L
   }
 
   override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
@@ -102,11 +102,15 @@ class UploadWorker(appContext: Context, params: WorkerParameters) : CoroutineWor
     // A6: the first redacted post since the server last heard 0 also waives the gap (once per change),
     // so the owner's "Android is hiding bank notifications" warning appears within seconds.
     val firstRedaction = state.redactedCount > 0L && state.lastHeartbeatRedacted == 0L
-    val wantHb = if (mode == Scheduler.MODE_HEARTBEAT_FORCED) {
-      sinceHb >= FORCED_MIN_GAP_MS || connectedChanged || firstRedaction
-    } else {
-      sinceHb >= PERIODIC_GAP_MS
-    }
+    // M4-3: a periodic run's first attempt heartbeats unless one went out in the last 60 s, so a
+    // server-side revoke is noticed within one period (acceptance 8, ≤ 16 min). See HeartbeatGate.
+    val wantHb = HeartbeatGate.wanted(
+      mode = HeartbeatGate.mode(mode),
+      sinceLastMs = sinceHb,
+      runAttempt = runAttemptCount,
+      connectedChanged = connectedChanged,
+      firstRedaction = firstRedaction,
+    )
     if (wantHb) {
       when (heartbeat(ctx, state, queue, client)) {
         HeartbeatAction.CLEAR -> return Result.success()

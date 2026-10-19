@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode, type Ref } from "react";
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -79,6 +80,12 @@ export interface SheetProps {
   scrollable?: boolean;
   /** Extra style for the body content container (padding/gap overrides). */
   bodyStyle?: StyleProp<ViewStyle>;
+  /**
+   * The body ScrollView (scrollable sheets only), for a form that must bring
+   * a field into view itself: the KeyboardAvoidingView shrinks the body but
+   * does not scroll a focused input into it (PasteSheet, audit T1 I5).
+   */
+  scrollRef?: Ref<ScrollView>;
 }
 
 /**
@@ -102,8 +109,9 @@ export interface SheetProps {
  * not wander into the dimmed screen behind; the title is a header; the close
  * X is a labelled 44pt button — rendered only when the default footer has no
  * `secondaryAction`, so a sheet never offers X and Cancel for the same
- * dismiss. The panel, close and backdrop carry `${testID}`,
- * `${testID}-close` and `${testID}-backdrop` for Maestro.
+ * dismiss. The panel, header, close and backdrop carry `${testID}`,
+ * `${testID}-header`, `${testID}-close` and `${testID}-backdrop` for Maestro.
+ * A tap on the header dismisses the keyboard.
  *
  * Presence is decided by `useSheetPresence` below, not by `visible` alone:
  * a Modal is its own native window, so it neither leaves with the screen
@@ -124,6 +132,7 @@ export function Sheet({
   closeOnBackdrop = true,
   scrollable = true,
   bodyStyle,
+  scrollRef,
 }: SheetProps) {
   const insets = useSafeAreaInsets();
   const rtl = useLocale((s) => s.locale) === "ar";
@@ -167,7 +176,16 @@ export function Sheet({
             testID={testID}
           >
             <View style={styles.grabber} />
-            <View style={[styles.header, !showClose && styles.headerNoClose]}>
+            {/* A tap on the header puts the keyboard away (audit T1 I5): a
+                multi-line field has no return key that does, and the keyboard
+                can cover the controls below it. Not an accessibility element
+                itself, so VoiceOver still reads the title as a header. */}
+            <Pressable
+              onPress={Keyboard.dismiss}
+              accessible={false}
+              testID={testID ? `${testID}-header` : undefined}
+              style={[styles.header, !showClose && styles.headerNoClose]}
+            >
               <View style={styles.headerText}>
                 <Text accessibilityRole="header" numberOfLines={2} style={styles.title}>
                   {title}
@@ -190,10 +208,11 @@ export function Sheet({
                   <X size={22} color={colors.text} />
                 </Pressable>
               ) : null}
-            </View>
+            </Pressable>
 
             {scrollable ? (
               <ScrollView
+                ref={scrollRef}
                 style={styles.scroll}
                 contentContainerStyle={[styles.body, bodyStyle]}
                 keyboardShouldPersistTaps="handled"

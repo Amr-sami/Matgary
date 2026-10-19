@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { headers, cookies } from "next/headers";
 import { Cairo, Tajawal, Lemonada } from "next/font/google";
-import Script from "next/script";
 import { SessionProvider } from "next-auth/react";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 import { IconProvider } from "@/components/IconProvider";
@@ -55,6 +54,10 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
+// Adds `.app-splash--hidden` after window.load, at least 520 ms after the
+// script ran so the breathing animation is perceptible on fast loads.
+const SPLASH_HIDE_JS = `(function(){var start=Date.now();function hide(){var elapsed=Date.now()-start;var wait=Math.max(0,520-elapsed);setTimeout(function(){var el=document.getElementById('app-splash');if(el)el.classList.add('app-splash--hidden');},wait);}if(document.readyState==='complete')hide();else window.addEventListener('load',hide,{once:true});})();`;
+
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -67,10 +70,9 @@ export default async function RootLayout({
   const raw = hdrs.get("x-locale");
   const locale = raw && isLocale(raw) ? raw : defaultLocale;
   const dir = dirOf(locale);
-  // Middleware sets x-nonce per request. We pass it to <Script> explicitly:
-  // in dev we ship CSP as Report-Only, and Next.js's auto-nonce injection
-  // only parses the enforce header, so without this the splash-hide script
-  // hydrates with nonce="" on the server and nonce={undefined} on the client.
+  // Middleware sets x-nonce per request. We pass it to the splash-hide
+  // <script> explicitly: in dev we ship CSP as Report-Only, and Next.js's
+  // auto-nonce injection only parses the enforce header.
   const nonce = hdrs.get("x-nonce") ?? undefined;
   // Phase 2 — load the dictionary at the root so the entire app (logged-in
   // pages + the pre-login [lang] tree) sees it via React context.
@@ -133,17 +135,24 @@ export default async function RootLayout({
             />
           </div>
         </div>
-        {/* React 19 refuses to execute inline <script> tags rendered as JSX
-            children (silent fail + console warning). next/script with
-            `beforeInteractive` injects the script tag outside React's
-            tree, which both makes the browser execute it AND lets us run
-            very early (before hydration starts), so the splash-hide
-            timer is already armed when window.load fires. */}
-        <Script
+        {/* Splash-hide timer. A plain server-rendered <script> runs while the
+            browser parses the HTML (before hydration, so the timer is armed
+            when window.load fires). dangerouslySetInnerHTML, not JSX text:
+            text children of a <script> are HTML-escaped by React's server
+            renderer and the quotes would break the JS. React never runs a
+            <script> it creates on the client, but the root layout is
+            hydrated, not client-created, and the script already ran.
+            suppressHydrationWarning (audit web W2): browsers hide a nonce
+            attribute once the element is connected (getAttribute returns
+            ""), so hydration saw nonce="" against the server's value and
+            next dev showed a mismatch on every page. next/script does not
+            forward the prop to its inner <script>, hence the plain tag. */}
+        <script
           id="app-splash-hide"
-          strategy="beforeInteractive"
           nonce={nonce}
-        >{`(function(){var start=Date.now();function hide(){var elapsed=Date.now()-start;var wait=Math.max(0,520-elapsed);setTimeout(function(){var el=document.getElementById('app-splash');if(el)el.classList.add('app-splash--hidden');},wait);}if(document.readyState==='complete')hide();else window.addEventListener('load',hide,{once:true});})();`}</Script>
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: SPLASH_HIDE_JS }}
+        />
         <SessionProvider>
           <QueryProvider>
             <IconProvider>

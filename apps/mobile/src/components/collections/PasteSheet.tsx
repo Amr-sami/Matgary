@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Keyboard, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { collectionCredits } from "@matgary/api-client";
 
@@ -30,6 +30,13 @@ export type PasteDone = ReturnType<typeof pasteOutcome>;
  *
  * On success the sheet closes and `onDone` gets the outcome; the caller
  * shows the notice and the list refetches (`["collection-credits"]`).
+ *
+ * The account picker sits ABOVE the text (audit T1 I5): with the multi-line
+ * field focused the iOS keyboard covered a picker placed below it, and a
+ * multi-line field has no return key that puts the keyboard away. A tap on
+ * the sheet header also dismisses the keyboard (`Sheet`), and the focused
+ * text is scrolled into view above the keys (the body scrolls to its end on
+ * focus and on keyboardDidShow).
  */
 export function PasteSheet({
   visible,
@@ -48,6 +55,18 @@ export function PasteSheet({
   const [key] = useState(newIdempotencyKey);
   const [text, setText] = useState("");
   const [accountId, setAccountId] = useState<string | null>(null);
+  // The picker sits above the text (I5), so a focused text can end up below
+  // the keyboard-shrunk body: bring it into view when it takes focus and once
+  // the keyboard has finished showing.
+  const scrollRef = useRef<ScrollView>(null);
+  const textFocused = useRef(false);
+  const showText = () => scrollRef.current?.scrollToEnd({ animated: true });
+  useEffect(() => {
+    const sub = Keyboard.addListener("keyboardDidShow", () => {
+      if (textFocused.current) scrollRef.current?.scrollToEnd({ animated: true });
+    });
+    return () => sub.remove();
+  }, []);
 
   const paste = useMutation({
     mutationFn: () =>
@@ -81,19 +100,8 @@ export function PasteSheet({
         testID: "credits-paste-submit",
       }}
       secondaryAction={{ label: t("app.common.cancel"), onPress: onClose, disabled: paste.isPending }}
+      scrollRef={scrollRef}
     >
-      <Field
-        label={t("app.collections.credits.pasteSheet.title")}
-        value={text}
-        onChangeText={(v) => setText(v.slice(0, PASTE_MAX_CHARS))}
-        multiline
-        numberOfLines={6}
-        maxLength={PASTE_MAX_CHARS}
-        autoCorrect={false}
-        autoCapitalize="none"
-        textAlignVertical="top"
-        testID="credits-paste-text"
-      />
       {accounts.length > 0 ? (
         <View style={styles.gap}>
           <Text style={styles.label}>{t("app.collections.credits.pasteSheet.account")}</Text>
@@ -105,6 +113,25 @@ export function PasteSheet({
           />
         </View>
       ) : null}
+      <Field
+        label={t("app.collections.credits.pasteSheet.title")}
+        value={text}
+        onChangeText={(v) => setText(v.slice(0, PASTE_MAX_CHARS))}
+        multiline
+        numberOfLines={6}
+        maxLength={PASTE_MAX_CHARS}
+        autoCorrect={false}
+        autoCapitalize="none"
+        textAlignVertical="top"
+        onFocus={() => {
+          textFocused.current = true;
+          showText();
+        }}
+        onBlur={() => {
+          textFocused.current = false;
+        }}
+        testID="credits-paste-text"
+      />
       {!online ? <Text style={styles.hint}>{t("app.collections.detail.onlineOnly")}</Text> : null}
       {paste.isError ? (
         <Text style={styles.error} testID="credits-paste-error">

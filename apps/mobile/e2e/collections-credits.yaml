@@ -15,12 +15,13 @@
 #   SetClipboardCommand / YamlSetClipboard{text}), but `pasteText` replays
 #   that text through `Maestro.inputText` (Orchestra.pasteText → inputText,
 #   read from the 2.10.0 bytecode): it is not a system-clipboard paste. So:
-#   - iOS: the UI paste — setClipboard + pasteText into `credits-paste-text`,
-#     account `credits-paste-account-<vfId>`, `credits-paste-submit`.
+#   - iOS: the UI paste — account `credits-paste-account-<vfId>` (above the
+#     text since T1 I5), setClipboard + pasteText into `credits-paste-text`,
+#     a header tap to put the keys away, `credits-paste-submit`.
 #     VERIFIED on the iPhone 17 Pro simulator (T1 iOS, 2026-10-19): the
 #     Arabic multi-line VF-1 text lands in the field line by line
 #     (screenshot in audit/t1/ios/rerun/) and the server parses it. The
-#     keyboard must go down before the account row is tapped (I3).
+#     keyboard must go down before a control below the text is tapped (I3).
 #   - Android: Maestro's inputText cannot type non-ASCII on Android, so the
 #     helper posts the same text through POST /api/collections/credits/paste
 #     with accountId BEFORE launch (15 §4.5.6 step 4's fallback); the UI paste
@@ -90,19 +91,8 @@ appId: com.thestoro.app
           visible:
             id: "credits-paste-text"
           timeout: 10000
-      - tapOn:
-          id: "credits-paste-text"
-      - setClipboard: "${output.vf1Text}"
-      - pasteText
-      # Keys down before the account row is looked for: with the keyboard
-      # up Maestro counted the row (y 607–680) as visible, its tap typed
-      # into the text instead, and the paste went up with NO account
-      # (held/no_account, T1 iOS I3). The pasted Arabic text itself arrived
-      # intact (server parsed amount, payer, reference 788247566405).
-      - runFlow:
-          file: helpers/keyboard-down-ios.yaml
-          env:
-            ID: "credits-paste-text"
+      # The account picker sits ABOVE the text (T1 I5): pick the account
+      # first, while no keyboard is up, as a person would top to bottom.
       - scrollUntilVisible:
           element:
             id: "credits-paste-account-${output.vfId}"
@@ -110,6 +100,21 @@ appId: com.thestoro.app
           centerElement: true
           timeout: 20000
       - tapOn:
+          id: "credits-paste-account-${output.vfId}"
+      - tapOn:
+          id: "credits-paste-text"
+      - setClipboard: "${output.vf1Text}"
+      - pasteText
+      # Keys down before the submit button is looked for: Maestro on the
+      # iOS simulator does not count the keyboard when it decides an element
+      # is visible (T1 iOS I1-I4). A tap on the sheet HEADER now puts the
+      # keyboard away (T1 I5) - the step proves it. The pasted Arabic text
+      # arrives intact (server parsed amount, payer, reference 788247566405).
+      - tapOn:
+          id: "credits-paste-sheet-header"
+      - waitForAnimationToEnd:
+          timeout: 2000
+      - assertVisible:
           id: "credits-paste-account-${output.vfId}"
       - scrollUntilVisible:
           element:
