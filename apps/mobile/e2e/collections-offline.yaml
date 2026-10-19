@@ -244,6 +244,25 @@ appId: com.thestoro.app
     timeout: 20000
 - tapOn:
     id: "sync-simulate-offline"
+# On iOS the single tap sometimes lands while the scroll is still settling and
+# the switch stays on (T2 iOS run: the banner stayed, 1 queued). Re-tap while
+# the offline banner is still there; the switch itself works (checked by hand).
+- repeat:
+    while:
+      visible:
+        text: "لا يوجد اتصال بالإنترنت.*|No internet connection.*"
+    times: 3
+    commands:
+      - waitForAnimationToEnd
+      - scrollUntilVisible:
+          element:
+            id: "sync-simulate-offline"
+          direction: DOWN
+          centerElement: true
+          timeout: 10000
+      - tapOn:
+          id: "sync-simulate-offline"
+      - waitForAnimationToEnd
 - scrollUntilVisible:
     element:
       id: "sync-now"
