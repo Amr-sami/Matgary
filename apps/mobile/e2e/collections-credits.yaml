@@ -17,9 +17,10 @@
 #   read from the 2.10.0 bytecode): it is not a system-clipboard paste. So:
 #   - iOS: the UI paste — setClipboard + pasteText into `credits-paste-text`,
 #     account `credits-paste-account-<vfId>`, `credits-paste-submit`.
-#     UNVERIFIED on the simulator: that XCUITest types the Arabic multi-line
-#     text (the "\n" as new lines) into the field. How to verify: the step's
-#     first run; if the field is wrong, switch iOS to the API branch too.
+#     VERIFIED on the iPhone 17 Pro simulator (T1 iOS, 2026-10-19): the
+#     Arabic multi-line VF-1 text lands in the field line by line
+#     (screenshot in audit/t1/ios/rerun/) and the server parses it. The
+#     keyboard must go down before the account row is tapped (I3).
 #   - Android: Maestro's inputText cannot type non-ASCII on Android, so the
 #     helper posts the same text through POST /api/collections/credits/paste
 #     with accountId BEFORE launch (15 §4.5.6 step 4's fallback); the UI paste
@@ -93,6 +94,15 @@ appId: com.thestoro.app
           id: "credits-paste-text"
       - setClipboard: "${output.vf1Text}"
       - pasteText
+      # Keys down before the account row is looked for: with the keyboard
+      # up Maestro counted the row (y 607–680) as visible, its tap typed
+      # into the text instead, and the paste went up with NO account
+      # (held/no_account, T1 iOS I3). The pasted Arabic text itself arrived
+      # intact (server parsed amount, payer, reference 788247566405).
+      - runFlow:
+          file: helpers/keyboard-down-ios.yaml
+          env:
+            ID: "credits-paste-text"
       - scrollUntilVisible:
           element:
             id: "credits-paste-account-${output.vfId}"

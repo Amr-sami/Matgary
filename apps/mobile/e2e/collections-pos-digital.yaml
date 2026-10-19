@@ -162,6 +162,10 @@ appId: com.thestoro.app
 - inputText: "${output.payer.charAt(1)}"
 - inputText: "${output.payer.charAt(2)}"
 - inputText: "${output.payer.charAt(3)}"
+- runFlow:
+    file: helpers/keyboard-down-ios.yaml
+    env:
+      ID: "pos-collection-payer"
 
 # 9. Record (centred, so it sits above the iPhone number pad).
 - scrollUntilVisible:
@@ -210,6 +214,16 @@ appId: com.thestoro.app
 # 12. New sale: the cart is back on cash, no transfer panel (sticky-chip fix).
 #     The cash chip is centred first so a leftover panel (it renders right
 #     under the chips) would be on screen, not hidden below the fold.
+# The result card grows with the cart (the chip guards can add 3 items), and
+# its "New sale" button then ends under the tab bar (iPhone: y 759–811, tab
+# bar from 787); Maestro still calls it visible and the tap hit the tab bar
+# (T1 iOS rerun 1). Centre it first, as a person would scroll to it.
+- scrollUntilVisible:
+    element:
+      text: "بيع جديد|New sale"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
 - tapOn:
     text: "بيع جديد|New sale"
 - extendedWaitUntil:
@@ -275,6 +289,14 @@ appId: com.thestoro.app
     id: "pos-collection-part-1-amount"
 - eraseText: 20
 - inputText: "1"
+# iOS: the keys go down before part 2 is looked for. With the number pad up,
+# Maestro saw part 2's amount "visible" at y 546–596 (pad top ≈ 560 of 874),
+# tapped the pad's "2" into part 1, then erased and typed "1" there again:
+# [1, 0], remainder 3,599 and "enter each transfer's amount" (T1 iOS I2).
+- runFlow:
+    file: helpers/keyboard-down-ios.yaml
+    env:
+      ID: "pos-collection-part-1-amount"
 # Part 2 already exists (addPart from single mode always makes two parts,
 # checkout.test.ts). A "when notVisible part-2-amount → add part" guard used to
 # sit here: with part 1 centred, part 2 is merely below the fold, so the guard
@@ -289,6 +311,10 @@ appId: com.thestoro.app
     id: "pos-collection-part-2-amount"
 - eraseText: 20
 - inputText: "1"
+- runFlow:
+    file: helpers/keyboard-down-ios.yaml
+    env:
+      ID: "pos-collection-part-2-amount"
 
 # 14. The cash remainder line is shown. Its value is checked on the server in
 #     step 15 (recent-chip products of the rich seed cost ≥ EGP 10, so
@@ -314,6 +340,10 @@ appId: com.thestoro.app
 - inputText: "${output.payer.charAt(1)}"
 - inputText: "${output.payer.charAt(2)}"
 - inputText: "${output.payer.charAt(3)}"
+- runFlow:
+    file: helpers/keyboard-down-ios.yaml
+    env:
+      ID: "pos-collection-part-1-payer"
 - scrollUntilVisible:
     element:
       id: "pos-record"
@@ -338,6 +368,13 @@ appId: com.thestoro.app
 
 # 16. Home: steps 11 and 15 left pending rows, so the awaiting card renders
 #     (it renders nothing at count 0, 13 §4.12).
+# Centred first, as in step 12.
+- scrollUntilVisible:
+    element:
+      text: "بيع جديد|New sale"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
 - tapOn:
     text: "بيع جديد|New sale"
 - runFlow: helpers/dismiss-logbox.yaml

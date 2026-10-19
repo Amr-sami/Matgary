@@ -136,6 +136,26 @@ test("T1 F2: the split state behind 'enter each amount' + 'more than the total' 
   });
 });
 
+test("T1 I2 (iOS): every key went to part 1 — [1, 0] shows remainder 3,599 and 'enter each amount'", () => {
+  // The iPhone POS showed "remainder 3,599" with "enter each transfer's
+  // amount" and Record disabled. Replayed from the run's maestro.log: total
+  // 3600 → [3600, 0]; part 1 "3600" → erase → "1". The tap meant for part 2
+  // (y 571) hit the number pad's "2" while part 1 still had focus → "12";
+  // erase → ""; "1" → part 1 = 1, and part 2 never left 0. One EGP short of
+  // the expected 3,598 is the tell; the validation and remainder are right.
+  const total = 3600;
+  let s = co.addPart(single(), total, "vf");
+  for (const typed of ["1", "12", "", "1"]) s = co.updatePart(s, 0, { amount: co.parseAmountInput(typed) });
+  assert.deepEqual(s.collectionParts.map((p) => p.amount), [1, 0]);
+  assert.equal(co.cashRemainder(total, s.collectionParts), 3599);
+  assert.deepEqual(co.validateTransfer(s, { total, collectionsOn: true, requireAccount: true, accounts: null }).errors, [
+    "part_amount_invalid",
+  ]);
+  s = co.updatePart(s, 1, { amount: co.parseAmountInput("1") });
+  assert.equal(co.cashRemainder(total, s.collectionParts), 3598);
+  assert.equal(co.validateTransfer(s, { total, collectionsOn: true, requireAccount: true, accounts: null }).ok, true);
+});
+
 test("removing back to one full part collapses to single mode; a partial part stays split", () => {
   let s = co.addPart(single(), 1000, "vf");
   s = co.removePart(s, 1, 1000);

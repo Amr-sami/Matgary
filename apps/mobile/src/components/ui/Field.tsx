@@ -63,7 +63,11 @@ const EYE_ICON = 20;
 
 /**
  * `props.testID` reaches the TextInput through the spread, and the eye toggle
- * derives its own from it as `<testID>-eye` (shared e2e contract). Likewise
+ * derives its own from it as `<testID>-eye` (shared e2e contract), the label
+ * as `<testID>-label`: a plain Text inside the form's ScrollView, which iOS
+ * flows tap to put the software keyboard away (e2e/helpers/
+ * keyboard-down-ios.yaml; Maestro taps "visible" targets under the keys,
+ * doc 15 T1 I1–I4). Likewise
  * `selectTextOnFocus` is NOT destructured here on purpose: it must reach the
  * TextInput untouched so the login identifier can select-all on focus (see
  * login.tsx).
@@ -77,7 +81,9 @@ export function Field({ label, secure = false, ltr = false, adornment, ...props 
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.label} testID={props.testID ? `${props.testID}-label` : undefined}>
+        {label}
+      </Text>
       <View style={[styles.box, multiline && styles.boxMultiline, focused && styles.boxFocused]}>
         <TextInput
           {...props}

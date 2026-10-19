@@ -11,6 +11,10 @@
 # (T1 F1, collections-accounts step 59). x = 8% of 1080 px is 86 px: right of
 # Android's back-gesture strip, left of the 98 px where the input boxes start.
 #
+# The drag runs from 50% to 15% of the height: on iOS the software keyboard
+# covers the lower ~40% of the screen, and a drag that starts on the keys
+# scrolls nothing (T1 iOS run, collections-accounts).
+#
 # One extra drag after the element shows, so a row that entered at the bottom
 # edge is lifted clear of it before the caller taps it.
 appId: com.thestoro.app
@@ -22,12 +26,12 @@ appId: com.thestoro.app
     times: 10
     commands:
       - swipe:
-          start: "8%, 75%"
-          end: "8%, 30%"
+          start: "8%, 50%"
+          end: "8%, 15%"
           duration: 500
 - swipe:
-    start: "8%, 75%"
-    end: "8%, 45%"
+    start: "8%, 50%"
+    end: "8%, 35%"
     duration: 500
 - extendedWaitUntil:
     visible:

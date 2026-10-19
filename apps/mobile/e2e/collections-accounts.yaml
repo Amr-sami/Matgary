@@ -96,15 +96,28 @@ appId: com.thestoro.app
 - tapOn:
     id: "collection-account-form-label"
 - inputText: "E2E QNB ${output.stamp}"
-- scrollUntilVisible:
-    element:
-      id: "collection-account-form-ipa_link"
-    direction: DOWN
-    centerElement: true
-    timeout: 20000
+# iOS: keys down before the next field is looked for — Maestro counts a
+# field under the keyboard as visible. And the next field is reached with
+# swipe-to, not scrollUntilVisible + centerElement: the centring swipe
+# overshot and parked the link field at y 76–177, BEHIND the fixed header
+# (back link + title, to ≈ y 170) — still "visible" to Maestro, so the tap
+# hit the header and the URL went into the label or nowhere (T1 iOS I1
+# reruns 1 and 3). The same for last 4 and the wallet number below.
+- runFlow:
+    file: helpers/keyboard-down-ios.yaml
+    env:
+      ID: "collection-account-form-label"
+- runFlow:
+    file: helpers/swipe-to.yaml
+    env:
+      ID: "collection-account-form-ipa_link"
 - tapOn:
     id: "collection-account-form-ipa_link"
 - inputText: "https://ipn.eg.evil.com/S/a/instapay/b"
+- runFlow:
+    file: helpers/keyboard-down-ios.yaml
+    env:
+      ID: "collection-account-form-ipa_link"
 - runFlow:
     file: helpers/swipe-to.yaml
     env:
@@ -143,6 +156,10 @@ appId: com.thestoro.app
 - eraseText: 120
 - eraseText: 120
 - inputText: "Click the link to send money to e2eqnb@instapay https://ipn.eg/S/e2eqnb/instapay/Qn8Zx2"
+- runFlow:
+    file: helpers/keyboard-down-ios.yaml
+    env:
+      ID: "collection-account-form-ipa_link"
 - scrollUntilVisible:
     element:
       id: "collection-account-form-ipa_handle"
@@ -152,18 +169,20 @@ appId: com.thestoro.app
 - assertVisible:
     id: "collection-account-form-ipa_handle"
     text: ".*e2eqnb@instapay.*"
-- scrollUntilVisible:
-    element:
-      id: "collection-account-form-account_last4"
-    direction: DOWN
-    centerElement: true
-    timeout: 20000
+- runFlow:
+    file: helpers/swipe-to.yaml
+    env:
+      ID: "collection-account-form-account_last4"
 - tapOn:
     id: "collection-account-form-account_last4"
 - inputText: "5"
 - inputText: "5"
 - inputText: "9"
 - inputText: "7"
+- runFlow:
+    file: helpers/keyboard-down-ios.yaml
+    env:
+      ID: "collection-account-form-account_last4"
 - runFlow:
     file: helpers/swipe-to.yaml
     env:
@@ -223,15 +242,21 @@ appId: com.thestoro.app
 - tapOn:
     id: "collection-account-form-label"
 - inputText: "E2E EM ${output.stamp}"
-- scrollUntilVisible:
-    element:
-      id: "collection-account-form-wallet_msisdn"
-    direction: DOWN
-    centerElement: true
-    timeout: 20000
+- runFlow:
+    file: helpers/keyboard-down-ios.yaml
+    env:
+      ID: "collection-account-form-label"
+- runFlow:
+    file: helpers/swipe-to.yaml
+    env:
+      ID: "collection-account-form-wallet_msisdn"
 - tapOn:
     id: "collection-account-form-wallet_msisdn"
 - inputText: "011${output.payer}${output.payer}"
+- runFlow:
+    file: helpers/keyboard-down-ios.yaml
+    env:
+      ID: "collection-account-form-wallet_msisdn"
 - runFlow:
     file: helpers/swipe-to.yaml
     env:
@@ -280,6 +305,10 @@ appId: com.thestoro.app
 - eraseText: 80
 - inputText: "E2E QNB ${output.stamp} v2"
 - runFlow:
+    file: helpers/keyboard-down-ios.yaml
+    env:
+      ID: "collection-account-form-label"
+- runFlow:
     file: helpers/swipe-to.yaml
     env:
       ID: "collection-account-save"
@@ -299,6 +328,10 @@ appId: com.thestoro.app
 
 # 9. Archive both: the form's archive button, then the Alert's button
 #    (09 §4.9 `form.archive`, the same words as the button that opens it).
+#    iOS keeps the form's own button (y 678–730, under Save) in the
+#    hierarchy behind the alert, and a bare text tap hit IT, not the alert's
+#    (T1 iOS rerun 4); the alert's button sits above Save, so `above` picks
+#    it. Android's dialog hierarchy has no such twin: the plain tap stays.
 - scrollUntilVisible:
     element:
       id: "collection-account-${output.qnbId}"
@@ -317,8 +350,20 @@ appId: com.thestoro.app
     visible:
       text: "(?i)أرشفة الحساب|archive account"
     timeout: 10000
-- tapOn:
-    text: "(?i)أرشفة الحساب|archive account"
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          text: "(?i)أرشفة الحساب|archive account"
+          above:
+            id: "collection-account-save"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn:
+          text: "(?i)أرشفة الحساب|archive account"
 - extendedWaitUntil:
     notVisible:
       id: "collection-account-archive"
@@ -351,8 +396,20 @@ appId: com.thestoro.app
     visible:
       text: "(?i)أرشفة الحساب|archive account"
     timeout: 10000
-- tapOn:
-    text: "(?i)أرشفة الحساب|archive account"
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          text: "(?i)أرشفة الحساب|archive account"
+          above:
+            id: "collection-account-save"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn:
+          text: "(?i)أرشفة الحساب|archive account"
 - extendedWaitUntil:
     notVisible:
       id: "collection-account-archive"

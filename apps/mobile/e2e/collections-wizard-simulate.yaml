@@ -24,11 +24,11 @@
 #   in dev; on an iOS 27 runtime COLLECTIONS_IOS_SHORTCUT_URL is empty and the
 #   wizard resolves `unsupported/link_missing`).
 #
-# UNVERIFIED (first device run): that the simulator's share sheet offers Copy
-# and returns sharedAction (09 §4.6.5 `tokenDelivered`); if not, the flow stops
-# at `install` and 09 §5 step 14 stays the manual proof. That the RN Alert's
-# "Unlink" button is tapped, not the row's own "Unlink" behind it (same label,
-# the same pattern as collections-accounts' archive).
+# VERIFIED (T1 iOS, iPhone 17 Pro / iOS 26.3): the share sheet offers Copy and
+# returns sharedAction (09 §4.6.5 `tokenDelivered`) — tapped by point, see
+# step 7. The RN Alert's "Unlink" button is told apart from the row's own
+# "Unlink" behind it (same label, as in collections-accounts' archive) by
+# position, see step 10.
 appId: com.thestoro.app
 ---
 # 1. Setup (ingest).
@@ -51,9 +51,21 @@ appId: com.thestoro.app
         id: "login-identifier"
     file: login.yaml
 
-# 3. Open the wizard (step root testID = collection-automation-<step>).
+# 3. Open the wizard from the hub, the way a person gets there (step root
+#    testID = collection-automation-<step>). A deep link straight to
+#    /settings/collections/automation leaves no hub under it in the settings
+#    Stack, so `finish` (goBack(HUB) → router.back()) popped to the previous
+#    TAB (More) and step 9 never saw the hub (T1 iOS rerun 2).
 - runFlow: helpers/dismiss-logbox.yaml
-- openLink: "matgary://settings/collections/automation"
+- openLink: "matgary://settings/collections"
+- scrollUntilVisible:
+    element:
+      id: "collections-settings-automation"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- tapOn:
+    id: "collections-settings-automation"
 - extendedWaitUntil:
     visible:
       id: "collection-automation-(intro|unsupported)"
@@ -105,10 +117,31 @@ appId: com.thestoro.app
           visible:
             id: "collection-device-label"
           timeout: 15000
+      # The field is prefilled with "{name} — {model}" (longer than the box)
+      # and right-aligned: a centre tap parked the caret at the START, so
+      # eraseText (backspace) deleted nothing and the label came out
+      # "E2E wizard <stamp>Amr Owner — Simulator…" (T1 iOS I4). Tap the
+      # box's right end and erase twice: the first round clears up to the
+      # visible end, the second the tail that is then right-aligned.
       - tapOn:
           id: "collection-device-label"
+          point: "99%,50%"
+      - eraseText: 80
+      - tapOn:
+          id: "collection-device-label"
+          point: "99%,50%"
       - eraseText: 80
       - inputText: "E2E wizard ${output.stamp}"
+      - assertVisible:
+          id: "collection-device-label"
+          text: "E2E wizard ${output.stamp}"
+      # Keys down: Next (y 530–582 of 874) sat under the keyboard (top ≈ 537)
+      # and Maestro still counted it visible, so its tap hit the keys (I4).
+      # A person scrolls it up (Screen: automaticallyAdjustKeyboardInsets).
+      - runFlow:
+          file: helpers/keyboard-down-ios.yaml
+          env:
+            ID: "collection-device-label"
       - scrollUntilVisible:
           element:
             id: "collection-automation-next"
@@ -136,8 +169,34 @@ appId: com.thestoro.app
           visible:
             text: "(?i)copy|نسخ"
           timeout: 15000
+      # The share sheet is a remote (out-of-process) view: XCTest reports its
+      # cells in the SHEET's coordinates (Copy at y 322–338) while it is drawn
+      # at the bottom of the screen (Copy ≈ y 773–820 of 874), so a text tap
+      # on "Copy" hit the dimmed backdrop, the sheet closed with
+      # dismissedAction, `shared` stayed false and "I added it" stayed
+      # disabled (T1 iOS rerun 2). Tap the Copy action where it is drawn
+      # (iPhone 17 Pro, iOS 26.3; checked by hand: the token reached the
+      # pasteboard and Share returned sharedAction).
+      # The sheet slides up after its cells exist: wait for it to settle (a
+      # tap during the slide missed, T1 iOS rerun 3), and tap once more if
+      # it is still up.
+      - waitForAnimationToEnd:
+          timeout: 5000
       - tapOn:
-          text: "(?i)copy|نسخ"
+          point: "17%,88%"
+      - waitForAnimationToEnd:
+          timeout: 3000
+      - runFlow:
+          when:
+            visible:
+              text: "(?i)copy|نسخ"
+          commands:
+            - tapOn:
+                point: "17%,88%"
+      - extendedWaitUntil:
+          notVisible:
+            text: "(?i)copy|نسخ"
+          timeout: 10000
       - extendedWaitUntil:
           visible:
             id: "collection-automation-open-link"
@@ -197,11 +256,14 @@ appId: com.thestoro.app
             ID: "${output.devId}"
 
       # 9. Finish → back on the collections hub.
+      # The hub comes back at the scroll offset it was left at (scrolled down
+      # to the automation entry, step 3), so its top switch is off screen:
+      # the entry row is the hub's signal.
       - tapOn:
           id: "collection-automation-finish"
       - extendedWaitUntil:
           visible:
-            id: "collections-settings-enabled"
+            id: "collections-settings-automation"
           timeout: 30000
 
       # 10. Revoke this phone's device on Linked phones.
@@ -218,8 +280,30 @@ appId: com.thestoro.app
           visible:
             text: "(?s)(إلغاء ربط «E2E wizard .*|Unlink .E2E wizard .*)"
           timeout: 10000
+      # iOS keeps the row's own "إلغاء الربط" (y 411–455) in the hierarchy
+      # behind the alert, with the same attributes as the alert's button
+      # (y 510–558), and a bare text tap hit the row's (T1 iOS rerun 5).
+      # `below: id <row's revoke>` also picked the row's (Maestro's `below`
+      # compares top edges; the button's inner text starts at y 418),
+      # `rightOf: Cancel` too (its inner text starts right of Cancel), and
+      # `childOf` the alert title found nothing (direct children only).
+      # Maestro lists the row's match first and the alert's second: index 1
+      # (checked live against the open alert: it tapped [205,510][345,558]).
+      # A first tap on the open alert was once swallowed (no DELETE reached
+      # the server, the same alert stayed up); one retry while it shows.
       - tapOn:
           text: "(?i)إلغاء الربط|unlink"
+          index: 1
+      - waitForAnimationToEnd:
+          timeout: 3000
+      - runFlow:
+          when:
+            visible:
+              text: "(?s)(إلغاء ربط «E2E wizard .*|Unlink .E2E wizard .*)"
+          commands:
+            - tapOn:
+                text: "(?i)إلغاء الربط|unlink"
+                index: 1
       - extendedWaitUntil:
           notVisible:
             id: "collection-device-${output.devId}"

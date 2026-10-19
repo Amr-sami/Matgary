@@ -1,0 +1,38 @@
+# iOS only: put the software keyboard away by tapping the label of the field
+# just typed into (env ID = the field's testID; Field gives its label
+# `<testID>-label`). The label is a plain Text inside the form's ScrollView
+# (Screen / Sheet, keyboardShouldPersistTaps="handled"): no child takes the
+# touch, so RN's ScrollView blurs the input and the keyboard goes down.
+# (A text selector is not enough: on the paste sheet "لصق رسالة" is both the
+# sheet title — outside the ScrollView, a tap there does nothing — and the
+# field label, and Maestro picked the title even with `above: id`.)
+#
+# Why: on the iOS simulator Maestro (2.10) does not count the software
+# keyboard when it decides an element is "visible". scrollUntilVisible stops
+# with the target UNDER the keys, and the tap that follows types a key into
+# the field that still has focus (T1 iOS run, I1–I4):
+#   - pos-digital: the tap on part 2's amount (y 571 of 874) hit the number
+#     pad's "2"; part 1 took the keys and part 2 stayed 0 → [1, 0], remainder
+#     3,599 and "enter each transfer's amount";
+#   - credits: the tap on the paste sheet's account row (y 643) hit the
+#     keyboard, so the paste went up with no account (held/no_account);
+#   - wizard: Next (y 556) sat under the keys (keyboard top ≈ 537).
+# A person scrolls the form past the keyboard (Screen's
+# automaticallyAdjustKeyboardInsets — checked by hand on the account form,
+# Save above the keys), so this is a test-driver gap, not an app bug.
+#
+# Not `hideKeyboard`: on iOS it presses Return, which only works on a
+# single-line text field — it failed on the paste sheet's multi-line field
+# ("Couldn't hide the keyboard") and a number pad has no Return. Android:
+# never hideKeyboard there (founder rule), and the Android flows already pass
+# with the IME up, hence the platform guard — this is a no-op on Android.
+appId: com.thestoro.app
+---
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: "${ID}-label"
+      - waitForAnimationToEnd:
+          timeout: 2000
