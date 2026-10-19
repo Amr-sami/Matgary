@@ -8,7 +8,7 @@ import { newIdempotencyKey } from "@/lib/api/collections";
 import { useCreditActions } from "@/hooks/useCollections";
 import { useCollectionAccounts } from "@/hooks/useCollectionAccounts";
 import { errorCode, errorCopy } from "./copy";
-import { pastedCount } from "./rules";
+import { pasteNotice } from "./rules";
 
 /** 07 §4.5: `text` 1..10,000 characters. */
 export const PASTE_MAX_CHARS = 10_000;
@@ -21,11 +21,11 @@ export const PASTE_MAX_CHARS = 10_000;
  * Idempotency-Key per opening, reused on every retry. Reuses 08's
  * `app.collections.credits.pasteSheet.*` (no `web.` leaf).
  */
-export function PasteDialog({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: (n: number) => void }) {
+export function PasteDialog({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: (message: string) => void }) {
   return open ? <PasteDialogBody onClose={onClose} onDone={onDone} /> : null;
 }
 
-function PasteDialogBody({ onClose, onDone }: { onClose: () => void; onDone: (n: number) => void }) {
+function PasteDialogBody({ onClose, onDone }: { onClose: () => void; onDone: (message: string) => void }) {
   const dict = useDictionary();
   const t = dict.app.collections.credits.pasteSheet;
   const providers = dict.app.collections.vocab.providers as Record<string, string>;
@@ -43,7 +43,7 @@ function PasteDialogBody({ onClose, onDone }: { onClose: () => void; onDone: (n:
     setError(null);
     try {
       const res = await paste.mutateAsync({ text, accountId: accountId || undefined, key });
-      onDone(pastedCount(res.results));
+      onDone(pasteNotice(res.results, dict.app.collections.credits.done));
     } catch (e) {
       setError(
         errorCopy(errorCode(e), [dict.app.collections.errors as Record<string, string>], dict.app.collections.detail.actionFailed),

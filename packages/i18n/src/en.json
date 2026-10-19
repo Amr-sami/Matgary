@@ -4074,7 +4074,31 @@
         "done": {
           "matched": "Matched to the sale",
           "ignored": "Ignored",
-          "pasted": "{n} messages added"
+          "pasted": "{n} messages added",
+          "pastedOne": "1 message added",
+          "pastedTwo": "2 messages added",
+          "pastedFew": "{n} messages added",
+          "alreadyAdded": "This message was already added.",
+          "notRecognised": "TheStoro couldn't read this message; the owner finds it under Unrecognised messages.",
+          "notCredit": "This isn't a money-received message."
+        },
+        "states": {
+          "unmatched": "No sale yet",
+          "held": "On hold",
+          "matched": "Matched",
+          "ignored": "Ignored",
+          "info": "For information"
+        },
+        "sender": "Sender",
+        "matchedTo": "Matched to {invoice}",
+        "unrecognised": {
+          "title": "Unrecognised messages",
+          "hint": "Messages TheStoro couldn't read; they are deleted after 30 days.",
+          "share": "Send to TheStoro to add support",
+          "shareNote": "Names and all but the last 4 digits are hidden before anyone at TheStoro reads it.",
+          "shared": "Sent — kept until {date}",
+          "empty": "No unrecognised messages.",
+          "expires": "Deleted on {date}"
         }
       }
     },

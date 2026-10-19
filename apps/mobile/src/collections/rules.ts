@@ -8,7 +8,7 @@
  * The server is the authority on every gate; these rules only decide what
  * the UI offers, so a button never leads to a 403 it could have predicted.
  */
-import type { MeResponse, collections, me as meApi, sales } from "@matgary/api-client";
+import type { MeResponse, collectionCredits, collections, me as meApi, sales } from "@matgary/api-client";
 
 type CollectionStatus = collections.CollectionStatus;
 type CollectionSourceType = collections.CollectionSourceType;
@@ -16,6 +16,10 @@ type RejectOutcome = collections.RejectOutcome;
 type RejectReason = collections.RejectReason;
 type SaleCollectionStatus = collections.SaleCollectionStatus;
 type CollectionsFeatures = meApi.CollectionsFeatures;
+type IgnoreReason = collectionCredits.IgnoreReason;
+type CollectionCandidate = collectionCredits.CollectionCandidate;
+type CreditDTO = collectionCredits.CreditDTO;
+type PasteResult = collectionCredits.PasteResult;
 
 export interface CollectionAccess {
   isOwner: boolean;
@@ -115,7 +119,7 @@ export const REJECT_REASONS = [
 ] as const satisfies readonly RejectReason[];
 
 /** 03 §B.1 IgnoreReason (credits, M2). */
-export const IGNORE_REASONS = ["personal", "not_a_sale", "duplicate", "other"] as const;
+export const IGNORE_REASONS = ["personal", "not_a_sale", "duplicate", "other"] as const satisfies readonly IgnoreReason[];
 
 // ─── inbox ───────────────────────────────────────────────────────────────────
 
@@ -218,6 +222,8 @@ export const KNOWN_COLLECTION_ERRORS = [
   "CREDIT_NOT_FOUND",
   "CREDIT_ALREADY_MATCHED",
   "CREDIT_NOT_MATCHABLE",
+  "INGEST_DISABLED",
+  "INGEST_PAYLOAD_TOO_LARGE",
   "IDEMPOTENCY_KEY_REQUIRED",
   "IDEMPOTENCY_MISMATCH",
   "INVALID_PHONE",
@@ -231,3 +237,106 @@ export const KNOWN_COLLECTION_ERRORS = [
 export function collectionErrorKey(code: string | null | undefined): string | null {
   return code && (KNOWN_COLLECTION_ERRORS as readonly string[]).includes(code) ? `app.collections.errors.${code}` : null;
 }
+
+// ─── credits (M2, spec 08 §4.11) ─────────────────────────────────────────────
+
+/** The credits tab lists what still needs a person (03 §B.4 comma list). */
+export const OPEN_CREDIT_STATES = "unmatched,held";
+
+export interface CreditsAccess {
+  /** The tab itself: features.collectionsIngest + view (03 §B.4 GET credits = view_collections). */
+  canList: boolean;
+  /** Paste, match, ignore: `confirm_collections` (with view), or the owner. */
+  canPaste: boolean;
+  canIgnore: boolean;
+  /** The Unrecognised section and its "send to TheStoro": owner only (03 §B.4, ARCH CR 8). */
+  canSeeUnrecognised: boolean;
+}
+
+export function creditsAccess(
+  features: Pick<CollectionsFeatures, "collections" | "collectionsIngest"> | null | undefined,
+  access: Pick<CollectionAccess, "isOwner" | "canView" | "canConfirm">,
+): CreditsAccess {
+  const on = Boolean(features?.collections && features?.collectionsIngest);
+  const canList = on && access.canView;
+  return {
+    canList,
+    canPaste: canList && access.canConfirm,
+    canIgnore: canList && access.canConfirm,
+    canSeeUnrecognised: canList && access.isOwner,
+  };
+}
+
+/**
+ * One-tap match of a credit to a candidate collection: `confirm_collections`
+ * + four-eyes on the COLLECTION (staff never match a sale they recorded;
+ * owner exempt, 03 §E.6). The server answers SELF_CONFIRM_FORBIDDEN anyway;
+ * the button renders disabled for `self` so no request is sent.
+ */
+export function canMatchCandidate(
+  access: Pick<CollectionAccess, "isOwner" | "canConfirm" | "userId">,
+  credit: Pick<CreditDTO, "state">,
+  candidate: Pick<CollectionCandidate, "status" | "selfRecorded" | "recordedBy">,
+): "ok" | "not_open" | "not_pending" | "no_permission" | "self" {
+  if (credit.state !== "unmatched" && credit.state !== "held") return "not_open";
+  if (candidate.status !== "pending") return "not_pending";
+  if (!access.canConfirm) return "no_permission";
+  if (!access.isOwner) {
+    if (candidate.selfRecorded) return "self";
+    if (access.userId != null && candidate.recordedBy?.id === access.userId) return "self";
+  }
+  return "ok";
+}
+
+/** §C.8 rule 11: the match button warns when the amount or the account differs (piasters, never floats). */
+export function candidateWarnings(
+  credit: Pick<CreditDTO, "amount" | "account">,
+  candidate: Pick<CollectionCandidate, "amount" | "accountId">,
+): { amountDiffers: boolean; accountDiffers: boolean } {
+  return {
+    amountDiffers: Math.round(credit.amount * 100) !== Math.round(candidate.amount * 100),
+    accountDiffers: Boolean(credit.account && candidate.accountId && candidate.accountId !== credit.account.id),
+  };
+}
+
+/** The payer as the credit carries it: full name (opt-in), masked name, or "•••• 1234". */
+export function creditPayerText(c: Pick<CreditDTO, "payerName" | "payerNameMasked" | "payerPhoneLast4">): string | null {
+  if (c.payerName) return c.payerName;
+  if (c.payerNameMasked) return c.payerNameMasked;
+  if (c.payerPhoneLast4) return `•••• ${c.payerPhoneLast4}`;
+  return null;
+}
+
+export type PasteNotice = "added" | "already" | "unrecognised" | "not_credit";
+
+/**
+ * What a paste did, from `POST collections/credits/paste` `results[]` (07
+ * §4.13): `added` counts the NEW credits (accepted WITH a creditId). An
+ * unknown-format message is `accepted` too but creates no credit — it goes
+ * to the owner's Unrecognised list — so it is counted apart (the web's
+ * `pastedCount` counts it as added). The notice is the best news first.
+ */
+export function pasteOutcome(results: readonly Pick<PasteResult, "status" | "reason" | "creditId">[]): {
+  added: number;
+  duplicates: number;
+  unrecognised: number;
+  dropped: number;
+  notice: PasteNotice;
+} {
+  let added = 0;
+  let duplicates = 0;
+  let unrecognised = 0;
+  let dropped = 0;
+  for (const r of results) {
+    if (r.status === "accepted" && r.creditId) added++;
+    else if (r.status === "accepted") unrecognised++;
+    else if (r.status === "duplicate") duplicates++;
+    else dropped++;
+  }
+  const notice: PasteNotice =
+    added > 0 ? "added" : duplicates > 0 ? "already" : unrecognised > 0 ? "unrecognised" : "not_credit";
+  return { added, duplicates, unrecognised, dropped, notice };
+}
+
+/** 07 §4.5: the paste `text` is 1..10,000 characters (≤ 20 pieces). */
+export const PASTE_MAX_CHARS = 10_000;

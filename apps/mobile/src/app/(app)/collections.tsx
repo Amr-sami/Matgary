@@ -1,11 +1,11 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { FlashList } from "@shopify/flash-list";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { CloudSlashIcon as CloudSlash } from "phosphor-react-native/src/icons/CloudSlash";
-import { collections } from "@matgary/api-client";
+import { collectionCredits, collections } from "@matgary/api-client";
 
 import { api } from "@/api/client";
 import {
@@ -16,9 +16,19 @@ import {
   useCollectionAccess,
   useCollectionsFeatures,
 } from "@/collections/queries";
-import { inboxTabs, parseInboxParams, statusFilterFor, type InboxTab } from "@/collections/rules";
+import {
+  OPEN_CREDIT_STATES,
+  creditsAccess,
+  inboxTabs,
+  parseInboxParams,
+  statusFilterFor,
+  type InboxTab,
+} from "@/collections/rules";
 import { CollectionBadge } from "@/components/collections/CollectionBadge";
+import { CreditRow } from "@/components/collections/CreditRow";
 import { DailyTotals } from "@/components/collections/DailyTotals";
+import { PasteSheet, type PasteDone } from "@/components/collections/PasteSheet";
+import { UnrecognisedSection } from "@/components/collections/UnrecognisedSection";
 import { usePullRefresh } from "@/components/layout/usePullRefresh";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -28,7 +38,7 @@ import { Chip } from "@/components/ui/Chip";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { t } from "@/i18n";
 import { errorText } from "@/lib/errors";
-import { money, shortDate } from "@/lib/format";
+import { countLabel, money, shortDate } from "@/lib/format";
 import { useGoBack } from "@/lib/nav";
 import { useOffline } from "@/stores/offline";
 import { useSession } from "@/stores/session";
@@ -36,11 +46,25 @@ import { RTL, RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
 
 type Collection = collections.CollectionDTO;
+type Credit = collectionCredits.CreditDTO;
+/** One FlashList for every list tab: collections (pending / confirmed / rejected) or credits (M2). */
+type Item = { kind: "collection"; c: Collection } | { kind: "credit"; credit: Credit };
 
 const PAGE_SIZE = 50;
 
-/** M1 renders four tabs; Credits is M2 (spec 08 step 24, order 21) — never shown before it is built. */
-const M1_TABS = (tabs: InboxTab[]): InboxTab[] => tabs.filter((tab) => tab !== "credits");
+/** The notice after a paste (08 §4.11): the count, with the Arabic 1 / 2 / 3–10 forms (`done.pasted{One,Two,Few}`). */
+function pasteNotice(o: PasteDone): string {
+  switch (o.notice) {
+    case "added":
+      return countLabel("app.collections.credits.done.pasted", o.added);
+    case "already":
+      return t("app.collections.credits.done.alreadyAdded");
+    case "unrecognised":
+      return t("app.collections.credits.done.notRecognised");
+    default:
+      return t("app.collections.credits.done.notCredit");
+  }
+}
 
 /** LTR isolate for an all-Latin run (invoice id, "13:41", "1234") inside Arabic. */
 function ltr(s: string): string {
@@ -57,9 +81,15 @@ function timeOf(iso: string): string {
 /**
  * The Collections inbox (doc 15 spec 08 §4.7): every InstaPay / wallet
  * transfer the shop was told about, for the owner and staff with
- * `view_collections` — Pending (with "late only"), Confirmed, Rejected, and
- * the per-account daily totals. Rows open /collections/<id>, where the
- * decisions are.
+ * `view_collections` — Pending (with "late only"), Credits (M2, only with
+ * `features.collectionsIngest`), Confirmed, Rejected, and the per-account
+ * daily totals. Rows open /collections/<id>, where the decisions are.
+ *
+ * Credits (M2, §4.11): the bank / wallet messages still waiting for a person
+ * (`state=unmatched,held`), rows → /collections/credit/<id> (one-tap match,
+ * ignore); `credits-paste` for `confirm_collections` / the owner; and, for
+ * the OWNER only, the "Unrecognised messages" section under the list (ARCH
+ * CR 8).
  *
  * Route params are the web links of 03 §B.6 (`?status=pending&stale=1`,
  * `?tab=totals`), so a push tap opens the right tab. Online only: the
@@ -69,6 +99,7 @@ function timeOf(iso: string): string {
 export default function CollectionsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const qc = useQueryClient();
   const goBack = useGoBack("/more");
   const params = useLocalSearchParams<{ tab?: string; status?: string; stale?: string }>();
   const me = useSession((s) => s.me);
@@ -78,7 +109,8 @@ export default function CollectionsScreen() {
   const branchId = useActiveBranchId();
   const online = useOffline((s) => s.online);
 
-  const tabs = M1_TABS(inboxTabs(features, access));
+  const credits = creditsAccess(features, access);
+  const tabs = inboxTabs(features, access).filter((key) => key !== "credits" || credits.canList);
   const parsed = parseInboxParams(params, features);
   // A push tap on an already-open inbox changes the params, not the mount:
   // the user's choice holds only for the params it was made under.
@@ -87,7 +119,7 @@ export default function CollectionsScreen() {
   const current =
     choice && choice.key === paramKey
       ? choice
-      : { key: paramKey, tab: parsed.tab === "credits" ? ("pending" as const) : parsed.tab, staleOnly: parsed.staleOnly };
+      : { key: paramKey, tab: parsed.tab === "credits" && !credits.canList ? ("pending" as const) : parsed.tab, staleOnly: parsed.staleOnly };
   const tab = current.tab;
   const staleOnly = current.staleOnly;
   const setTab = (next: InboxTab) => setChoice({ ...current, tab: next });
@@ -105,7 +137,7 @@ export default function CollectionsScreen() {
   const listFilters = { status: status ?? undefined, stale: tab === "pending" && staleOnly ? true : undefined, branchId };
   const listQ = useInfiniteQuery({
     queryKey: collectionKeys.list(listFilters),
-    enabled: allowed && tab !== "totals" && online,
+    enabled: allowed && tab !== "totals" && tab !== "credits" && online,
     initialPageParam: null as string | null,
     queryFn: ({ pageParam }) =>
       collections.listCollections(api, {
@@ -124,6 +156,37 @@ export default function CollectionsScreen() {
   }, [listQ.data]);
   const counts = listQ.data?.pages[0]?.counts ?? null;
 
+  // ── credits (M2) ───────────────────────────────────────────────────────────
+  const creditFilters = { state: OPEN_CREDIT_STATES, branchId };
+  const creditsQ = useInfiniteQuery({
+    queryKey: collectionKeys.credits(creditFilters),
+    enabled: allowed && credits.canList && tab === "credits" && online,
+    initialPageParam: null as string | null,
+    queryFn: ({ pageParam }) =>
+      collectionCredits.listCredits(api, {
+        state: ["unmatched", "held"],
+        cursor: pageParam,
+        limit: PAGE_SIZE,
+      }),
+    getNextPageParam: (last, _pages, lastParam) =>
+      last.nextCursor && last.nextCursor !== lastParam ? last.nextCursor : null,
+  });
+  const creditRows = useMemo(() => {
+    const seen = new Map<string, Credit>();
+    for (const page of creditsQ.data?.pages ?? []) for (const c of page.data) if (!seen.has(c.id)) seen.set(c.id, c);
+    return [...seen.values()];
+  }, [creditsQ.data]);
+
+  // The paste sheet: remounted on every opening (a fresh form and a fresh Idempotency-Key).
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteMount, setPasteMount] = useState(0);
+  const [notice, setNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (!notice) return;
+    const h = setTimeout(() => setNotice(null), 4000);
+    return () => clearTimeout(h);
+  }, [notice]);
+
   const today = localYmd();
   const [date, setDate] = useState(today);
   const summaryQ = useQuery({
@@ -132,9 +195,15 @@ export default function CollectionsScreen() {
     queryFn: () => collections.getSummary(api, { date }),
   });
 
+  const activeQ = tab === "credits" ? creditsQ : listQ;
   const pull = usePullRefresh(
-    () => (tab === "totals" ? summaryQ.refetch() : listQ.refetch()),
-    tab === "totals" ? summaryQ.isRefetching : listQ.isRefetching && !listQ.isFetchingNextPage,
+    () =>
+      tab === "totals"
+        ? summaryQ.refetch()
+        : tab === "credits"
+          ? Promise.all([creditsQ.refetch(), qc.invalidateQueries({ queryKey: collectionKeys.unrecognised() })])
+          : listQ.refetch(),
+    tab === "totals" ? summaryQ.isRefetching : activeQ.isRefetching && !activeQ.isFetchingNextPage,
   );
 
   // ── full-screen states (§4.7 "Who") ────────────────────────────────────────
@@ -214,6 +283,28 @@ export default function CollectionsScreen() {
           />
         </View>
       ) : null}
+      {tab === "credits" && credits.canPaste ? (
+        <View style={styles.filterRow}>
+          <View testID="credits-paste" collapsable={false}>
+            <Button
+              label={t("app.collections.credits.pasteSheet.title")}
+              variant="outline"
+              disabled={!online}
+              onPress={() => {
+                setPasteMount((n) => n + 1);
+                setPasteOpen(true);
+              }}
+            />
+          </View>
+        </View>
+      ) : null}
+      {notice ? (
+        <View style={styles.notice}>
+          <Text style={styles.noticeText} testID="credits-notice">
+            {notice}
+          </Text>
+        </View>
+      ) : null}
       {tab === "totals" ? (
         <View style={styles.dateRow}>
           <Pressable
@@ -264,43 +355,68 @@ export default function CollectionsScreen() {
   );
 
   const listTab = tab !== "totals" && online;
-  const empty = !listTab ? null : listQ.isLoading ? (
+  const emptyKey = tab === "pending" ? "pending" : tab === "confirmed" ? "confirmed" : tab === "credits" ? "credits" : "rejected";
+  const empty = !listTab ? null : activeQ.isLoading ? (
     <ActivityIndicator color={colors.accent} style={styles.footer} />
-  ) : listQ.isError ? (
-    <ErrorCard text={errorText(listQ.error, t("app.collections.inbox.loadFailed"))} onRetry={() => void listQ.refetch()} />
+  ) : activeQ.isError ? (
+    <ErrorCard text={errorText(activeQ.error, t("app.collections.inbox.loadFailed"))} onRetry={() => void activeQ.refetch()} />
   ) : (
     <Card>
       <View testID="collections-empty" collapsable={false}>
         <EmptyState
-          title={t(`app.collections.inbox.empty.${tab === "pending" ? "pending" : tab === "confirmed" ? "confirmed" : "rejected"}.title`)}
+          title={t(`app.collections.inbox.empty.${emptyKey}.title`)}
           hint={tab === "pending" ? t("app.collections.inbox.empty.pending.hint") : undefined}
         />
       </View>
     </Card>
   );
 
-  const footer = listTab && listQ.isFetchingNextPage ? (
+  const pager = listTab && activeQ.isFetchingNextPage ? (
     <ActivityIndicator color={colors.accent} style={styles.footer} />
-  ) : listTab && listQ.isFetchNextPageError ? (
-    <Pressable accessibilityRole="button" onPress={() => void listQ.fetchNextPage()} style={styles.retry}>
+  ) : listTab && activeQ.isFetchNextPageError ? (
+    <Pressable accessibilityRole="button" onPress={() => void activeQ.fetchNextPage()} style={styles.retry}>
       <Text style={styles.retryText}>{t("app.common.errorRetry")}</Text>
     </Pressable>
   ) : null;
+  // The owner's Unrecognised messages sit under the credits list (ARCH CR 8).
+  const footer =
+    tab === "credits" && credits.canSeeUnrecognised && online ? (
+      <View style={styles.footerStack}>
+        {pager}
+        <UnrecognisedSection online={online} />
+      </View>
+    ) : (
+      pager
+    );
+
+  const items: Item[] = !listTab
+    ? []
+    : tab === "credits"
+      ? creditRows.map((credit) => ({ kind: "credit" as const, credit }))
+      : rows.map((c) => ({ kind: "collection" as const, c }));
 
   return (
     <View style={styles.root}>
       <FlashList
-        data={listTab ? rows : []}
-        keyExtractor={(c) => c.id}
-        renderItem={({ item }) => (
-          <CollectionRow c={item} onPress={() => router.push(`/collections/${encodeURIComponent(item.id)}`)} />
-        )}
+        data={items}
+        keyExtractor={(item) => (item.kind === "credit" ? `k-${item.credit.id}` : `c-${item.c.id}`)}
+        getItemType={(item) => item.kind}
+        renderItem={({ item }) =>
+          item.kind === "credit" ? (
+            <CreditRow
+              credit={item.credit}
+              onPress={() => router.push(`/collections/credit/${encodeURIComponent(item.credit.id)}`)}
+            />
+          ) : (
+            <CollectionRow c={item.c} onPress={() => router.push(`/collections/${encodeURIComponent(item.c.id)}`)} />
+          )
+        }
         ItemSeparatorComponent={Separator}
         ListHeaderComponent={header}
         ListEmptyComponent={empty}
         ListFooterComponent={footer}
         onEndReached={() => {
-          if (listTab && listQ.hasNextPage && !listQ.isFetchingNextPage) void listQ.fetchNextPage();
+          if (listTab && activeQ.hasNextPage && !activeQ.isFetchingNextPage) void activeQ.fetchNextPage();
         }}
         onEndReachedThreshold={0.4}
         refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
@@ -308,6 +424,17 @@ export default function CollectionsScreen() {
         keyboardShouldPersistTaps="handled"
         testID="collections-list"
       />
+      {credits.canPaste ? (
+        <PasteSheet
+          key={`paste-${pasteMount}`}
+          visible={pasteOpen}
+          onClose={() => setPasteOpen(false)}
+          onDone={(outcome) => {
+            setPasteOpen(false);
+            setNotice(pasteNotice(outcome));
+          }}
+        />
+      ) : null}
     </View>
   );
 }
@@ -438,6 +565,9 @@ const styles = StyleSheet.create({
   dateSub: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, textAlign: "center" },
   offline: { alignItems: "center" },
   footer: { paddingVertical: spacing.xl },
+  footerStack: { gap: spacing.md, paddingTop: spacing.md },
+  notice: { borderRadius: radius.lg, borderWidth: 1, padding: spacing.md, backgroundColor: colors.successLight, borderColor: colors.successStrong },
+  noticeText: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.successStrong },
   retry: { alignSelf: "center", minHeight: MIN_TOUCH, justifyContent: "center", paddingHorizontal: spacing.lg },
   retryText: { ...RTL_TEXT, fontFamily: fonts.semibold, fontSize: 15, color: colors.accent },
   separator: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },

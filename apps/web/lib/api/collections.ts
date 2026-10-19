@@ -6,9 +6,19 @@
 
 import type * as api from "@matgary/api-client/endpoints/collections";
 import { NO_FEATURES } from "@/components/collections/rules";
-import type { CreditDTO, CreditDetailDTO, PasteResult, UnrecognisedDTO } from "@/lib/repo/collection-credits";
-import type { DeviceDTO } from "@/lib/repo/collection-devices";
-import type { CollectionStatus as CandidateStatus, CreditState, IgnoreReason } from "@matgary/domain/collections/types";
+import type {
+  CreditDTO,
+  CreditDetailDTO,
+  DeviceDTO as ApiDeviceDTO,
+  PasteResult,
+  UnrecognisedDTO,
+} from "@matgary/api-client/endpoints/collection-credits";
+import type {
+  CollectionStatus as CandidateStatus,
+  CreditState,
+  DeviceHealth,
+  IgnoreReason,
+} from "@matgary/domain/collections/types";
 
 type Result<F extends (...args: never[]) => Promise<unknown>> = Awaited<ReturnType<F>>;
 
@@ -180,11 +190,9 @@ export function getSummary(params: { date?: string; branchId?: string | "all" } 
 
 // ---- M2: credits, paste, unrecognised, devices (07 §4.5) ---------------------
 //
-// Types: 12 §4.2 takes them from @matgary/api-client/endpoints/collection-credits
-// (07 step 16). That file is not written yet (order 19 in progress), so they
-// come TYPE-ONLY from 07's server modules — the same interfaces the routes
-// serialise (erased at build; nothing server-side reaches the bundle). Switch
-// these imports to the api-client file once it lands; the names are 07 §4.6's.
+// Types: 12 §4.2 — type-only from @matgary/api-client/endpoints/collection-credits
+// (07 step 16), the wire shapes of 07 §4.6, so the web cannot drift from the
+// phone clients. (Until order 19 finished they came from 07's server repos.)
 
 export type {
   AccountRef as CreditAccountRef,
@@ -193,8 +201,11 @@ export type {
   CreditDetailDTO,
   PasteResult,
   UnrecognisedDTO,
-} from "@/lib/repo/collection-credits";
-export type { DeviceDTO } from "@/lib/repo/collection-devices";
+} from "@matgary/api-client/endpoints/collection-credits";
+
+/** The api-client widens `health` for phone builds older than the server; the
+ *  web ships with its server, so it knows every value (03 §B.1). */
+export type DeviceDTO = Omit<ApiDeviceDTO, "health"> & { health: DeviceHealth };
 
 export interface CreditsPage {
   data: CreditDTO[];

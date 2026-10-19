@@ -907,7 +907,35 @@ export function splitDevices<T extends { revokedAt: string | null }>(devices: re
   return { live, revoked };
 }
 
-/** Accepted pieces of a paste (the `credits.done.pasted` {n}). */
-export function pastedCount(results: ReadonlyArray<{ status: string }>): number {
-  return results.filter((r) => r.status === "accepted").length;
+/** NEW credits a paste created (the `credits.done.pasted` {n}): accepted AND
+ *  with a creditId. An unknown-format piece is accepted but makes no credit. */
+export function pastedCount(results: ReadonlyArray<{ status: string; creditId?: string | null }>): number {
+  return results.filter((r) => r.status === "accepted" && !!r.creditId).length;
+}
+
+type PasteDoneCopy = {
+  pasted: string;
+  pastedOne?: string;
+  pastedTwo?: string;
+  pastedFew?: string;
+  alreadyAdded: string;
+  notRecognised: string;
+  notCredit: string;
+};
+
+/** The toast after a paste (same rule as mobile's `pasteOutcome`): the count of
+ *  new credits with the 1 / 2 / 3–10 forms (`done.pasted{One,Two,Few}`, else the
+ *  base key), or why nothing new was added. */
+export function pasteNotice(
+  results: ReadonlyArray<{ status: string; creditId?: string | null }>,
+  done: PasteDoneCopy,
+): string {
+  const n = pastedCount(results);
+  if (n > 0) {
+    const form = n === 1 ? done.pastedOne : n === 2 ? done.pastedTwo : n <= 10 ? done.pastedFew : undefined;
+    return (form ?? done.pasted).replace("{n}", String(n));
+  }
+  if (results.some((r) => r.status === "duplicate")) return done.alreadyAdded;
+  if (results.some((r) => r.status === "accepted")) return done.notRecognised;
+  return done.notCredit;
 }

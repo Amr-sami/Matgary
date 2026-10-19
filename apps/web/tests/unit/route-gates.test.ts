@@ -97,6 +97,10 @@ const GATES: Array<[string, string, string[]]> = [
   ["collections/devices/[id]", "DELETE", [ENFORCED("manage_collection_accounts")]],
   ["collections/unrecognised", "GET", ["requireTenantWithBranch()", "isOwner(r.ctx)", COLL]],
   ["collections/unrecognised/[id]/share", "POST", ["requireTenantWithBranch()", "isOwner(r.ctx)", COLL]],
+  // Doc 15 spec 07 §4.4 — the three device-token routes: an ingest token, never a user session.
+  ["v1/collections/ingest", "POST", ['requireIngestDevice(req, "ingest.device")']],
+  ["v1/collections/ingest/heartbeat", "POST", ['requireIngestDevice(req, "ingest.heartbeat")']],
+  ["v1/collections/ingest/config", "GET", ['requireIngestDevice(req, "ingest.config")']],
   // Doc 15 spec 13 §7 T7 — the collections tick is a bearer-guarded cron.
   ["cron/collections-tick", "POST", ['guardCronRequest(req, { bucket: "collections-tick" })']],
 ];
@@ -158,6 +162,29 @@ describe("every digital-collections handler is pinned (doc 15 spec 05 §6 criter
       const src = routeSource(route);
       const handlers = [...src.matchAll(/export async function (GET|POST|PATCH|PUT|DELETE)\(/g)].map((m) => m[1]);
       expect(handlers.length).toBeGreaterThan(0);
+      for (const h of handlers) expect(pinned.has(`${h} ${route}`), `${h} /api/${route} has no GATES row`).toBe(true);
+    });
+  }
+});
+
+describe("the v1 ingest handlers never open a user session (doc 15 spec 07 §7, §4.4)", () => {
+  const routes = routeFilesUnder("v1/collections");
+
+  it("finds the three ingest route files", () => {
+    expect(routes).toEqual(["v1/collections/ingest", "v1/collections/ingest/config", "v1/collections/ingest/heartbeat"]);
+  });
+
+  for (const route of routes) {
+    it(`/api/${route}: no requireTenant* / requirePermission* anywhere; every handler has a GATES row`, () => {
+      const src = routeSource(route);
+      // Code only: the header comments may name the helpers they do NOT use.
+      const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+      expect(code).not.toMatch(/\brequireTenant/);
+      expect(code).not.toMatch(/\brequirePermission/);
+      expect(code).not.toMatch(/auth-helpers/);
+      const handlers = [...src.matchAll(/export async function (GET|POST|PATCH|PUT|DELETE)\(/g)].map((m) => m[1]);
+      expect(handlers.length).toBeGreaterThan(0);
+      const pinned = new Set(GATES.map(([r, h]) => `${h} ${r}`));
       for (const h of handlers) expect(pinned.has(`${h} ${route}`), `${h} /api/${route} has no GATES row`).toBe(true);
     });
   }

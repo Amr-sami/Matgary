@@ -3,9 +3,15 @@
 // §4.10; 03 §B.7). Called every 15 minutes by POST /api/cron/collections-tick.
 //
 // M1 jobs (13-B): `staleSweep` (grouped stale alerts, D13-1) and `limitSweep`
-// (wallet limit warnings, durable dedupe D13-3). The M2 jobs of 13-C
-// (`silentSourceSweep`, `rawPurge`, `lateRematch`) are added with spec 07 —
-// their repo functions do not exist at M1.
+// (wallet limit warnings, durable dedupe D13-3).
+// M2 jobs (13-C, on spec 07's repo functions): `silentSourceSweep` (one alert
+// per silence per ingest device, D13-4), `rawPurge` (raw-text retention, runs
+// for EVERY tenant whatever the flags — Q14) and `lateRematch` (07's
+// `rematchRecentCredits`); `limitSweep`'s sums also count unmatched/held credits.
+//
+// Gates: rawPurge — none. stale/limit — COLLECTIONS_ENABLED admits the tenant
+// and D13-6. silent/rematch — the same, AND COLLECTIONS_INGEST_ENABLED admits
+// it (with its own pilot list, like `computeCollectionsFeatures`).
 //
 // Rules kept here:
 //   - `tenants` has no RLS, so the tenant list is read with the plain `db`
@@ -22,9 +28,16 @@ import { db, withTenant } from "@/lib/db";
 import { tenants } from "@/lib/db/schema";
 import { cacheGet, cacheSet, globalKey } from "@/lib/cache";
 import { logger } from "@/lib/logger";
-import { collectionsTenantAdmitted } from "@/lib/collections/flags";
+import {
+  collectionsTenantAdmitted,
+  gateMode,
+  ingestPilotTenantIds,
+  tenantAdmitted,
+} from "@/lib/collections/flags";
 import { fanoutEvent, type CollectionLimitWarning } from "@/lib/notifications/dispatch";
 import { insertCollectionEvent } from "@/lib/repo/collections";
+import { purgeExpiredRawMessages } from "@/lib/repo/collection-ingest";
+import { rematchRecentCredits } from "@/lib/repo/collection-matching";
 import { limitWarnings, WALLET_LIMITS } from "@matgary/domain/collections/limits";
 import { accountMask } from "@matgary/domain/collections/normalize";
 import { COLLECTION_PROVIDERS } from "@matgary/domain/collections/providers";
@@ -62,6 +75,21 @@ export interface LimitSweepResult {
   notifications: number;
 }
 
+export interface SilentSweepResult {
+  devices: number;
+  notifications: number;
+}
+
+export interface RawPurgeResult {
+  deleted: number;
+}
+
+export interface LateRematchResult {
+  examined: number;
+  autoConfirmed: number;
+  suggested: number;
+}
+
 export interface TickResult {
   tenants: { total: number; processed: number };
   /** true when BUDGET_MS stopped the loop before every tenant was visited. */
@@ -69,14 +97,23 @@ export interface TickResult {
   ms: number;
   staleSweep: StaleSweepResult;
   limitSweep: LimitSweepResult;
+  /** M2: `devices` = devices newly claimed as silent (= notifications issued). */
+  silentSourceSweep: SilentSweepResult;
+  /** M2: raw rows deleted, summed over every visited tenant (Q14, SO-22). */
+  rawPurge: RawPurgeResult;
+  /** M2: 07's `rematchRecentCredits` counters, summed. */
+  lateRematch: LateRematchResult;
   /** Jobs that threw (each logged as cron.collections_tick.job_failed). */
   failures: number;
 }
 
-/** The M1 jobs; overridable in tests only (13 §7 T3 "a thrown job"). */
+/** The jobs; overridable in tests only (13 §7 T3 "a thrown job", the M2 spies). */
 export interface TickJobs {
   staleSweep: (t: TickTenant, now: Date) => Promise<StaleSweepResult>;
   limitSweep: (t: TickTenant, now: Date) => Promise<LimitSweepResult>;
+  silentSourceSweep: (t: TickTenant, now: Date) => Promise<SilentSweepResult>;
+  rawPurge: (t: TickTenant) => Promise<RawPurgeResult>;
+  lateRematch: (t: TickTenant) => Promise<LateRematchResult>;
 }
 
 export interface RunTickOptions {
@@ -108,6 +145,12 @@ export function tenantGetsAlerts(t: TickTenant): boolean {
   return !t.isDemo && !t.suspendedAt && !t.deletionScheduledAt;
 }
 
+/** COLLECTIONS_INGEST_ENABLED admits the tenant (its own pilot list, falling
+ *  back to the shared one — the same rule as `computeCollectionsFeatures`). */
+export function ingestTenantAdmitted(tenantId: string): boolean {
+  return tenantAdmitted(gateMode(process.env.COLLECTIONS_INGEST_ENABLED), tenantId, ingestPilotTenantIds());
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Runner
 // ─────────────────────────────────────────────────────────────────────────────
@@ -115,7 +158,7 @@ export function tenantGetsAlerts(t: TickTenant): boolean {
 export async function runCollectionsTick(opts: RunTickOptions): Promise<TickResult> {
   const start = Date.now();
   const budget = opts.budgetMs ?? TICK_CONSTANTS.BUDGET_MS;
-  const jobs: TickJobs = { staleSweep, limitSweep, ...opts.jobs };
+  const jobs: TickJobs = { staleSweep, limitSweep, silentSourceSweep, rawPurge, lateRematch, ...opts.jobs };
 
   const all = await db
     .select({
@@ -135,6 +178,9 @@ export async function runCollectionsTick(opts: RunTickOptions): Promise<TickResu
     ms: 0,
     staleSweep: { collections: 0, notifications: 0 },
     limitSweep: { accounts: 0, notifications: 0 },
+    silentSourceSweep: { devices: 0, notifications: 0 },
+    rawPurge: { deleted: 0 },
+    lateRematch: { examined: 0, autoConfirmed: 0, suggested: 0 },
     failures: 0,
   };
   if (all.length === 0) {
@@ -174,7 +220,10 @@ export async function runCollectionsTick(opts: RunTickOptions): Promise<TickResu
     const t = all[(startIndex + k) % all.length]!;
     result.tenants.processed += 1;
 
-    // (M2: rawPurge runs here for EVERY tenant, whatever the flags — Q14.)
+    // Retention first, for EVERY tenant — suspended, demo, to-be-deleted and
+    // flag-off ones included (Q14: retention never depends on a flag).
+    const p = await runJob(t, "rawPurge", () => jobs.rawPurge(t));
+    if (p) result.rawPurge.deleted += p.deleted;
 
     if (collectionsTenantAdmitted(t.id) && tenantGetsAlerts(t)) {
       const s = await runJob(t, "staleSweep", () => jobs.staleSweep(t, opts.now));
@@ -187,7 +236,19 @@ export async function runCollectionsTick(opts: RunTickOptions): Promise<TickResu
         result.limitSweep.accounts += l.accounts;
         result.limitSweep.notifications += l.notifications;
       }
-      // (M2: silentSourceSweep + lateRematch, also behind COLLECTIONS_INGEST_ENABLED.)
+      if (ingestTenantAdmitted(t.id)) {
+        const q = await runJob(t, "silentSourceSweep", () => jobs.silentSourceSweep(t, opts.now));
+        if (q) {
+          result.silentSourceSweep.devices += q.devices;
+          result.silentSourceSweep.notifications += q.notifications;
+        }
+        const m = await runJob(t, "lateRematch", () => jobs.lateRematch(t));
+        if (m) {
+          result.lateRematch.examined += m.examined;
+          result.lateRematch.autoConfirmed += m.autoConfirmed;
+          result.lateRematch.suggested += m.suggested;
+        }
+      }
     }
   }
 
@@ -354,18 +415,36 @@ export async function limitSweep(t: TickTenant, now: Date): Promise<LimitSweepRe
 
     // 4) Day / month received per account: pending + confirmed + auto (06 §4.5).
     //    Void and rejected parts are money that never arrived.
+    //    M2 (13-C): plus forwarded credits no sale explains yet — real
+    //    (`NOT is_test`) incoming money in `unmatched` / `held` on the
+    //    account, windowed on `occurred_at`. A matched credit is already
+    //    counted through its collection; an ignored one is not money received.
+    const accountList = sql.join(accounts.map((a) => sql`${a.id}`), sql`, `);
     const sums = rows<{ account_id: string; day: string; month: string }>(
       await tx.execute(sql`
-        SELECT c.collection_account_id AS account_id,
-               COALESCE(sum(c.amount) FILTER (WHERE c.rung_at >= ${bounds!.day_start}::timestamptz), 0)::text AS day,
-               COALESCE(sum(c.amount), 0)::text AS month
-          FROM collections c
-         WHERE c.tenant_id = ${t.id}
-           AND c.collection_account_id IN (${sql.join(accounts.map((a) => sql`${a.id}`), sql`, `)})
-           AND c.status IN ('pending', 'confirmed', 'auto_confirmed')
-           AND c.rung_at >= ${bounds!.month_start}::timestamptz
-           AND c.rung_at < ${bounds!.day_end}::timestamptz
-         GROUP BY c.collection_account_id
+        SELECT x.account_id,
+               COALESCE(sum(x.amount) FILTER (WHERE x.at >= ${bounds!.day_start}::timestamptz), 0)::text AS day,
+               COALESCE(sum(x.amount), 0)::text AS month
+          FROM (
+            SELECT c.collection_account_id AS account_id, c.amount, c.rung_at AS at
+              FROM collections c
+             WHERE c.tenant_id = ${t.id}
+               AND c.collection_account_id IN (${accountList})
+               AND c.status IN ('pending', 'confirmed', 'auto_confirmed')
+               AND c.rung_at >= ${bounds!.month_start}::timestamptz
+               AND c.rung_at < ${bounds!.day_end}::timestamptz
+            UNION ALL
+            SELECT cc.collection_account_id AS account_id, cc.amount, cc.occurred_at AS at
+              FROM collection_credits cc
+             WHERE cc.tenant_id = ${t.id}
+               AND cc.collection_account_id IN (${accountList})
+               AND cc.direction = 'credit'
+               AND cc.state IN ('unmatched', 'held')
+               AND NOT cc.is_test
+               AND cc.occurred_at >= ${bounds!.month_start}::timestamptz
+               AND cc.occurred_at < ${bounds!.day_end}::timestamptz
+          ) x
+         GROUP BY x.account_id
       `),
     );
     return { accounts, bounds: bounds!, sums };
@@ -437,4 +516,136 @@ export async function limitSweep(t: TickTenant, now: Date): Promise<LimitSweepRe
     }
   }
   return { accounts: plan.accounts.length, notifications };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// silentSourceSweep — "automatic confirmation stopped on this phone" (M2, D13-4)
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface SilentCandidateRow {
+  id: string;
+  branch_id: string | null;
+  label: string;
+  platform: string;
+  account_ids: string[] | null;
+  /** ISO text: last_message_at, or created_at when the device never posted. */
+  since: string;
+  disconnected: boolean;
+}
+
+/**
+ * One alert per silence per live ingest device. A device is silent when ≥ 3
+ * collections it should have seen (pending/confirmed, no matched credit, an
+ * account set, inside its accounts and branch) were rung more than 10 min
+ * after its last message (or creation) and more than 30 min ago; an Android
+ * listener reporting `listenerConnected = false` needs only 1. The claim
+ * (`silent_alerted_at IS NULL` → now()) is atomic, so overlapping ticks never
+ * alert twice; 07's ingest resets `silent_alerted_at` on the next accepted
+ * batch, which re-arms it (02 US-M2-08). `devices` counts devices claimed.
+ */
+export async function silentSourceSweep(t: TickTenant, now: Date): Promise<SilentSweepResult> {
+  const nowIso = now.toISOString();
+  // collection_ingest_devices has NO RLS (03 §B.2.5): the tenant filter is
+  // explicit on every statement, read with the plain pool.
+  const candidates = rows<SilentCandidateRow>(
+    await db.execute(sql`
+      SELECT d.id, d.branch_id, d.label, d.platform, d.account_ids::text[] AS account_ids,
+             to_json(COALESCE(d.last_message_at, d.created_at)) #>> '{}' AS since,
+             (d.platform = 'android_listener'
+               AND COALESCE(d.last_heartbeat ->> 'listenerConnected', '') = 'false') AS disconnected
+        FROM collection_ingest_devices d
+       WHERE d.tenant_id = ${t.id}
+         AND d.revoked_at IS NULL
+         AND d.silent_alerted_at IS NULL
+         AND d.created_at < ${nowIso}::timestamptz - make_interval(mins => ${TICK_CONSTANTS.SILENT_GRACE_MIN})
+       ORDER BY d.created_at, d.id
+    `),
+  );
+  if (candidates.length === 0) return { devices: 0, notifications: 0 };
+
+  let devices = 0;
+  let notifications = 0;
+  const branchNames = new Map<string, string | null>();
+
+  for (const d of candidates) {
+    const accountIds = d.account_ids ?? [];
+    const [row] = await withTenant(t.id, async (tx) =>
+      rows<{ missed: number }>(
+        await tx.execute(sql`
+          SELECT count(*)::int AS missed
+            FROM collections c
+           WHERE c.tenant_id = ${t.id}
+             AND c.status IN ('pending', 'confirmed')
+             AND c.matched_credit_id IS NULL
+             AND c.collection_account_id IS NOT NULL
+             AND c.rung_at > ${d.since}::timestamptz + make_interval(mins => ${TICK_CONSTANTS.SILENT_AFTER_LAST_MIN})
+             AND c.rung_at < ${nowIso}::timestamptz - make_interval(mins => ${TICK_CONSTANTS.SILENT_GRACE_MIN})
+             ${accountIds.length > 0 ? sql`AND c.collection_account_id IN (${sql.join(accountIds.map((id) => sql`${id}`), sql`, `)})` : sql``}
+             ${d.branch_id ? sql`AND c.branch_id = ${d.branch_id}` : sql``}
+        `),
+      ),
+    );
+    const missed = Number(row?.missed ?? 0);
+    const threshold = d.disconnected ? TICK_CONSTANTS.SILENT_MIN_MISSED_DISCONNECTED : TICK_CONSTANTS.SILENT_MIN_MISSED;
+    if (missed < threshold) continue;
+
+    const claimed = rows<{ id: string }>(
+      await db.execute(sql`
+        UPDATE collection_ingest_devices
+           SET silent_alerted_at = now(), updated_at = now()
+         WHERE id = ${d.id} AND tenant_id = ${t.id} AND silent_alerted_at IS NULL AND revoked_at IS NULL
+        RETURNING id
+      `),
+    );
+    if (claimed.length === 0) continue; // another tick (or a fresh batch's reset race) won
+    devices += 1;
+
+    let branchName: string | null = null;
+    if (d.branch_id) {
+      if (!branchNames.has(d.branch_id)) {
+        const [b] = await withTenant(t.id, async (tx) =>
+          rows<{ name: string | null }>(
+            await tx.execute(sql`SELECT name FROM branches WHERE tenant_id = ${t.id} AND id = ${d.branch_id}`),
+          ),
+        );
+        branchNames.set(d.branch_id, b?.name ?? null);
+      }
+      branchName = branchNames.get(d.branch_id) ?? null;
+    }
+
+    await fanoutEvent(t.id, d.branch_id, "collection.source_silent", {
+      deviceId: d.id,
+      deviceLabel: d.label,
+      platform: d.platform,
+      missedCount: missed,
+      branchName,
+      link: "/settings/collections",
+    });
+    notifications += 1;
+  }
+  return { devices, notifications };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// rawPurge — raw-text retention (M2; every tenant, no flag — Q14, 03 §E.4)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Deletes up to RAW_PURGE_LIMIT expired `collection_raw_messages` rows of
+ *  the tenant (07's `purgeExpiredRawMessages`, its own `withTenant`: a global
+ *  DELETE under `matgary_app` would delete nothing under FORCE RLS, 04 §4.4). */
+export async function rawPurge(t: TickTenant): Promise<RawPurgeResult> {
+  return purgeExpiredRawMessages(t.id, { limit: TICK_CONSTANTS.RAW_PURGE_LIMIT });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// lateRematch — re-run matching for recent unmatched / ambiguous credits (M2)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** 07's `rematchRecentCredits` over the last 72 h (= SUGGEST_AFTER_H), at most
+ *  200 credits; 07 flushes its own effects (activity, fan-outs, cache bust). */
+export async function lateRematch(t: TickTenant): Promise<LateRematchResult> {
+  return rematchRecentCredits(t.id, {
+    maxAgeHours: TICK_CONSTANTS.REMATCH_MAX_AGE_H,
+    limit: TICK_CONSTANTS.REMATCH_LIMIT,
+  });
 }

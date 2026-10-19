@@ -131,3 +131,82 @@ test("REJECT_REASONS and IGNORE_REASONS follow 03 §B.1 order", () => {
   assert.deepEqual([...r.REJECT_REASONS], ["not_received", "wrong_amount", "wrong_account", "duplicate", "other"]);
   assert.deepEqual([...r.IGNORE_REASONS], ["personal", "not_a_sale", "duplicate", "other"]);
 });
+
+// ─── M2 credits (spec 08 §4.11, order 21) ────────────────────────────────────
+
+const acc = (isOwner: boolean, perms: string[], id = "u1") => r.collectionAccess(me(isOwner, perms, id));
+const ON = { collections: true, collectionsIngest: true };
+
+test("creditsAccess: tab with ingest + view; paste/ignore with confirm; Unrecognised owner only", () => {
+  assert.deepEqual(r.creditsAccess(ON, acc(true, [])), { canList: true, canPaste: true, canIgnore: true, canSeeUnrecognised: true });
+  assert.deepEqual(r.creditsAccess(ON, acc(false, ["view_collections"])), {
+    canList: true,
+    canPaste: false,
+    canIgnore: false,
+    canSeeUnrecognised: false,
+  });
+  const confirmer = r.creditsAccess(ON, acc(false, ["view_collections", "confirm_collections"]));
+  assert.deepEqual([confirmer.canList, confirmer.canPaste, confirmer.canIgnore, confirmer.canSeeUnrecognised], [true, true, true, false]);
+  // R8: confirm without view → nothing (the tab is unreachable).
+  assert.equal(r.creditsAccess(ON, acc(false, ["confirm_collections"])).canPaste, false);
+  // Ingest off (or collections off) → no tab even for the owner.
+  assert.equal(r.creditsAccess({ collections: true, collectionsIngest: false }, acc(true, [])).canList, false);
+  assert.equal(r.creditsAccess({ collections: false, collectionsIngest: true }, acc(true, [])).canSeeUnrecognised, false);
+  assert.equal(r.creditsAccess(null, acc(true, [])).canList, false);
+});
+
+test("canMatchCandidate: four-eyes on the collection, owner exempt, open credits only", () => {
+  const cand = (over: Record<string, unknown> = {}) =>
+    ({ status: "pending", selfRecorded: false, recordedBy: { id: "u9", name: "x" }, ...over }) as never;
+  const held = { state: "held" } as never;
+  const staff = acc(false, ["view_collections", "confirm_collections"], "u1");
+  assert.equal(r.canMatchCandidate(staff, held, cand()), "ok");
+  assert.equal(r.canMatchCandidate(staff, held, cand({ selfRecorded: true })), "self");
+  assert.equal(r.canMatchCandidate(staff, held, cand({ recordedBy: { id: "u1", name: "me" } })), "self");
+  assert.equal(r.canMatchCandidate(acc(true, [], "u1"), held, cand({ selfRecorded: true })), "ok");
+  assert.equal(r.canMatchCandidate(acc(false, ["view_collections"]), held, cand()), "no_permission");
+  assert.equal(r.canMatchCandidate(staff, { state: "unmatched" } as never, cand()), "ok");
+  assert.equal(r.canMatchCandidate(staff, { state: "matched" } as never, cand()), "not_open");
+  assert.equal(r.canMatchCandidate(staff, { state: "ignored" } as never, cand()), "not_open");
+  assert.equal(r.canMatchCandidate(staff, held, cand({ status: "confirmed" })), "not_pending");
+});
+
+test("candidateWarnings: amount in piasters, account only when both are known", () => {
+  const credit = { amount: 0.3, account: { id: "a1" } } as never;
+  assert.deepEqual(r.candidateWarnings(credit, { amount: 0.1 + 0.2, accountId: "a1" } as never), {
+    amountDiffers: false,
+    accountDiffers: false,
+  });
+  assert.deepEqual(r.candidateWarnings(credit, { amount: 0.31, accountId: "a2" } as never), {
+    amountDiffers: true,
+    accountDiffers: true,
+  });
+  assert.equal(r.candidateWarnings(credit, { amount: 0.3, accountId: null } as never).accountDiffers, false);
+  assert.equal(r.candidateWarnings({ amount: 5, account: null } as never, { amount: 5, accountId: "a1" } as never).accountDiffers, false);
+});
+
+test("creditPayerText: full name, masked name, last 4, or null", () => {
+  assert.equal(r.creditPayerText({ payerName: "Ahmed Mohamed", payerNameMasked: "AHMED M****", payerPhoneLast4: "1234" }), "Ahmed Mohamed");
+  assert.equal(r.creditPayerText({ payerName: null, payerNameMasked: "AHMED M****", payerPhoneLast4: "1234" }), "AHMED M****");
+  assert.equal(r.creditPayerText({ payerName: null, payerNameMasked: null, payerPhoneLast4: "1234" }), "•••• 1234");
+  assert.equal(r.creditPayerText({ payerName: null, payerNameMasked: null, payerPhoneLast4: null }), null);
+});
+
+test("pasteOutcome: new credits counted apart from unknown-format, duplicates and drops", () => {
+  const ok = { status: "accepted", creditId: "k1" } as const;
+  const unk = { status: "accepted", reason: "unknown_format" } as const;
+  const dup = { status: "duplicate", reason: "duplicate", creditId: "k0" } as const;
+  const drop = { status: "dropped", reason: "not_credit" } as const;
+  assert.deepEqual(r.pasteOutcome([ok]), { added: 1, duplicates: 0, unrecognised: 0, dropped: 0, notice: "added" });
+  assert.deepEqual(r.pasteOutcome([ok, ok, dup, unk, drop]), { added: 2, duplicates: 1, unrecognised: 1, dropped: 1, notice: "added" });
+  assert.equal(r.pasteOutcome([dup, unk]).notice, "already");
+  assert.equal(r.pasteOutcome([unk, drop]).notice, "unrecognised");
+  assert.equal(r.pasteOutcome([drop]).notice, "not_credit");
+  assert.equal(r.pasteOutcome([]).notice, "not_credit");
+});
+
+test("OPEN_CREDIT_STATES is the 03 §B.4 comma list the credits tab asks for", () => {
+  assert.equal(r.OPEN_CREDIT_STATES, "unmatched,held");
+  assert.ok(r.KNOWN_COLLECTION_ERRORS.includes("CREDIT_ALREADY_MATCHED" as never));
+  assert.ok(r.KNOWN_COLLECTION_ERRORS.includes("INGEST_PAYLOAD_TOO_LARGE" as never));
+});

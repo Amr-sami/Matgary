@@ -32,6 +32,7 @@ import {
   methodsFor,
   parseInboxParams,
   pastedCount,
+  pasteNotice,
   paymentEventView,
   pillTone,
   removePart,
@@ -606,8 +607,37 @@ describe("splitDevices / pastedCount", () => {
     expect(live.map((d) => d.id)).toEqual(["a", "c"]);
     expect(revoked.map((d) => d.id)).toEqual(["b"]);
   });
-  it("counts accepted pieces only", () => {
-    expect(pastedCount([{ status: "accepted" }, { status: "duplicate" }, { status: "dropped" }, { status: "accepted" }])).toBe(2);
+  it("counts accepted pieces that made a credit only", () => {
+    expect(
+      pastedCount([
+        { status: "accepted", creditId: "c1" },
+        { status: "duplicate", creditId: "c0" },
+        { status: "dropped" },
+        { status: "accepted", creditId: "c2" },
+        { status: "accepted", creditId: null },
+      ]),
+    ).toBe(2);
     expect(pastedCount([])).toBe(0);
+  });
+  it("pasteNotice: 1 / 2 / 3–10 forms, base key past 10, and the nothing-new sentences", () => {
+    const done = {
+      pasted: "{n} base",
+      pastedOne: "one",
+      pastedTwo: "two",
+      pastedFew: "{n} few",
+      alreadyAdded: "already",
+      notRecognised: "unknown",
+      notCredit: "not credit",
+    };
+    const acc = (n: number) => Array.from({ length: n }, (_, i) => ({ status: "accepted", creditId: `c${i}` }));
+    expect(pasteNotice(acc(1), done)).toBe("one");
+    expect(pasteNotice(acc(2), done)).toBe("two");
+    expect(pasteNotice(acc(3), done)).toBe("3 few");
+    expect(pasteNotice(acc(10), done)).toBe("10 few");
+    expect(pasteNotice(acc(12), done)).toBe("12 base");
+    expect(pasteNotice(acc(1), { ...done, pastedOne: undefined })).toBe("1 base");
+    expect(pasteNotice([{ status: "duplicate", creditId: "c1" }], done)).toBe("already");
+    expect(pasteNotice([{ status: "accepted", creditId: null }], done)).toBe("unknown");
+    expect(pasteNotice([{ status: "dropped" }], done)).toBe("not credit");
   });
 });

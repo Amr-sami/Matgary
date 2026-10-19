@@ -7,7 +7,9 @@ import { runCollectionsTick } from "@/lib/repo/collections-tick";
 // 03 §B.7). Pinned to */15 in the compose cron service (spec 16): 5 pokes per
 // sliding hour, inside guardCronRequest's default 6/h per IP.
 //   M1: staleSweep (grouped stale alerts) · limitSweep (wallet limit warnings)
-//   M2 (13-C, with spec 07): silentSourceSweep · rawPurge · lateRematch
+//   M2 (13-C, with spec 07): silentSourceSweep · lateRematch (both behind
+//   COLLECTIONS_INGEST_ENABLED) · rawPurge (raw-text retention, every tenant,
+//   no flag — never remove or slow this route below hourly, spec 16 Q13)
 // The JSON result is printed by the cron sidecar into /var/log/cron.log and
 // monitored by spec 16 (`truncated`, `ms`, `failures`).
 

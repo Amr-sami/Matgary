@@ -16,9 +16,10 @@
 //     negative), revoked → 401 INGEST_DEVICE_REVOKED (never cached as valid),
 //     suspended → 403 TENANT_SUSPENDED, deletion scheduled → 403 INGEST_DISABLED
 //   5 the route's device bucket, then the tenant ceiling `ingest.default`
-//   6 admission: COLLECTIONS_INGEST_ENABLED admits the tenant and
-//     features.collectionsIngest holds for the device's branch (any branch for
-//     a NULL-branch device), cached 60 s; consent older than
+//   6 admission: COLLECTIONS_INGEST_ENABLED admits the tenant (env, read on
+//     every request: SEC14-F6) and features.collectionsIngest holds for the
+//     device's branch (any branch for a NULL-branch device; that switch
+//     lookup cached 60 s); consent older than
 //     COLLECTIONS_CONSENT_MIN_VERSION → 403 INGEST_DISABLED "consent_outdated"
 //   7 throttled `last_seen_at` write (≤ once a minute)
 //
@@ -33,7 +34,14 @@ import { bearerFromHeader } from "@/lib/api/native-token";
 import { clientIp } from "@/lib/request-ip";
 import { cacheDel, cacheGet, cacheSet, globalKey, tenantKey } from "@/lib/cache";
 import { checkScopedRateLimit, checkTenantRateLimit } from "@/lib/api/tenant-rate-limit";
-import { COLLECTIONS_CONSENT_MIN_VERSION, resolveCollectionsFeatures } from "@/lib/collections/flags";
+import {
+  COLLECTIONS_CONSENT_MIN_VERSION,
+  collectionsTenantAdmitted,
+  gateMode,
+  ingestPilotTenantIds,
+  resolveCollectionsFeatures,
+  tenantAdmitted,
+} from "@/lib/collections/flags";
 import type { IngestChannel, IngestPlatform } from "@matgary/domain/collections/types";
 
 export const INGEST_TOKEN_PREFIX = "mgi_";
@@ -113,9 +121,31 @@ interface DeviceLookupRow {
   deletion_scheduled_at: string | null;
 }
 
-/** Admission (§4.4 step 6), cached 60 s per (tenant, branch | any). */
+/**
+ * The env half of admission (COLLECTIONS_ENABLED and COLLECTIONS_INGEST_ENABLED
+ * with its pilot list), read on EVERY request and never cached: the kill
+ * switch bites on the first request after the redeploy (SEC14-F6, which
+ * measured 56 s while this sat behind the 60 s cache).
+ */
+export function ingestEnvAdmitted(tenantId: string): boolean {
+  return (
+    collectionsTenantAdmitted(tenantId) &&
+    tenantAdmitted(gateMode(process.env.COLLECTIONS_INGEST_ENABLED), tenantId, ingestPilotTenantIds())
+  );
+}
+
+/**
+ * Admission (§4.4 step 6). The env gates are checked first, uncached
+ * (`ingestEnvAdmitted`); only the per-branch switch lookup is cached 60 s per
+ * (tenant, ingest mode, branch | any). The mode is part of the key, so an
+ * off → pilot / on flip never reads an answer cached under the old mode
+ * either. A branch switch turned off still takes ≤ 60 s (03 §B.14 reads it
+ * per call elsewhere; here the cache bounds the DB cost of a busy phone).
+ */
 export async function ingestAdmitted(tenantId: string, branchId: string | null): Promise<boolean> {
-  const key = tenantKey(tenantId, "collections-ingest-admit", branchId ?? "any");
+  if (!ingestEnvAdmitted(tenantId)) return false;
+  const mode = gateMode(process.env.COLLECTIONS_INGEST_ENABLED);
+  const key = tenantKey(tenantId, "collections-ingest-admit", mode, branchId ?? "any");
   const hit = await cacheGet<{ admitted: boolean }>(key);
   if (hit) return hit.admitted;
   let admitted = false;

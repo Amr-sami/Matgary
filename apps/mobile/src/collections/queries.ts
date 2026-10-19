@@ -47,6 +47,13 @@ export const collectionKeys = {
   summary: (date: string, branchId: string | null) => ["collection-summary", date, branchId] as const,
   credits: (filters: CreditListFilters) => ["collection-credits", filters] as const,
   credit: (id: string) => ["collection-credits", "detail", id] as const,
+  /**
+   * M2 (order 21): the owner-only Unrecognised list (GET collections/unrecognised)
+   * — an 08-internal sub-key under the credits root, like `detail`, so a paste's
+   * invalidation of `["collection-credits"]` refreshes it too (an unknown-format
+   * paste lands there). Not snapshotted (raw text never goes to disk).
+   */
+  unrecognised: () => ["collection-credits", "unrecognised"] as const,
   /** Spec 09 imports it from here. */
   devices: () => ["collection-devices"] as const,
 };
@@ -135,6 +142,8 @@ export function invalidateCollections(qc: QueryClient): Promise<unknown> {
       ["customer-payments"],
       ["customers"],
       ["insights-overview"],
+      // M2: a decision can drop a credit's candidate; a match / ignore moves the credit.
+      ["collection-credits"],
     ].map((queryKey) => qc.invalidateQueries({ queryKey })),
   );
 }

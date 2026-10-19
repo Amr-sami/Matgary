@@ -378,9 +378,9 @@ function CollectionsPageInner() {
         <PasteDialog
           open={pasteOpen}
           onClose={() => setPasteOpen(false)}
-          onDone={(n) => {
+          onDone={(message) => {
             setPasteOpen(false);
-            setToast(dict.app.collections.credits.done.pasted.replace("{n}", String(n)));
+            setToast(message);
           }}
         />
       )}

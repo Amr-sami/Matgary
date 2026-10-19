@@ -84,7 +84,7 @@ function isActive(a: collections.CollectionsSummaryAccount, showCredits: boolean
 
 function Rows({
   b,
-  showCredits: _showCredits,
+  showCredits,
 }: {
   b: Pick<collections.CollectionsSummaryAccount, "confirmed" | "autoConfirmed" | "pending" | "rejectedDebt" | "rejectedLoss" | "unmatchedCredits">;
   showCredits: boolean;
@@ -96,9 +96,9 @@ function Rows({
       <Row label={t("app.collections.totals.pending")} bucket={b.pending} tone="warning" />
       {b.rejectedDebt.count > 0 ? <Row label={t("app.collections.totals.rejectedDebt")} bucket={b.rejectedDebt} tone="danger" /> : null}
       {b.rejectedLoss.count > 0 ? <Row label={t("app.collections.totals.rejectedLoss")} bucket={b.rejectedLoss} tone="danger" /> : null}
-      {/* M2 (spec 08 step 24, order 21): the unmatchedCredits row with its †
-          key `app.collections.totals.unmatchedCredits`, only when showCredits
-          (features.collectionsIngest). Always {0,0} until spec 07 lands. */}
+      {/* M2 (spec 08 §4.11 "Totals"): bank messages with no sale yet, only with
+          features.collectionsIngest. Not money the shop has booked, so no tone. */}
+      {showCredits ? <Row label={t("app.collections.totals.unmatchedCredits")} bucket={b.unmatchedCredits} /> : null}
     </View>
   );
 }

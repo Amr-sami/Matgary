@@ -10,9 +10,18 @@
  * see from a screenshot: that refresh rotates, that a rotated token is refused,
  * that concurrent 401s collapse into ONE refresh, and that a bogus branch id is
  * refused (400 INVALID_BRANCH) rather than honoured.
+ *
+ * SMOKE_COLLECTIONS=1 adds the digital-collections L2 section (doc 15 spec 07
+ * step 17): create an ingest device → heartbeat → config → ingest 06's VF-1
+ * fixture twice (accepted, duplicate) → list credits → revoke → ingest → 401.
+ * It needs COLLECTIONS_ENABLED + COLLECTIONS_INGEST_ENABLED admitting the
+ * smoke user's tenant (dev :3003 has both `on`).
  */
-import { ApiClient, ApiError, auth, catalog, dashboard, me, sales } from "../src/index";
+import { randomBytes } from "node:crypto";
+import { ApiClient, ApiError, auth, catalog, collectionCredits, collections, dashboard, me, sales } from "../src/index";
 import type { AuthTokens, TokenStore } from "../src/index";
+// 06's message corpus (doc 15): never a hand-typed bank format.
+import { sampleById } from "../../domain/src/collections/__fixtures__/samples";
 
 const BASE = process.env.API_URL ?? "http://127.0.0.1:3001";
 const IDENTIFIER = process.env.SMOKE_USER ?? "amr@matgary.local";
@@ -156,6 +165,11 @@ async function main() {
     );
   } else {
     console.log("  skip  POS — no product with stock >= 2");
+  }
+
+  // ---- digital collections L2 (SMOKE_COLLECTIONS=1; doc 15 spec 07 step 17) --
+  if (process.env.SMOKE_COLLECTIONS === "1") {
+    await collectionsSmoke(client);
   }
 
   // ---- trial store + signup (each mints its own session) -------------------
@@ -368,6 +382,103 @@ async function main() {
 
   console.log(`\n${passed} passed, ${failed} failed\n`);
   process.exit(failed === 0 ? 0 : 1);
+}
+
+/** "HH:MM YY-MM-DD" in Africa/Cairo — VF-1's date line, so the credit is "now". */
+function cairoStamp(at: Date): string {
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Africa/Cairo",
+      year: "2-digit",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    })
+      .formatToParts(at)
+      .map((x) => [x.type, x.value]),
+  );
+  return `${p.hour}:${p.minute} ${p.year}-${p.month}-${p.day}`;
+}
+
+/** URL path of an absolute ingest URL (the client joins it onto its own base). */
+function pathOf(url: string): string {
+  return url.replace(/^[a-z][a-z0-9+.-]*:\/\/[^/]+/i, "") || "/";
+}
+
+async function collectionsSmoke(client: ApiClient): Promise<void> {
+  const cfg = await collections.getConfig(client);
+  const ingest = (cfg as { ingest?: collectionCredits.IngestConfigBlock | null }).ingest ?? null;
+  check("collections config carries the ingest block", Boolean(ingest?.ingestUrl), ingest?.ingestUrl ?? "ingest: null (flag off?)");
+  if (!ingest) return;
+
+  const created = await collectionCredits.createDevice(
+    client,
+    {
+      label: "smoke-harness phone",
+      platform: "ios_shortcut",
+      channels: ["ios_sms", "ios_notification"],
+      accountIds: [],
+      branchId: null,
+      consentVersion: "2026-10-01",
+      consentAccepted: true,
+      appVersion: "0.1.0",
+      osVersion: "27.0",
+    },
+    `smoke-dev-${Date.now()}-${randomBytes(4).toString("hex")}`,
+  );
+  const token = created.token ?? "";
+  check("device create returns a one-time mgi_ token", /^mgi_[A-Za-z0-9_-]{43}$/.test(token), `prefix ${created.device.tokenPrefix}`);
+  check("a new device reads never_seen", created.device.health === "never_seen");
+
+  const device = (path: string, init: { method?: "GET" | "POST"; body?: unknown } = {}) =>
+    client.request<Record<string, unknown>>(pathOf(path), {
+      method: init.method ?? "GET",
+      body: init.body,
+      auth: false,
+      noBranch: true,
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+  const beat = (await device(created.heartbeatUrl, {
+    method: "POST",
+    body: { v: 1, platform: "ios_shortcut", appVersion: "0.1.0", osVersion: "27.0" },
+  })) as { configVersion?: string };
+  check("heartbeat answers a 16-hex configVersion", /^[0-9a-f]{16}$/.test(beat.configVersion ?? ""), beat.configVersion ?? "");
+  const conf = await collectionCredits.getIngestConfig(client, created.ingestUrl, token);
+  check("device config: maxAgeHours 48, keywords, same configVersion", conf.maxAgeHours === 48 && conf.keywords.ar.length > 0 && conf.configVersion === beat.configVersion);
+
+  // 06's VF-1 with today's Cairo date line and a fresh 12-digit reference.
+  const ref = Array.from(randomBytes(12), (b) => String(b % 10)).join("");
+  const vf1 = sampleById("VF-1")!;
+  const body = vf1.text.replace("17:36 26-07-27", cairoStamp(new Date())).replace("022177777777", ref);
+  const message = {
+    v: 1,
+    messages: [{ fp: randomBytes(16).toString("hex"), channel: "ios_sms", sourceApp: "", sender: vf1.sender ?? "", title: "", subtitle: "", body, receivedAt: new Date().toISOString(), test: false }],
+  };
+  const first = await collectionCredits.sendIngestTest(client, created.ingestUrl, token, message);
+  check("ingest VF-1 → accepted/parsed", first.results[0]?.status === "accepted" && first.results[0]?.reason === "parsed", JSON.stringify(first.results[0]));
+  const again = await collectionCredits.sendIngestTest(client, created.ingestUrl, token, message);
+  check("the same message again → duplicate", again.results[0]?.status === "duplicate", JSON.stringify(again.results[0]));
+
+  const list = await collectionCredits.listCredits(client, { limit: 50 });
+  const mine = list.data.find((c) => c.operatorReference === ref);
+  check("the credit is listed once", Boolean(mine) && list.data.filter((c) => c.operatorReference === ref).length === 1, mine ? `${mine.state}/${mine.holdReason ?? "-"}` : "missing");
+
+  await collectionCredits.revokeDevice(client, created.device.id);
+  let revokedCode = "";
+  try {
+    await collectionCredits.sendIngestTest(client, created.ingestUrl, token, message);
+  } catch (e) {
+    if (e instanceof ApiError) revokedCode = `${e.status} ${e.code ?? ""}`;
+  }
+  check("after revoke the token is refused", revokedCode === "401 INGEST_DEVICE_REVOKED", revokedCode || "accepted?!");
+
+  // Leave no smoke credit in the dev inbox.
+  if (mine) {
+    await collectionCredits.ignoreCredit(client, mine.id, { reason: "other", note: "smoke" }, `smoke-ign-${randomBytes(6).toString("hex")}`);
+  }
 }
 
 main().catch((error) => {

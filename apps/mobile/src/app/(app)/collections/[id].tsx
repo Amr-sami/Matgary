@@ -284,6 +284,29 @@ export default function CollectionDetailScreen() {
         </Card>
       ) : null}
 
+      {/* Matched credit (M2, §4.8): the bank / wallet message that confirmed it */}
+      {c.matchedCredit ? (
+        <Card title={t("app.collections.detail.matchedCredit")}>
+          <Row label={t("app.collections.detail.amount")} value={money(c.matchedCredit.amount)} />
+          <Row label={t("app.collections.credits.occurredAt")} value={when(c.matchedCredit.occurredAt)} />
+          {c.matchedCredit.payerNameMasked ? (
+            <Row label={t("app.collections.detail.payer")} value={c.matchedCredit.payerNameMasked} />
+          ) : null}
+          {c.matchedCredit.operatorReference ? (
+            <Row label={t("app.collections.detail.reference")} value={ltr(c.matchedCredit.operatorReference)} />
+          ) : null}
+          <Row
+            label={t("app.collections.credits.channels")}
+            value={c.matchedCredit.channels.map((ch) => t(`app.collections.vocab.channels.${ch}`)).join(" · ") || "—"}
+          />
+          <LinkRow
+            label={t("app.collections.credits.title")}
+            onPress={() => router.push(`/collections/credit/${encodeURIComponent(c.matchedCredit!.id)}`)}
+            testID="collection-open-credit"
+          />
+        </Card>
+      ) : null}
+
       {decisions.sheets}
       <EditSheet
         key={`edit-${editMount}`}
