@@ -377,7 +377,15 @@ export function toCreditDTO(r: CreditDtoRow, collections: Map<string, CandidateR
     senderKind: r.sender_kind as SenderKind,
     deviceReceivedAt: toIso(r.device_received_at)!,
     device: r.ingest_device_id && r.device_label != null ? { id: r.ingest_device_id, label: r.device_label } : null,
-    suggestedCollection: cand(r.suggested_collection_id),
+    // Only a still-pending sale is a suggestion. A manual confirm/reject does not
+    // clear other credits' suggested_collection_id (only the match path does,
+    // above), and clearing it there would take credit locks inside the
+    // collection-decision transaction — the reverse of the match path's order.
+    // Filtering on read keeps the lock order and never offers a dead match (W1).
+    suggestedCollection: (() => {
+      const k = r.suggested_collection_id ? collections.get(r.suggested_collection_id) : undefined;
+      return k && k.status === "pending" ? toCandidate(credit, k, viewerUserId) : null;
+    })(),
     matchedCollection: cand(r.matched_collection_id),
     ignoredReason: (r.ignored_reason as IgnoreReason | null) ?? null,
     decidedBy: r.decided_by_user_id ? { id: r.decided_by_user_id, name: r.decided_by_name } : null,

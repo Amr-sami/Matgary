@@ -25,7 +25,7 @@ import {
   splitPaste,
   type CreditActor,
 } from "@/lib/repo/collection-credits";
-import { getCollection, rejectCollection } from "@/lib/repo/collections";
+import { confirmCollection, getCollection, rejectCollection } from "@/lib/repo/collections";
 import { sampleById } from "@matgary/domain/collections/__fixtures__/samples";
 import {
   accountRow,
@@ -224,6 +224,18 @@ describe.skipIf(!hasTestDb)("pasteCredits (§4.13; acceptance 17)", () => {
     );
     expect(raw[0]).toMatchObject({ sender_kind: "numeric", ingest_device_id: null });
     expect(raw[0]!.client_fingerprint).toBeTruthy();
+  });
+
+  it("W1: a held credit stops suggesting a sale once that sale is confirmed by hand", async () => {
+    const acc = await walletAccount(f);
+    const sale = await walletCart(f, 390, acc.id);
+    const out = await pasteCredits(f.tenantId, owner(), { text: vf1({ amount: "390.00", receiving: acc.msisdn }), sender: null });
+    const creditId = out.results[0]!.creditId!;
+    expect((await getCredit(f.tenantId, creditId, { userId: f.ownerId, accessibleBranchIds: null, includeRaw: false }))!.suggestedCollection?.id).toBe(sale.collectionIds[0]);
+    await confirmCollection(f.tenantId, sale.collectionIds[0]!, owner(), { note: null });
+    const after = (await getCredit(f.tenantId, creditId, { userId: f.ownerId, accessibleBranchIds: null, includeRaw: false }))!;
+    expect(after.state).toBe("held");
+    expect(after.suggestedCollection).toBeNull();
   });
 
   it("a pasted copy of an already-ingested credit → duplicate with the same creditId (unchanged)", async () => {
