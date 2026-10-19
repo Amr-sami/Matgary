@@ -17,6 +17,7 @@ import type {
   CollectionStatus as CandidateStatus,
   CreditState,
   DeviceHealth,
+  DeviceWarning,
   IgnoreReason,
 } from "@matgary/domain/collections/types";
 
@@ -205,7 +206,7 @@ export type {
 
 /** The api-client widens `health` for phone builds older than the server; the
  *  web ships with its server, so it knows every value (03 §B.1). */
-export type DeviceDTO = Omit<ApiDeviceDTO, "health"> & { health: DeviceHealth };
+export type DeviceDTO = Omit<ApiDeviceDTO, "health" | "warnings"> & { health: DeviceHealth; warnings: DeviceWarning[] };
 
 export interface CreditsPage {
   data: CreditDTO[];

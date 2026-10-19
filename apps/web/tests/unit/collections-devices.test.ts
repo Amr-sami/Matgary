@@ -12,16 +12,19 @@ import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { isDomainError } from "@/lib/errors";
 import { hashIngestToken } from "@/lib/api/ingest-token";
-import { revokeReasonSchema } from "@/lib/collections/credit-schemas";
+import { heartbeatSchema, revokeReasonSchema } from "@/lib/collections/credit-schemas";
 import {
   collectionsIngestConfigFields,
   createIngestDevice,
   deviceHealth,
+  deviceWarnings,
   HEARTBEAT_LATE_MIN,
   ingestConfigFor,
   listIngestDevices,
   MAX_LIVE_DEVICES,
   PLATFORM_CHANNELS,
+  recordHeartbeat,
+  REDACTED_WARN_DAYS,
   replayCreatedDevice,
   revokeIngestDevice,
   shortcutUrls,
@@ -103,6 +106,79 @@ describe("deviceHealth(row, now) — the only health value, first match wins", (
 
   it("silent clears once a message arrives after the alert", () => {
     expect(deviceHealth(base({ silentAlertedAt: minsAgo(10), lastMessageAt: minsAgo(1) }), now)).toBe("ok");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pure: A6 — the heartbeat's redaction fields and the notifications_hidden warning
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("heartbeatSchema — A6 redaction fields (spec 11 ARCH CHANGE REQUEST 7)", () => {
+  const beat = {
+    v: 1,
+    platform: "android_listener",
+    appVersion: "1.0.0",
+    osVersion: "15",
+    listenerConnected: true,
+    lastNotificationAt: "2026-10-19T08:00:00.000Z",
+    lastUploadAt: null,
+    queued: 0,
+    packagesInstalled: [],
+  };
+
+  it("accepts the Kotlin golden body with and without the new keys, and keeps them", () => {
+    expect(heartbeatSchema.safeParse(beat).success).toBe(true);
+    const full = { ...beat, redactedCount: 3, redactedByPackage: { "com.android.shell": 2, "com.egyptianbanks.instapay": 1 }, lastRedactedAt: "2026-10-19T08:01:00.000Z" };
+    const r = heartbeatSchema.safeParse(full);
+    expect(r.success).toBe(true);
+    expect(r.data).toMatchObject({ redactedCount: 3, redactedByPackage: { "com.android.shell": 2 }, lastRedactedAt: "2026-10-19T08:01:00.000Z" });
+    expect(heartbeatSchema.safeParse({ ...beat, redactedCount: 0, redactedByPackage: {}, lastRedactedAt: null }).success).toBe(true);
+  });
+
+  it("rejects bad counts, non-package keys, more than 50 packages and a bad time", () => {
+    expect(heartbeatSchema.safeParse({ ...beat, redactedCount: -1 }).success).toBe(false);
+    expect(heartbeatSchema.safeParse({ ...beat, redactedCount: 1.5 }).success).toBe(false);
+    expect(heartbeatSchema.safeParse({ ...beat, redactedByPackage: { "not a package": 1 } }).success).toBe(false);
+    expect(heartbeatSchema.safeParse({ ...beat, redactedByPackage: { "com.a.b": -2 } }).success).toBe(false);
+    const many = Object.fromEntries(Array.from({ length: 51 }, (_, i) => [`com.p${i}.app`, 1]));
+    expect(heartbeatSchema.safeParse({ ...beat, redactedByPackage: many }).success).toBe(false);
+    expect(heartbeatSchema.safeParse({ ...beat, lastRedactedAt: "yesterday" }).success).toBe(false);
+  });
+});
+
+describe("deviceWarnings(row, now) — notifications_hidden beside the health (A6)", () => {
+  const now = new Date("2026-10-19T12:00:00.000Z");
+  const daysAgo = (d: number) => new Date(now.getTime() - d * 86_400_000).toISOString();
+  const row = (hb: Record<string, unknown> | null, over: Partial<DeviceHealthInput> = {}) => ({
+    platform: "android_listener",
+    revokedAt: null,
+    lastHeartbeat: hb,
+    ...over,
+  });
+
+  it("warns while the last redacted post is at most REDACTED_WARN_DAYS old", () => {
+    expect(REDACTED_WARN_DAYS).toBe(7);
+    expect(deviceWarnings(row({ listenerConnected: true, redactedCount: 1, lastRedactedAt: daysAgo(0) }), now)).toEqual(["notifications_hidden"]);
+    expect(deviceWarnings(row({ redactedCount: 4, lastRedactedAt: daysAgo(6.9) }), now)).toEqual(["notifications_hidden"]);
+    expect(deviceWarnings(row({ redactedCount: 4, lastRedactedAt: daysAgo(7.1) }), now)).toEqual([]);
+  });
+
+  it("is silent for 0 / missing counts, older builds, bad values, revoked devices and non-Android platforms", () => {
+    expect(deviceWarnings(row({ redactedCount: 0, lastRedactedAt: daysAgo(0) }), now)).toEqual([]);
+    expect(deviceWarnings(row({ listenerConnected: true }), now)).toEqual([]);
+    expect(deviceWarnings(row(null), now)).toEqual([]);
+    expect(deviceWarnings(row({ redactedCount: "3", lastRedactedAt: daysAgo(0) }), now)).toEqual([]);
+    expect(deviceWarnings(row({ redactedCount: 3, lastRedactedAt: null }), now)).toEqual([]);
+    expect(deviceWarnings(row({ redactedCount: 3, lastRedactedAt: "garbage" }), now)).toEqual([]);
+    expect(deviceWarnings(row({ redactedCount: 3, lastRedactedAt: daysAgo(0) }, { revokedAt: daysAgo(1) }), now)).toEqual([]);
+    expect(deviceWarnings(row({ redactedCount: 3, lastRedactedAt: daysAgo(0) }, { platform: "ios_shortcut" }), now)).toEqual([]);
+  });
+
+  it("never changes the health: a redacting phone that still uploads stays ok", () => {
+    const hb = { listenerConnected: true, redactedCount: 2, lastRedactedAt: daysAgo(0) };
+    expect(
+      deviceHealth({ platform: "android_listener", revokedAt: null, lastHeartbeat: hb, silentAlertedAt: null, lastMessageAt: daysAgo(0), lastSeenAt: daysAgo(0) }, now),
+    ).toBe("ok");
   });
 });
 
@@ -237,6 +313,36 @@ describe.skipIf(!hasTestDb)("createIngestDevice — validation (§4.11)", () => 
     expect(dto.health).toBe("never_seen");
     expect(dto.tokenPrefix).toBe(d.token.slice(4, 12));
     expect(JSON.stringify(list)).not.toContain(d.token);
+    expect(dto.warnings).toEqual([]);
+    await revokeIngestDevice(ownerDeviceActor(f), d.id);
+  });
+
+  it("A6: a heartbeat's redaction fields are stored in last_heartbeat and surface as notifications_hidden", async () => {
+    const d = await device(f, { platform: "android_listener", label: "Counter Android" });
+    const parsed = heartbeatSchema.parse({
+      v: 1,
+      platform: "android_listener",
+      appVersion: "1.0.0",
+      osVersion: "15",
+      listenerConnected: true,
+      lastNotificationAt: new Date().toISOString(),
+      lastUploadAt: null,
+      queued: 0,
+      packagesInstalled: [],
+      redactedCount: 2,
+      redactedByPackage: { "com.android.shell": 2 },
+      lastRedactedAt: new Date().toISOString(),
+    });
+    await recordHeartbeat(d.ctx, parsed);
+    const [r] = await q<{ last_heartbeat: Record<string, unknown> }>(f, sql`SELECT last_heartbeat FROM collection_ingest_devices WHERE id = ${d.id}`);
+    expect(r!.last_heartbeat).toMatchObject({ redactedCount: 2, redactedByPackage: { "com.android.shell": 2 } });
+    let dto = (await listIngestDevices(f.tenantId)).find((x) => x.id === d.id)!;
+    expect(dto.warnings).toEqual(["notifications_hidden"]);
+    expect(dto.health).toBe("never_seen"); // the warning never replaces the health
+    // A later heartbeat from a build without the fields clears it (last_heartbeat is replaced, not merged).
+    await recordHeartbeat(d.ctx, { platform: "android_listener", listenerConnected: true, queued: 0 });
+    dto = (await listIngestDevices(f.tenantId)).find((x) => x.id === d.id)!;
+    expect(dto.warnings).toEqual([]);
     await revokeIngestDevice(ownerDeviceActor(f), d.id);
   });
 });

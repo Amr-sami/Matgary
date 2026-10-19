@@ -196,6 +196,22 @@ export function healthTone(h: string): "danger" | "warning" | "neutral" | "succe
   }
 }
 
+/** The server's `DeviceDTO.warnings` this build has copy for (A6: `notifications_hidden`). */
+export const KNOWN_DEVICE_WARNINGS: readonly string[] = ["notifications_hidden"];
+
+/**
+ * 03 §B.1 `DeviceWarning`s to render beside the health badge: only known values (a newer server's
+ * value renders nothing), deduped, none for a revoked phone, [] from a server older than A6.
+ */
+export function knownWarnings(d: { warnings?: readonly unknown[] | null; revokedAt?: string | null }): string[] {
+  if (d.revokedAt || !Array.isArray(d.warnings)) return [];
+  const out: string[] = [];
+  for (const w of d.warnings) {
+    if (typeof w === "string" && KNOWN_DEVICE_WARNINGS.includes(w) && !out.includes(w)) out.push(w);
+  }
+  return out;
+}
+
 /** The non-secret MMKV record of this phone's link (09 §4.6.4 rule 4). Never a token. */
 export interface SetupRecord {
   deviceId: string | null;

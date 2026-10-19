@@ -122,6 +122,7 @@ function DeviceRow({
   const t = dict.app.collections.web.devices;
   const health = t.health as Record<string, string>;
   const platform = t.platform as Record<string, string>;
+  const warnings = t.warnings as Record<string, string>;
   const accountNames =
     d.accountIds.length === 0
       ? t.accountsAll
@@ -162,6 +163,21 @@ function DeviceRow({
           )}
           {d.lastCreditAt && <span>{t.lastCredit.replace("{date}", formatDateTime(d.lastCreditAt, locale))}</span>}
         </p>
+        {!d.revokedAt &&
+          (d.warnings ?? [])
+            .filter((w) => typeof warnings[w] === "string")
+            .map((w) => (
+              <div key={w} data-testid={`collection-device-warning-${w}`} className="pt-1 space-y-0.5">
+                <p className="text-[11px] font-medium text-orange-700" dir="auto">
+                  {warnings[w]}
+                </p>
+                {typeof warnings[`${w}Hint`] === "string" && (
+                  <p className="text-[11px] text-text-secondary" dir="auto">
+                    {warnings[`${w}Hint`]}
+                  </p>
+                )}
+              </div>
+            ))}
       </div>
       {onRevoke && !d.revokedAt && (
         <Button

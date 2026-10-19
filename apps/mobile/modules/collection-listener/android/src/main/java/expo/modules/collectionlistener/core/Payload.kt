@@ -7,8 +7,12 @@ package expo.modules.collectionlistener.core
  * ```
  * POST {ingestUrl}            {"v":1,"messages":[{"fp","channel":"android_notification","sourceApp","title"?,"subtitle"?,"body","receivedAt"}]}
  * POST {ingestUrl}/heartbeat  {"v":1,"platform":"android_listener","appVersion","osVersion","listenerConnected",
- *                              "lastNotificationAt","lastUploadAt","queued","packagesInstalled"}
+ *                              "lastNotificationAt","lastUploadAt","queued","packagesInstalled",
+ *                              "redactedCount","redactedByPackage","lastRedactedAt"}
  * ```
+ *
+ * The last three are A6 (Android 15+ sensitive-content redaction, spec 11 ARCH CHANGE REQUEST 7): how many
+ * allowlisted posts the platform handed over redacted since configure(), per package, and when the last one was.
  *
  * `sender` and `test` are never sent (the server sets `sender_kind = 'app'` for `*_notification`;
  * 09's Android verify uses the heartbeat). Null `title` / `subtitle` are omitted.
@@ -109,9 +113,15 @@ object Payload {
     val lastUploadAtMs: Long?,
     val queued: Int,
     val packagesInstalled: List<String>,
+    val redactedCount: Long = 0L,
+    val redactedByPackage: Map<String, Long> = emptyMap(),
+    val lastRedactedAtMs: Long? = null,
   )
 
-  /** Exactly the 03 §B.17 keys, in that order; null versions / timestamps are sent as JSON null. */
+  /**
+   * The 03 §B.17 keys in that order, then the A6 keys (ARCH CHANGE REQUEST 7); null versions /
+   * timestamps are sent as JSON null. `redactedByPackage` holds ≤ 50 allowlisted package ids → counts.
+   */
   fun heartbeatBody(h: Heartbeat): String {
     val sb = StringBuilder(256)
     sb.append("{\"v\":1")
@@ -124,6 +134,14 @@ object Payload {
     sb.append(",\"queued\":").append(h.queued.coerceIn(0, 100_000).toString())
     sb.append(",\"packagesInstalled\":")
     sb.append(h.packagesInstalled.take(50).joinToString(separator = ",", prefix = "[", postfix = "]") { quote(it) })
+    sb.append(",\"redactedCount\":").append(h.redactedCount.coerceIn(0L, 1_000_000_000L).toString())
+    sb.append(",\"redactedByPackage\":")
+    sb.append(
+      h.redactedByPackage.entries.take(Redaction.MAX_PACKAGES).joinToString(separator = ",", prefix = "{", postfix = "}") {
+        quote(it.key.take(200)) + ":" + it.value.coerceIn(0L, 1_000_000_000L).toString()
+      },
+    )
+    sb.append(",\"lastRedactedAt\":").append(Iso.formatOrNull(h.lastRedactedAtMs)?.let { quote(it) } ?: "null")
     sb.append('}')
     return sb.toString()
   }

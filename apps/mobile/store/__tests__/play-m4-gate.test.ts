@@ -285,6 +285,10 @@ const DECLARED: Record<string, string> = {
   lastUploadAt: "App info and performance → Diagnostics",
   queued: "App info and performance → Diagnostics",
   packagesInstalled: "App activity → Installed apps (SEC14-F7)",
+  // A6 (11 ARCH CR 7): Android 15+ redaction counts, never text.
+  redactedCount: "App info and performance → Diagnostics",
+  lastRedactedAt: "App info and performance → Diagnostics",
+  redactedByPackage: "App activity → Installed apps (SEC14-F7; allowlisted package ids → counts)",
 };
 
 test("PG-6: every field the listener sends has a Data safety row", () => {

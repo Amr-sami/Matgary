@@ -2,12 +2,15 @@ package expo.modules.collectionlistener
 
 import android.app.Notification
 import android.content.Context
+import android.content.res.Resources
+import android.os.Build
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import expo.modules.collectionlistener.core.CandidateFilter
 import expo.modules.collectionlistener.core.Fingerprint
 import expo.modules.collectionlistener.core.NotificationText
 import expo.modules.collectionlistener.core.Payload
+import expo.modules.collectionlistener.core.Redaction
 import expo.modules.collectionlistener.store.AppInfo
 import expo.modules.collectionlistener.store.CredentialStore
 import expo.modules.collectionlistener.store.KeystoreFailure
@@ -74,7 +77,17 @@ class CollectionListenerService : NotificationListenerService() {
   override fun onNotificationPosted(sbn: StatusBarNotification?) {
     if (sbn == null) return
     val ctx = applicationContext
-    executor.execute { guard(ctx) { Pipeline.handle(ctx, sbn, allowDrain = true) } }
+    // Debug builds only: the ranking snapshot for the A6 diagnostic line (Pipeline.diagnose).
+    val ranking = if (AppInfo.isDebuggable(ctx)) {
+      try {
+        currentRanking
+      } catch (_: Throwable) {
+        null
+      }
+    } else {
+      null
+    }
+    executor.execute { guard(ctx) { Pipeline.handle(ctx, sbn, allowDrain = true, ranking = ranking) } }
   }
 
   override fun onDestroy() {
@@ -123,6 +136,57 @@ internal object Pipeline {
     return s
   }
 
+  @Volatile private var placeholderId: Int = -1
+
+  /** A6: the framework's redaction placeholder in the system locale, plus the fixed en / ar strings. */
+  private fun placeholders(): Set<String> {
+    val resolved = try {
+      val res = Resources.getSystem()
+      var id = placeholderId
+      if (id == -1) {
+        id = res.getIdentifier("redacted_notification_message", "string", "android")
+        placeholderId = id
+      }
+      if (id != 0) res.getString(id) else null
+    } catch (_: Throwable) {
+      null
+    }
+    return Redaction.placeholders(resolved)
+  }
+
+  /**
+   * Debug builds only: one line per allowlisted post with booleans — never text — so a device run can
+   * see what the platform handed over (spec 11 §7.3 A6). `rankingSensitive` reads the @SystemApi
+   * `Ranking#hasSensitiveContent` by reflection when the platform allows it, else `n/a`.
+   */
+  private fun diagnose(
+    ctx: Context,
+    sbn: StatusBarNotification,
+    e: NotificationText.Extras,
+    ph: Set<String>,
+    redacted: Boolean,
+    ranking: NotificationListenerService.RankingMap?,
+  ) {
+    if (!AppInfo.isDebuggable(ctx)) return
+    fun isPh(cs: CharSequence?) = cs?.toString()?.trim()?.let { it in ph } == true
+    val sensitive = try {
+      val r = NotificationListenerService.Ranking()
+      if (ranking != null && ranking.getRanking(sbn.key, r)) {
+        r.javaClass.getMethod("hasSensitiveContent").invoke(r)?.toString() ?: "n/a"
+      } else {
+        "no-ranking"
+      }
+    } catch (_: Throwable) {
+      "n/a"
+    }
+    AppInfo.debug(
+      ctx,
+      "post sdk=${Build.VERSION.SDK_INT} redacted=$redacted textIsPlaceholder=${isPh(e.text)} " +
+        "bigTextIsPlaceholder=${isPh(e.bigText)} hasBigText=${e.bigText != null} hasLines=${e.textLines != null} " +
+        "titleLen=${e.title?.length ?: -1} textLen=${e.text?.length ?: -1} rankingSensitive=$sensitive",
+    )
+  }
+
   /** Forget the compiled config (configure() / clearCredentials()). */
   fun reset() {
     filter = null
@@ -132,7 +196,12 @@ internal object Pipeline {
   }
 
   /** True when a new row was queued. */
-  fun handle(ctx: Context, sbn: StatusBarNotification, allowDrain: Boolean): Boolean {
+  fun handle(
+    ctx: Context,
+    sbn: StatusBarNotification,
+    allowDrain: Boolean,
+    ranking: NotificationListenerService.RankingMap? = null,
+  ): Boolean {
     val state = State(ctx)
     // 1. Not configured → nothing is read (covers access granted from Settings without the consent flow).
     if (!state.configured) return false
@@ -151,15 +220,29 @@ internal object Pipeline {
     if (NotificationText.skipReason(n.flags, sbn.postTime, now, maxAge) != null) return false
     // 6. Text.
     val x = n.extras ?: return false
-    val text = NotificationText.extract(
-      NotificationText.Extras(
-        title = x.getCharSequence(Notification.EXTRA_TITLE),
-        subText = x.getCharSequence(Notification.EXTRA_SUB_TEXT),
-        bigText = x.getCharSequence(Notification.EXTRA_BIG_TEXT),
-        textLines = x.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)?.toList(),
-        text = x.getCharSequence(Notification.EXTRA_TEXT),
-      ),
-    ) ?: return false
+    val extras = NotificationText.Extras(
+      title = x.getCharSequence(Notification.EXTRA_TITLE),
+      subText = x.getCharSequence(Notification.EXTRA_SUB_TEXT),
+      bigText = x.getCharSequence(Notification.EXTRA_BIG_TEXT),
+      textLines = x.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)?.toList(),
+      text = x.getCharSequence(Notification.EXTRA_TEXT),
+    )
+    // 6a. A6: Android 15+ handed over a redacted copy (sensitive content, untrusted listener). Count it
+    //     once per shade entry (key + postTime, hashed into the seen table so the reconnect backfill does
+    //     not count it again), never its text; the heartbeat reports it. The first one forces a heartbeat.
+    val ph = placeholders()
+    val redacted = Redaction.isRedacted(Build.VERSION.SDK_INT, extras, ph)
+    diagnose(ctx, sbn, extras, ph, redacted, ranking)
+    if (redacted) {
+      val key = Fingerprint.sha256Hex("redacted|" + (sbn.key ?: pkg) + "|" + sbn.postTime)
+      if (Queue.get(ctx).markSeen(key, now, maxAge * 3_600_000L)) {
+        state.recordRedacted(pkg, now)
+        if (state.lastHeartbeatRedacted == 0L) Scheduler.heartbeatNow(ctx)
+        AppInfo.debug(ctx, "redacted total=${state.redactedCount}")
+      }
+      return false
+    }
+    val text = NotificationText.extract(extras) ?: return false
     // 7. Candidate = keyword && !OTP; otherwise dropped in memory.
     if (!filterFor(state).isCandidate(text.title, text.subtitle, text.text)) return false
 

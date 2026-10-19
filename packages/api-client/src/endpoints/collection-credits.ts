@@ -31,6 +31,8 @@ export type IngestChannel =
   | "statement";
 export type IngestPlatform = "ios_shortcut" | "ios_app_intent" | "android_listener" | "android_collector";
 export type DeviceHealth = "ok" | "never_seen" | "silent" | "listener_off" | "heartbeat_late" | "revoked";
+/** 03 §B.1 `DeviceWarning` (A6; spec 11 ARCH CHANGE REQUEST 7): shown beside the health. */
+export type DeviceWarning = "notifications_hidden";
 export type SenderKind = "alphanumeric" | "numeric" | "app";
 export type CreditDirection = "credit" | "debit" | "cash_in";
 export type CreditState = "unmatched" | "held" | "matched" | "ignored" | "info";
@@ -78,6 +80,8 @@ export interface DeviceDTO {
   lastTest: { at: string; templateId: string; amount: number } | null;
   /** A value this build does not know (a newer server) renders no badge. */
   health: DeviceHealth | (string & {});
+  /** Absent from a server older than A6; a value this build does not know renders nothing. */
+  warnings?: Array<DeviceWarning | (string & {})>;
   revokedAt: string | null;
   revokedReason: DeviceRevokeReason | null;
   createdAt: string;

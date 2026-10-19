@@ -113,6 +113,14 @@ export type CollectionFlag = (typeof COLLECTION_FLAG_VALUES)[number];
 export const DEVICE_HEALTH_VALUES = ["ok", "never_seen", "silent", "listener_off", "heartbeat_late", "revoked"] as const;
 export type DeviceHealth = (typeof DEVICE_HEALTH_VALUES)[number];
 
+/**
+ * `DeviceDTO.warnings`, computed by spec 07 `deviceWarnings` beside (never instead of) the health.
+ * `notifications_hidden`: an Android 15+ phone reported, in the last 7 days, allowlisted posts that the
+ * platform handed over redacted as sensitive content (audit A6; spec 11 ARCH CHANGE REQUEST 7).
+ */
+export const DEVICE_WARNING_VALUES = ["notifications_hidden"] as const;
+export type DeviceWarning = (typeof DEVICE_WARNING_VALUES)[number];
+
 /** Summary `limitWarnings` (§B.17); output order of limits.ts `limitWarnings()`. */
 export const LIMIT_WARNING_VALUES = ["day_80", "month_80", "new_wallet_day_80", "balance_90"] as const;
 export type LimitWarning = (typeof LIMIT_WARNING_VALUES)[number];

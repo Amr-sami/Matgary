@@ -83,7 +83,10 @@ class PayloadTest {
     )
     val o = JSONObject(body)
     assertEquals(
-      setOf("v", "platform", "appVersion", "osVersion", "listenerConnected", "lastNotificationAt", "lastUploadAt", "queued", "packagesInstalled"),
+      setOf(
+        "v", "platform", "appVersion", "osVersion", "listenerConnected", "lastNotificationAt", "lastUploadAt", "queued", "packagesInstalled",
+        "redactedCount", "redactedByPackage", "lastRedactedAt",
+      ),
       o.keys().asSequence().toSet(),
     )
     assertEquals(1, o.getInt("v"))
@@ -95,8 +98,32 @@ class PayloadTest {
     assertEquals("com.egyptianbanks.instapay", o.getJSONArray("packagesInstalled").getString(0))
     assertEquals(
       "{\"v\":1,\"platform\":\"android_listener\",\"appVersion\":\"1.1.0\",\"osVersion\":\"15\",\"listenerConnected\":true," +
-        "\"lastNotificationAt\":\"2026-09-27T09:03:11.402Z\",\"lastUploadAt\":null,\"queued\":0,\"packagesInstalled\":[\"com.egyptianbanks.instapay\"]}",
+        "\"lastNotificationAt\":\"2026-09-27T09:03:11.402Z\",\"lastUploadAt\":null,\"queued\":0,\"packagesInstalled\":[\"com.egyptianbanks.instapay\"]," +
+        "\"redactedCount\":0,\"redactedByPackage\":{},\"lastRedactedAt\":null}",
       body,
+    )
+  }
+
+  /** A6 (ARCH CHANGE REQUEST 7): redacted posts per allowlisted package, the total and the last time. */
+  @Test fun heartbeatCarriesRedactionCounts() {
+    val body = Payload.heartbeatBody(
+      Payload.Heartbeat(
+        "1.1.0", "15", true, at, null, 0, emptyList(),
+        redactedCount = 3,
+        redactedByPackage = linkedMapOf("com.android.shell" to 2L, "com.egyptianbanks.instapay" to 1L),
+        lastRedactedAtMs = at,
+      ),
+    )
+    val o = JSONObject(body)
+    assertEquals(3, o.getInt("redactedCount"))
+    assertEquals(2, o.getJSONObject("redactedByPackage").getInt("com.android.shell"))
+    assertEquals(1, o.getJSONObject("redactedByPackage").getInt("com.egyptianbanks.instapay"))
+    assertEquals("2026-09-27T09:03:11.402Z", o.getString("lastRedactedAt"))
+    assertTrue(
+      body.endsWith(
+        ",\"redactedCount\":3,\"redactedByPackage\":{\"com.android.shell\":2,\"com.egyptianbanks.instapay\":1}," +
+          "\"lastRedactedAt\":\"2026-09-27T09:03:11.402Z\"}",
+      ),
     )
   }
 }

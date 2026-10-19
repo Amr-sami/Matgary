@@ -99,8 +99,11 @@ class UploadWorker(appContext: Context, params: WorkerParameters) : CoroutineWor
     // last one (access granted right after configure()), so the server's health leaves `listener_off`
     // without waiting for the periodic run.
     val connectedChanged = Rebind.connected(ctx, state) != state.lastHeartbeatConnected
+    // A6: the first redacted post since the server last heard 0 also waives the gap (once per change),
+    // so the owner's "Android is hiding bank notifications" warning appears within seconds.
+    val firstRedaction = state.redactedCount > 0L && state.lastHeartbeatRedacted == 0L
     val wantHb = if (mode == Scheduler.MODE_HEARTBEAT_FORCED) {
-      sinceHb >= FORCED_MIN_GAP_MS || connectedChanged
+      sinceHb >= FORCED_MIN_GAP_MS || connectedChanged || firstRedaction
     } else {
       sinceHb >= PERIODIC_GAP_MS
     }
@@ -193,6 +196,7 @@ class UploadWorker(appContext: Context, params: WorkerParameters) : CoroutineWor
 
   private fun heartbeat(ctx: Context, state: State, queue: Queue, client: IngestClient): HeartbeatAction {
     val connectedNow = Rebind.connected(ctx, state)
+    val redactedSent = state.redactedCount
     val body = Payload.heartbeatBody(
       Payload.Heartbeat(
         appVersion = AppInfo.versionName(ctx),
@@ -202,6 +206,9 @@ class UploadWorker(appContext: Context, params: WorkerParameters) : CoroutineWor
         lastUploadAtMs = state.lastUploadAt,
         queued = queue.count(),
         packagesInstalled = Rebind.packagesInstalled(ctx, state.packages),
+        redactedCount = redactedSent,
+        redactedByPackage = state.redactedByPackage,
+        lastRedactedAtMs = state.lastRedactedAt,
       ),
     )
     val resp = client.postHeartbeat(body)
@@ -210,6 +217,7 @@ class UploadWorker(appContext: Context, params: WorkerParameters) : CoroutineWor
       HeartbeatAction.OK -> {
         state.lastHeartbeatAt = System.currentTimeMillis()
         state.lastHeartbeatConnected = connectedNow
+        state.lastHeartbeatRedacted = redactedSent
         if (state.pausedAt != 0L) {
           state.pausedAt = 0L
           Scheduler.drain(ctx)

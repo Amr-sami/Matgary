@@ -154,6 +154,23 @@ test("healthTone: the seven rows' badges; unknown → no badge", () => {
   assert.equal(w.healthTone("future_value"), null);
 });
 
+test("knownWarnings (A6): known values only, deduped; none when revoked or from an older server", () => {
+  assert.deepEqual(w.knownWarnings({ warnings: ["notifications_hidden"], revokedAt: null }), ["notifications_hidden"]);
+  assert.deepEqual(w.knownWarnings({ warnings: ["notifications_hidden", "future_value", "notifications_hidden", 3] }), ["notifications_hidden"]);
+  assert.deepEqual(w.knownWarnings({ warnings: ["notifications_hidden"], revokedAt: "2026-10-19T08:00:00.000Z" }), []);
+  assert.deepEqual(w.knownWarnings({}), []);
+  assert.deepEqual(w.knownWarnings({ warnings: null }), []);
+  // Every known warning has copy (text + hint) in both dictionaries.
+  const src = join(dirname(fileURLToPath(import.meta.url)), "../../../../../../../packages/i18n/src");
+  for (const l of ["ar", "en"]) {
+    const d = JSON.parse(readFileSync(join(src, `${l}.json`), "utf8")).mobile.collections.setup.devices.warnings as Record<string, unknown>;
+    for (const k of w.KNOWN_DEVICE_WARNINGS) {
+      assert.equal(typeof d[k], "string", `${l} ${k}`);
+      assert.equal(typeof d[`${k}Hint`], "string", `${l} ${k}Hint`);
+    }
+  }
+});
+
 test("resumeAction: the §4.6.6 table", () => {
   const rec = (over: Partial<typeof w.EMPTY_RECORD>) => ({ ...w.EMPTY_RECORD, ...over });
   const live = { ok: true as const, liveIds: ["d1"] };

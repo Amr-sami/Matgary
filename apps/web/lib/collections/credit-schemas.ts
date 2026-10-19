@@ -49,6 +49,10 @@ export const ingestBodySchema = z.object({
   messages: z.array(ingestMessageSchema).min(1).max(INGEST_MAX_MESSAGES),
 });
 
+/** An Android package id (spec 11 §4.5.1 `PackagePolicy.sanitize`). */
+const ANDROID_PACKAGE_RE = /^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$/;
+const HEARTBEAT_COUNT_MAX = 1_000_000_000;
+
 export const heartbeatSchema = z.object({
   v: z.literal(1),
   platform: z.enum(INGEST_PLATFORM_VALUES),
@@ -59,6 +63,14 @@ export const heartbeatSchema = z.object({
   lastUploadAt: isoInstant.nullable().optional(),
   queued: z.number().int().min(0).max(100_000).optional(),
   packagesInstalled: z.array(z.string().max(200)).max(50).optional(),
+  // A6 (Android 15+ sensitive-content redaction; spec 11 ARCH CHANGE REQUEST 7): allowlisted posts the
+  // platform handed over redacted since configure() — total, per package (≤ 50), and the last time.
+  redactedCount: z.number().int().min(0).max(HEARTBEAT_COUNT_MAX).optional(),
+  redactedByPackage: z
+    .record(z.string().regex(ANDROID_PACKAGE_RE).max(200), z.number().int().min(0).max(HEARTBEAT_COUNT_MAX))
+    .refine((m) => Object.keys(m).length <= 50, "at most 50 packages")
+    .optional(),
+  lastRedactedAt: isoInstant.nullable().optional(),
 });
 
 /** Device channels never include manual_paste / statement (§4.11). */

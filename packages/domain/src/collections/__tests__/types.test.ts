@@ -26,6 +26,7 @@ const B1: Record<string, readonly string[]> = {
     "account_inactive", "account_missing", "parts_clamped", "total_changed", "returned", "offline_rung", "via_provider",
   ],
   DEVICE_HEALTH_VALUES: ["ok", "never_seen", "silent", "listener_off", "heartbeat_late", "revoked"],
+  DEVICE_WARNING_VALUES: ["notifications_hidden"],
   LIMIT_WARNING_VALUES: ["day_80", "month_80", "new_wallet_day_80", "balance_90"],
   INGEST_RESULT_REASON_VALUES: [
     "parsed", "fallback", "unknown_format", "not_credit", "otp", "too_old", "duplicate", "channel_not_allowed",

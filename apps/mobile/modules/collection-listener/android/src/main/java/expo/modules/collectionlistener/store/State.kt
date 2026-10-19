@@ -72,6 +72,43 @@ class State(context: Context) {
   var droppedRejected: Long by long("dropped_rejected")
   var badPatterns: Long by long("bad_patterns")
 
+  // A6 (Android 15+ sensitive-content redaction): counts and a time only, never text.
+  var redactedCount: Long by long("redacted_count")
+  var lastRedactedAt: Long by long("last_redacted_at")
+
+  /** `redactedCount` as of the last 200 heartbeat; the first redaction after a 0 forces one. */
+  var lastHeartbeatRedacted: Long by long("last_heartbeat_redacted")
+
+  /** Allowlisted package → redacted posts (≤ 50 keys, `Redaction.bump`). */
+  val redactedByPackage: Map<String, Long>
+    get() {
+      val s = prefs.getString("redacted_by_package", null) ?: return emptyMap()
+      return try {
+        val o = JSONObject(s)
+        val out = LinkedHashMap<String, Long>()
+        val it = o.keys()
+        while (it.hasNext()) {
+          val k = it.next()
+          out[k] = o.optLong(k, 0L)
+        }
+        out
+      } catch (_: Throwable) {
+        emptyMap()
+      }
+    }
+
+  /** One more redacted post from [pkg] (an allowlisted package) at [nowMs]. */
+  fun recordRedacted(pkg: String, nowMs: Long) {
+    val next = expo.modules.collectionlistener.core.Redaction.bump(redactedByPackage, pkg)
+    val o = JSONObject()
+    for ((k, v) in next) o.put(k, v)
+    val e = prefs.edit()
+    e.putLong("redacted_count", redactedCount + 1)
+    e.putLong("last_redacted_at", nowMs)
+    e.putString("redacted_by_package", o.toString())
+    e.commit()
+  }
+
   /** A class name, never a message. */
   var lastErrorCode: String?
     get() = prefs.getString("last_error_code", null)

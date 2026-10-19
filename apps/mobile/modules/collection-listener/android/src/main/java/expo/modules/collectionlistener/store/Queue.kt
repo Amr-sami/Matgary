@@ -77,6 +77,32 @@ class Queue private constructor(context: Context) :
   }
 
   /**
+   * Seen-check + insert of a key that is never queued (A6: a redacted post, so the reconnect backfill
+   * does not count the same shade entry twice). True when it was new inside the window.
+   */
+  @Synchronized
+  fun markSeen(fp: String, nowMs: Long, maxAgeMs: Long): Boolean {
+    val db = writableDatabase
+    db.beginTransaction()
+    try {
+      purgeLocked(db, nowMs, maxAgeMs)
+      val seen = db.rawQuery("SELECT seen_at FROM seen WHERE fp = ?", arrayOf(fp)).use { c ->
+        c.moveToFirst() && nowMs - c.getLong(0) <= maxAgeMs
+      }
+      if (!seen) {
+        db.insertWithOnConflict("seen", null, ContentValues().apply {
+          put("fp", fp)
+          put("seen_at", nowMs)
+        }, SQLiteDatabase.CONFLICT_REPLACE)
+      }
+      db.setTransactionSuccessful()
+      return !seen
+    } finally {
+      db.endTransaction()
+    }
+  }
+
+  /**
    * Seen-check + insert in one transaction. Returns [Offer.SEEN] for a repeat inside the window,
    * else marks it seen, queues the ciphertext, applies the 500-row cap and returns
    * [Offer.QUEUED] plus how many old rows the cap pushed out.

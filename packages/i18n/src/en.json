@@ -3852,7 +3852,11 @@
           "revokeTitle": "Unlink \"{label}\"?",
           "revokeBody": "TheStoro will stop accepting messages from this phone. On an iPhone, also delete the shortcut from the Shortcuts app.",
           "revoked": "Unlinked",
-          "revokeFailed": "Couldn't unlink"
+          "revokeFailed": "Couldn't unlink",
+          "warnings": {
+            "notifications_hidden": "Android is hiding bank notifications on this phone — automatic confirmation can't read them",
+            "notifications_hiddenHint": "Transfers announced by these notifications won't be confirmed automatically. Confirm them by hand."
+          }
         },
         "credits": {
           "showRaw": "Show the message text",
@@ -6354,7 +6358,11 @@
           "revokeConfirmBody": "TheStoro will stop accepting messages from this phone.",
           "revokeIosHint": "Also delete the shortcut from the Shortcuts app.",
           "revoked": "Unlinked",
-          "revokeFailed": "Couldn't unlink"
+          "revokeFailed": "Couldn't unlink",
+          "warnings": {
+            "notifications_hidden": "Android is hiding bank notifications on this phone — automatic confirmation can't read them",
+            "notifications_hiddenHint": "Transfers announced by these notifications won't be confirmed automatically. Confirm them by hand."
+          }
         },
         "dev": {
           "simulateTest": "Simulate the test (dev)"

@@ -8,7 +8,7 @@ import { shortDate } from "@/lib/format";
 import { RTL_TEXT } from "@/theme/rtl";
 import { colors, fonts, radius, spacing } from "@/theme/tokens";
 
-import { healthTone, normalizeTs } from "./wizard";
+import { healthTone, knownWarnings, normalizeTs } from "./wizard";
 
 const TONE_VARIANT = { danger: "outofstock", warning: "lowstock", neutral: "neutral", success: "success" } as const;
 
@@ -102,6 +102,12 @@ export function DeviceRow({
         </>
       ) : null}
       {health === "silent" ? <Text style={[styles.meta, styles.warn]}>{t("mobile.collections.setup.devices.health.silentHint")}</Text> : null}
+      {knownWarnings(device).map((w) => (
+        <View key={w} testID={`collection-device-warning-${w}`} collapsable={false} style={styles.warningBox}>
+          <Text style={styles.warningText}>{t(`mobile.collections.setup.devices.warnings.${w}`)}</Text>
+          <Text style={styles.meta}>{t(`mobile.collections.setup.devices.warnings.${w}Hint`)}</Text>
+        </View>
+      ))}
       <View style={styles.actions}>
         {isThisPhone && onSetupAgain && health !== "ok" ? (
           <View testID={`collection-device-setup-again-${device.id}`} collapsable={false} style={styles.flex1}>
@@ -131,6 +137,14 @@ const styles = StyleSheet.create({
   meta: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 13, lineHeight: 20, color: colors.textSecondary },
   ltr: { writingDirection: "ltr" },
   warn: { color: colors.danger },
+  warningBox: {
+    gap: 2,
+    marginTop: spacing.xs,
+    padding: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.warningLight,
+  },
+  warningText: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 13, lineHeight: 20, color: colors.warningStrong },
   actions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.xs },
   flex1: { flex: 1 },
 });

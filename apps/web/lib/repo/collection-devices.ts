@@ -25,6 +25,7 @@ import {
   COLLECTION_PROVIDER_VALUES,
   type CollectionProvider,
   type DeviceHealth,
+  type DeviceWarning,
   type IngestChannel,
   type IngestPlatform,
 } from "@matgary/domain/collections/types";
@@ -44,6 +45,8 @@ export const PLATFORM_CHANNELS: Readonly<Record<IngestPlatform, readonly IngestC
 export const MAX_LIVE_DEVICES = 10;
 /** Three missed 15-min heartbeats of spec 11. */
 export const HEARTBEAT_LATE_MIN = 45;
+/** A6: `notifications_hidden` while the last redacted post is at most this old. */
+export const REDACTED_WARN_DAYS = 7;
 /** Revoked devices stay in the list this long. */
 export const REVOKED_LIST_DAYS = 30;
 
@@ -72,6 +75,8 @@ export interface DeviceDTO {
   lastHeartbeat: Record<string, unknown> | null;
   lastTest: { at: string; templateId: string; amount: number } | null;
   health: DeviceHealth;
+  /** Beside the health, never instead of it (A6; spec 11 ARCH CHANGE REQUEST 7). */
+  warnings: DeviceWarning[];
   revokedAt: string | null;
   revokedReason: RevokeReason | null;
   createdAt: string;
@@ -162,6 +167,25 @@ export function deviceHealth(row: DeviceHealthInput, now: Date): DeviceHealth {
   return "ok";
 }
 
+/**
+ * Warnings shown beside the health (A6; spec 11 ARCH CHANGE REQUEST 7). `notifications_hidden`: a
+ * live Android listener whose last heartbeat reports allowlisted posts that Android 15+ redacted as
+ * sensitive (so the phone could not read them) with the last one at most REDACTED_WARN_DAYS old.
+ * The heartbeat fields are re-checked here: `last_heartbeat` is jsonb written by older builds too.
+ */
+export function deviceWarnings(
+  row: Pick<DeviceHealthInput, "platform" | "revokedAt" | "lastHeartbeat">,
+  now: Date,
+): DeviceWarning[] {
+  if (row.revokedAt || row.platform !== "android_listener" || !row.lastHeartbeat) return [];
+  const count = row.lastHeartbeat.redactedCount;
+  const at = row.lastHeartbeat.lastRedactedAt;
+  if (typeof count !== "number" || !(count > 0) || typeof at !== "string") return [];
+  const t = Date.parse(at);
+  if (Number.isNaN(t) || t < now.getTime() - REDACTED_WARN_DAYS * 86_400_000) return [];
+  return ["notifications_hidden"];
+}
+
 export function toDeviceDTO(r: DeviceRow, now: Date = new Date()): DeviceDTO {
   return {
     id: r.id,
@@ -195,6 +219,7 @@ export function toDeviceDTO(r: DeviceRow, now: Date = new Date()): DeviceDTO {
       },
       now,
     ),
+    warnings: deviceWarnings({ platform: r.platform, revokedAt: r.revoked_at, lastHeartbeat: r.last_heartbeat }, now),
     revokedAt: toIso(r.revoked_at),
     revokedReason: (r.revoked_reason as RevokeReason | null) ?? null,
     createdAt: toIso(r.created_at)!,
@@ -535,6 +560,10 @@ export interface HeartbeatBody {
   lastUploadAt?: string | null;
   queued?: number;
   packagesInstalled?: string[];
+  /** A6 (spec 11 ARCH CHANGE REQUEST 7): stored as sent; `deviceWarnings` reads them. */
+  redactedCount?: number;
+  redactedByPackage?: Record<string, number>;
+  lastRedactedAt?: string | null;
 }
 
 /** last_seen_at = now(), last_heartbeat = body + serverAt; never touches last_message_at. */
