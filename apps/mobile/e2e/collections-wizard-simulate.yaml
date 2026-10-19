@@ -68,26 +68,30 @@ appId: com.thestoro.app
 #    TAB (More) and step 9 never saw the hub (T1 iOS rerun 2).
 - runFlow: helpers/dismiss-logbox.yaml
 - openLink: "matgary://settings/collections"
+# Both platforms: the centring swipes moved the hub while it was still laying
+# out, and the tap landed on the late-alert minutes field (keyboard up, still
+# on the hub; T3 Android run 1, T3 iPhone run 1). Drag in the gutter
+# (helpers/swipe-to.yaml), let it settle, tap, and once more if the wizard is
+# not up — on iOS put the number pad away first (tap the field's label).
+- runFlow:
+    file: helpers/swipe-to.yaml
+    env:
+      ID: "collections-settings-automation"
+- waitForAnimationToEnd:
+    timeout: 3000
+- tapOn:
+    id: "collections-settings-automation"
+- waitForAnimationToEnd:
+    timeout: 3000
 - runFlow:
     when:
-      platform: iOS
+      notVisible:
+        id: "collection-automation-(intro|unsupported)"
     commands:
-      - scrollUntilVisible:
-          element:
-            id: "collections-settings-automation"
-          direction: DOWN
-          centerElement: true
-          timeout: 30000
-      - tapOn:
-          id: "collections-settings-automation"
-# Android: the centring swipes moved the hub while it was still laying out,
-# and the tap landed on the late-alert minutes field (keyboard up, still on
-# the hub; T3 Android run 1). Drag in the gutter (helpers/swipe-to.yaml),
-# let it settle, tap, and once more if the wizard is not up.
-- runFlow:
-    when:
-      platform: Android
-    commands:
+      - runFlow:
+          file: helpers/keyboard-down-ios.yaml
+          env:
+            ID: "collections-settings-stale_after_minutes"
       - runFlow:
           file: helpers/swipe-to.yaml
           env:
@@ -96,19 +100,6 @@ appId: com.thestoro.app
           timeout: 3000
       - tapOn:
           id: "collections-settings-automation"
-      - waitForAnimationToEnd:
-          timeout: 3000
-      - runFlow:
-          when:
-            notVisible:
-              id: "collection-automation-(intro|unsupported)"
-          commands:
-            - runFlow:
-                file: helpers/swipe-to.yaml
-                env:
-                  ID: "collections-settings-automation"
-            - tapOn:
-                id: "collections-settings-automation"
 - extendedWaitUntil:
     visible:
       id: "collection-automation-(intro|unsupported)"
