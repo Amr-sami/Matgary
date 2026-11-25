@@ -21,6 +21,15 @@ export interface RecentSale {
   createdAt: string;
   /** Units sold across the invoice (sum of the lines' quantitySold). */
   itemCount: number;
+  /** First few lines of the invoice (newest-first). Optional on older servers
+   *  that haven't been upgraded — callers should fall back to the previous
+   *  customer/invoiceId identity when missing. */
+  lines?: { productName: string; quantitySold: number }[];
+  /** Total distinct product lines on the invoice. Optional for the same
+   *  reason — `lines.length` is a lower bound when it's absent. */
+  lineCount?: number;
+  /** Σ line discount on the invoice. Optional; 0 when absent. */
+  discount?: number;
   /** True when every line has been returned. */
   isReturned: boolean;
   isPaid: boolean;

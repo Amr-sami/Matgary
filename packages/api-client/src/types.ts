@@ -117,7 +117,13 @@ export interface DeviceSummary {
 /** apps/web/lib/repo/insights.ts — DashboardStats */
 export interface DashboardStats {
   todayRevenue: number;
+  /** Channel split for today's revenue (migration 0057). Optional for
+   *  back-compat with older servers; sums ≤ todayRevenue. */
+  todayRevenueStore?: number;
+  todayRevenueOnline?: number;
   monthRevenue: number;
+  monthRevenueStore?: number;
+  monthRevenueOnline?: number;
   monthReturns: number;
   productCount: number;
 }

@@ -75,6 +75,93 @@
       "to": "إلى",
       "clear": "مسح"
     },
+    "financials": {
+      "title": "الماليات",
+      "subtitle": "الإيرادات والتكاليف والأرباح في لمحة.",
+      "tabs": {
+        "overview": "نظرة عامة",
+        "pnl": "الأرباح والخسائر",
+        "expenses": "المصاريف",
+        "moneyMovements": "الحركات المالية",
+        "recurring": "مصاريف دورية",
+        "profitability": "الربحية"
+      },
+      "presets": {
+        "today": "اليوم",
+        "yesterday": "أمس",
+        "this_week": "هذا الأسبوع",
+        "last_week": "الأسبوع الماضي",
+        "this_month": "هذا الشهر",
+        "last_month": "الشهر الماضي",
+        "last_7_days": "آخر 7 أيام",
+        "last_30_days": "آخر 30 يومًا",
+        "this_year": "هذا العام"
+      },
+      "kpi": {
+        "grossSales": "إجمالي المبيعات",
+        "discounts": "الخصومات",
+        "returns": "المرتجعات",
+        "netSales": "صافي المبيعات",
+        "cogs": "تكلفة البضاعة المباعة",
+        "grossProfit": "إجمالي الربح",
+        "grossMargin": "هامش الربح الإجمالي",
+        "operatingExpenses": "المصاريف التشغيلية",
+        "operatingProfit": "الربح التشغيلي",
+        "otherIncome": "إيرادات أخرى",
+        "otherExpense": "مصروفات أخرى",
+        "netProfit": "صافي الربح",
+        "netMargin": "هامش صافي الربح",
+        "salesCount": "عدد الفواتير",
+        "returnsCount": "عدد المرتجعات",
+        "moneyIn": "أموال واردة",
+        "moneyOut": "أموال صادرة"
+      },
+      "kpiHint": {
+        "netSales": "إجمالي المبيعات بعد خصم التخفيضات والمرتجعات.",
+        "cogs": "تكلفة الأصناف المباعة تاريخياً، بعد خصم المرتجعات.",
+        "grossProfit": "صافي المبيعات ناقص تكلفة البضاعة المباعة.",
+        "operatingExpenses": "المصاريف + الرواتب المعتمدة.",
+        "netProfit": "الربح التشغيلي + إيرادات أخرى - مصروفات أخرى."
+      },
+      "pnl": {
+        "sectionRevenue": "الإيرادات",
+        "sectionCogs": "تكلفة البضاعة المباعة",
+        "sectionOpex": "المصاريف التشغيلية",
+        "sectionOther": "متنوعات",
+        "rowGrossSales": "المبيعات",
+        "rowDiscounts": "الخصومات",
+        "rowReturns": "المرتجعات",
+        "rowNetSales": "صافي المبيعات",
+        "rowProductCosts": "تكلفة المنتجات",
+        "rowGrossProfit": "إجمالي الربح",
+        "rowTotalOpex": "إجمالي المصاريف التشغيلية",
+        "rowOperatingProfit": "الربح التشغيلي",
+        "rowOtherIncome": "إيرادات أخرى",
+        "rowOtherExpense": "مصروفات أخرى",
+        "rowNetProfit": "صافي الربح",
+        "rowNetMargin": "هامش صافي الربح",
+        "profitRedacted": "تحتاج صلاحية view_profit لعرض أرقام الربح.",
+        "emptyGroup": "لا يوجد نشاط في هذه الفترة"
+      },
+      "comingSoon": {
+        "expensesTitle": "إدارة المصاريف ستتوفر في التحديث القادم.",
+        "expensesHint": "ستتمكن من إضافة وتعديل وتصنيف وإلغاء المصاريف من هنا. حاليًا استخدم صفحة المصاريف القديمة.",
+        "moneyMovementsTitle": "الحركات المالية ستتوفر في التحديث القادم.",
+        "moneyMovementsHint": "إيداعات وسحوبات المالك، التحويلات، والقروض — مُنفصلة عن حساب الأرباح والخسائر."
+      },
+      "empty": {
+        "title": "لا يوجد نشاط مالي في هذه الفترة",
+        "hint": "جرّب نطاقًا زمنيًا مختلفًا."
+      },
+      "error": {
+        "title": "تعذّر تحميل الماليات",
+        "hint": "تحقق من اتصالك وأعد المحاولة.",
+        "retry": "إعادة المحاولة"
+      },
+      "margin": {
+        "unit": "٪"
+      }
+    },
     "insights": {
       "loadingTitle": "الإحصائيات",
       "title": "تحليلات العمل",
@@ -560,7 +647,11 @@
           "scannedOutOfStockAction": "زيادة الكمية من المخزن",
           "scannedMultiple": "{n} منتجات بنفس الباركود — اختر واحداً",
           "scannedAdded": "تمت إضافة {name} للسلة",
-          "scannedIncremented": "تم زيادة كمية {name}"
+          "scannedIncremented": "تم زيادة كمية {name}",
+          "notFoundTitle": "منتج غير معروف",
+          "notFoundBody": "لم نجد منتجًا بالباركود \"{code}\". تحب تضيفه الآن؟",
+          "notFoundAddCta": "إضافة المنتج",
+          "scannedAlreadyInCart": "موجود بالفعل في الفاتورة: {name}"
         },
         "quickAddProduct": {
           "title": "إضافة صنف جديد للمخزن",
@@ -795,7 +886,8 @@
         "instapay": "إنستاباي",
         "card": "كارت",
         "deferred": "آجل",
-        "wallet": "محفظة موبايل"
+        "wallet": "محفظة موبايل",
+        "other": "أخرى"
       },
       "payTypes": {
         "fixed": "ثابت",
@@ -834,7 +926,9 @@
         "supplier": "الموردون",
         "purchase": "المشتريات",
         "attendance": "الحضور",
-        "collection": "التحويلات"
+        "collection": "التحويلات",
+        "customer": "العملاء",
+        "payroll": "الرواتب"
       },
       "actions": {
         "auth.login": "تسجيل الدخول",
@@ -852,6 +946,13 @@
         "team.delete": "حذف موظف",
         "team.password_reset": "إعادة ضبط كلمة مرور موظف",
         "team.compensation_set": "تعديل راتب / أجر موظف",
+        "payroll.calculate": "حساب الراتب (تحديث المسودة)",
+        "payroll.finalize": "اعتماد راتب الشهر",
+        "payroll.void": "إلغاء راتب معتمد",
+        "payroll.adjustment_create": "إضافة مكافأة / خصم",
+        "payroll.adjustment_void": "إلغاء مكافأة / خصم",
+        "payroll.compensation_update": "تعديل راتب / عمولة / مكافآت موظف",
+        "payroll.bonus_eligibility_update": "تغيير حق استلام المكافآت",
         "settings.update": "تعديل إعدادات المتجر",
         "settings.attendance_update": "تعديل إعدادات الحضور",
         "leave.submit": "تقديم طلب إجازة",
@@ -877,6 +978,8 @@
         "purchase.create": "إنشاء أمر شراء",
         "purchase.receive": "استلام أمر شراء",
         "purchase.cancel": "إلغاء أمر شراء",
+        "customer.create": "إنشاء عميل",
+        "customer.update": "تعديل عميل",
         "attendance.check_in": "تسجيل دخول",
         "attendance.check_out": "تسجيل خروج",
         "attendance.geofence_rejected": "محاولة حضور من خارج نطاق المتجر",
@@ -923,6 +1026,8 @@
         "view_suppliers": "الموردين",
         "view_purchases": "المشتريات",
         "manage_inventory": "إدارة المنتجات (إضافة / تعديل / حذف)",
+        "view_inventory_counts": "عرض جرد المخزون",
+        "manage_inventory_counts": "إجراء جرد المخزون (عدّ / اعتماد)",
         "record_sales": "تسجيل المبيعات",
         "modify_sales": "تعديل / إلغاء فاتورة",
         "manage_returns": "تسجيل المرتجعات",
@@ -940,15 +1045,18 @@
         "manage_digest_settings": "إعدادات الملخص اليومي",
         "view_collections": "عرض التحويلات",
         "confirm_collections": "تأكيد ورفض التحويلات",
-        "manage_collection_accounts": "إدارة حسابات الاستلام"
+        "manage_collection_accounts": "إدارة حسابات الاستلام",
+        "receive_all_alerts": "استقبال كل الإشعارات"
       },
       "groups": {
         "pages": "الوصول للصفحات",
         "edit": "صلاحيات التعديل",
         "suppliersPurchases": "الموردين والمشتريات",
+        "inventoryCounts": "جرد المخزون",
         "tasksLeaves": "المهام والإجازات",
         "audit": "المراقبة والتدقيق",
         "attendance": "الحضور والانصراف",
+        "notifications": "الإشعارات",
         "collections": "التحويلات"
       }
     },
@@ -1210,6 +1318,118 @@
         "charts": {
           "planDistribution": "توزيع الباقات",
           "signups30d": "تسجيلات (آخر 30 يوم)"
+        },
+        "attention": {
+          "title": "محتاج متابعة",
+          "allClear": "كل حاجة تمام — مفيش حاجة محتاجة متابعة.",
+          "critical": "عاجل",
+          "atRisk": "في خطر",
+          "attention": "متابعة",
+          "items": {
+            "suspended": "متجر موقوف",
+            "paymentFailures": "متجر عنده دفعات فاشلة (30 يوم)",
+            "highRisk": "متجر في خطر انسحاب مرتفع",
+            "trialsExpiring": "تجربة بتنتهي خلال 7 أيام",
+            "mediumRisk": "متجر في خطر انسحاب متوسط"
+          }
+        },
+        "presence": {
+          "title": "المستخدمون الآن",
+          "onlineNow": "متصل الآن",
+          "active5m": "نشط آخر 5د",
+          "active15m": "نشط آخر 15د",
+          "activeToday": "نشط اليوم",
+          "dau": "يومي",
+          "wau": "أسبوعي",
+          "mau": "شهري",
+          "platformSplit": "المتصلون حسب المنصة",
+          "liveDot": "مباشر",
+          "platform": {
+            "ios": "iOS",
+            "android": "Android",
+            "web": "ويب",
+            "other": "أخرى"
+          }
+        },
+        "storeActivity": {
+          "title": "نشاط المتاجر",
+          "activeToday": "نشط اليوم",
+          "active7d": "نشط آخر 7 أيام",
+          "active30d": "نشط آخر 30 يوم",
+          "salesActiveToday": "عمليات بيع اليوم",
+          "salesActive7d": "عمليات بيع 7 أيام",
+          "salesActive30d": "عمليات بيع 30 يوم",
+          "inactive7d": "متوقف 7 أيام+",
+          "inactive14d": "متوقف 14 يوم+",
+          "inactive30d": "متوقف 30 يوم+",
+          "trend": "عدد المتاجر النشطة — آخر 30 يوم"
+        },
+        "totals": {
+          "title": "إجماليات المنصة",
+          "products": "المنتجات",
+          "categories": "التصنيفات",
+          "customers": "العملاء",
+          "suppliers": "الموردون",
+          "employees": "الموظفون",
+          "activePaid": "متاجر مدفوعة",
+          "suspended": "موقوفة",
+          "expiredTrials": "تجارب منتهية"
+        },
+        "devices": {
+          "title": "الأجهزة والتثبيتات",
+          "activeDevicesNow": "أجهزة نشطة الآن",
+          "activeDevicesToday": "أجهزة نشطة اليوم",
+          "installsToday": "تثبيتات اليوم",
+          "installsThisWeek": "تثبيتات 7 أيام",
+          "installsThisMonth": "تثبيتات 30 يوم",
+          "byPlatform": "الأجهزة النشطة حسب المنصة",
+          "platform": {
+            "ios": "iOS",
+            "android": "Android",
+            "web": "ويب",
+            "other": "أخرى"
+          },
+          "trend": "التثبيتات الجديدة — آخر 90 يوم",
+          "versions": "توزيع إصدارات التطبيق (نشطة آخر 30 يوم)",
+          "versionLabel": "الإصدار",
+          "versionsEmpty": "لا توجد أجهزة نشطة بإصدار مسجّل بعد."
+        }
+      },
+      "health": {
+        "reasons": {
+          "noActivityEver": "لا يوجد نشاط مسجّل أبدًا لهذا المتجر.",
+          "lowActivity": "آخر نشاط كان من {days} يوم.",
+          "inactiveDays": "لا يوجد نشاط من {days} يوم.",
+          "noSales60d": "لا توجد مبيعات في آخر 60 يوم.",
+          "noSales30d": "لا توجد مبيعات في آخر 30 يوم.",
+          "salesDeclinedModerate": "المبيعات انخفضت {pct}% مقارنة بـ 30 يوم السابقين.",
+          "salesDeclinedSevere": "المبيعات انخفضت {pct}% مقارنة بـ 30 يوم السابقين.",
+          "noEmployees": "المتجر مفيش بيه موظفين.",
+          "lowEmployeeActivity": "{active} من {total} موظف فقط كانوا نشطين مؤخرًا.",
+          "veryLowEmployeeActivity": "{active} من {total} موظف فقط كانوا نشطين مؤخرًا.",
+          "suspended": "المتجر موقوف.",
+          "trialExpiresSoon": "التجربة بتنتهي خلال {days} يوم.",
+          "trialExpired": "التجربة انتهت.",
+          "paymentPastDue": "الاشتراك متأخر السداد.",
+          "subscription_cancelled": "الاشتراك ملغي.",
+          "subscription_expired": "الاشتراك منتهي.",
+          "flag_digest_not_configured": "الملخص اليومي غير مفعّل.",
+          "flag_no_sales_7d": "لا توجد مبيعات في آخر 7 أيام.",
+          "flag_dormant_employees_30d": "{value} موظف غير نشط من 30 يوم أو أكثر."
+        }
+      },
+      "risk": {
+        "reasons": {
+          "suspended": "المتجر موقوف.",
+          "paymentFailed": "{count} محاولة دفع فاشلة في آخر 30 يوم.",
+          "trialExpiringSoon": "التجربة بتنتهي خلال {days} يوم.",
+          "trialExpired": "التجربة انتهت.",
+          "subscriptionCancelled": "الاشتراك ملغي.",
+          "noSalesEver": "لا توجد عملية بيع مسجّلة أبدًا.",
+          "noSalesDays": "لا توجد مبيعات في آخر {days} يوم.",
+          "salesDeclined": "المبيعات انخفضت {pct}% مقارنة بـ 30 يوم السابقين.",
+          "employeesInactive": "{active} من {total} موظف فقط كانوا نشطين مؤخرًا.",
+          "ownerInactive": "آخر نشاط للمالك من {days} يوم."
         }
       },
       "sales": {
@@ -1556,7 +1776,16 @@
             "branchCount_1": "1",
             "branchCount_23": "2–3",
             "branchCount_4p": "+4",
-            "trialExpiring": "تنتهي التجربة خلال"
+            "trialExpiring": "تنتهي التجربة خلال",
+            "health": "الصحة",
+            "health_healthy": "سليم",
+            "health_attention": "يحتاج متابعة",
+            "health_at_risk": "في خطر",
+            "risk": "الخطر",
+            "risk_healthy": "سليم",
+            "risk_low": "منخفض",
+            "risk_medium": "متوسط",
+            "risk_high": "مرتفع"
           },
           "columns": {
             "name": "المتجر",
@@ -1565,11 +1794,17 @@
             "branches": "الفروع",
             "employees": "الموظفون",
             "lastLogin": "آخر بيع",
+            "lastActivity": "آخر نشاط",
             "mrr": "الإيراد الشهري",
-            "status": "الحالة"
+            "status": "الحالة",
+            "health": "الصحة",
+            "risk": "الخطر",
+            "products": "منتجات",
+            "categories": "تصنيفات"
           },
           "empty": "مفيش متاجر بالفلتر ده.",
-          "emptyHint": "جرب تشيل الفلتر أو وسّع الفترة الزمنية."
+          "emptyHint": "جرب تشيل الفلتر أو وسّع الفترة الزمنية.",
+          "truncatedWarning": "بنعرض أعلى النتائج المطابقة. فلتر الصحة/الخطر بياخد عينة من أحدث المتاجر فقط — ممكن يوجد متاجر إضافية مطابقة. الأرقام الكبيرة في نظرة عامة بتطلع من مصدر دقيق للمنصة كاملة."
         },
         "detail": {
           "back": "← كل المتاجر",
@@ -1630,7 +1865,93 @@
               "errorGeneric": "تعذر تمديد التجربة.",
               "errorNotTrialing": "ميقدرش تمدد التجربة إلا لو الاشتراك في وضع 'تجربة'.",
               "successToast": "تم تمديد التجربة."
+            },
+            "enableTrial": "تفعيل تجربة",
+            "enableTrialModal": {
+              "title": "تفعيل تجربة مجانية",
+              "intro": "تبدأ تجربة جديدة مدتها N يوم من الآن. تلغي تاريخ انتهاء التجربة الحالي وتعيد حالة الاشتراك إلى 'تجربة'.",
+              "daysLabel": "مدة التجربة (أيام، 1–90)",
+              "previewLabel": "تنتهي التجربة",
+              "cancel": "إلغاء",
+              "confirm": "تفعيل التجربة",
+              "errorGeneric": "تعذر تفعيل التجربة.",
+              "errorInvalidDays": "المدة لازم تكون بين 1 و 90 يوم.",
+              "successToast": "تم تفعيل التجربة."
+            },
+            "resetOwnerPassword": "إعادة تعيين كلمة مرور المالك",
+            "resetPasswordModal": {
+              "title": "إعادة تعيين كلمة مرور المالك",
+              "intro": "هيتم إنشاء كلمة مرور مؤقتة لمرة واحدة لمالك المتجر. هتشوفها مرة واحدة فقط — انسخها وابعتها للمالك بوسيلة آمنة (تليفون أو واتساب). المالك هيُطلب منه تعيين كلمة مرور جديدة عند الدخول التالي.",
+              "storeLabel": "المتجر",
+              "ownerLabel": "المالك",
+              "bullets": {
+                "newPassword": "هيتم توليد كلمة مرور مؤقتة من 16 حرفًا من السيرفر.",
+                "signOutEverywhere": "كل جلسات المالك هيتم إنهاؤها فورًا — ويب + موبايل.",
+                "forceRotation": "عند الدخول التالي، المالك لازم يختار كلمة مرور جديدة قبل استخدام التطبيق.",
+                "audited": "الإجراء بيتسجّل في سجل التدقيق. كلمة المرور نفسها ما بتتسجّل أبدًا."
+              },
+              "cancel": "إلغاء",
+              "confirm": "إعادة التعيين",
+              "resultIntro": "تمّ. كلمة المرور المؤقتة:",
+              "resultWarning": "كلمة المرور دي بتظهر مرة واحدة. انسخها دلوقتي — تحديث الصفحة مش هيرجّعها. ابعتها للمالك بوسيلة آمنة.",
+              "tempPasswordLabel": "كلمة المرور المؤقتة",
+              "copy": "نسخ",
+              "copied": "تم النسخ ✓",
+              "close": "إغلاق",
+              "errorGeneric": "تعذّر إعادة تعيين كلمة المرور."
             }
+          },
+          "presence": {
+            "title": "الحضور",
+            "onlineNow": "متصل الآن",
+            "activeToday": "نشط اليوم",
+            "activeDevices": "أجهزة نشطة",
+            "byPlatform": "حسب المنصة",
+            "platform": {
+              "ios": "iOS",
+              "android": "Android",
+              "web": "ويب",
+              "other": "أخرى"
+            },
+            "last24h": "المستخدمون النشطون — آخر 24 ساعة"
+          },
+          "usage": {
+            "title": "الاستخدام",
+            "products": "المنتجات",
+            "categories": "التصنيفات",
+            "customers": "العملاء",
+            "suppliers": "الموردون",
+            "employees": "الموظفون",
+            "salesLast30d": "مبيعات (30 يوم)",
+            "topCategories": "أعلى التصنيفات بعدد المنتجات",
+            "topCategoriesEmpty": "لا توجد تصنيفات بعد."
+          },
+          "healthRisk": {
+            "title": "صحة المتجر",
+            "scoreLabel": "درجة الصحة",
+            "status": {
+              "healthy": "سليم",
+              "attention": "يحتاج متابعة",
+              "at_risk": "في خطر"
+            },
+            "riskLabel": "خطر الانسحاب",
+            "risk": {
+              "healthy": "سليم",
+              "low": "منخفض",
+              "medium": "متوسط",
+              "high": "مرتفع"
+            },
+            "categories": {
+              "activity": "النشاط",
+              "sales": "المبيعات",
+              "employees": "الموظفون",
+              "recent_activity": "الاستخدام الحديث",
+              "subscription": "الاشتراك",
+              "flags": "تنبيهات قائمة"
+            },
+            "whyHealth": "السبب؟",
+            "whyRisk": "أسباب الخطر",
+            "noReasons": "لا توجد مشاكل."
           },
           "billing": {
             "title": "الباقة والفواتير",
@@ -2292,7 +2613,35 @@
         "footerCount": "{n}/500 — يظهر تحت «شكراً لتسوقكم».",
         "showLoyalty": "إظهار النقاط والرصيد على الفاتورة",
         "showLoyaltyHint": "يطبع «نقاط مكتسبة» و«رصيد المحفظة» — أقوى محفز لاستخدام برنامج الولاء. يحتاج برنامج الولاء مفعّل.",
-        "previewLabel": "↓ معاينة مبدئية ↓"
+        "previewLabel": "↓ معاينة مبدئية ↓",
+        "identityHeading": "هوية الفاتورة",
+        "identitySubhead": "كل حقل اختياري. مفيش أي تأثير على المبيعات القديمة أو الحسابات.",
+        "addressLabel": "عنوان الفاتورة",
+        "addressHint": "يظهر في أعلى الفاتورة المطبوعة.",
+        "addressPlaceholder": "مثال: 15 شارع النصر، مدينة نصر، القاهرة",
+        "sloganLabel": "الشعار / رسالة الشكر",
+        "sloganHint": "يُطبع تحت اسم المتجر. اضغط اقتراح لتعبئته بسرعة.",
+        "sloganPlaceholder": "مثال: شكراً لتسوقكم معنا",
+        "taxRegLabel": "السجل الضريبي",
+        "taxRegPlaceholder": "مثال: 123-456-789",
+        "taxCardLabel": "البطاقة الضريبية",
+        "taxCardPlaceholder": "مثال: 100-200-300",
+        "returnPolicyLabel": "سياسة الاستبدال والاسترجاع",
+        "returnPolicyHint": "يظهر تحت سطر الشكر.",
+        "returnPolicyPlaceholder": "مثال: الاستبدال خلال 14 يومًا بشرط وجود الفاتورة. لا يوجد استرداد نقدي.",
+        "referencePrefixLabel": "بادئة رقم الفاتورة",
+        "referencePrefixHint": "تُطبع قبل رقم الفاتورة في الذيل (مثال: INV-A1B2C3D4E5).",
+        "referencePrefixPlaceholder": "مثال: INV",
+        "showToggle": "إظهار على الفاتورة",
+        "showTaxToggle": "إظهار بيانات الضرائب",
+        "emptyHidesHint": "ملاحظة: الحقل الفاضي يختفي تلقائيًا. المفتاح يخفي السطر مع الاحتفاظ بالنص للاستخدام لاحقًا.",
+        "phoneLabel": "رقم هاتف الفاتورة",
+        "phonePlaceholder": "مثال: 01000000000",
+        "phoneHint": "يظهر في رأس الفاتورة. لو تركته فاضي السطر هيختفي.",
+        "nameAlignmentLabel": "محاذاة اسم المتجر",
+        "alignLeft": "يسار",
+        "alignCenter": "وسط",
+        "alignRight": "يمين"
       },
       "whatsapp": {
         "section": "إعدادات واتساب",
@@ -3142,6 +3491,34 @@
         "sale.alert": {
           "title": "صوت البيع",
           "hint": "كل أجهزة المحل ترنّ رنّة الكاشير لما تتسجّل بيعة من جهاز تاني"
+        },
+        "report.weekly": {
+          "title": "التقرير الأسبوعي",
+          "hint": "صباح الاثنين — إيرادات الأسبوع الماضي وأعلى المنتجات مبيعاً والمرتجعات والمصاريف."
+        },
+        "report.monthly": {
+          "title": "التقرير الشهري",
+          "hint": "أول كل شهر — ملخص الشهر الماضي كاملاً يصل مباشرة إلى هاتفك."
+        },
+        "expense.recorded": {
+          "title": "مصروف جديد",
+          "hint": "يُرسل عندما يسجّل أحد الموظفين مصروفاً."
+        },
+        "product.added": {
+          "title": "منتج جديد",
+          "hint": "يُرسل عند إضافة منتج جديد إلى المخزن."
+        },
+        "inventory.adjusted": {
+          "title": "تعديل مخزون",
+          "hint": "يُرسل عند تعديل كمية منتج يدوياً (+ أو −)."
+        },
+        "return.recorded": {
+          "title": "مرتجع جديد",
+          "hint": "يُرسل عند تسجيل مرتجع ضد بيع."
+        },
+        "attendance.check_in": {
+          "title": "تسجيل حضور موظف",
+          "hint": "يُرسل عندما يسجّل أحد الموظفين حضوره لمناوبة."
         }
       },
       "delivery": {
@@ -3227,7 +3604,8 @@
         "stockStatus": {
           "in": "متوفر",
           "low": "مخزون منخفض",
-          "out": "نفذ"
+          "out": "نفذ",
+          "alert": "يحتاج تجديد"
         }
       },
       "sort": {
@@ -3568,7 +3946,8 @@
         "sales": "المبيعات",
         "addProduct": "إضافة منتج",
         "purchases": "المشتريات",
-        "insights": "التحليلات"
+        "insights": "التحليلات",
+        "financials": "الماليات"
       },
       "secondary": {
         "tasks": "المهام",
@@ -5100,6 +5479,73 @@
     }
   },
   "mobile": {
+    "voice": {
+      "micLabel": "سجل رسالة صوتية",
+      "recording": "جاري التسجيل",
+      "cancel": "إلغاء",
+      "stop": "تم",
+      "transcribing": "جاري تحويل الصوت لنص…",
+      "permissionTitle": "إذن الميكروفون",
+      "permissionBody": "لتسجيل الرسائل الصوتية لـ Storo، فعّل الميكروفون من الإعدادات.",
+      "permissionOpenSettings": "فتح الإعدادات",
+      "permissionCancel": "إلغاء",
+      "errorGeneric": "في مشكلة. حاول تاني.",
+      "errorRateLimited": "محاولات كتير. انتظر دقيقة.",
+      "errorAudioTooLarge": "التسجيل طويل جدًا. سجل مرة أقصر.",
+      "errorAudioTooShort": "التسجيل قصير جدًا. اضغط مطوّل شوية.",
+      "errorNoNetwork": "مفيش اتصال. حاول تاني.",
+      "errorNoServiceKey": "خدمة الصوت غير مفعّلة حاليًا.",
+      "errorEmptyTranscript": "ما قدرتش أسمع كلامك. سجل تاني أوضح.",
+      "tipTapAndHold": "اضغط واستمر في الضغط للتسجيل"
+    },
+    "payroll": {
+      "title": "الرواتب",
+      "backToTeam": "الفريق",
+      "totalNet": "صافي الرواتب",
+      "changeMonth": "تغيير الشهر",
+      "base": "الأساسي",
+      "net": "الصافي",
+      "statusDraft": "مسودة",
+      "statusFinalized": "معتمد",
+      "statusVoided": "ملغي",
+      "statusMissing": "بدون",
+      "emptyTitle": "لا توجد رواتب",
+      "emptyMessage": "لا يوجد موظفون لهذا المتجر في هذا الشهر.",
+      "detailBack": "الرواتب",
+      "addBonus": "إضافة مكافأة",
+      "addDeduction": "إضافة خصم",
+      "amount": "المبلغ",
+      "reason": "السبب",
+      "save": "حفظ",
+      "adjustments": "مكافآت وخصومات",
+      "adjustmentsEmpty": "لا توجد مكافآت أو خصومات هذا الشهر.",
+      "attendance": "الحضور",
+      "regularHours": "ساعات أساسية",
+      "overtimeHours": "ساعات إضافية",
+      "paidLeave": "إجازة مدفوعة (يوم)",
+      "unpaidLeave": "إجازة بدون راتب (يوم)",
+      "commission": "عمولة",
+      "sales": "المبيعات",
+      "returns": "المرتجعات",
+      "gross": "الإجمالي",
+      "netLabel": "صافي الراتب",
+      "sharePdf": "مشاركة كشف الراتب PDF",
+      "compensationLocked": "الكشف {state} — التعديل غير متاح. ألغِ الاعتماد من الويب أولاً.",
+      "warnings": "تنبيهات",
+      "warningCodes": {
+        "no_compensation": "لا يوجد راتب معتمد في بداية الشهر — الأساسي = ٠",
+        "open_shifts": "يوجد وردية مفتوحة (نسيان تسجيل خروج) تحتاج مراجعة",
+        "missing_attendance": "لا يوجد حضور مسجل في هذا الشهر",
+        "unapproved_overtime": "ساعات إضافية بدون اعتماد",
+        "no_sales_attribution": "عمولة مفعّلة لكن لا توجد مبيعات باسم هذا الموظف"
+      },
+      "adjustmentKinds": {
+        "bonus": "مكافأة",
+        "deduction": "خصم",
+        "advance_repayment": "استرداد سلفة",
+        "correction": "تسوية"
+      }
+    },
     "common": {
       "owner": "مالك",
       "recurring": "متكرر",
@@ -5134,11 +5580,14 @@
       "piecesOne": "قطعة واحدة",
       "piecesTwo": "قطعتان",
       "piecesFew": "{n} قطع",
-      "piecesMany": "{n} قطعة"
+      "piecesMany": "{n} قطعة",
+      "comingSoon": "قريبًا"
     },
     "pos": {
       "itemsInCart": "{n} قطعة في الفاتورة",
       "available": "المتاح: {n} قطعة",
+      "restock": "إعادة توريد",
+      "restockHint": "{name} نفد من المخزن — اضغط لإعادة التوريد",
       "saveFailed": "تعذّر تسجيل البيع",
       "offlineNotSaved": "تعذّر الاتصال بالخادم — لم يُسجَّل البيع",
       "timeoutNotSaved": "انتهت مهلة الاتصال — لم يُسجَّل البيع",
@@ -5162,7 +5611,10 @@
       "emptyCartHint": "ابحث عن منتج، امسح الباركود، أو اضغط على منتج حديث لبدء البيع.",
       "itemsInCartOne": "قطعة واحدة في الفاتورة",
       "itemsInCartTwo": "قطعتان في الفاتورة",
-      "itemsInCartFew": "{n} قطع في الفاتورة"
+      "itemsInCartFew": "{n} قطع في الفاتورة",
+      "channelLabel": "نوع البيعة",
+      "channelStore": "في المحل",
+      "channelOnline": "أونلاين"
     },
     "product": {
       "details": "بيانات المنتج",
@@ -5288,7 +5740,8 @@
         "noLinesHint": "ابحث بالاسم بالأعلى أو امسح الباركود لإضافة أول صنف",
         "linesSummaryOne": "صنف واحد · {amount}",
         "linesSummaryTwo": "صنفان · {amount}",
-        "linesSummaryFew": "{n} أصناف · {amount}"
+        "linesSummaryFew": "{n} أصناف · {amount}",
+        "paidSoFar": "تم دفع {amount} · المتبقي {remaining}"
       },
       "actionFailed": "فشلت العملية، حاول مرة أخرى",
       "filterAll": "الكل",
@@ -5304,6 +5757,160 @@
       "summaryOne": "مصروف واحد · {total}",
       "summaryTwo": "مصروفان · {total}",
       "summaryFew": "{n} مصاريف · {total}"
+    },
+    "financials": {
+      "loadFailed": "تعذر تحميل الأرقام المالية",
+      "movementsNote": "الحركات المالية مُنفصلة تمامًا عن الأرباح والخسائر.",
+      "presets": {
+        "today": "اليوم",
+        "yesterday": "أمس",
+        "this_week": "هذا الأسبوع",
+        "this_month": "هذا الشهر",
+        "last_month": "الشهر الماضي",
+        "last_7_days": "آخر 7 أيام",
+        "last_30_days": "آخر 30 يومًا",
+        "this_year": "هذا العام",
+        "custom": "مخصّص"
+      },
+      "customFrom": "من",
+      "customTo": "إلى",
+      "expenses": {
+        "title": "المصروفات",
+        "listEmpty": "لا توجد مصروفات في هذه الفترة",
+        "listEmptyHint": "اضغط + لتسجيل أول مصروف.",
+        "saveFailed": "تعذر حفظ المصروف",
+        "voidFailed": "تعذر إلغاء المصروف",
+        "voidTitle": "إلغاء المصروف",
+        "voidPrompt": "السبب (اختياري) — بيسهّل التسوية.",
+        "voidConfirm": "إلغاء",
+        "voidedBadge": "ملغى",
+        "statusAll": "الكل",
+        "statusPosted": "مسجّل",
+        "statusVoided": "ملغى",
+        "filterTitle": "تصفية المصروفات",
+        "filterApply": "تطبيق",
+        "filterReset": "مسح",
+        "searchPlaceholder": "ابحث بالعنوان / المرجع / الملاحظة",
+        "paymentAll": "أي طريقة",
+        "categoryAll": "أي تصنيف",
+        "newTitle": "مصروف جديد",
+        "editTitle": "تعديل المصروف",
+        "fieldTitle": "العنوان",
+        "fieldAmount": "المبلغ",
+        "fieldDate": "التاريخ",
+        "fieldCategory": "التصنيف",
+        "fieldPaymentMethod": "طريقة الدفع",
+        "fieldReference": "رقم المرجع (اختياري)",
+        "fieldNote": "ملاحظة (اختياري)",
+        "fieldSupplier": "المورد (اختياري)",
+        "save": "حفظ",
+        "editAction": "تعديل",
+        "voidAction": "إلغاء",
+        "pickCategoryTitle": "اختر تصنيف",
+        "pickSupplierTitle": "اختر مورد",
+        "noSupplier": "بدون مورد",
+        "ownerOnly": "فقط مالك المتجر يقدر يدير المصروفات.",
+        "noPermission": "ماعندكش صلاحية لإدارة المصروفات.",
+        "noViewPermission": "تحتاج صلاحية «عرض الماليات» لفتح الصفحة."
+      },
+      "moneyMovements": {
+        "title": "الحركات المالية",
+        "notPnlNote": "هذه الحركات بتتبع التدفق النقدي. مش ربح أو خسارة.",
+        "listEmpty": "لا توجد حركات في هذه الفترة",
+        "listEmptyHint": "اضغط + لتسجيل إيداع أو سحب أو قرض أو تحويل.",
+        "saveFailed": "تعذر حفظ الحركة",
+        "voidFailed": "تعذر إلغاء الحركة",
+        "voidTitle": "إلغاء الحركة",
+        "voidPrompt": "السبب (اختياري).",
+        "voidedBadge": "ملغاة",
+        "filterTitle": "تصفية الحركات",
+        "kindAll": "أي نوع",
+        "statusAll": "الكل",
+        "statusActive": "نشطة",
+        "statusVoided": "ملغاة",
+        "directionIn": "وارد",
+        "directionOut": "صادر",
+        "newTitle": "حركة مالية جديدة",
+        "fieldKind": "النوع",
+        "fieldAmount": "المبلغ",
+        "fieldDate": "التاريخ",
+        "fieldDescription": "الوصف (اختياري)",
+        "fieldPaymentMethod": "طريقة الدفع (اختياري)",
+        "save": "حفظ",
+        "voidAction": "إلغاء",
+        "kinds": {
+          "owner_deposit": "إيداع من المالك",
+          "owner_withdrawal": "سحب للمالك",
+          "cash_transfer": "تحويل نقدي",
+          "loan_received": "قرض مُستلم",
+          "loan_principal_repayment": "سداد قرض",
+          "supplier_payment_direct": "دفع مباشر لمورد",
+          "customer_deposit": "إيداع عميل",
+          "other": "أخرى"
+        },
+        "totalsIn": "إجمالي الوارد",
+        "totalsOut": "إجمالي الصادر"
+      },
+      "recurring": {
+        "title": "المصروفات المتكررة",
+        "listEmpty": "لا توجد قوالب متكررة",
+        "listEmptyHint": "أنشئ قالب علشان Storo يسجله تلقائيًا كل فترة.",
+        "generateNow": "إنشاء المستحقات الآن",
+        "generatedToast": "تم إنشاء {n} مصروف.",
+        "newTitle": "قالب متكرر جديد",
+        "fieldFrequency": "التكرار",
+        "fieldNextOccurrence": "الموعد القادم",
+        "frequency": {
+          "weekly": "أسبوعي",
+          "monthly": "شهري",
+          "quarterly": "ربع سنوي",
+          "yearly": "سنوي"
+        }
+      },
+      "categories": {
+        "title": "تصنيفات المصروفات",
+        "systemBadge": "نظام",
+        "archive": "أرشفة",
+        "archiveFailed": "تعذر الأرشفة — التصنيف ما زال مستخدمًا.",
+        "newTitle": "تصنيف مخصص جديد",
+        "pickGroup": "المجموعة الأم",
+        "fieldNameEn": "الاسم بالإنجليزية",
+        "fieldNameAr": "الاسم بالعربية",
+        "fieldSlug": "المعرّف (a-z, 0-9, dashes)",
+        "renameTitle": "إعادة تسمية التصنيف",
+        "archivedBadge": "مؤرشف"
+      },
+      "profitability": {
+        "title": "الربحية",
+        "tabProducts": "حسب المنتج",
+        "tabCategories": "حسب التصنيف",
+        "sort": "ترتيب حسب",
+        "sortRevenue": "الإيرادات",
+        "sortGrossProfit": "مجمل الربح",
+        "sortMargin": "الهامش",
+        "sortQuantity": "الكمية",
+        "searchPlaceholder": "ابحث بمنتج",
+        "colQuantity": "الكمية",
+        "colRevenue": "الإيرادات",
+        "colGrossProfit": "مجمل الربح",
+        "colMargin": "الهامش",
+        "empty": "لا توجد مبيعات في هذه الفترة"
+      },
+      "charts": {
+        "revenueVsExpenses": "الإيرادات مقابل المصروفات",
+        "netProfitTrend": "صافي الربح",
+        "opexByGroup": "المصروفات التشغيلية حسب المجموعة",
+        "noData": "لا توجد بيانات في هذه الفترة"
+      },
+      "view": {
+        "overview": "نظرة عامة",
+        "pnl": "الأرباح والخسائر",
+        "expenses": "المصروفات",
+        "moneyMovements": "الحركات المالية",
+        "recurring": "المتكررة",
+        "profitability": "الربحية",
+        "categories": "التصنيفات"
+      }
     },
     "customers": {
       "emptyHint": "يظهر العملاء هنا بعد أول عملية بيع باسم عميل.",
@@ -5364,7 +5971,17 @@
       "owingPill": "على الحساب",
       "invoicePaidLabel": "فاتورة {id}، مدفوعة",
       "invoicePartialLabel": "فاتورة {id}، مدفوعة جزئيًا، المتبقي {amount}",
-      "invoiceUnpaidLabel": "فاتورة {id}، آجلة، المتبقي {amount}"
+      "invoiceUnpaidLabel": "فاتورة {id}، آجلة، المتبقي {amount}",
+      "totalCustomers": "إجمالي العملاء",
+      "payPartial": "دفع جزء",
+      "payPartialTitle": "تسجيل دفعة جزئية",
+      "payPartialMax": "المتبقي على العميل: {amount}",
+      "payPartialHint": "يُخصم المبلغ من أقدم فاتورة آجلة أولًا.",
+      "accountStatement": "كشف حساب العميل",
+      "statementShareTitle": "كشف حساب — {name}",
+      "statementUnavailable": "المشاركة غير متاحة على هذا الجهاز",
+      "statementFailed": "تعذّر إنشاء كشف الحساب",
+      "statementSettingsLoading": "جارٍ تجهيز بيانات المحل…"
     },
     "suppliers": {
       "profileOf": "ملف المورد {name}",
@@ -5378,7 +5995,12 @@
       "maybeSaved": "انقطع الاتصال قبل رد الخادم. تحقق من القائمة قبل الإضافة مرة أخرى — قد يكون المورد محفوظاً بالفعل.",
       "summaryOne": "مورد واحد · مستحق {owed}",
       "summaryTwo": "موردان · مستحق {owed}",
-      "summaryFew": "{n} موردين · مستحق {owed}"
+      "summaryFew": "{n} موردين · مستحق {owed}",
+      "payPartial": "دفع جزء",
+      "payAll": "تأكيد دفع الكل",
+      "payTitle": "تسجيل دفعة للمورّد",
+      "paySubmit": "تسجيل",
+      "payOwed": "المتبقي عليك: {amount}"
     },
     "team": {
       "summary": "{n} عضو",
@@ -5435,7 +6057,44 @@
       "memberMetaOne": "صلاحية واحدة · {email}",
       "memberMetaTwo": "صلاحيتان · {email}",
       "memberMetaFew": "{n} صلاحيات · {email}",
-      "back": "الفريق"
+      "back": "الفريق",
+      "addMember": "إضافة عضو",
+      "new": {
+        "title": "إضافة عضو جديد",
+        "intro": "أنشئ حسابًا ليستطيع هذا الشخص تسجيل الدخول واستخدام المتجر. يمكنك تحديد صلاحياته بالأسفل.",
+        "credentialsSection": "بيانات تسجيل الدخول",
+        "profileSection": "البيانات الشخصية",
+        "permissionsSection": "الصلاحيات",
+        "usernameLabel": "اسم المستخدم",
+        "usernamePlaceholder": "مثال: ahmed",
+        "usernameHint": "حروف إنجليزية صغيرة وأرقام و . _ - فقط. من ٢ إلى ٤٠ حرفًا.",
+        "displayNameLabel": "الاسم الكامل",
+        "displayNamePlaceholder": "مثال: أحمد محمد",
+        "passwordLabel": "كلمة مرور مؤقتة",
+        "passwordPlaceholder": "٨ أحرف على الأقل",
+        "passwordHint": "سيُطلب من العضو تغييرها عند أول تسجيل دخول.",
+        "phoneLabel": "رقم الهاتف",
+        "phonePlaceholder": "01012345678",
+        "nationalIdLabel": "الرقم القومي",
+        "nationalIdPlaceholder": "اختياري",
+        "addressLabel": "العنوان",
+        "addressPlaceholder": "اختياري",
+        "submit": "إضافة العضو",
+        "submitting": "جاري الإضافة…",
+        "success": "تمت إضافة العضو",
+        "verifying": "جاري التحقق من بيانات العضو…",
+        "verifyFailed": "تمت الإضافة، لكن تعذّر التحقق. اسحب للأسفل لتحديث قائمة الفريق.",
+        "errors": {
+          "usernameRequired": "اسم المستخدم مطلوب (من ٢ إلى ٤٠ حرفًا).",
+          "usernameFormat": "استخدم حروفًا إنجليزية صغيرة أو أرقامًا أو . _ - فقط.",
+          "displayNameRequired": "الاسم مطلوب.",
+          "passwordTooShort": "كلمة المرور يجب أن تكون ٨ أحرف على الأقل.",
+          "genericValidation": "راجع البيانات وأعد المحاولة.",
+          "conflict": "اسم المستخدم مستخدم بالفعل في هذا المتجر.",
+          "forbidden": "ليس لديك صلاحية إضافة أعضاء.",
+          "generic": "تعذّر إضافة العضو. حاول مجددًا."
+        }
+      }
     },
     "tasks": {
       "summary": "{open} مفتوحة · {done} منجزة",
@@ -5480,9 +6139,135 @@
       "heatmap": {
         "footerLabel": "الإجمالي"
       },
+      "ai": {
+        "entryTitle": "اسأل عمرو",
+        "entrySubtitle": "أرقام واتجاهات وأي سؤال عن متجرك — بكلامك الطبيعي.",
+        "screenTitle": "عمرو",
+        "greetingTitle": "عايز تعرف إيه؟",
+        "greetingSub": "أقدر أقرأ المبيعات والمخزن والعملاء والبراندات. اختر سؤال أو اكتب سؤالك.",
+        "inputPlaceholder": "اكتب سؤالك هنا…",
+        "send": "إرسال",
+        "thinking": "جارٍ التفكير…",
+        "newChat": "محادثة جديدة",
+        "disclaimer": "الذكاء الاصطناعي ممكن يخطئ. راجع الأرقام المهمة من التقارير مباشرة.",
+        "errorDisabled": "المساعد الذكي غير مفعّل على متجرك حاليًا.",
+        "errorFailed": "تعذّر الوصول للذكاء الاصطناعي. حاول مرة أخرى.",
+        "errorBusy": "عمرو مشغول حاليًا، جرّب تاني بعد لحظات.",
+        "errorTimeout": "الرد تأخر أكثر من المعتاد. جرّب تاني — عمرو غالبًا خلص الإجابة لكن الاتصال طال.",
+        "productCard": {
+          "inStock": "متوفر: {n}",
+          "lowStock": "مخزون منخفض: {n}",
+          "outOfStock": "غير متوفر",
+          "sku": "كود: {sku}"
+        },
+        "confirm": {
+          "expiresIn": "ينتهي بعد {m}:{s}",
+          "expired": "انتهت صلاحية التأكيد — اطلب العملية من جديد.",
+          "cancelled": "تم الإلغاء.",
+          "sent": "جارٍ التنفيذ…",
+          "rejected": "تعذّر تنفيذ العملية — التأكيد غير صالح.",
+          "branchMismatch": "الفرع تغيّر بين المعاينة والتأكيد. أعِد العملية داخل الفرع الصحيح.",
+          "forbidden": "لا تملك الصلاحية لتنفيذ هذه العملية."
+        },
+        "clarification": {
+          "pickOne": "اضغط على اللي تقصده.",
+          "selected": "تم اختيار: {label}"
+        },
+        "comparison": {
+          "winner": "الأفضل",
+          "unavailable": "—"
+        },
+        "inventorySummary": {
+          "total": "إجمالي المنتجات",
+          "lowStock": "مخزون منخفض",
+          "outOfStock": "غير متوفر",
+          "stockValueRetail": "قيمة المخزون (بيع)",
+          "stockValueCost": "قيمة المخزون (تكلفة)",
+          "urgent": "محتاج انتباه"
+        },
+        "salesSummary": {
+          "revenue": "الإيراد",
+          "orders": "عدد الطلبات",
+          "averageOrderValue": "متوسط الطلب",
+          "vsPrevious": "مقارنة بالفترة السابقة",
+          "noTrend": "لا توجد مقارنة متاحة"
+        },
+        "warning": {
+          "info": "ملحوظة",
+          "warning": "تنبيه",
+          "error": "مشكلة"
+        },
+        "knowledge": {
+          "sources": "المصادر",
+          "section": "القسم: {name}"
+        },
+        "import": {
+          "chooseFile": "اختر ملف",
+          "uploading": "جاري رفع الملف…",
+          "uploadFailed": "تعذّر رفع الملف. حاول مرة أخرى.",
+          "unsupportedFile": "ملفات CSV و XLSX فقط مدعومة حاليًا.",
+          "fileTooLarge": "الملف أكبر من الحد المسموح (٢ ميجا).",
+          "userTurn": "عايز أستورد ملف {file}. جلسة الاستيراد: {sessionId}. افحصها واشرحلي النتيجة.",
+          "editable": {
+            "editHint": "اضغط أي خانة لتعديلها — الذكاء الاصطناعي بيراجعها فورًا.",
+            "saving": "جاري الحفظ…",
+            "saved": "تم الحفظ",
+            "saveFailed": "فشل الحفظ",
+            "wasLabel": "كانت {value}",
+            "readyToConfirm": "جاهز للاستيراد",
+            "fixIssuesFirst": "{n} صف محتاج متابعة أولًا",
+            "rowLabel": "صف {n}",
+            "rowStatus": {
+              "new": "جديد",
+              "update": "تحديث",
+              "skip": "تجاهل",
+              "invalid": "خطأ",
+              "missing": "ناقص",
+              "ambiguous": "غامض",
+              "valid": "صالح",
+              "ready": "جاهز",
+              "imported": "تم الاستيراد",
+              "failed": "فشل",
+              "skipped": "تم التجاهل"
+            }
+          }
+        },
+        "suggested": {
+          "topBrand": "أي براند بيع أكثر الأسبوع ده؟",
+          "slowStock": "فيه منتجات ماتباعتش من فترة؟",
+          "revenueTrend": "إيرادي شكله إيه مقارنة بالشهر اللي فات؟",
+          "topCustomers": "مين أكتر عملائي شراء؟",
+          "profit": "أرباحي بتزيد ولا بتقل؟",
+          "online": "كم نسبة مبيعاتي أونلاين؟"
+        }
+      },
       "deep": {
         "product": {
           "pickTitle": "اختر منتجًا"
+        },
+        "picker": {
+          "brands": {
+            "label": "البراندات",
+            "hint": "الإيراد والهامش والتوزيع بين المحل والأونلاين لكل براند في متجرك."
+          }
+        },
+        "brands": {
+          "title": "تحليل البراندات",
+          "subtitle": "البراندات الأعلى إيرادًا أولًا. الصف يعرض الهامش ومتوسط الفاتورة والخصومات وعدد العمليات.",
+          "empty": "لا توجد مبيعات لبراندات في هذه الفترة.",
+          "totalRevenue": "إجمالي الإيراد",
+          "totalGross": "ربح إجمالي",
+          "totalMargin": "الهامش",
+          "col": {
+            "units": "القطع",
+            "transactions": "العمليات",
+            "aov": "متوسط الفاتورة",
+            "gross": "ربح إجمالي",
+            "margin": "الهامش",
+            "discounts": "الخصومات"
+          },
+          "channelStore": "داخل المحل {amount} · {pct}",
+          "channelOnline": "أونلاين {amount} · {pct}"
         }
       }
     },
@@ -5846,7 +6631,10 @@
       "settingsFallbackTitle": "إعدادات الفاتورة غير متاحة",
       "settingsFallbackAsk": "تعذّر تحميل إعدادات فاتورة المتجر ولا توجد نسخة محفوظة على هذا الجهاز. ستصدر الفاتورة بالتصميم الافتراضي بدون اسم المتجر أو رقم الهاتف أو التذييل. هل تريد المتابعة؟",
       "settingsFallbackContinue": "متابعة على أي حال",
-      "settingsSaved": "غير متصل — استُخدمت آخر إعدادات فاتورة محفوظة على هذا الجهاز."
+      "settingsSaved": "غير متصل — استُخدمت آخر إعدادات فاتورة محفوظة على هذا الجهاز.",
+      "whatsappShare": "إرسال عبر واتساب",
+      "whatsappMessage": "فاتورة #{code}",
+      "whatsappUnavailable": "تعذر فتح واتساب على هذا الجهاز."
     },
     "catalog": {
       "productsCount": "{n} منتج",
@@ -5993,7 +6781,158 @@
       "prefsEmpty": "لا توجد أحداث لإعدادها",
       "channelCollections": "التحويلات",
       "channelSales": "تنبيهات البيع",
+      "channelGeneric": "تنبيهات عامة",
+      "channelCritical": "تنبيهات هامة",
       "sendTestSale": "ابعت تنبيه بيع تجريبي"
+    },
+    "reports": {
+      "back": "الرئيسية",
+      "loadingPeriod": "جاري تحميل {period}…",
+      "productQty": "{n} مباع",
+      "heroSales": "{n} فاتورة",
+      "weekly": {
+        "title": "التقرير الأسبوعي"
+      },
+      "monthly": {
+        "title": "التقرير الشهري"
+      },
+      "sections": {
+        "headline": "أبرز الأرقام",
+        "trend": "اتجاه يومي",
+        "topProducts": "أعلى المنتجات مبيعاً",
+        "byCategory": "المبيعات حسب القسم",
+        "comparison": "مقارنة"
+      },
+      "kpi": {
+        "revenue": "الإيرادات",
+        "sales": "عدد الفواتير",
+        "netProfit": "صافي الربح",
+        "grossProfit": "الربح الإجمالي",
+        "cogs": "تكلفة البضاعة",
+        "returns": "المرتجعات",
+        "expenses": "المصاريف",
+        "discounts": "الخصومات",
+        "discountsPct": "{pct}٪ من الإيرادات",
+        "lastPeriod": "الفترة السابقة"
+      },
+      "empty": {
+        "noSales": "لا توجد مبيعات في هذه الفترة"
+      },
+      "error": {
+        "title": "تعذّر تحميل التقرير",
+        "invalidPeriod": "رابط التقرير غير صحيح. افتح الإشعار مرة أخرى.",
+        "notFound": "هذا التقرير لم يعد متاحاً.",
+        "generic": "حدث خطأ أثناء تحميل التقرير."
+      }
+    },
+    "inventoryCount": {
+      "title": "جرد المخزون",
+      "subtitle": "اعدّ المخزون، راجع الفروق، حدّث الكميات.",
+      "newCount": "جرد جديد",
+      "notFound": "الجرد غير موجود",
+      "deletedProduct": "منتج محذوف",
+      "backToCount": "رجوع للجرد",
+      "sections": {
+        "active": "جرد جارٍ",
+        "completed": "جرد مكتمل"
+      },
+      "empty": {
+        "active": "لا توجد عمليات جرد جارية.",
+        "completed": "لا توجد عمليات جرد مكتملة بعد."
+      },
+      "row": {
+        "countedOf": "{n}/{total} مُعدّ",
+        "differences": "{n} فرق",
+        "system": "النظام {n}",
+        "counted": "تم عدّ {n}"
+      },
+      "scope": {
+        "title": "نطاق الجرد",
+        "summary": "ما الذي تُجرده",
+        "all": "كل المنتجات",
+        "category": "قسم",
+        "brand": "ماركة",
+        "filterLabel": "بحث",
+        "filterPlaceholder": "اكتب للتصفية…",
+        "empty": "لا يوجد ما يُختار.",
+        "pickOne": "اختر قسم أو ماركة",
+        "productCount": "{n} منتج",
+        "categoryLabel": "قسم: {value}",
+        "brandLabel": "ماركة: {value}",
+        "lowActivityHint": "الجرد أدق لما يكون المحل مقفول أو خفيف الحركة."
+      },
+      "start": {
+        "cta": "ابدأ الجرد",
+        "failed": "تعذّر بدء الجرد."
+      },
+      "counting": {
+        "progress": "{counted}/{total} مُعدّ · {pct}%"
+      },
+      "scanner": {
+        "scan": "مسح الباركود",
+        "looking": "جاري البحث عن المنتج…",
+        "notFound": "باركود غير معروف: {code}"
+      },
+      "search": {
+        "placeholder": "ابحث بالاسم أو SKU أو الباركود"
+      },
+      "summary": {
+        "title": "هذه الجلسة",
+        "matched": "مطابق",
+        "shortage": "عجز",
+        "overage": "زيادة"
+      },
+      "lists": {
+        "counted": "تم عدّها",
+        "notYet": "لم تُعدّ بعد ({n})",
+        "moreHint": "+{n} منتجات أخرى — استخدم المسح أو البحث للوصول إليها"
+      },
+      "actions": {
+        "review": "مراجعة الجرد",
+        "cancelCount": "إلغاء هذا الجرد"
+      },
+      "sheet": {
+        "save": "حفظ العدّ",
+        "update": "تحديث العدّ",
+        "cancel": "إلغاء",
+        "minus": "إنقاص",
+        "plus": "زيادة",
+        "systemQty": "كمية النظام",
+        "difference": "الفرق",
+        "removeLine": "إزالة من الجرد",
+        "outOfScope": "هذا المنتج خارج نطاق الجرد. إضافته رغم ذلك؟",
+        "addAnyway": "إضافة رغم ذلك",
+        "saveFailed": "تعذّر حفظ العدّ."
+      },
+      "lineBadge": {
+        "addedMidCount": "مُضاف"
+      },
+      "review": {
+        "title": "مراجعة الجرد",
+        "subtitle": "تم عدّ {counted} من أصل {total} منتج",
+        "breakdown": "التوزيع",
+        "netAdjustment": "صافي التعديل: {n} قطعة",
+        "tab": {
+          "shortage": "عجز",
+          "overage": "زيادة",
+          "matched": "مطابق",
+          "notCounted": "لم تُعدّ"
+        },
+        "emptyBucket": "لا يوجد في هذه الفئة.",
+        "exceptionsTitle": "حُلّ الاستثناءات قبل الاعتماد",
+        "exceptionsBody": "{n} منتجات مُعدّة لم تعد موجودة. أزِلها من الجرد ثم اعتمد مرة أخرى.",
+        "confirmCount": "اعتماد الجرد",
+        "confirmFailed": "تعذّر اعتماد الجرد.",
+        "alreadyConfirmed": "تم اعتماد هذا الجرد."
+      },
+      "report": {
+        "title": "تقرير الجرد",
+        "subtitle": "شارك PDF بتفاصيل هذا الجرد.",
+        "shareBtn": "مشاركة التقرير (PDF)",
+        "impact": "الأثر {v} ج.م",
+        "shareUnavailable": "المشاركة غير متاحة على هذا الجهاز.",
+        "shareFailed": "تعذّرت مشاركة التقرير."
+      }
     },
     "offline": {
       "chipOffline": "غير متصل",
@@ -6119,7 +7058,8 @@
       "unpaid": "لم يُسدد",
       "saleMetaOne": "قطعة واحدة · {when}",
       "saleMetaTwo": "قطعتان · {when}",
-      "saleMetaFew": "{n} قطع · {when}"
+      "saleMetaFew": "{n} قطع · {when}",
+      "channelSplit": "محل {store} · أونلاين {online}"
     },
     "salesHistory": {
       "title": "سجل المبيعات",
@@ -6139,7 +7079,10 @@
       "lineCountOne": "صنف واحد",
       "lineCountTwo": "صنفان",
       "lineCountFew": "{n} أصناف",
-      "walkIn": "عميل نقدي"
+      "walkIn": "عميل نقدي",
+      "channelAll": "كل القنوات",
+      "moreLines": "+{n} أخرى",
+      "discountBadge": "خصم {amount}"
     },
     "saleDetail": {
       "title": "تفاصيل الفاتورة",

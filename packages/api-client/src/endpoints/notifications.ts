@@ -25,7 +25,10 @@ export type NotificationKind =
   | "collection_stale"
   | "collection_unmatched"
   | "collection_source_silent"
-  | "collection_limit";
+  | "collection_limit"
+  // Scheduled roll-ups (weekly + monthly). Shares one kind — the `link`
+  // carries the specific route (/reports/weekly?period=... etc.).
+  | "report";
 
 export interface NotificationItem {
   id: string;
@@ -196,7 +199,16 @@ export type NotificationEventType =
   | "collection.stale"
   | "collection.unmatched_credit"
   | "collection.source_silent"
-  | "collection.limit_warning";
+  | "collection.limit_warning"
+  // Phase B — scheduled roll-ups + instant business events (mirrors
+  // apps/web/lib/notifications/event-types.ts NOTIFICATION_EVENT_TYPES).
+  | "report.weekly"
+  | "report.monthly"
+  | "expense.recorded"
+  | "product.added"
+  | "inventory.adjusted"
+  | "return.recorded"
+  | "attendance.check_in";
 
 export type DigestMode = "instant" | "digest";
 

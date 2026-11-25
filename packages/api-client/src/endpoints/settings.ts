@@ -98,6 +98,24 @@ export interface ShopSettings {
   receiptBlockOrder: ReceiptBlockKey[];
   receiptFontFamily: ReceiptFontFamily;
   receiptCustomBlocks: Record<string, ReceiptCustomBlock>;
+  /** Receipt identity (0065) — optional free-text fields. Empty string means
+   *  the Owner left it blank and the renderer omits that row entirely. */
+  receiptTaxRegistration: string;
+  receiptTaxCardNumber: string;
+  receiptSlogan: string;
+  receiptReturnPolicy: string;
+  receiptAddress: string;
+  /** Short uppercase prefix (max 8) stamped before the invoice short code. */
+  receiptReferencePrefix: string;
+  /** Per-row visibility toggles (0066). Default true; a filled field prints
+   *  unless the Owner flips it off. */
+  receiptShowAddress: boolean;
+  receiptShowSlogan: boolean;
+  receiptShowTaxInfo: boolean;
+  receiptShowReturnPolicy: boolean;
+  /** Per-row alignment overrides (0067). Record<rowKey, "left"|"center"|"right">.
+   *  Empty / missing key → center fallback. */
+  receiptBlockAlignments: Record<string, "left" | "center" | "right">;
 }
 
 export interface ShopSettingsResponse {
@@ -136,6 +154,17 @@ export type ShopSettingsPatch = Partial<
     | "receiptBlockOrder"
     | "receiptFontFamily"
     | "receiptCustomBlocks"
+    | "receiptTaxRegistration"
+    | "receiptTaxCardNumber"
+    | "receiptSlogan"
+    | "receiptReturnPolicy"
+    | "receiptAddress"
+    | "receiptReferencePrefix"
+    | "receiptShowAddress"
+    | "receiptShowSlogan"
+    | "receiptShowTaxInfo"
+    | "receiptShowReturnPolicy"
+    | "receiptBlockAlignments"
   >
 >;
 
@@ -157,6 +186,17 @@ export const RECEIPT_SETTINGS_FIELDS = [
   "receiptFontFamily",
   "receiptBlockOrder",
   "receiptCustomBlocks",
+  "receiptTaxRegistration",
+  "receiptTaxCardNumber",
+  "receiptSlogan",
+  "receiptReturnPolicy",
+  "receiptAddress",
+  "receiptReferencePrefix",
+  "receiptShowAddress",
+  "receiptShowSlogan",
+  "receiptShowTaxInfo",
+  "receiptShowReturnPolicy",
+  "receiptBlockAlignments",
 ] as const satisfies readonly (keyof ShopSettingsPatch)[];
 
 /** Active-branch settings (owner-only page on the web, `requireTenantWithBranch` on the API). */

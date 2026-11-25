@@ -75,6 +75,93 @@
       "to": "To",
       "clear": "Clear"
     },
+    "financials": {
+      "title": "Financials",
+      "subtitle": "Revenue, costs, and profit at a glance.",
+      "tabs": {
+        "overview": "Overview",
+        "pnl": "Profit & Loss",
+        "expenses": "Expenses",
+        "moneyMovements": "Money Movements",
+        "recurring": "Recurring",
+        "profitability": "Profitability"
+      },
+      "presets": {
+        "today": "Today",
+        "yesterday": "Yesterday",
+        "this_week": "This week",
+        "last_week": "Last week",
+        "this_month": "This month",
+        "last_month": "Last month",
+        "last_7_days": "Last 7 days",
+        "last_30_days": "Last 30 days",
+        "this_year": "This year"
+      },
+      "kpi": {
+        "grossSales": "Gross Sales",
+        "discounts": "Discounts",
+        "returns": "Returns",
+        "netSales": "Net Sales",
+        "cogs": "Cost of Goods Sold",
+        "grossProfit": "Gross Profit",
+        "grossMargin": "Gross Margin",
+        "operatingExpenses": "Operating Expenses",
+        "operatingProfit": "Operating Profit",
+        "otherIncome": "Other Income",
+        "otherExpense": "Other Expense",
+        "netProfit": "Net Profit",
+        "netMargin": "Net Margin",
+        "salesCount": "Sales",
+        "returnsCount": "Returns",
+        "moneyIn": "Money In",
+        "moneyOut": "Money Out"
+      },
+      "kpiHint": {
+        "netSales": "Gross sales minus discounts and returns.",
+        "cogs": "Historical cost of sold items, net of returns.",
+        "grossProfit": "Net sales minus cost of goods sold.",
+        "operatingExpenses": "Expenses + finalised payroll.",
+        "netProfit": "Operating profit + other income − other expense."
+      },
+      "pnl": {
+        "sectionRevenue": "Revenue",
+        "sectionCogs": "Cost of Goods Sold",
+        "sectionOpex": "Operating Expenses",
+        "sectionOther": "Other",
+        "rowGrossSales": "Sales",
+        "rowDiscounts": "Discounts",
+        "rowReturns": "Returns / Refunds",
+        "rowNetSales": "Net Sales",
+        "rowProductCosts": "Product costs",
+        "rowGrossProfit": "Gross Profit",
+        "rowTotalOpex": "Total Operating Expenses",
+        "rowOperatingProfit": "Operating Profit",
+        "rowOtherIncome": "Other Income",
+        "rowOtherExpense": "Other Expense",
+        "rowNetProfit": "Net Profit",
+        "rowNetMargin": "Net Margin",
+        "profitRedacted": "Profit figures require the view_profit permission.",
+        "emptyGroup": "No activity in this period"
+      },
+      "comingSoon": {
+        "expensesTitle": "Expense management is coming in the next update.",
+        "expensesHint": "You will be able to create, edit, categorise and void expenses here. For now, use the existing Expenses page.",
+        "moneyMovementsTitle": "Money movements is coming in the next update.",
+        "moneyMovementsHint": "Owner deposits, withdrawals, cash transfers, and loans will be recorded here — kept separate from the P&L."
+      },
+      "empty": {
+        "title": "No financial activity in this period",
+        "hint": "Try a different date range."
+      },
+      "error": {
+        "title": "Couldn't load financials",
+        "hint": "Check your connection and try again.",
+        "retry": "Retry"
+      },
+      "margin": {
+        "unit": "%"
+      }
+    },
     "insights": {
       "loadingTitle": "Insights",
       "title": "Business analytics",
@@ -560,7 +647,11 @@
           "scannedOutOfStockAction": "Top up stock in inventory",
           "scannedMultiple": "{n} products share this barcode — pick one",
           "scannedAdded": "{name} added to cart",
-          "scannedIncremented": "{name} quantity increased"
+          "scannedIncremented": "{name} quantity increased",
+          "notFoundTitle": "Unknown product",
+          "notFoundBody": "No product found with barcode \"{code}\". Add it now?",
+          "notFoundAddCta": "Add product",
+          "scannedAlreadyInCart": "Already in cart: {name}"
         },
         "quickAddProduct": {
           "title": "Add new product to inventory",
@@ -795,7 +886,8 @@
         "instapay": "InstaPay",
         "card": "Card",
         "deferred": "On account",
-        "wallet": "Mobile wallet"
+        "wallet": "Mobile wallet",
+        "other": "Other"
       },
       "payTypes": {
         "fixed": "Fixed",
@@ -834,7 +926,9 @@
         "supplier": "Suppliers",
         "purchase": "Purchases",
         "attendance": "Attendance",
-        "collection": "Collections"
+        "collection": "Collections",
+        "customer": "Customers",
+        "payroll": "Payroll"
       },
       "actions": {
         "auth.login": "Signed in",
@@ -852,6 +946,13 @@
         "team.delete": "Removed staff",
         "team.password_reset": "Reset staff password",
         "team.compensation_set": "Updated staff pay",
+        "payroll.calculate": "Recalculated payroll draft",
+        "payroll.finalize": "Finalized monthly payroll",
+        "payroll.void": "Voided a finalized payroll",
+        "payroll.adjustment_create": "Added payroll bonus / deduction",
+        "payroll.adjustment_void": "Voided a payroll bonus / deduction",
+        "payroll.compensation_update": "Updated salary / commission / bonus eligibility",
+        "payroll.bonus_eligibility_update": "Toggled bonus eligibility",
         "settings.update": "Updated shop settings",
         "settings.attendance_update": "Updated attendance settings",
         "leave.submit": "Submitted leave request",
@@ -877,6 +978,8 @@
         "purchase.create": "Created purchase order",
         "purchase.receive": "Received purchase order",
         "purchase.cancel": "Cancelled purchase order",
+        "customer.create": "Created customer",
+        "customer.update": "Updated customer",
         "attendance.check_in": "Checked in",
         "attendance.check_out": "Checked out",
         "attendance.geofence_rejected": "Check-in attempted from outside the shop area",
@@ -923,6 +1026,8 @@
         "view_suppliers": "Suppliers",
         "view_purchases": "Purchases",
         "manage_inventory": "Manage products (add / edit / delete)",
+        "view_inventory_counts": "View inventory counts",
+        "manage_inventory_counts": "Run inventory counts (count / confirm)",
         "record_sales": "Record sales",
         "modify_sales": "Edit / void invoices",
         "manage_returns": "Record returns",
@@ -940,15 +1045,18 @@
         "manage_digest_settings": "Daily digest settings",
         "view_collections": "View transfers",
         "confirm_collections": "Confirm or reject transfers",
-        "manage_collection_accounts": "Manage receiving accounts"
+        "manage_collection_accounts": "Manage receiving accounts",
+        "receive_all_alerts": "Receive every alert"
       },
       "groups": {
         "pages": "Page access",
         "edit": "Edit permissions",
         "suppliersPurchases": "Suppliers & purchases",
+        "inventoryCounts": "Inventory counts (جرد)",
         "tasksLeaves": "Tasks & leaves",
         "audit": "Audit & monitoring",
         "attendance": "Attendance",
+        "notifications": "Notifications",
         "collections": "Collections"
       }
     },
@@ -1210,6 +1318,118 @@
         "charts": {
           "planDistribution": "Plan distribution",
           "signups30d": "Signups (last 30 days)"
+        },
+        "attention": {
+          "title": "Requires attention",
+          "allClear": "All clear — nothing needs immediate attention.",
+          "critical": "Critical",
+          "atRisk": "At risk",
+          "attention": "Attention",
+          "items": {
+            "suspended": "suspended store(s)",
+            "paymentFailures": "store(s) with payment failures (30d)",
+            "highRisk": "store(s) at high churn risk",
+            "trialsExpiring": "trial(s) expiring in 7 days",
+            "mediumRisk": "store(s) at medium churn risk"
+          }
+        },
+        "presence": {
+          "title": "Live users",
+          "onlineNow": "Online now",
+          "active5m": "Active 5m",
+          "active15m": "Active 15m",
+          "activeToday": "Active today",
+          "dau": "DAU",
+          "wau": "WAU",
+          "mau": "MAU",
+          "platformSplit": "Online by platform",
+          "liveDot": "live",
+          "platform": {
+            "ios": "iOS",
+            "android": "Android",
+            "web": "Web",
+            "other": "Other"
+          }
+        },
+        "storeActivity": {
+          "title": "Store activity",
+          "activeToday": "Active today",
+          "active7d": "Active 7 d",
+          "active30d": "Active 30 d",
+          "salesActiveToday": "Sales today",
+          "salesActive7d": "Sales 7 d",
+          "salesActive30d": "Sales 30 d",
+          "inactive7d": "Inactive 7 d+",
+          "inactive14d": "Inactive 14 d+",
+          "inactive30d": "Inactive 30 d+",
+          "trend": "Distinct active stores — last 30 days"
+        },
+        "totals": {
+          "title": "Platform totals",
+          "products": "Products",
+          "categories": "Categories",
+          "customers": "Customers",
+          "suppliers": "Suppliers",
+          "employees": "Employees",
+          "activePaid": "Paid stores",
+          "suspended": "Suspended",
+          "expiredTrials": "Expired trials"
+        },
+        "devices": {
+          "title": "Devices & installs",
+          "activeDevicesNow": "Active devices now",
+          "activeDevicesToday": "Active devices today",
+          "installsToday": "Installs today",
+          "installsThisWeek": "Installs 7 d",
+          "installsThisMonth": "Installs 30 d",
+          "byPlatform": "Active devices by platform",
+          "platform": {
+            "ios": "iOS",
+            "android": "Android",
+            "web": "Web",
+            "other": "Other"
+          },
+          "trend": "New installs — last 90 days",
+          "versions": "App version distribution (active 30 d)",
+          "versionLabel": "Version",
+          "versionsEmpty": "No active devices with a recorded version yet."
+        }
+      },
+      "health": {
+        "reasons": {
+          "noActivityEver": "No activity has ever been recorded for this store.",
+          "lowActivity": "Last activity was {days} day(s) ago.",
+          "inactiveDays": "No activity for {days} day(s).",
+          "noSales60d": "No sales in the last 60 days.",
+          "noSales30d": "No sales in the last 30 days.",
+          "salesDeclinedModerate": "Sales declined {pct}% vs. the previous 30 days.",
+          "salesDeclinedSevere": "Sales declined {pct}% vs. the previous 30 days.",
+          "noEmployees": "This store has no employees.",
+          "lowEmployeeActivity": "Only {active} of {total} employees were active recently.",
+          "veryLowEmployeeActivity": "Only {active} of {total} employees were active recently.",
+          "suspended": "Store is suspended.",
+          "trialExpiresSoon": "Trial ends in {days} day(s).",
+          "trialExpired": "Trial has ended.",
+          "paymentPastDue": "Subscription is past due.",
+          "subscription_cancelled": "Subscription has been cancelled.",
+          "subscription_expired": "Subscription has expired.",
+          "flag_digest_not_configured": "Daily digest is not configured.",
+          "flag_no_sales_7d": "No sales in the last 7 days.",
+          "flag_dormant_employees_30d": "{value} employee(s) inactive for 30+ days."
+        }
+      },
+      "risk": {
+        "reasons": {
+          "suspended": "Store is suspended.",
+          "paymentFailed": "{count} failed payment attempt(s) in the last 30 days.",
+          "trialExpiringSoon": "Trial ends in {days} day(s).",
+          "trialExpired": "Trial has ended.",
+          "subscriptionCancelled": "Subscription has been cancelled.",
+          "noSalesEver": "No sale has ever been recorded.",
+          "noSalesDays": "No sale in the last {days} day(s).",
+          "salesDeclined": "Sales declined {pct}% vs. the previous 30 days.",
+          "employeesInactive": "Only {active} of {total} employees were active recently.",
+          "ownerInactive": "Owner activity last seen {days} day(s) ago."
         }
       },
       "sales": {
@@ -1556,7 +1776,16 @@
             "branchCount_1": "1",
             "branchCount_23": "2–3",
             "branchCount_4p": "4+",
-            "trialExpiring": "Trial expiring in"
+            "trialExpiring": "Trial expiring in",
+            "health": "Health",
+            "health_healthy": "Healthy",
+            "health_attention": "Attention",
+            "health_at_risk": "At risk",
+            "risk": "Risk",
+            "risk_healthy": "Healthy",
+            "risk_low": "Low",
+            "risk_medium": "Medium",
+            "risk_high": "High"
           },
           "columns": {
             "name": "Store",
@@ -1565,11 +1794,17 @@
             "branches": "Branches",
             "employees": "Employees",
             "lastLogin": "Last sale",
+            "lastActivity": "Last active",
             "mrr": "MRR",
-            "status": "Status"
+            "status": "Status",
+            "health": "Health",
+            "risk": "Risk",
+            "products": "Products",
+            "categories": "Categories"
           },
           "empty": "No stores match this filter.",
-          "emptyHint": "Try clearing the filter or expanding the date range."
+          "emptyHint": "Try clearing the filter or expanding the date range.",
+          "truncatedWarning": "Showing the top matches. The health/risk filter samples the most recent slice of stores — additional matching stores may exist. The Overview headline counts are exact across the whole platform."
         },
         "detail": {
           "back": "← All stores",
@@ -1630,7 +1865,93 @@
               "errorGeneric": "Could not extend the trial.",
               "errorNotTrialing": "Trial can only be extended while the subscription is in 'trialing' state.",
               "successToast": "Trial extended."
+            },
+            "enableTrial": "Enable trial",
+            "enableTrialModal": {
+              "title": "Enable free trial",
+              "intro": "Start a fresh N-day trial from now. Overrides any existing trial end date and resets the subscription to 'trialing'.",
+              "daysLabel": "Trial length (days, 1–90)",
+              "previewLabel": "Trial ends",
+              "cancel": "Cancel",
+              "confirm": "Enable trial",
+              "errorGeneric": "Could not enable the trial.",
+              "errorInvalidDays": "Days must be between 1 and 90.",
+              "successToast": "Trial enabled."
+            },
+            "resetOwnerPassword": "Reset owner password",
+            "resetPasswordModal": {
+              "title": "Reset owner password",
+              "intro": "Generate a one-shot temporary password for this store's owner. You'll see it ONCE — copy it and share it with them over a trusted channel (phone or WhatsApp). The owner is forced to pick a new password on next sign-in.",
+              "storeLabel": "Store",
+              "ownerLabel": "Owner",
+              "bullets": {
+                "newPassword": "A new 16-character temporary password is generated server-side.",
+                "signOutEverywhere": "Every active session for the owner is terminated immediately — web + mobile.",
+                "forceRotation": "On next sign-in, the owner must set a new password before using the app.",
+                "audited": "The action is written to the admin audit log. The password itself is never logged."
+              },
+              "cancel": "Cancel",
+              "confirm": "Reset password",
+              "resultIntro": "Done. Temporary password:",
+              "resultWarning": "This password is shown once. Copy it now — refreshing this page won't bring it back. Share it with the owner over a trusted channel.",
+              "tempPasswordLabel": "Temporary password",
+              "copy": "Copy",
+              "copied": "Copied ✓",
+              "close": "Close",
+              "errorGeneric": "Could not reset the password."
             }
+          },
+          "presence": {
+            "title": "Presence",
+            "onlineNow": "Online now",
+            "activeToday": "Active today",
+            "activeDevices": "Active devices",
+            "byPlatform": "By platform",
+            "platform": {
+              "ios": "iOS",
+              "android": "Android",
+              "web": "Web",
+              "other": "Other"
+            },
+            "last24h": "Active users — last 24 h"
+          },
+          "usage": {
+            "title": "Usage",
+            "products": "Products",
+            "categories": "Categories",
+            "customers": "Customers",
+            "suppliers": "Suppliers",
+            "employees": "Employees",
+            "salesLast30d": "Sales (30 d)",
+            "topCategories": "Top categories by product count",
+            "topCategoriesEmpty": "No categories yet."
+          },
+          "healthRisk": {
+            "title": "Store health",
+            "scoreLabel": "Health score",
+            "status": {
+              "healthy": "Healthy",
+              "attention": "Attention",
+              "at_risk": "At risk"
+            },
+            "riskLabel": "Churn risk",
+            "risk": {
+              "healthy": "Healthy",
+              "low": "Low",
+              "medium": "Medium",
+              "high": "High"
+            },
+            "categories": {
+              "activity": "Activity",
+              "sales": "Sales",
+              "employees": "Employees",
+              "recent_activity": "Recent usage",
+              "subscription": "Subscription",
+              "flags": "Existing flags"
+            },
+            "whyHealth": "Why?",
+            "whyRisk": "Risk reasons",
+            "noReasons": "No issues detected."
           },
           "billing": {
             "title": "Plan & billing",
@@ -2292,7 +2613,35 @@
         "footerCount": "{n}/500 — shown under \"Thank you for shopping\".",
         "showLoyalty": "Show points and credit on the receipt",
         "showLoyaltyHint": "Prints \"points earned\" and \"wallet balance\" — the strongest nudge for using the loyalty programme. Requires the loyalty programme to be enabled.",
-        "previewLabel": "↓ Preview ↓"
+        "previewLabel": "↓ Preview ↓",
+        "identityHeading": "Receipt identity",
+        "identitySubhead": "Every field is optional. Nothing here affects historical sales or accounting.",
+        "addressLabel": "Receipt address",
+        "addressHint": "Shown at the top of the printed receipt.",
+        "addressPlaceholder": "e.g. 15 Main Street, Nasr City, Cairo",
+        "sloganLabel": "Slogan / thank-you message",
+        "sloganHint": "Printed under the shop header. Tap a suggestion to fill it quickly.",
+        "sloganPlaceholder": "e.g. Thank you for shopping with us",
+        "taxRegLabel": "Tax registration number",
+        "taxRegPlaceholder": "e.g. 123-456-789",
+        "taxCardLabel": "Tax card number",
+        "taxCardPlaceholder": "e.g. 100-200-300",
+        "returnPolicyLabel": "Return & exchange policy",
+        "returnPolicyHint": "Shown under the thank-you line.",
+        "returnPolicyPlaceholder": "e.g. Exchanges within 14 days with the invoice. No cash refunds.",
+        "referencePrefixLabel": "Receipt reference prefix",
+        "referencePrefixHint": "Stamped before the invoice number at the footer (e.g. INV-A1B2C3D4E5).",
+        "referencePrefixPlaceholder": "e.g. INV",
+        "showToggle": "Show on receipt",
+        "showTaxToggle": "Show tax info",
+        "emptyHidesHint": "Tip: leaving a field empty also hides it. The toggle keeps the text saved while hiding the row.",
+        "phoneLabel": "Receipt phone number",
+        "phonePlaceholder": "e.g. 01000000000",
+        "phoneHint": "Shown in the receipt header. Clearing it hides the row.",
+        "nameAlignmentLabel": "Store name alignment",
+        "alignLeft": "Left",
+        "alignCenter": "Center",
+        "alignRight": "Right"
       },
       "whatsapp": {
         "section": "WhatsApp settings",
@@ -3142,6 +3491,34 @@
         "sale.alert": {
           "title": "Sale sound alerts",
           "hint": "Every device in the shop plays the till sound when a sale is recorded on another device."
+        },
+        "report.weekly": {
+          "title": "Weekly report",
+          "hint": "Monday morning — last week's revenue, top products, returns and expenses."
+        },
+        "report.monthly": {
+          "title": "Monthly report",
+          "hint": "First of each month — last month's full summary, delivered to your phone."
+        },
+        "expense.recorded": {
+          "title": "New expense",
+          "hint": "Fires when a staff member records an expense."
+        },
+        "product.added": {
+          "title": "New product",
+          "hint": "Fires when a product is added to the catalog."
+        },
+        "inventory.adjusted": {
+          "title": "Stock adjusted",
+          "hint": "Fires when a product's stock is manually changed (+ or −)."
+        },
+        "return.recorded": {
+          "title": "New return",
+          "hint": "Fires when a return is processed against a sale."
+        },
+        "attendance.check_in": {
+          "title": "Employee check-in",
+          "hint": "Fires when a staff member checks in for a shift."
         }
       },
       "delivery": {
@@ -3227,7 +3604,8 @@
         "stockStatus": {
           "in": "In stock",
           "low": "Low stock",
-          "out": "Out of stock"
+          "out": "Out of stock",
+          "alert": "Needs restock"
         }
       },
       "sort": {
@@ -3568,7 +3946,8 @@
         "sales": "Sales",
         "addProduct": "Add product",
         "purchases": "Purchases",
-        "insights": "Insights"
+        "insights": "Insights",
+        "financials": "Financials"
       },
       "secondary": {
         "tasks": "Tasks",
@@ -5100,6 +5479,73 @@
     }
   },
   "mobile": {
+    "voice": {
+      "micLabel": "Record a voice message",
+      "recording": "Recording",
+      "cancel": "Cancel",
+      "stop": "Done",
+      "transcribing": "Transcribing…",
+      "permissionTitle": "Microphone permission",
+      "permissionBody": "To record voice messages for Storo, enable the microphone in Settings.",
+      "permissionOpenSettings": "Open Settings",
+      "permissionCancel": "Cancel",
+      "errorGeneric": "Something went wrong. Try again.",
+      "errorRateLimited": "Too many attempts. Wait a minute.",
+      "errorAudioTooLarge": "Recording too long. Try a shorter clip.",
+      "errorAudioTooShort": "Recording too short. Hold the mic a bit longer.",
+      "errorNoNetwork": "No connection. Try again.",
+      "errorNoServiceKey": "Voice service is not configured.",
+      "errorEmptyTranscript": "Couldn't hear you. Try again more clearly.",
+      "tipTapAndHold": "Press and hold to record"
+    },
+    "payroll": {
+      "title": "Payroll",
+      "backToTeam": "Team",
+      "totalNet": "Total net",
+      "changeMonth": "Change month",
+      "base": "Base",
+      "net": "Net",
+      "statusDraft": "Draft",
+      "statusFinalized": "Finalized",
+      "statusVoided": "Voided",
+      "statusMissing": "Not started",
+      "emptyTitle": "No payroll yet",
+      "emptyMessage": "There are no employees on this tenant for this month.",
+      "detailBack": "Payroll",
+      "addBonus": "Add bonus",
+      "addDeduction": "Add deduction",
+      "amount": "Amount",
+      "reason": "Reason",
+      "save": "Save",
+      "adjustments": "Bonuses & deductions",
+      "adjustmentsEmpty": "No bonuses or deductions this month.",
+      "attendance": "Attendance",
+      "regularHours": "Regular hours",
+      "overtimeHours": "Overtime hours",
+      "paidLeave": "Paid leave (days)",
+      "unpaidLeave": "Unpaid leave (days)",
+      "commission": "Commission",
+      "sales": "Sales",
+      "returns": "Returns",
+      "gross": "Gross",
+      "netLabel": "Net salary",
+      "sharePdf": "Share statement PDF",
+      "compensationLocked": "This sheet is {state}; adjustments can’t be edited. Void from the web register first.",
+      "warnings": "Warnings",
+      "warningCodes": {
+        "no_compensation": "No compensation effective at period start — base pay is 0",
+        "open_shifts": "Open shift (forgot to check out) needs review",
+        "missing_attendance": "No attendance recorded this month",
+        "unapproved_overtime": "Overtime without approval",
+        "no_sales_attribution": "Commission enabled but no sales attributed to this employee"
+      },
+      "adjustmentKinds": {
+        "bonus": "Bonus",
+        "deduction": "Deduction",
+        "advance_repayment": "Advance repayment",
+        "correction": "Correction"
+      }
+    },
     "common": {
       "owner": "Owner",
       "recurring": "Recurring",
@@ -5134,11 +5580,14 @@
       "piecesOne": "1 pc",
       "piecesTwo": "{n} pcs",
       "piecesFew": "{n} pcs",
-      "piecesMany": "{n} pcs"
+      "piecesMany": "{n} pcs",
+      "comingSoon": "Soon"
     },
     "pos": {
       "itemsInCart": "{n} items in the invoice",
       "available": "Available: {n}",
+      "restock": "Restock",
+      "restockHint": "{name} is sold out — tap to restock",
       "saveFailed": "Couldn't record the sale",
       "offlineNotSaved": "Can't reach the server — the sale was NOT recorded",
       "timeoutNotSaved": "Connection timed out — the sale was NOT recorded",
@@ -5162,7 +5611,10 @@
       "emptyCartHint": "Search, scan a barcode, or tap a recent product to start a sale.",
       "itemsInCartOne": "1 item in the invoice",
       "itemsInCartTwo": "{n} items in the invoice",
-      "itemsInCartFew": "{n} items in the invoice"
+      "itemsInCartFew": "{n} items in the invoice",
+      "channelLabel": "Sale type",
+      "channelStore": "In store",
+      "channelOnline": "Online"
     },
     "product": {
       "details": "Product details",
@@ -5288,7 +5740,8 @@
         "noLinesHint": "Search by name above or scan a barcode to add the first item",
         "linesSummaryOne": "1 item · {amount}",
         "linesSummaryTwo": "2 items · {amount}",
-        "linesSummaryFew": "{n} items · {amount}"
+        "linesSummaryFew": "{n} items · {amount}",
+        "paidSoFar": "Paid {amount} · Remaining {remaining}"
       },
       "actionFailed": "The action failed, try again",
       "filterAll": "All",
@@ -5304,6 +5757,160 @@
       "summaryOne": "1 expense · {total}",
       "summaryTwo": "{n} expenses · {total}",
       "summaryFew": "{n} expenses · {total}"
+    },
+    "financials": {
+      "loadFailed": "Couldn't load financial figures",
+      "movementsNote": "Money movements are kept separate from profit and loss.",
+      "presets": {
+        "today": "Today",
+        "yesterday": "Yesterday",
+        "this_week": "This week",
+        "this_month": "This month",
+        "last_month": "Last month",
+        "last_7_days": "Last 7 days",
+        "last_30_days": "Last 30 days",
+        "this_year": "This year",
+        "custom": "Custom"
+      },
+      "customFrom": "From",
+      "customTo": "To",
+      "expenses": {
+        "title": "Expenses",
+        "listEmpty": "No expenses in this period",
+        "listEmptyHint": "Tap + to record the first expense.",
+        "saveFailed": "Couldn't save the expense",
+        "voidFailed": "Couldn't void the expense",
+        "voidTitle": "Void expense",
+        "voidPrompt": "Reason (optional) — helps reconciliation.",
+        "voidConfirm": "Void",
+        "voidedBadge": "Voided",
+        "statusAll": "All",
+        "statusPosted": "Posted",
+        "statusVoided": "Voided",
+        "filterTitle": "Filter expenses",
+        "filterApply": "Apply",
+        "filterReset": "Reset",
+        "searchPlaceholder": "Search title / reference / note",
+        "paymentAll": "Any method",
+        "categoryAll": "Any category",
+        "newTitle": "New expense",
+        "editTitle": "Edit expense",
+        "fieldTitle": "Title",
+        "fieldAmount": "Amount",
+        "fieldDate": "Date",
+        "fieldCategory": "Category",
+        "fieldPaymentMethod": "Payment method",
+        "fieldReference": "Reference # (optional)",
+        "fieldNote": "Note (optional)",
+        "fieldSupplier": "Supplier (optional)",
+        "save": "Save",
+        "editAction": "Edit",
+        "voidAction": "Void",
+        "pickCategoryTitle": "Pick a category",
+        "pickSupplierTitle": "Pick a supplier",
+        "noSupplier": "No supplier",
+        "ownerOnly": "Only the store owner can manage expenses.",
+        "noPermission": "You don't have permission to manage expenses.",
+        "noViewPermission": "You need the view-financials permission to open this page."
+      },
+      "moneyMovements": {
+        "title": "Money Movements",
+        "notPnlNote": "These movements track cash flow. They are not profit or loss.",
+        "listEmpty": "No movements in this period",
+        "listEmptyHint": "Tap + to record a deposit, withdrawal, loan or transfer.",
+        "saveFailed": "Couldn't save the movement",
+        "voidFailed": "Couldn't void the movement",
+        "voidTitle": "Void movement",
+        "voidPrompt": "Reason (optional).",
+        "voidedBadge": "Voided",
+        "filterTitle": "Filter movements",
+        "kindAll": "Any type",
+        "statusAll": "All",
+        "statusActive": "Active",
+        "statusVoided": "Voided",
+        "directionIn": "Money In",
+        "directionOut": "Money Out",
+        "newTitle": "New money movement",
+        "fieldKind": "Type",
+        "fieldAmount": "Amount",
+        "fieldDate": "Date",
+        "fieldDescription": "Description (optional)",
+        "fieldPaymentMethod": "Payment method (optional)",
+        "save": "Save",
+        "voidAction": "Void",
+        "kinds": {
+          "owner_deposit": "Owner deposit",
+          "owner_withdrawal": "Owner withdrawal",
+          "cash_transfer": "Cash transfer",
+          "loan_received": "Loan received",
+          "loan_principal_repayment": "Loan repayment",
+          "supplier_payment_direct": "Direct supplier payment",
+          "customer_deposit": "Customer deposit",
+          "other": "Other"
+        },
+        "totalsIn": "Total in",
+        "totalsOut": "Total out"
+      },
+      "recurring": {
+        "title": "Recurring expenses",
+        "listEmpty": "No recurring templates yet",
+        "listEmptyHint": "Create a template so Storo posts it automatically every cycle.",
+        "generateNow": "Generate due now",
+        "generatedToast": "Spawned {n} expense(s).",
+        "newTitle": "New recurring template",
+        "fieldFrequency": "Frequency",
+        "fieldNextOccurrence": "Next occurrence",
+        "frequency": {
+          "weekly": "Weekly",
+          "monthly": "Monthly",
+          "quarterly": "Quarterly",
+          "yearly": "Yearly"
+        }
+      },
+      "categories": {
+        "title": "Expense categories",
+        "systemBadge": "System",
+        "archive": "Archive",
+        "archiveFailed": "Couldn't archive — category still in use.",
+        "newTitle": "New custom category",
+        "pickGroup": "Parent group",
+        "fieldNameEn": "English name",
+        "fieldNameAr": "Arabic name",
+        "fieldSlug": "Slug (a-z, 0-9, dashes)",
+        "renameTitle": "Rename category",
+        "archivedBadge": "Archived"
+      },
+      "profitability": {
+        "title": "Profitability",
+        "tabProducts": "By product",
+        "tabCategories": "By category",
+        "sort": "Sort by",
+        "sortRevenue": "Revenue",
+        "sortGrossProfit": "Gross profit",
+        "sortMargin": "Margin",
+        "sortQuantity": "Quantity",
+        "searchPlaceholder": "Search product",
+        "colQuantity": "Qty",
+        "colRevenue": "Revenue",
+        "colGrossProfit": "Gross profit",
+        "colMargin": "Margin",
+        "empty": "No sales in this period"
+      },
+      "charts": {
+        "revenueVsExpenses": "Revenue vs Expenses",
+        "netProfitTrend": "Net Profit",
+        "opexByGroup": "Operating expenses by group",
+        "noData": "No data in this period"
+      },
+      "view": {
+        "overview": "Overview",
+        "pnl": "Profit & Loss",
+        "expenses": "Expenses",
+        "moneyMovements": "Money Movements",
+        "recurring": "Recurring",
+        "profitability": "Profitability",
+        "categories": "Categories"
+      }
     },
     "customers": {
       "emptyHint": "Customers appear here after the first sale recorded with a name.",
@@ -5364,7 +5971,17 @@
       "owingPill": "On account",
       "invoicePaidLabel": "Invoice {id}, paid",
       "invoicePartialLabel": "Invoice {id}, partially paid, {amount} remaining",
-      "invoiceUnpaidLabel": "Invoice {id}, deferred, {amount} remaining"
+      "invoiceUnpaidLabel": "Invoice {id}, deferred, {amount} remaining",
+      "totalCustomers": "All customers",
+      "payPartial": "Pay partial",
+      "payPartialTitle": "Record a partial payment",
+      "payPartialMax": "Outstanding balance: {amount}",
+      "payPartialHint": "Applied to the oldest unpaid invoice first.",
+      "accountStatement": "Account statement",
+      "statementShareTitle": "Statement — {name}",
+      "statementUnavailable": "Sharing is unavailable on this device",
+      "statementFailed": "Could not build the statement",
+      "statementSettingsLoading": "Loading shop details…"
     },
     "suppliers": {
       "profileOf": "Supplier: {name}",
@@ -5378,7 +5995,12 @@
       "maybeSaved": "The connection dropped before the server answered. Check the list before adding again — the supplier may already be saved.",
       "summaryOne": "1 supplier · {owed} owed",
       "summaryTwo": "{n} suppliers · {owed} owed",
-      "summaryFew": "{n} suppliers · {owed} owed"
+      "summaryFew": "{n} suppliers · {owed} owed",
+      "payPartial": "Pay partial",
+      "payAll": "Pay all remaining",
+      "payTitle": "Record a payment to supplier",
+      "paySubmit": "Record",
+      "payOwed": "Outstanding to supplier: {amount}"
     },
     "team": {
       "summary": "{n} members",
@@ -5435,7 +6057,44 @@
       "memberMetaOne": "{email} · 1 permission",
       "memberMetaTwo": "{email} · {n} permissions",
       "memberMetaFew": "{email} · {n} permissions",
-      "back": "Team"
+      "back": "Team",
+      "addMember": "Add member",
+      "new": {
+        "title": "Add new member",
+        "intro": "Create an account so this person can sign in and use the store. You can refine their permissions below.",
+        "credentialsSection": "Sign-in credentials",
+        "profileSection": "Profile",
+        "permissionsSection": "Permissions",
+        "usernameLabel": "Username",
+        "usernamePlaceholder": "e.g. ahmed",
+        "usernameHint": "Lowercase letters, numbers, . _ -. 2–40 characters.",
+        "displayNameLabel": "Full name",
+        "displayNamePlaceholder": "e.g. Ahmed Mohamed",
+        "passwordLabel": "Temporary password",
+        "passwordPlaceholder": "At least 8 characters",
+        "passwordHint": "The member will be asked to change this on first sign-in.",
+        "phoneLabel": "Phone",
+        "phonePlaceholder": "01012345678",
+        "nationalIdLabel": "National ID",
+        "nationalIdPlaceholder": "Optional",
+        "addressLabel": "Address",
+        "addressPlaceholder": "Optional",
+        "submit": "Create member",
+        "submitting": "Creating…",
+        "success": "Member added",
+        "verifying": "Verifying created member…",
+        "verifyFailed": "Created but couldn't verify. Pull to refresh the team list.",
+        "errors": {
+          "usernameRequired": "Username is required (2–40 characters).",
+          "usernameFormat": "Use lowercase letters, numbers, . _ or -.",
+          "displayNameRequired": "Name is required.",
+          "passwordTooShort": "Password must be at least 8 characters.",
+          "genericValidation": "Please check the form and try again.",
+          "conflict": "That username is already taken in this store.",
+          "forbidden": "You don't have permission to add members.",
+          "generic": "Couldn't create member. Try again."
+        }
+      }
     },
     "tasks": {
       "summary": "{open} open · {done} done",
@@ -5480,9 +6139,135 @@
       "heatmap": {
         "footerLabel": "Total"
       },
+      "ai": {
+        "entryTitle": "Ask Amr",
+        "entrySubtitle": "Numbers, trends and anything about your store — in your own words.",
+        "screenTitle": "Amr",
+        "greetingTitle": "What do you want to know?",
+        "greetingSub": "I can read your sales, stock, customers and brands. Pick a question or type your own.",
+        "inputPlaceholder": "Type a question…",
+        "send": "Send",
+        "thinking": "Thinking…",
+        "newChat": "New chat",
+        "disclaimer": "AI can make mistakes. Double-check important numbers against the actual report.",
+        "errorDisabled": "The AI assistant is not configured on your store yet.",
+        "errorFailed": "Couldn't reach the AI right now. Please try again.",
+        "errorBusy": "Amr is a bit busy right now. Try again in a moment.",
+        "errorTimeout": "The reply took longer than usual. Try again — Amr likely finished the answer but the connection ran long.",
+        "productCard": {
+          "inStock": "In stock: {n}",
+          "lowStock": "Low stock: {n}",
+          "outOfStock": "Out of stock",
+          "sku": "SKU: {sku}"
+        },
+        "confirm": {
+          "expiresIn": "Expires in {m}:{s}",
+          "expired": "Confirmation expired — ask again to retry.",
+          "cancelled": "Cancelled.",
+          "sent": "Executing…",
+          "rejected": "Could not execute — the confirmation is no longer valid.",
+          "branchMismatch": "You switched branches between preview and confirm. Retry in the correct branch.",
+          "forbidden": "You don't have permission to execute this action."
+        },
+        "clarification": {
+          "pickOne": "Tap the one you mean.",
+          "selected": "You picked: {label}"
+        },
+        "comparison": {
+          "winner": "Best",
+          "unavailable": "—"
+        },
+        "inventorySummary": {
+          "total": "Total products",
+          "lowStock": "Low stock",
+          "outOfStock": "Out of stock",
+          "stockValueRetail": "Stock value (retail)",
+          "stockValueCost": "Stock value (cost)",
+          "urgent": "Needs attention"
+        },
+        "salesSummary": {
+          "revenue": "Revenue",
+          "orders": "Orders",
+          "averageOrderValue": "Avg. order",
+          "vsPrevious": "vs. previous period",
+          "noTrend": "No prior period data"
+        },
+        "warning": {
+          "info": "Note",
+          "warning": "Heads up",
+          "error": "Problem"
+        },
+        "knowledge": {
+          "sources": "Sources",
+          "section": "Section: {name}"
+        },
+        "import": {
+          "chooseFile": "Choose file",
+          "uploading": "Uploading file…",
+          "uploadFailed": "Couldn't upload the file. Please try again.",
+          "unsupportedFile": "Only CSV and XLSX files are supported right now.",
+          "fileTooLarge": "That file is too large. The limit is 2 MB.",
+          "userTurn": "I want to import {file}. Import session: {sessionId}. Inspect it and tell me what you see.",
+          "editable": {
+            "editHint": "Tap any cell to edit — the AI will revalidate instantly.",
+            "saving": "Saving…",
+            "saved": "Saved",
+            "saveFailed": "Save failed",
+            "wasLabel": "was {value}",
+            "readyToConfirm": "Ready to import",
+            "fixIssuesFirst": "{n} rows need attention first",
+            "rowLabel": "Row {n}",
+            "rowStatus": {
+              "new": "NEW",
+              "update": "UPDATE",
+              "skip": "SKIP",
+              "invalid": "ERROR",
+              "missing": "MISSING",
+              "ambiguous": "AMBIGUOUS",
+              "valid": "VALID",
+              "ready": "READY",
+              "imported": "IMPORTED",
+              "failed": "FAILED",
+              "skipped": "SKIPPED"
+            }
+          }
+        },
+        "suggested": {
+          "topBrand": "Which brand sold the most this week?",
+          "slowStock": "What products haven't sold in a while?",
+          "revenueTrend": "How is my revenue trending vs last month?",
+          "topCustomers": "Who are my top-spending customers?",
+          "profit": "Is my gross profit growing or shrinking?",
+          "online": "What share of my sales is online?"
+        }
+      },
       "deep": {
         "product": {
           "pickTitle": "Pick a product"
+        },
+        "picker": {
+          "brands": {
+            "label": "Brands",
+            "hint": "Revenue, margin and store/online split for every brand you sell."
+          }
+        },
+        "brands": {
+          "title": "Brand breakdown",
+          "subtitle": "Highest-earning brands first. The 2 × 2 row shows margin, AOV, discounts and transactions.",
+          "empty": "No brand sales in this window.",
+          "totalRevenue": "Total revenue",
+          "totalGross": "Gross profit",
+          "totalMargin": "Margin",
+          "col": {
+            "units": "Units",
+            "transactions": "Transactions",
+            "aov": "AOV",
+            "gross": "Gross profit",
+            "margin": "Margin",
+            "discounts": "Discounts"
+          },
+          "channelStore": "In-store {amount} · {pct}",
+          "channelOnline": "Online {amount} · {pct}"
         }
       }
     },
@@ -5846,7 +6631,10 @@
       "settingsFallbackTitle": "Receipt settings unavailable",
       "settingsFallbackAsk": "The shop's receipt settings could not be loaded and this device has no saved copy. The receipt would use the default layout with no shop name, phone or footer. Continue anyway?",
       "settingsFallbackContinue": "Continue anyway",
-      "settingsSaved": "Offline — the last receipt settings saved on this device were used."
+      "settingsSaved": "Offline — the last receipt settings saved on this device were used.",
+      "whatsappShare": "Send via WhatsApp",
+      "whatsappMessage": "Receipt #{code}",
+      "whatsappUnavailable": "Couldn't open WhatsApp on this device."
     },
     "catalog": {
       "productsCount": "{n} products",
@@ -5993,7 +6781,158 @@
       "prefsEmpty": "No events to configure",
       "channelCollections": "Collections",
       "channelSales": "Sale alerts",
+      "channelGeneric": "General alerts",
+      "channelCritical": "Critical alerts",
       "sendTestSale": "Send a test sale alert"
+    },
+    "reports": {
+      "back": "Home",
+      "loadingPeriod": "Loading {period}…",
+      "productQty": "{n} sold",
+      "heroSales": "{n} sales",
+      "weekly": {
+        "title": "Weekly report"
+      },
+      "monthly": {
+        "title": "Monthly report"
+      },
+      "sections": {
+        "headline": "Headline",
+        "trend": "Daily trend",
+        "topProducts": "Top products",
+        "byCategory": "Sales by category",
+        "comparison": "Comparison"
+      },
+      "kpi": {
+        "revenue": "Revenue",
+        "sales": "Sales",
+        "netProfit": "Net profit",
+        "grossProfit": "Gross profit",
+        "cogs": "Cost of goods",
+        "returns": "Returns",
+        "expenses": "Expenses",
+        "discounts": "Discounts",
+        "discountsPct": "{pct}% of revenue",
+        "lastPeriod": "Previous period"
+      },
+      "empty": {
+        "noSales": "No sales in this period"
+      },
+      "error": {
+        "title": "Couldn't load report",
+        "invalidPeriod": "The report link looks malformed. Try opening it again from the notification.",
+        "notFound": "That report is no longer available.",
+        "generic": "Something went wrong loading the report."
+      }
+    },
+    "inventoryCount": {
+      "title": "Inventory count",
+      "subtitle": "Count stock, review differences, update inventory.",
+      "newCount": "New inventory count",
+      "notFound": "Count not found",
+      "deletedProduct": "Deleted product",
+      "backToCount": "Back to count",
+      "sections": {
+        "active": "Active counts",
+        "completed": "Completed counts"
+      },
+      "empty": {
+        "active": "No counts in progress.",
+        "completed": "No completed counts yet."
+      },
+      "row": {
+        "countedOf": "{n}/{total} counted",
+        "differences": "{n} differences",
+        "system": "System {n}",
+        "counted": "Counted {n}"
+      },
+      "scope": {
+        "title": "Scope",
+        "summary": "What you're counting",
+        "all": "All products",
+        "category": "Category",
+        "brand": "Brand",
+        "filterLabel": "Search",
+        "filterPlaceholder": "Type to filter…",
+        "empty": "Nothing to pick.",
+        "pickOne": "Pick a category or brand",
+        "productCount": "{n} products",
+        "categoryLabel": "Category: {value}",
+        "brandLabel": "Brand: {value}",
+        "lowActivityHint": "Counts are more accurate when the store is closed or quiet."
+      },
+      "start": {
+        "cta": "Start counting",
+        "failed": "Couldn't start the count."
+      },
+      "counting": {
+        "progress": "{counted}/{total} counted · {pct}%"
+      },
+      "scanner": {
+        "scan": "Scan barcode",
+        "looking": "Finding product…",
+        "notFound": "Unknown barcode: {code}"
+      },
+      "search": {
+        "placeholder": "Search by name, SKU, or barcode"
+      },
+      "summary": {
+        "title": "This session",
+        "matched": "Matched",
+        "shortage": "Shortage",
+        "overage": "Overage"
+      },
+      "lists": {
+        "counted": "Counted",
+        "notYet": "Not yet counted ({n})",
+        "moreHint": "+{n} more — use scan or search to find them"
+      },
+      "actions": {
+        "review": "Review count",
+        "cancelCount": "Cancel this count"
+      },
+      "sheet": {
+        "save": "Save count",
+        "update": "Update count",
+        "cancel": "Cancel",
+        "minus": "Decrease",
+        "plus": "Increase",
+        "systemQty": "System quantity",
+        "difference": "Difference",
+        "removeLine": "Remove from count",
+        "outOfScope": "This product isn't in the count's scope. Add it anyway?",
+        "addAnyway": "Add anyway",
+        "saveFailed": "Couldn't save the count."
+      },
+      "lineBadge": {
+        "addedMidCount": "added"
+      },
+      "review": {
+        "title": "Review count",
+        "subtitle": "{counted} of {total} products counted",
+        "breakdown": "Breakdown",
+        "netAdjustment": "Net adjustment: {n} units",
+        "tab": {
+          "shortage": "Shortage",
+          "overage": "Overage",
+          "matched": "Matched",
+          "notCounted": "Not counted"
+        },
+        "emptyBucket": "Nothing in this bucket.",
+        "exceptionsTitle": "Resolve exceptions before confirming",
+        "exceptionsBody": "{n} counted products no longer exist. Remove them from the count, then confirm again.",
+        "confirmCount": "Confirm count",
+        "confirmFailed": "Couldn't confirm the count.",
+        "alreadyConfirmed": "This count has been confirmed."
+      },
+      "report": {
+        "title": "Inventory count report",
+        "subtitle": "Share a PDF of this count.",
+        "shareBtn": "Share report (PDF)",
+        "impact": "Impact {v} EGP",
+        "shareUnavailable": "Sharing isn't available on this device.",
+        "shareFailed": "Couldn't share the report."
+      }
     },
     "offline": {
       "chipOffline": "Offline",
@@ -6119,7 +7058,8 @@
       "unpaid": "Unpaid",
       "saleMetaOne": "1 item · {when}",
       "saleMetaTwo": "{n} items · {when}",
-      "saleMetaFew": "{n} items · {when}"
+      "saleMetaFew": "{n} items · {when}",
+      "channelSplit": "Store {store} · Online {online}"
     },
     "salesHistory": {
       "title": "Sales history",
@@ -6139,7 +7079,10 @@
       "lineCountOne": "1 item",
       "lineCountTwo": "{n} items",
       "lineCountFew": "{n} items",
-      "walkIn": "Walk-in"
+      "walkIn": "Walk-in",
+      "channelAll": "All channels",
+      "moreLines": "+{n} more",
+      "discountBadge": "Discount {amount}"
     },
     "saleDetail": {
       "title": "Invoice details",

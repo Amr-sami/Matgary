@@ -29,6 +29,12 @@ export interface CartOptions {
   invoiceId?: string;
   amountPaidNow?: number;
   /**
+   * Sales channel (migration 0057). Omit = 'store' (in-person at the till).
+   * 'online' tags carts rung for WhatsApp / Instagram / phone orders; the
+   * dashboard and insights split on this field.
+   */
+  channel?: "store" | "online";
+  /**
    * ISO datetime of the moment the sale was rung. The route books
    * `customDate ?? now`, so a sale rung offline at 22:00 and drained at 09:00
    * lands on the day the customer's receipt shows, not the day it synced.
@@ -67,6 +73,8 @@ export interface CartSaleResult {
   lines: { productId: string; productName: string; quantity: number; lineTotal: number }[];
   total: number;
   paymentMethod: PaymentMethod;
+  /** 'store' | 'online' — mirrors what was persisted (defaults to 'store'). */
+  channel: "store" | "online";
   customerName: string | null;
   customerPhone: string | null;
   note: string | null;
@@ -177,6 +185,8 @@ export interface SaleRecord {
   /** Digital-collection status of the invoice (0055); null/absent = not a
    *  digital sale or an older server. */
   collectionStatus?: "pending" | "confirmed" | "rejected" | null;
+  /** Sales channel (migration 0057); absent on servers predating it. */
+  channel?: "store" | "online";
 }
 
 export interface SalesPage {
@@ -323,6 +333,9 @@ export interface Invoice {
    *  (the server writes `sales.collection_status` on every line in one
    *  transaction, 03 §B.2.4); null = not a digital sale or an older server. */
   collectionStatus: "pending" | "confirmed" | "rejected" | null;
+  /** Sales channel (migration 0057). Server writes it on every line of the
+   *  cart so the first-line value is authoritative; defaults to 'store'. */
+  channel: "store" | "online";
 }
 
 /**
@@ -354,6 +367,9 @@ export function groupInvoices(rows: SaleRecord[]): Invoice[] {
         fullyReturned: true,
         outstanding: 0,
         collectionStatus: null,
+        // First line's channel. Server writes it on every line of a cart,
+        // so later lines won't disagree; defaults to 'store' when absent.
+        channel: r.channel ?? "store",
       };
       byKey.set(key, inv);
       order.push(inv);

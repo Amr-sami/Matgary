@@ -25,6 +25,23 @@ export async function getMe(client: ApiClient): Promise<MeResponse> {
   return client.request<MeResponse>("/api/v1/me");
 }
 
+/**
+ * Persist the caller's preferred UI locale. Writes to `users.locale`; the
+ * notification dispatcher reads from the same column, so push/email copy
+ * from this point forward renders in the new language. Fire-and-forget on
+ * mobile — a transient network failure must not block the UI from switching.
+ */
+export async function updateLocale(
+  client: ApiClient,
+  locale: "ar" | "en",
+): Promise<{ ok: true; locale: "ar" | "en" }> {
+  return client.request<{ ok: true; locale: "ar" | "en" }>("/api/account/locale", {
+    method: "PATCH",
+    body: { locale },
+    noBranch: true,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Billing — the owner's subscription, the sellable plans and the Paymob
 // checkout hand-off. Lives next to /me because /api/billing/me is the one

@@ -50,6 +50,33 @@ export async function getMember(
   return rows.find((m) => m.userId === userId) ?? null;
 }
 
+/**
+ * POST /api/team body — mirrors the zod schema in apps/web/app/api/team/route.ts.
+ * `branchId` is required by the current backend contract. Mobile callers should
+ * pass `session.me.branch.id` to satisfy it without exposing a branch concept
+ * in the UI (follow-up: drop this once the backend makes it optional).
+ */
+export interface CreateMemberInput {
+  username: string;
+  displayName: string;
+  password: string;
+  permissions?: string[];
+  phone?: string | null;
+  nationalId?: string | null;
+  address?: string | null;
+  /** UUID of a branch in the caller's tenant. */
+  branchId: string;
+}
+
+/** 201 body shape from apps/web/lib/repo/team.ts addTeamMember(). */
+export interface CreateMemberResult {
+  userId: string;
+  loginEmail: string;
+}
+
+export const createMember = (c: ApiClient, input: CreateMemberInput) =>
+  c.request<CreateMemberResult>("/api/team", { method: "POST", body: input });
+
 /** PATCH /api/team/[userId] body — every field optional. */
 export interface UpdateMemberInput {
   displayName?: string;
