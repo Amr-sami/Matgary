@@ -67,21 +67,9 @@ export default function SettingsScreen() {
   const locale = useLocale((s) => s.locale);
   const setLocale = useLocale((s) => s.setLocale);
   const isOwner = me?.isOwner ?? false;
-  const branchCount = me?.branches.length ?? 0;
   const collectionsAccess = useCollectionsAccess();
 
   const tiles: Tile[] = [
-    {
-      key: "branches",
-      route: "/settings/branches",
-      icon: Storefront,
-      title: t("app.settingsPage.branches.title"),
-      hint:
-        branchCount <= 1
-          ? t("app.settingsPage.branches.hintOne")
-          : t("app.settingsPage.branches.hintMany"),
-      ownerOnly: true,
-    },
     {
       key: "digest",
       route: "/settings/digest",
@@ -201,9 +189,11 @@ export default function SettingsScreen() {
         <Text numberOfLines={1} style={styles.store}>
           {me?.tenant.name ?? me?.tenant.slug ?? "—"}
         </Text>
-        <Text numberOfLines={1} style={styles.meta}>
-          {t("mobile.settings.currentBranchLine", { slug: me?.tenant.slug ?? "", branch: me?.branch.name ?? "—" })}
-        </Text>
+        {me?.tenant.slug ? (
+          <Text numberOfLines={1} style={styles.meta}>
+            {me.tenant.slug}
+          </Text>
+        ) : null}
       </Card>
 
       {/* Language. The web puts this in the user menu; on the phone Settings is
@@ -236,9 +226,6 @@ export default function SettingsScreen() {
                   <Text numberOfLines={1} style={styles.tileTitle}>
                     {tile.title}
                   </Text>
-                  {/* Bare count: the title already names the noun, and a digit
-                      needs no Arabic dual/plural agreement ("2 فروع" was wrong). */}
-                  {tile.key === "branches" ? <Badge label={String(branchCount)} /> : null}
                   {tile.soon ? <Badge label={t("app.billing.comingSoon")} variant="lowstock" /> : null}
                 </View>
                 <Text style={styles.tileHint}>{tile.hint}</Text>

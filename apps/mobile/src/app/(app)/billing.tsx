@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { ActivityIndicator, AppState, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { AppState, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { SkeletonText } from "@/components/ui/skeleton";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import * as WebBrowser from "expo-web-browser";
 import { ApiError, me as meApi } from "@matgary/api-client";
@@ -230,7 +231,7 @@ export default function BillingScreen() {
         // A Card of the plan card's height, not a bare spinner: the manage-on-
         // web card below keeps its place when the real plan card mounts.
         <Card style={styles.loadingCard}>
-          <ActivityIndicator color={colors.accent} accessibilityLabel={t("app.common.loading")} />
+          <SkeletonText lines={3} height={14} />
         </Card>
       ) : null}
 

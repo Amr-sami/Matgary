@@ -1,30 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
-import { branches as branchesApi } from "@matgary/api-client";
 
 import { api } from "@/api/client";
 import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SearchField } from "@/components/ui/SearchField";
+import { SkeletonChart, SkeletonListRow } from "@/components/ui/skeleton";
 import { compact, countLabel, dayMonth, money } from "@/lib/format";
-import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
 import { colors, fonts, MIN_TOUCH, radius, spacing } from "@/theme/tokens";
 import { t, useLocale } from "@/i18n";
 
 /**
  * Port of apps/web/components/insights/deep/DeepDive.tsx — the "تحليل معمّق"
- * tab. Same five reports, same `/api/insights/deep?report=…` endpoint; the
+ * tab. Same reports, same `/api/insights/deep?report=…` endpoint; the
  * charts are plain Views (bars / heat cells) so no new chart dependency.
- *
- * Branch scope (doc 02 §2.9 "owner-only branch-scope toggle survives"): an
- * owner of a multi-branch tenant gets a chip row "All branches / <branch>…"
- * above the reports. It sends `branchId=all|<uuid>` on every deep query, the
- * same param web's useDeepFetch sets, and the scope is part of every query
- * key. Staff and single-branch tenants see no row and the query carries no
- * `branchId`, so the server keeps defaulting to the caller's active branch.
  */
 
 export type InsightsRange = "all" | "today" | "yesterday" | "7d" | "30d";
@@ -32,35 +24,21 @@ export type InsightsRange = "all" | "today" | "yesterday" | "7d" | "30d";
 interface TabProps {
   /** `insights?tab=deep&report=heatmap` opens straight on a report. */
   initialReport?: string;
-  /**
-   * `insights?tab=deep&branchId=all|<uuid>` opens on a scope. Only honoured
-   * when the chip row is shown (owner, >1 active branch); otherwise ignored, so a
-   * link cannot make a cashier's request 403.
-   */
-  initialBranchId?: string;
   range: InsightsRange;
   from?: string;
   to?: string;
 }
 
-/**
- * `"all"` or a branch uuid — the value web's useDeepFetch puts in `branchId`.
- * `undefined` = omit the param (server falls back to the active branch).
- */
-type BranchScope = string | undefined;
+type ReportProps = TabProps;
 
-/** What DeepTab hands each report: the screen's props plus the resolved scope. */
-type ReportProps = TabProps & { branchId: BranchScope };
-
-type ReportKey = "compare" | "heatmap" | "payments" | "branches" | "product";
+type ReportKey = "compare" | "heatmap" | "payments" | "product";
 const isReportKey = (v: unknown): v is ReportKey =>
-  v === "compare" || v === "heatmap" || v === "payments" || v === "branches" || v === "product";
+  v === "compare" || v === "heatmap" || v === "payments" || v === "product";
 
 const REPORTS = (): { key: ReportKey; label: string; hint: string }[] => ([
   { key: "compare", label: t("app.insights.deep.picker.compare.label"), hint: t("app.insights.deep.picker.compare.hint") },
   { key: "heatmap", label: t("app.insights.deep.picker.heatmap.label"), hint: t("app.insights.deep.picker.heatmap.hint") },
   { key: "payments", label: t("app.insights.deep.picker.payments.label"), hint: t("app.insights.deep.picker.payments.hint") },
-  { key: "branches", label: t("app.insights.deep.picker.branches.label"), hint: t("app.insights.deep.picker.branches.hint") },
   { key: "product", label: t("app.insights.deep.picker.product.label"), hint: t("app.insights.deep.picker.product.hint") },
 ]);
 
@@ -78,24 +56,19 @@ function percent(n: number, opts?: { sign?: boolean; digits?: number }): string 
 
 function useDeep<T>(
   report: string,
-  { range, from, to, branchId }: ReportProps,
+  { range, from, to }: ReportProps,
   extra?: Record<string, string | undefined>,
   enabled = true,
 ) {
   const hasWindow = Boolean(from && to);
   return useQuery({
-    // range AND branch scope are part of the KEY so a chip tap refetches
-    // instead of serving the previous window's / branch's figures from cache
-    // (same rule as the overview).
-    queryKey: ["insights-deep", report, range, from ?? null, to ?? null, branchId ?? null, extra ?? null],
+    queryKey: ["insights-deep", report, range, from ?? null, to ?? null, extra ?? null],
     queryFn: () =>
       api.request<T>("/api/insights/deep", {
         query: {
           report,
           from: hasWindow ? from : undefined,
           to: hasWindow ? to : undefined,
-          // Same param web's useDeepFetch sets: "all" | <uuid>, or omitted.
-          branchId,
           ...(extra ?? {}),
         },
       }),
@@ -103,25 +76,7 @@ function useDeep<T>(
   });
 }
 
-/**
- * Owner-only management list (GET /api/branches). Shares the cache entry
- * settings/branches.tsx already keeps under ["branches"] — same endpoint,
- * same `data` array — so a rename or a new branch made there shows up here
- * without a second fetch. Suspended branches stay in: their history is
- * still worth a report.
- */
-function useBranchList(enabled: boolean) {
-  return useQuery({
-    queryKey: ["branches"],
-    queryFn: () => branchesApi.list(api).then((r) => r.data ?? []),
-    enabled,
-  });
-}
-
 export function DeepTab(props: TabProps) {
-  const isOwner = useSession((s) => s.me?.isOwner ?? false);
-  const activeBranchId = useSession((s) => s.me?.branch.id ?? null);
-  const sessionBranches = useSession((s) => s.me?.branches);
   const [report, setReport] = useState<ReportKey>(
     isReportKey(props.initialReport) ? props.initialReport : "compare",
   );
@@ -129,101 +84,21 @@ export function DeepTab(props: TabProps) {
     if (isReportKey(props.initialReport)) setReport(props.initialReport);
   }, [props.initialReport]);
   const active = REPORTS().find((r) => r.key === report);
-
-  // ---- branch scope -------------------------------------------------------
-  // `picked` is only what the user (or a deep link) chose; until then the
-  // scope follows the active branch, so a switch elsewhere is reflected here.
-  const branchList = useBranchList(isOwner);
-  // /me already carries the switchable branches, so the row does not wait on
-  // (or vanish with) the extra GET — same fallback settings/branches.tsx uses.
-  // /me lists ACTIVE branches only; the GET adds suspended ones, sorted to the
-  // tail so the active chips keep their slot when it lands.
-  const branchRows = useMemo(() => {
-    const rows = branchList.data
-      ? branchList.data.map((b) => ({ id: b.id, name: b.name, isActive: b.isActive }))
-      : (sessionBranches ?? []).map((b) => ({ id: b.id, name: b.name, isActive: true }));
-    return [...rows.filter((b) => b.isActive), ...rows.filter((b) => !b.isActive)];
-  }, [branchList.data, sessionBranches]);
-  // Gate on the ACTIVE count, which both sources agree on. Counting suspended
-  // rows too would let the row pop in (and re-key every deep query, refetching
-  // identical data) the moment the GET returns for an owner with one live
-  // branch plus suspended ones.
-  const activeBranchCount = branchRows.filter((b) => b.isActive).length;
-  const showScope = isOwner && activeBranchCount > 1;
-  const [picked, setPicked] = useState<string | null>(props.initialBranchId ?? null);
-  useEffect(() => {
-    if (props.initialBranchId) setPicked(props.initialBranchId);
-  }, [props.initialBranchId]);
-  const pickedIsValid =
-    picked === "all" || (picked != null && branchRows.some((b) => b.id === picked));
-  const scope: BranchScope = !showScope
-    ? undefined
-    : pickedIsValid
-      ? (picked as string)
-      : (activeBranchId ?? "all");
-  // Branch comparison is the one report that only makes sense across every
-  // branch — the server ignores `branchId` for it and web forces "all". The
-  // row stays put (no layout jump) but is dimmed with "All branches" lit so
-  // the chips never claim a scope the report is not showing.
-  const scopeLocked = report === "branches";
-  const branchId: BranchScope = scopeLocked && showScope ? "all" : scope;
-  const reportProps: ReportProps = { ...props, branchId };
+  const reportProps: ReportProps = props;
 
   return (
     <>
-      {showScope ? (
-        <View
-          pointerEvents={scopeLocked ? "none" : "auto"}
-          accessibilityState={scopeLocked ? { disabled: true } : undefined}
-          style={[styles.scope, scopeLocked && styles.chipLocked]}
-        >
-          <Text style={styles.scopeLabel}>{t("app.insights.scope.label")}</Text>
-          <View style={styles.chipRow}>
-            <Chip
-              label={t("app.insights.scope.all")}
-              active={branchId === "all"}
-              onPress={() => setPicked("all")}
-            />
-            {branchRows.map((b) => (
-              <Chip
-                key={b.id}
-                // A suspended branch is still worth a report (its history is
-                // real), but the chip must say so — settings/branches.tsx badges
-                // these rows and a plain name here would read as live.
-                label={
-                  b.isActive
-                    ? b.name
-                    : `${b.name} · ${t("app.branchesPage.labels.suspended")}`
-                }
-                active={branchId === b.id}
-                onPress={() => setPicked(b.id)}
-              />
-            ))}
-          </View>
-        </View>
-      ) : null}
-
       <View style={styles.scope}>
         <Text style={styles.scopeLabel}>{t("app.insights.deep.picker.label")}</Text>
         <View style={styles.chipRow}>
-          {REPORTS().map((r) => {
-            // Web greys out the "Branch comparison" card for non-owners instead
-            // of revealing the gate after a tap. Chip has no disabled prop, so
-            // the wrapper swallows touches; it can never become `active`, hence
-            // no hint swap is needed here.
-            const locked = r.key === "branches" && !isOwner;
-            return (
-              <View
-                key={r.key}
-                pointerEvents={locked ? "none" : "auto"}
-                accessibilityState={locked ? { disabled: true } : undefined}
-                accessibilityHint={locked ? t("app.insights.deep.picker.branches.ownerOnly") : undefined}
-                style={locked && styles.chipLocked}
-              >
-                <Chip label={r.label} active={report === r.key} onPress={() => setReport(r.key)} />
-              </View>
-            );
-          })}
+          {REPORTS().map((r) => (
+            <Chip
+              key={r.key}
+              label={r.label}
+              active={report === r.key}
+              onPress={() => setReport(r.key)}
+            />
+          ))}
         </View>
         {active ? <Text style={styles.hint}>{active.hint}</Text> : null}
       </View>
@@ -231,7 +106,6 @@ export function DeepTab(props: TabProps) {
       {report === "compare" ? <CompareReport {...reportProps} /> : null}
       {report === "heatmap" ? <HeatmapReport {...reportProps} /> : null}
       {report === "payments" ? <PaymentsReport {...reportProps} /> : null}
-      {report === "branches" ? <BranchesReport {...reportProps} isOwner={isOwner} /> : null}
       {report === "product" ? <ProductReport {...reportProps} /> : null}
     </>
   );
@@ -240,7 +114,12 @@ export function DeepTab(props: TabProps) {
 /* ---------------------------------------------------------------- shared */
 
 function Loading() {
-  return <ActivityIndicator color={colors.accent} style={{ marginVertical: spacing.xl }} />;
+  return (
+    <Card>
+      <SkeletonChart height={160} />
+      <SkeletonListRow count={3} avatarSize={0} trailingWidth={56} height={44} />
+    </Card>
+  );
 }
 
 function Failed() {
@@ -316,7 +195,7 @@ function CompareReport(props: ReportProps) {
       </Card>
     );
   }
-  if (q.isLoading) return <Loading />;
+  if (q.isPending && !q.data) return <Loading />;
   if (!q.data) return <Failed />;
 
   const { points, totals } = q.data;
@@ -396,7 +275,7 @@ function HeatmapReport(props: ReportProps) {
     return { grid, dayTotals, hourTotals, maxHour, grand, max, peak: q.data?.peak ?? peak, empty: cells.length === 0 };
   }, [q.data]);
 
-  if (q.isLoading) return <Loading />;
+  if (q.isPending && !q.data) return <Loading />;
   if (!q.data) return <Failed />;
 
   return (
@@ -566,7 +445,7 @@ function PaymentsReport(props: ReportProps) {
     return { methods, series, totals, grand, max };
   }, [q.data]);
 
-  if (q.isLoading) return <Loading />;
+  if (q.isPending && !q.data) return <Loading />;
   if (!q.data) return <Failed />;
 
   return (
@@ -670,69 +549,6 @@ function CollectionsStrip({
   );
 }
 
-/* -------------------------------------------------------------- branches */
-
-interface BranchesData {
-  rows: {
-    branchId: string;
-    branchName: string;
-    revenue: number;
-    cost: number;
-    discounts: number;
-    grossProfit: number;
-    transactions: number;
-    aov: number;
-    margin: number;
-  }[];
-}
-
-function BranchesReport(props: ReportProps & { isOwner: boolean }) {
-  const q = useDeep<BranchesData>("branches", props, undefined, props.isOwner);
-
-  if (!props.isOwner) {
-    return (
-      <Card title={t("app.insights.deep.branches.title")}>
-        <Text style={styles.muted}>{t("app.insights.deep.branches.ownerOnly")}</Text>
-      </Card>
-    );
-  }
-  if (q.isLoading) return <Loading />;
-  if (!q.data) return <Failed />;
-
-  const rows = q.data.rows;
-  const max = Math.max(1, ...rows.map((r) => r.revenue));
-
-  return (
-    <Card title={t("app.insights.deep.branches.title")}>
-      <Subtitle>{t("app.insights.deep.branches.subtitle")}</Subtitle>
-      {rows.length === 0 ? (
-        <EmptyState title={t("app.insights.deep.branches.empty")} />
-      ) : (
-        <View style={styles.list}>
-          {rows.map((r) => (
-            <View key={r.branchId} style={styles.rowCard}>
-              <View style={styles.rowHead}>
-                <Text numberOfLines={1} style={styles.rowTitle}>{r.branchName}</Text>
-                <Text style={styles.rowValue}>{money(r.revenue)}</Text>
-              </View>
-              <View style={styles.track}>
-                <View style={[styles.fill, { width: `${(r.revenue / max) * 100}%` }]} />
-              </View>
-              <View style={styles.metricGrid}>
-                <Metric label={t("app.insights.deep.branches.col.transactions")} value={String(r.transactions)} />
-                <Metric label={t("app.insights.deep.branches.col.aov")} value={money(r.aov)} />
-                <Metric label={t("app.insights.deep.branches.col.gross")} value={money(r.grossProfit)} />
-                <Metric label={t("app.insights.deep.branches.col.margin")} value={percent(r.margin)} />
-                <Metric label={t("app.insights.deep.branches.col.discounts")} value={money(r.discounts)} />
-              </View>
-            </View>
-          ))}
-        </View>
-      )}
-    </Card>
-  );
-}
-
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.metric}>
@@ -793,7 +609,7 @@ function ProductReport(props: ReportProps) {
             onChangeText={setQ}
             placeholder={t("app.insights.deep.product.searchPlaceholder")}
           />
-          {search.isLoading ? (
+          {search.isPending && !search.data ? (
             <Loading />
           ) : !search.data ? (
             <Text style={styles.muted}>{t("mobile.insights.loadFailed")}</Text>
@@ -834,7 +650,7 @@ function ProductReport(props: ReportProps) {
       )}
 
       {picked ? (
-        detail.isLoading ? (
+        detail.isPending && !detail.data ? (
           <Loading />
         ) : !detail.data ? (
           <Text style={styles.muted}>{t("mobile.insights.loadFailed")}</Text>
@@ -893,7 +709,6 @@ function ProductDetail({ data }: { data: ProductData }) {
 
 const styles = StyleSheet.create({
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  chipLocked: { opacity: 0.45 },
   scope: { gap: spacing.xs },
   scopeLabel: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
   // Inside the captioned group (gap xs) — xs + xs = the 8pt it always sat at.

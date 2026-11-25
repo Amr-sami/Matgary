@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Pressable,
   StyleSheet,
@@ -40,6 +39,7 @@ import { countLabel } from "@/lib/format";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
+import { SkeletonListRow } from "@/components/ui/skeleton";
 
 import { t } from "@/i18n";
 
@@ -251,8 +251,8 @@ export default function CategoriesSettingsScreen() {
         </Text>
       ) : null}
 
-      {q.isLoading ? (
-        <ActivityIndicator color={colors.accent} style={{ marginTop: spacing.xl }} />
+      {q.isPending && !q.data ? (
+        <SkeletonListRow count={5} avatarSize={0} trailingWidth={48} height={56} />
       ) : q.isError ? (
         <Card>
           <Text style={styles.hint}>{errText(q.error)}</Text>

@@ -13,15 +13,15 @@ appId: com.thestoro.app
 ---
 - extendedWaitUntil:
     visible:
-      text: "http://127.0.0.1:8081|http://localhost:8081|المزيد|More|تسجيل الدخول|Sign in"
+      text: "http://[0-9a-z.]+:8081|المزيد|More|تسجيل الدخول|Sign in"
     timeout: 45000
 - runFlow:
     when:
       visible:
-        text: "http://127.0.0.1:8081|http://localhost:8081"
+        text: "http://[0-9a-z.]+:8081"
     commands:
       - tapOn:
-          text: "http://127.0.0.1:8081|http://localhost:8081"
+          text: "http://[0-9a-z.]+:8081"
       - extendedWaitUntil:
           visible:
             text: "المزيد|More|تسجيل الدخول|Sign in|Error loading app"
@@ -34,7 +34,7 @@ appId: com.thestoro.app
             - tapOn:
                 text: "OK"
             - tapOn:
-                text: "http://127.0.0.1:8081|http://localhost:8081"
+                text: "http://[0-9a-z.]+:8081"
             - extendedWaitUntil:
                 visible:
                   text: "المزيد|More|تسجيل الدخول|Sign in"

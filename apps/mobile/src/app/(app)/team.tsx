@@ -1,8 +1,11 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { SkeletonListRow } from "@/components/ui/skeleton";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { CalendarBlankIcon as CalendarBlank } from "phosphor-react-native/src/icons/CalendarBlank";
 import { ClockCounterClockwiseIcon as ClockCounterClockwise } from "phosphor-react-native/src/icons/ClockCounterClockwise";
+import { CurrencyDollarSimpleIcon as CurrencyDollarSimple } from "phosphor-react-native/src/icons/CurrencyDollarSimple";
+import { UserPlusIcon as UserPlus } from "phosphor-react-native/src/icons/UserPlus";
 import { ApiError, team } from "@matgary/api-client";
 
 import { api } from "@/api/client";
@@ -12,7 +15,7 @@ import { ChevronForward } from "@/components/ui/Chevron";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
-import { colors, elevation, fonts, radius, spacing, MIN_TOUCH } from "@/theme/tokens";
+import { colors, fonts, radius, spacing, MIN_TOUCH } from "@/theme/tokens";
 import { t } from "@/i18n";
 
 const ROLE = (): Record<string, string> => ({
@@ -23,9 +26,14 @@ const ROLE = (): Record<string, string> => ({
 });
 
 /**
- * Port of app__team.png — the team list, now the hub of the HR drill-ins
- * (doc 02 §1.1 row 15, SPLIT): each row opens /team/[userId], and the
- * attendance chip opens /team/attendance and the leave chip opens /leave.
+ * Port of app__team.png — the team hub (doc 02 §1.1 row 15, SPLIT).
+ *
+ * Rows share the one list pattern used elsewhere in the app (see
+ * app/(app)/more.tsx): white card, hairline border, plain icon on the start,
+ * chevron on the end. No filled chips, no circular icon backgrounds — the
+ * detail / attendance / leave drill-ins are visually equal; the member rows
+ * underneath use the same frame with initials in a bordered (not filled)
+ * circle, so every row on the page shares one silhouette.
  *
  * Gating mirrors app/team/page.tsx: the list, the roster and payroll are all
  * behind `manage_team` (owner-expanded server-side into `me.permissions`).
@@ -65,8 +73,8 @@ export default function TeamScreen() {
     >
       {!canManage ? (
         <EmptyState title={t("mobile.common.forbidden")} />
-      ) : q.isLoading ? (
-        <ActivityIndicator color={colors.accent} />
+      ) : q.isPending && !q.data ? (
+        <SkeletonListRow count={5} avatarSize={44} trailingWidth={48} height={72} />
       ) : errorMessage ? (
         <EmptyState title={errorMessage} />
       ) : (
@@ -75,11 +83,9 @@ export default function TeamScreen() {
             testID="team-attendance"
             accessibilityRole="button"
             onPress={() => router.push("/team/attendance")}
-            style={({ pressed }) => [styles.attendanceRow, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.row, pressed && styles.pressed]}
           >
-            <View style={styles.attendanceIcon}>
-              <ClockCounterClockwise size={22} color={colors.accent} weight="duotone" />
-            </View>
+            <ClockCounterClockwise size={22} color={colors.accent} />
             <View style={styles.body}>
               <Text style={styles.name}>{t("app.team.tabs.attendance")}</Text>
               <Text numberOfLines={2} style={styles.meta}>
@@ -88,20 +94,48 @@ export default function TeamScreen() {
             </View>
             <ChevronForward />
           </Pressable>
+
+          <Pressable
+            testID="team-payroll"
+            accessibilityRole="button"
+            onPress={() => router.push("/team/payroll")}
+            style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+          >
+            <CurrencyDollarSimple size={22} color={colors.accent} />
+            <View style={styles.body}>
+              <Text style={styles.name}>{t("mobile.payroll.title")}</Text>
+              <Text numberOfLines={2} style={styles.meta}>
+                {t("app.team.tabDescriptions.payroll")}
+              </Text>
+            </View>
+            <ChevronForward />
+          </Pressable>
+
           <Pressable
             testID="team-leave"
             accessibilityRole="button"
             onPress={() => router.push("/leave")}
-            style={({ pressed }) => [styles.attendanceRow, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.row, pressed && styles.pressed]}
           >
-            <View style={styles.attendanceIcon}>
-              <CalendarBlank size={22} color={colors.accent} weight="duotone" />
-            </View>
+            <CalendarBlank size={22} color={colors.accent} />
             <View style={styles.body}>
               <Text style={styles.name}>{t("mobile.leave.title")}</Text>
               <Text numberOfLines={2} style={styles.meta}>
                 {t("mobile.leave.subtitle")}
               </Text>
+            </View>
+            <ChevronForward />
+          </Pressable>
+
+          <Pressable
+            testID="team-add-member"
+            accessibilityRole="button"
+            onPress={() => router.push("/team/new")}
+            style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+          >
+            <UserPlus size={22} color={colors.accent} />
+            <View style={styles.body}>
+              <Text style={[styles.name, styles.accentLabel]}>{t("mobile.team.addMember")}</Text>
             </View>
             <ChevronForward />
           </Pressable>
@@ -125,8 +159,8 @@ export default function TeamScreen() {
                   onPress={() => router.push(`/team/${encodeURIComponent(m.userId)}`)}
                   style={({ pressed }) => [styles.row, pressed && styles.pressed]}
                 >
-                  <View style={[styles.avatar, isOwner && styles.avatarOwner]}>
-                    <Text style={[styles.initial, isOwner && styles.initialOwner]}>
+                  <View style={styles.avatar}>
+                    <Text style={styles.initial}>
                       {(m.displayName || m.username || "?").trim().charAt(0)}
                     </Text>
                   </View>
@@ -164,68 +198,53 @@ export default function TeamScreen() {
 }
 
 const styles = StyleSheet.create({
-  list: { gap: spacing.md },
+  list: { gap: spacing.sm },
+  // The one row silhouette for the whole page — matches app/(app)/more.tsx so
+  // actions, drill-ins and members all read as the same primitive.
   row: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
     minHeight: MIN_TOUCH,
     backgroundColor: colors.card,
-    borderRadius: radius.lg,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: spacing.lg,
-    ...elevation.card,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
-  attendanceRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    minHeight: MIN_TOUCH,
-    backgroundColor: colors.accentLight,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.accentLight,
-    padding: spacing.lg,
-  },
-  attendanceIcon: {
-    width: 44,
-    height: 44,
+  pressed: { opacity: 0.85 },
+  // Initials circle — bordered, not filled: the "no background colour for
+  // icons" directive applies here too (an avatar reads as an icon on this
+  // page). Text colour carries the identity (accent), not the fill.
+  avatar: {
+    width: 36,
+    height: 36,
     borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
     backgroundColor: colors.card,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
   },
-  pressed: { opacity: 0.85 },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.full,
-    backgroundColor: colors.accentLight,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-  avatarOwner: { backgroundColor: colors.accent },
   // lineHeight = the circle's height so the line box IS the circle; Cairo's
   // ascent-heavy box then parks the glyph a few pt low, hence the negative
   // marginTop (م / ي / A checked optically). includeFontPadding is Android.
   initial: {
     fontFamily: fonts.bold,
-    fontSize: 18,
-    lineHeight: 44,
+    fontSize: 16,
+    lineHeight: 36,
     textAlign: "center",
     includeFontPadding: false,
     marginTop: -2,
     color: colors.accent,
   },
-  initialOwner: { color: colors.card },
   body: { flex: 1, minWidth: 0, gap: 2 },
   name: { fontFamily: fonts.semibold, fontSize: 15, color: colors.text, ...RTL_TEXT },
+  // Lift "Add member" by colour only — no filled chip or accent border — so it
+  // reads as the primary action without breaking the row silhouette.
+  accentLabel: { color: colors.accent },
   meta: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
-  // Lives under the meta line, inside the flexible body column, so a wide
-  // warning pill never squeezes the email out of the row (the trailing column
-  // holds only the short role pill).
   mustChange: { marginTop: 4, alignItems: "flex-start" },
 });

@@ -1,8 +1,8 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { ArrowCounterClockwiseIcon as ArrowCounterClockwise } from "phosphor-react-native/src/icons/ArrowCounterClockwise";
-import { BellIcon as Bell } from "phosphor-react-native/src/icons/Bell";
 import { CalendarBlankIcon as CalendarBlank } from "phosphor-react-native/src/icons/CalendarBlank";
+import { ClipboardTextIcon as ClipboardText } from "phosphor-react-native/src/icons/ClipboardText";
 import { ClockCounterClockwiseIcon as ClockCounterClockwise } from "phosphor-react-native/src/icons/ClockCounterClockwise";
 import { CloudArrowUpIcon as CloudArrowUp } from "phosphor-react-native/src/icons/CloudArrowUp";
 import { CreditCardIcon as CreditCard } from "phosphor-react-native/src/icons/CreditCard";
@@ -23,7 +23,7 @@ import { ChevronForward } from "@/components/ui/Chevron";
 import { Card } from "@/components/ui/Card";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
-import { colors, fonts, spacing } from "@/theme/tokens";
+import { colors, fonts, radius, spacing } from "@/theme/tokens";
 import { t } from "@/i18n";
 
 /**
@@ -40,12 +40,19 @@ const ITEMS = () =>
   { route: "/tasks", label: t("app.shell.secondary.tasks"), icon: ListChecks, requires: "view_dashboard" },
   { route: "/attendance", label: t("mobile.attendance.title"), icon: MapPinArea, requires: null },
   { route: "/sync", label: t("mobile.sync.title"), icon: CloudArrowUp, requires: "record_sales" },
-  { route: "/notifications", label: t("mobile.notifications.title"), icon: Bell, requires: null },
+  // Notifications row removed (owner's call, 2026-11-01): already reachable
+  // from the bell icon on the home header, so a second entry here was noise.
+  // Route itself is kept routable so push-tap deep links still land.
   { route: "/customers", label: t("app.shell.secondary.customers"), icon: Users, requires: "view_customers" },
   { route: "/collections", label: t("app.collections.inbox.title"), icon: HandCoins, requires: "view_collections" },
   { route: "/expenses", label: t("app.shell.secondary.expenses"), icon: Wallet, requires: "view_expenses" },
+  // Financial Management (Slice 2b). Owners + members with view_financials
+  // see this entry. The screens read the same /api/financials/* endpoints
+  // the web uses — single source of truth.
+  { route: "/financials", label: t("app.financials.title"), icon: Wallet, requires: "view_financials" },
   { route: "/suppliers", label: t("app.shell.secondary.suppliers"), icon: Truck, requires: "view_suppliers" },
   { route: "/returns", label: t("app.shell.secondary.returns"), icon: ArrowCounterClockwise, requires: "view_returns" },
+  { route: "/inventory-count", label: t("mobile.inventoryCount.title"), icon: ClipboardText, requires: "view_inventory_counts" },
   { route: "/team", label: t("app.shell.secondary.team"), icon: UsersThree, requires: "manage_team" },
   { route: "/activity", label: t("app.shell.secondary.activity"), icon: ClockCounterClockwise, requires: "view_activity_log" },
   { route: "/leave", label: t("mobile.leave.title"), icon: CalendarBlank, requires: "request_leave" },
@@ -107,18 +114,30 @@ export default function MoreScreen() {
       <View style={styles.list}>
         {visible.map((item) => {
           const Icon = item.icon;
+          // WhatsApp is wired end-to-end but turned off by the owner for now
+          // (2026-10-31). Row stays visible so the capability is discoverable,
+          // but tap is disabled and a "soon" pill replaces the chevron.
+          const comingSoon = item.route === "/whatsapp";
           return (
             <Pressable
               key={item.route}
-              style={styles.row}
+              style={[styles.row, comingSoon && styles.rowDisabled]}
               accessibilityRole="button"
+              accessibilityState={{ disabled: comingSoon }}
+              disabled={comingSoon}
               onPress={() => router.push(item.route as never)}
               testID={`more-row-${item.route.slice(1)}`}
             >
-              <Icon size={22} color={colors.accent} />
-              <Text style={styles.rowLabel}>{item.label}</Text>
-              {/* not Right: under RTL "forward" points left. */}
-              <ChevronForward size={16} color={colors.textSecondary} />
+              <Icon size={22} color={comingSoon ? colors.textSecondary : colors.accent} />
+              <Text style={[styles.rowLabel, comingSoon && styles.rowLabelDisabled]}>{item.label}</Text>
+              {comingSoon ? (
+                <View style={styles.soonPill}>
+                  <Text style={styles.soonPillText}>{t("mobile.common.comingSoon")}</Text>
+                </View>
+              ) : (
+                /* not Right: under RTL "forward" points left. */
+                <ChevronForward size={16} color={colors.textSecondary} />
+              )}
             </Pressable>
           );
         })}
@@ -159,6 +178,22 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
   },
   rowLabel: { flex: 1, fontFamily: fonts.medium, fontSize: 16, color: colors.text, ...RTL_TEXT },
+  rowDisabled: { opacity: 0.55 },
+  rowLabelDisabled: { color: colors.textSecondary },
+  soonPill: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.full,
+    backgroundColor: colors.neutralTint,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  soonPillText: {
+    fontFamily: fonts.semibold,
+    fontSize: 11,
+    color: colors.textSecondary,
+    ...RTL_TEXT,
+  },
   setup: { borderColor: colors.accent, backgroundColor: colors.accentLight },
   signOut: { marginTop: spacing.lg, borderColor: colors.dangerLight },
   signOutLabel: { color: colors.danger, flex: 1 },

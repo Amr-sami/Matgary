@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { PlusIcon as Plus } from "phosphor-react-native/src/icons/Plus";
 import { TrashIcon as Trash } from "phosphor-react-native/src/icons/Trash";
 import { WhatsappLogoIcon as WhatsappLogo } from "phosphor-react-native/src/icons/WhatsappLogo";
@@ -24,6 +24,7 @@ import type { AccountsState } from "@/collections/queries";
 import { AccountPicker } from "@/components/collections/AccountPicker";
 import { IpaQr } from "@/components/collections/IpaQr";
 import { Field } from "@/components/ui/Field";
+import { SkeletonListRow } from "@/components/ui/skeleton";
 import { t } from "@/i18n";
 import { money } from "@/lib/format";
 import { toE164 } from "@/lib/customer-phone";
@@ -133,7 +134,7 @@ export function TransferPanel({
       <Text style={styles.title}>{t("app.collections.pos.panelTitle")}</Text>
 
       {loading && !listed ? (
-        <ActivityIndicator color={colors.accent} />
+        <SkeletonListRow count={2} avatarSize={0} trailingWidth={0} height={48} />
       ) : unknown ? (
         <Text style={styles.hint}>{t("app.collections.pos.accountsUnknown")}</Text>
       ) : !listed ? (

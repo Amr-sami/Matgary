@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Image,
   Pressable,
   StyleSheet,
@@ -25,6 +24,7 @@ import { useLogoPicker } from "@/lib/useLogoPicker";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
+import { SkeletonFormField } from "@/components/ui/skeleton";
 import { t } from "@/i18n";
 
 /**
@@ -140,8 +140,14 @@ export default function StoreSettingsScreen() {
       );
       setNotice({ tone: "ok", text: t("app.settingsPage.toast.saveSuccess") });
       await qc.invalidateQueries({ queryKey: ["shop-settings"] });
-      // The dashboard header + receipts read the shop name too.
+      // The dashboard greeting reads me.tenant.name from the session store
+      // (not React Query). shopName now mirrors to tenants.name server-side
+      // on the PRIMARY branch, so a refetch of /me pulls the new value into
+      // the session and the welcome text updates without a sign-out.
       void qc.invalidateQueries({ queryKey: ["me"] });
+      if (sent?.shopName !== undefined) {
+        void useSession.getState().refreshMe();
+      }
     },
     onError: (e) => {
       const text =
@@ -206,7 +212,12 @@ export default function StoreSettingsScreen() {
           />
         </Card>
       ) : !server || !draft ? (
-        <ActivityIndicator color={colors.accent} />
+        <>
+          <SkeletonFormField />
+          <SkeletonFormField />
+          <SkeletonFormField />
+          <SkeletonFormField />
+        </>
       ) : (
         <>
           {/* معلومات المتجر — no card title: the page H1 60pt above already says it. */}

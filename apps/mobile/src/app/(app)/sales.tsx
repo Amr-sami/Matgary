@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Pressable,
   StyleSheet,
   Text,
@@ -8,6 +7,7 @@ import {
 } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
+import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import { CheckCircleIcon as CheckCircle } from "phosphor-react-native/src/icons/CheckCircle";
 import { ClockCounterClockwiseIcon as ClockCounterClockwise } from "phosphor-react-native/src/icons/ClockCounterClockwise";
@@ -48,6 +48,7 @@ import { ChevronForward } from "@/components/ui/Chevron";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
 import { SearchField } from "@/components/ui/SearchField";
+import { Segmented } from "@/components/ui/Segmented";
 import { ScannerSheet, type ScanTone } from "@/components/scanner/ScannerSheet";
 import { ReceiptActions } from "@/components/receipt/ReceiptActions";
 import { money } from "@/lib/format";
@@ -63,6 +64,7 @@ import { usePush } from "@/stores/push";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
+import { SkeletonListRow } from "@/components/ui/skeleton";
 import { t } from "@/i18n";
 
 type Payment = salesApi.PaymentMethod;
@@ -79,6 +81,10 @@ interface LastSale {
   queuedReason: "offline" | "network" | null;
   /** Local wall-clock of the ring — what options.customDate books it under. */
   rungAt: Date;
+  /** Customer phone captured on the sale (raw, as the cashier typed it).
+   *  Drives the "Send via WhatsApp" action on the success card — null = no
+   *  phone was entered → no WhatsApp button. */
+  customerPhone: string | null;
 }
 
 /** Cart-line trash glyph; sized here so trashBtn can centre it on the card edge. */
@@ -147,6 +153,13 @@ export default function SalesScreen() {
   // (mid-refresh) → do not block; the server is still the authority.
   const permissions = useSession((s) => s.me?.permissions);
   const canRecord = permissions == null || permissions.includes("record_sales");
+  // Owners always have manage_inventory; for staff, respect the explicit grant.
+  // Used to offer the "Restock" shortcut on out-of-stock search results.
+  const canRestock = permissions == null || permissions.includes("manage_inventory");
+  // Read once (not reactive) so the dev-only local notification below can
+  // compose seller + branch into the body without re-rendering onSuccess.
+  const meUserName = useSession((s) => s.me?.user.name ?? null);
+  const meBranchName = useSession((s) => s.me?.branch.name ?? null);
 
   // The outbox handler must exist before a drain looks at a queued sale.
   useEffect(() => {
@@ -161,6 +174,22 @@ export default function SalesScreen() {
 
   const [scannerOpen, setScannerOpen] = useState(false);
   const [scan, setScan] = useState<{ text: string; tone: ScanTone } | null>(null);
+  // When resolveCode can't find a product, this holds the scanned/typed code
+  // so the "add this product?" Sheet below can show it. Cleared on dismiss or
+  // on tap of the primary action.
+  const [notFoundCode, setNotFoundCode] = useState<string | null>(null);
+  // Deferred-sale partial payment: the amount the customer handed over NOW on
+  // an آجل sale. Backend accepts `amountPaidNow` (apps/web/app/api/sales/cart
+  // route schema), distributes it proportionally across the lines, and books
+  // the remainder as the customer's debt. The reset-on-method-switch effect
+  // lives below where `payment` is in scope.
+  const [deferredPaidNow, setDeferredPaidNow] = useState("");
+  // Sales channel (migration 0057). Default "store"; the toggle at the top
+  // of the screen flips it to "online" for WhatsApp / Instagram / phone
+  // orders. State lives in the screen so it persists across multiple sales
+  // as long as the Sales tab stays mounted — ring up 5 online orders in a
+  // row without re-tapping. The cart body sends it on submit.
+  const [salesChannel, setSalesChannel] = useState<"store" | "online">("store");
   // Guards a slow lookup answering after a faster later one.
   const scanSeq = useRef(0);
 
@@ -185,6 +214,12 @@ export default function SalesScreen() {
   const accountsQ = useCollectionAccounts();
   const settingsQ = useCollectionSettings();
   const payment = cart.paymentMethod;
+  // Clear the deferred "paid now" field whenever the cashier switches away
+  // from آجل — a cash sale carrying a stale partial-paid value would send a
+  // misleading amountPaidNow to the server.
+  useEffect(() => {
+    if (payment !== "deferred") setDeferredPaidNow("");
+  }, [payment]);
   const paymentFields: CartPaymentFields = {
     paymentMethod: cart.paymentMethod,
     collectionAccountId: cart.collectionAccountId,
@@ -310,12 +345,24 @@ export default function SalesScreen() {
           // a sale rung offline at 22:00 and synced at 09:00 belongs to
           // yesterday's reports, digest and shift — the day on the receipt.
           customDate: rungAt.toISOString(),
+          channel: salesChannel,
           ...(cart.customerName.trim() ? { customerName: cart.customerName.trim() } : {}),
           ...(cart.customerPhone.trim() ? { customerPhone: cart.customerPhone.trim() } : {}),
           ...(cart.note.trim() ? { note: cart.note.trim() } : {}),
           ...(cart.orderDiscountValue > 0
             ? { orderDiscountType: cart.orderDiscountType, orderDiscountValue: cart.orderDiscountValue }
             : {}),
+          // Deferred-sale partial payment. Only sent on آجل; clamped against
+          // the resolved total so a typo (customer owed 1000, typed 10000)
+          // can't accidentally credit extra. 0 or absent → full balance goes
+          // to the customer's debt, which is the old behaviour.
+          ...((() => {
+            if (paySnapshot.paymentMethod !== "deferred") return {};
+            const typed = Number(deferredPaidNow.replace(/[^\d.]/g, "")) || 0;
+            const total = totals.afterOrderDiscount;
+            const clamped = Math.max(0, Math.min(typed, total));
+            return clamped > 0 ? { amountPaidNow: clamped } : {};
+          })()),
         },
       );
       // What the receipt shows while the server has not answered: the same
@@ -331,6 +378,7 @@ export default function SalesScreen() {
         })),
         total: totals.afterOrderDiscount,
         paymentMethod: paySnapshot.paymentMethod,
+        channel: salesChannel,
         customerName: body.options.customerName ?? null,
         customerPhone: body.options.customerPhone ?? null,
         note: body.options.note ?? null,
@@ -353,12 +401,14 @@ export default function SalesScreen() {
           return typeof at === "string" && at ? [[l.productId, at] as const] : [];
         }),
       );
+      const customerPhoneSnapshot = body.options.customerPhone ?? null;
       const queued = (reason: "offline" | "network"): LastSale => ({
         result: localResult,
         receipt: toReceiptSale(snapshot, localResult, receiptExtra),
         rowId: enqueueSale(body, cart.invoiceId, names, catalogUpdatedAt),
         queuedReason: reason,
         rungAt,
+        customerPhone: customerPhoneSnapshot,
       });
 
       // Known offline: do not even try — queue, and the cashier keeps selling.
@@ -373,7 +423,14 @@ export default function SalesScreen() {
           cart.invoiceId,
           alertOriginHeader(usePush.getState().token),
         );
-        return { result, receipt: toReceiptSale(snapshot, result, receiptExtra), rowId: null, queuedReason: null, rungAt };
+        return {
+          result,
+          receipt: toReceiptSale(snapshot, result, receiptExtra),
+          rowId: null,
+          queuedReason: null,
+          rungAt,
+          customerPhone: customerPhoneSnapshot,
+        };
       } catch (e) {
         // Never reached the server / server failed: the outbox owns it from
         // here under the SAME key, so a half-sent sale cannot double-post.
@@ -387,6 +444,45 @@ export default function SalesScreen() {
       setError(null);
       cart.reset();
       setQuery("");
+
+      // __DEV__-only local notification. Mirrors the server's push copy so the
+      // simulator (which cannot receive real Expo pushes — APNs needs a real
+      // device token) and devices on a free Apple team (no Push Notifications
+      // entitlement) can still see the cha-ching banner end-to-end. Stripped
+      // from release bundles. Server-side push still fires in parallel for any
+      // real devices whose tokens live in push_tokens.
+      if (__DEV__) {
+        const r = sale.result;
+        const seller = meUserName?.trim().split(/\s+/)[0] ?? null;
+        const firstProduct = r.lines[0]?.productName ?? null;
+        const extras = Math.max(0, r.lines.length - 1);
+        const productPhrase = firstProduct
+          ? extras > 0 ? `${firstProduct} +${extras} أخرى` : firstProduct
+          : null;
+        const branch = meBranchName
+          ? /فرع/.test(meBranchName) ? meBranchName : `فرع ${meBranchName}`
+          : null;
+        const total = Math.round(r.total).toLocaleString("en-US");
+        const body = [
+          productPhrase,
+          seller && `سجّلها ${seller}`,
+          branch,
+        ].filter(Boolean).join(" · ");
+        void Notifications.scheduleNotificationAsync({
+          content: {
+            title: `بيع جديد · ${total} ج.م`,
+            body,
+            sound: "cha_ching.wav",
+            data: {
+              type: "sale_alert",
+              route: `/sales/${r.saleIds[0]}`,
+              id: r.saleIds[0],
+            },
+          },
+          trigger: null,
+        }).catch(() => {});
+      }
+
       // Queued (not booked): subtract the rung units from the cached catalogue
       // NOW (localDelta, §6.5) so the next chip tap — and the cart's stock cap —
       // sees what is really left on the shelf. The server's answer replaces
@@ -461,7 +557,12 @@ export default function SalesScreen() {
       if (!p) {
         clearMark("pos.scan-decoded");
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
-        setScan({ text: t("app.sales.form.productSearch.scannedNotFound", { code }), tone: "error" });
+        // v2 UX (2026-10-31): instead of a dead-end error toast, open a sheet
+        // offering to add the product. The barcode is handed off to
+        // /add-product?sku=<code>&at=<nonce> (the Add Product screen already
+        // reads `sku` to seed the Barcode field — see its header comment).
+        setNotFoundCode(code);
+        setScan(null);
         return;
       }
       if (p.quantity <= 0) {
@@ -605,7 +706,7 @@ export default function SalesScreen() {
               <Text style={styles.receiptTotalAmt}>{money(shownResult.total)}</Text>
             </View>
           </View>
-          <ReceiptActions sale={lastSale.receipt} />
+          <ReceiptActions sale={lastSale.receipt} customerPhone={lastSale.customerPhone} />
           <Button label={t("app.notificationSettings.events.sale.created.title")} onPress={() => setLastSale(null)} />
         </Card>
       ) : null}
@@ -622,6 +723,19 @@ export default function SalesScreen() {
 
       {canRecord ? (
       <Card title={t("app.sales.form.title")}>
+        {/* Sales channel toggle (migration 0057). Sits at the very top so a
+            cashier switching to Online for a WhatsApp order sees it before
+            anything else; survives across sales so a run of online orders
+            doesn't need re-tapping. */}
+        <Text style={styles.label}>{t("mobile.pos.channelLabel")}</Text>
+        <Segmented
+          items={[
+            { key: "store", label: t("mobile.pos.channelStore") },
+            { key: "online", label: t("mobile.pos.channelOnline") },
+          ]}
+          value={salesChannel}
+          onChange={(v) => setSalesChannel(v as "store" | "online")}
+        />
         <Text style={styles.label}>{t("app.sales.form.productSearch.label")}</Text>
         <SearchField
           testID="pos-search"
@@ -669,16 +783,32 @@ export default function SalesScreen() {
             <View style={styles.results}>
               {matches.map((p) => {
                 const out = p.quantity <= 0;
+                // Out-of-stock rows used to be disabled — the shopkeeper tapped
+                // "Anna Fayrouz", nothing happened, and they had to find the
+                // product in the Inventory tab. Now the row stays tappable for
+                // anyone who may restock: the tap routes to /inventory/<id>
+                // (inline ± adjust) with a clear "Restock" chip so the intent
+                // is unambiguous. Cashiers without manage_inventory keep the
+                // disabled dim row so they don't open a screen they can't act on.
                 return (
                   <Pressable
                     key={p.id}
                     style={[styles.result, out && styles.resultOut]}
-                    disabled={out}
+                    disabled={out && !canRestock}
                     onPress={() => {
+                      if (out) {
+                        if (canRestock) router.push(`/inventory/${encodeURIComponent(p.id)}`);
+                        return;
+                      }
                       cart.add(p);
                       setQuery("");
                     }}
                     accessibilityRole="button"
+                    accessibilityLabel={
+                      out
+                        ? t("mobile.pos.restockHint", { name: p.name })
+                        : p.name
+                    }
                   >
                     <View style={styles.resultText}>
                       <Text numberOfLines={1} style={styles.resultName}>
@@ -688,7 +818,14 @@ export default function SalesScreen() {
                         {out ? t("mobile.common.notAvailable") : t("mobile.pos.available", { n: p.quantity })}
                       </Text>
                     </View>
-                    <Text style={styles.resultPrice}>{money(p.price)}</Text>
+                    {out && canRestock ? (
+                      <View style={styles.restockChip}>
+                        <Plus size={14} color={colors.accent} />
+                        <Text style={styles.restockChipText}>{t("mobile.pos.restock")}</Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.resultPrice}>{money(p.price)}</Text>
+                    )}
                   </Pressable>
                 );
               })}
@@ -803,9 +940,37 @@ export default function SalesScreen() {
             ))}
           </View>
           {payment === "deferred" ? (
-            <Text style={styles.muted}>
-              {t("app.sales.form.payment.deferredNote")}
-            </Text>
+            <View style={{ gap: spacing.sm }}>
+              <Text style={styles.muted}>
+                {t("app.sales.form.payment.deferredNote")}
+              </Text>
+              <Field
+                label={t("app.sales.form.payment.partialPaidNow")}
+                value={deferredPaidNow}
+                onChangeText={setDeferredPaidNow}
+                keyboardType="decimal-pad"
+                placeholder="0"
+              />
+              {(() => {
+                const typed = Number(deferredPaidNow.replace(/[^\d.]/g, "")) || 0;
+                const total = totals.afterOrderDiscount;
+                if (typed > total) {
+                  return (
+                    <Text style={{ fontFamily: fonts.regular, fontSize: 12, color: colors.warningStrong, ...RTL_TEXT }}>
+                      {t("app.sales.form.payment.paidNowOverTotal")}
+                    </Text>
+                  );
+                }
+                if (typed > 0 && typed < total) {
+                  return (
+                    <Text style={styles.muted}>
+                      {t("app.sales.form.payment.partialBalanceLabel")}: {money(total - typed)}
+                    </Text>
+                  );
+                }
+                return null;
+              })()}
+            </View>
           ) : null}
           {digital && isDigitalMethod(payment) ? (
             <>
@@ -869,7 +1034,9 @@ export default function SalesScreen() {
         </Card>
       ) : null}
 
-      {products.isLoading ? <ActivityIndicator color={colors.accent} /> : null}
+      {products.isPending && !products.data ? (
+        <SkeletonListRow count={4} avatarSize={44} trailingWidth={48} height={64} />
+      ) : null}
 
       <ScannerSheet
         visible={scannerOpen}
@@ -878,6 +1045,20 @@ export default function SalesScreen() {
         onScan={(code) => void resolveCode(code)}
         message={scan?.text ?? null}
         tone={scan?.tone ?? "info"}
+        notFound={
+          notFoundCode
+            ? {
+                code: notFoundCode,
+                onDismiss: () => setNotFoundCode(null),
+                onAdd: () => {
+                  const code = notFoundCode;
+                  setNotFoundCode(null);
+                  setScannerOpen(false);
+                  router.push(`/add-product?sku=${encodeURIComponent(code)}&at=${Date.now()}` as never);
+                },
+              }
+            : null
+        }
       />
     </Screen>
   );
@@ -950,8 +1131,6 @@ const styles = StyleSheet.create({
   historyIcon: {
     width: 36,
     height: 36,
-    borderRadius: radius.full,
-    backgroundColor: colors.accentLight,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -977,7 +1156,27 @@ const styles = StyleSheet.create({
   pillText: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.accent },
   results: { marginTop: spacing.md, gap: spacing.sm },
   result: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md, minHeight: 56, paddingHorizontal: spacing.lg, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border },
-  resultOut: { opacity: 0.45 },
+  // Out-of-stock rows are tappable for restockers (routing to /inventory/id),
+  // so don't dim the whole row — only the stock caption reads muted below.
+  resultOut: { opacity: 1 },
+  restockChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    backgroundColor: colors.card,
+    flexShrink: 0,
+  },
+  restockChipText: {
+    fontFamily: fonts.semibold,
+    fontSize: 12,
+    color: colors.accent,
+    ...RTL_TEXT,
+  },
   resultText: { flexShrink: 1, minWidth: 0 },
   resultName: { fontFamily: fonts.medium, fontSize: 15, color: colors.text, ...RTL_TEXT },
   resultStock: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -26,6 +25,10 @@ import { ChevronBack } from "@/components/ui/Chevron";
 import { useSession } from "@/stores/session";
 import { RTL, RTL_TEXT } from "@/theme/rtl";
 import { colors, elevation, fonts, radius, spacing, MIN_TOUCH } from "@/theme/tokens";
+import {
+  SkeletonListRow,
+  SkeletonPaginationFooter,
+} from "@/components/ui/skeleton";
 
 /**
  * Port of mobile-fold/app__whatsapp.png — the web's /whatsapp inbox
@@ -313,10 +316,8 @@ function InboxView({ onSelect }: { onSelect: (id: string) => void }) {
     </View>
   );
 
-  const empty = list.isPending ? (
-    <View style={[styles.centered, styles.listCardBody]}>
-      <ActivityIndicator color={colors.accent} />
-    </View>
+  const empty = list.isPending && !list.data ? (
+    <SkeletonListRow count={6} avatarSize={48} trailingWidth={32} height={80} />
   ) : list.isError ? (
     <View style={[styles.centered, styles.listCardBody]}>
       <Text style={styles.errorText}>
@@ -336,9 +337,7 @@ function InboxView({ onSelect }: { onSelect: (id: string) => void }) {
   );
 
   const footer = list.isFetchingNextPage ? (
-    <View style={[styles.footer, styles.listCardBody]}>
-      <ActivityIndicator color={colors.accent} />
-    </View>
+    <SkeletonPaginationFooter count={2} rowHeight={80} avatarSize={48} />
   ) : null;
 
   return (
@@ -524,9 +523,7 @@ function ThreadView({ conversationId, onBack }: { conversationId: string; onBack
   };
 
   const older = messages.isFetchingNextPage ? (
-    <View style={styles.footer}>
-      <ActivityIndicator color={colors.accent} />
-    </View>
+    <SkeletonPaginationFooter count={2} rowHeight={56} avatarSize={0} />
   ) : messages.hasNextPage ? (
     <Pressable
       onPress={() => void messages.fetchNextPage()}
@@ -537,10 +534,8 @@ function ThreadView({ conversationId, onBack }: { conversationId: string; onBack
     </Pressable>
   ) : null;
 
-  const empty = messages.isPending ? (
-    <View style={styles.centered}>
-      <ActivityIndicator color={colors.accent} />
-    </View>
+  const empty = messages.isPending && !messages.data ? (
+    <SkeletonListRow count={4} avatarSize={0} trailingWidth={0} height={64} />
   ) : messages.isError ? (
     <View style={styles.centered}>
       <Text style={styles.errorText}>

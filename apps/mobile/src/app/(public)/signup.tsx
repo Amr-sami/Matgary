@@ -442,41 +442,58 @@ export default function SignupScreen() {
 
               The sentence is ONE dictionary template with {terms}/{privacy}
               placeholders so each locale keeps its own word order and
-              typography (Arabic "و" attaches to the next word). The document
-              names are NOT emphasised in the sentence — a darker run reads as
-              a link but is not tappable, and the real links sit 40pt beneath;
-              the pills are the one affordance. They are full-height rows
-              because a nested <Text onPress> is only as tall as its glyphs —
-              well under MIN_TOUCH. */}
+              typography (Arabic "و" attaches to the next word). The two
+              names ARE the affordance now — rendered blue + underlined and
+              tappable inline. No separate pill row. accessibilityRole="link"
+              on the nested <Text> keeps the screen-reader semantics even
+              though the parent is a text block. */}
           <Text style={styles.consent} accessibilityRole="text">
             {renderTemplate(t("mobile.legal.consent"), {
-              terms: t("mobile.legal.termsLabel"),
-              privacy: t("mobile.legal.privacyLabel"),
+              terms: (
+                <Text
+                  key="terms"
+                  style={styles.consentInlineLink}
+                  accessibilityRole="link"
+                  accessibilityLabel={t("mobile.legal.termsLabel")}
+                  onPress={() =>
+                    router.push({ pathname: "/legal/terms", params: { from: "signup" } })
+                  }
+                >
+                  {t("mobile.legal.termsLabel")}
+                </Text>
+              ),
+              privacy: (
+                <Text
+                  key="privacy"
+                  style={styles.consentInlineLink}
+                  accessibilityRole="link"
+                  accessibilityLabel={t("mobile.legal.privacyLabel")}
+                  onPress={() =>
+                    router.push({ pathname: "/legal/privacy", params: { from: "signup" } })
+                  }
+                >
+                  {t("mobile.legal.privacyLabel")}
+                </Text>
+              ),
             })}
           </Text>
-          <View style={styles.consentLinks}>
-            <Pressable
-              accessibilityRole="link"
-              accessibilityLabel={t("mobile.legal.termsLabel")}
-              onPress={() => router.push({ pathname: "/legal/terms", params: { from: "signup" } })}
-              style={({ pressed }) => [styles.consentLink, pressed && styles.consentLinkPressed]}
-            >
-              <Text style={styles.consentLinkLabel}>{t("mobile.legal.termsLabel")}</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="link"
-              accessibilityLabel={t("mobile.legal.privacyLabel")}
-              onPress={() => router.push({ pathname: "/legal/privacy", params: { from: "signup" } })}
-              style={({ pressed }) => [styles.consentLink, pressed && styles.consentLinkPressed]}
-            >
-              <Text style={styles.consentLinkLabel}>{t("mobile.legal.privacyLabel")}</Text>
-            </Pressable>
-          </View>
 
           <View style={styles.rule} />
 
-          <Text style={styles.noAccount}>{T().haveAccountQ}</Text>
-          <Button label={T().signIn} variant="outline" onPress={goToLogin} />
+          {/* "Already have an account? Sign in" — one inline sentence with
+              the trailing word as the blue tappable link, mirroring the
+              signup template. Replaces the prior outline button. */}
+          <Text style={styles.noAccountInline}>
+            {T().haveAccountQ}{" "}
+            <Text
+              style={styles.consentInlineLink}
+              accessibilityRole="link"
+              accessibilityLabel={T().signIn}
+              onPress={goToLogin}
+            >
+              {T().signIn}
+            </Text>
+          </Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -610,37 +627,24 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     paddingHorizontal: spacing.sm,
   },
-  consentLinks: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  consentLink: {
-    minHeight: MIN_TOUCH,
-    justifyContent: "center",
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
-  },
-  consentLinkPressed: { backgroundColor: colors.neutralTint },
-  consentLinkLabel: {
-    ...RTL_TEXT,
+  // Inline link style used both in the consent sentence (Terms / Privacy)
+  // and in the "Already have an account? Sign in" tail. Accent-coloured +
+  // underlined so the affordance reads at a glance even without pill chrome.
+  consentInlineLink: {
     fontFamily: fonts.semibold,
-    fontSize: 13,
     color: colors.accent,
+    textDecorationLine: "underline",
+    textDecorationColor: colors.accent,
   },
   rule: {
     height: 1,
     backgroundColor: colors.border,
     marginVertical: spacing.xl,
   },
-  noAccount: {
+  noAccountInline: {
     fontFamily: fonts.regular,
     fontSize: 14,
+    lineHeight: 22,
     color: colors.textSecondary,
     textAlign: "center",
     marginBottom: spacing.lg,

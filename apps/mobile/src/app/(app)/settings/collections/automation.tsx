@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ActivityIndicator, AppState, BackHandler, Linking, Platform, Pressable, Share, StyleSheet, Text, View } from "react-native";
+import { AppState, BackHandler, Linking, Platform, Pressable, Share, StyleSheet, Text, View } from "react-native";
+import { SkeletonListRow } from "@/components/ui/skeleton";
 import { Stack, useRouter } from "expo-router";
 import * as Application from "expo-application";
 import * as Crypto from "expo-crypto";
@@ -645,7 +646,7 @@ export default function AutomationWizardScreen() {
             />
           </Card>
         ) : (
-          <ActivityIndicator color={colors.accent} />
+          <SkeletonListRow count={3} avatarSize={0} trailingWidth={48} height={56} />
         )}
       </Screen>
     );

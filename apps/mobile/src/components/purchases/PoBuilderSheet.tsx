@@ -26,6 +26,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
 import { SearchField } from "@/components/ui/SearchField";
 import { Sheet } from "@/components/ui/Sheet";
+import { SkeletonListRow } from "@/components/ui/skeleton";
 import { ScannerSheet, type ScanTone } from "@/components/scanner/ScannerSheet";
 import { money } from "@/lib/format";
 import { RTL_TEXT } from "@/theme/rtl";
@@ -219,6 +220,7 @@ export function PoBuilderSheet({
       ) : (
         <DoneStep
           id={createdId ?? ""}
+          supplierId={supplier?.id ?? ""}
           supplierName={supplier?.name ?? ""}
           lineCount={validLines.length}
           total={total}
@@ -384,8 +386,8 @@ function SupplierStep({
           </View>
         ) : null}
 
-        {suppliers.isLoading ? (
-          <ActivityIndicator color={colors.accent} />
+        {suppliers.isPending && !suppliers.data ? (
+          <SkeletonListRow count={3} avatarSize={0} trailingWidth={0} height={56} />
         ) : suppliers.isError ? (
           <Text style={styles.err}>{describeError(suppliers.error, t("mobile.common.serverError"))}</Text>
         ) : rows.length === 0 ? (
@@ -746,6 +748,7 @@ function ReviewStep({
 
 function DoneStep({
   id,
+  supplierId,
   supplierName,
   lineCount,
   total,
@@ -754,6 +757,7 @@ function DoneStep({
   onClose,
 }: {
   id: string;
+  supplierId: string;
   supplierName: string;
   lineCount: number;
   total: number;
@@ -761,6 +765,51 @@ function DoneStep({
   onReceiveNow: () => void;
   onClose: () => void;
 }) {
+  const qc = useQueryClient();
+  // Pay-now flow (added 2026-10-31). Same server pattern as the Supplier
+  // detail page: POST /api/expenses with category:"supplier" + supplierId
+  // debits the supplier balance. We stay on this success step after a pay —
+  // the cashier can "دفع جزء" twice if they want, or tap close to finish.
+  const [payOpen, setPayOpen] = useState(false);
+  const [payAmount, setPayAmount] = useState("");
+  const [paid, setPaid] = useState(0);
+  const remaining = Math.max(0, total - paid);
+
+  const payMutation = useMutation({
+    mutationFn: (amount: number) =>
+      catalog.createExpense(api, {
+        title: `دفعة إلى ${supplierName}`.trim() || "Supplier payment",
+        amount,
+        category: "supplier",
+        supplierId,
+      }),
+    onSuccess: async (_r, amount) => {
+      setPaid((p) => p + amount);
+      setPayOpen(false);
+      setPayAmount("");
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["supplier", supplierId] }),
+        qc.invalidateQueries({ queryKey: ["expenses"] }),
+        qc.invalidateQueries({ queryKey: ["suppliers"] }),
+      ]);
+    },
+  });
+
+  const payTyped = Number(payAmount.replace(/[^\d.]/g, "")) || 0;
+  const payClamped = Math.max(0, Math.min(payTyped, remaining));
+  const payAll = () => {
+    if (remaining <= 0 || payMutation.isPending) return;
+    payMutation.mutate(remaining);
+  };
+  const openPartial = () => {
+    setPayAmount(String(remaining));
+    setPayOpen(true);
+  };
+  const submitPartial = () => {
+    if (payClamped <= 0 || payMutation.isPending) return;
+    payMutation.mutate(payClamped);
+  };
+
   return (
     <>
       <ScrollView contentContainerStyle={[styles.content, styles.doneContent]}>
@@ -771,6 +820,11 @@ function DoneStep({
         </Text>
         <Text style={styles.pickName} testID="po-done-supplier">{supplierName}</Text>
         <Text style={styles.meta} testID="po-done-summary">{linesSummary(lineCount, total)}</Text>
+        {paid > 0 ? (
+          <Text style={[styles.meta, styles.doneHint]}>
+            {t("mobile.purchases.builder.paidSoFar", { amount: money(paid), remaining: money(remaining) })}
+          </Text>
+        ) : null}
         <Text style={[styles.hint, styles.doneHint]}>{t("mobile.purchases.builder.createdHint")}</Text>
       </ScrollView>
       <View style={styles.footer}>
@@ -778,14 +832,69 @@ function DoneStep({
           <Button
             label={t("mobile.purchases.builder.receiveNow")}
             onPress={onReceiveNow}
-            disabled={receiving}
+            disabled={receiving || payMutation.isPending}
             loading={receiving}
           />
         </View>
+        {remaining > 0 ? (
+          <View style={styles.poPayRow}>
+            <Button
+              label={t("mobile.suppliers.payPartial")}
+              variant="outline"
+              onPress={openPartial}
+              disabled={receiving || payMutation.isPending}
+              style={styles.poPayBtn}
+              testID="po-done-pay-partial"
+            />
+            <Button
+              label={t("mobile.suppliers.payAll")}
+              variant="outline"
+              onPress={payAll}
+              disabled={receiving || payMutation.isPending}
+              loading={payMutation.isPending && !payOpen}
+              style={styles.poPayBtn}
+              testID="po-done-pay-all"
+            />
+          </View>
+        ) : null}
         <View testID="po-done-close">
-          <Button label={t("mobile.purchases.builder.close")} variant="ghost" onPress={onClose} disabled={receiving} />
+          <Button
+            label={t("mobile.purchases.builder.close")}
+            variant="ghost"
+            onPress={onClose}
+            disabled={receiving || payMutation.isPending}
+          />
         </View>
       </View>
+
+      <Sheet
+        visible={payOpen}
+        onClose={payMutation.isPending ? () => {} : () => setPayOpen(false)}
+        title={t("mobile.suppliers.payTitle")}
+        testID="po-done-pay-sheet"
+        primaryAction={{
+          label: `${t("mobile.suppliers.paySubmit")} · ${money(payClamped)}`,
+          onPress: submitPartial,
+          loading: payMutation.isPending,
+          disabled: payClamped <= 0,
+        }}
+        secondaryAction={{
+          label: t("app.common.cancel"),
+          onPress: () => setPayOpen(false),
+          disabled: payMutation.isPending,
+        }}
+      >
+        <Text style={styles.hint}>
+          {t("mobile.suppliers.payOwed", { amount: money(remaining) })}
+        </Text>
+        <Field
+          label={t("app.customers.settle.amountLabel")}
+          value={payAmount}
+          onChangeText={setPayAmount}
+          keyboardType="decimal-pad"
+          editable={!payMutation.isPending}
+        />
+      </Sheet>
     </>
   );
 }
@@ -938,4 +1047,6 @@ const styles = StyleSheet.create({
   doneTitle: { fontFamily: fonts.bold, fontSize: 22, color: colors.text, marginTop: spacing.md, ...RTL_TEXT },
   doneRef: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.textSecondary, fontVariant: ["tabular-nums"] },
   doneHint: { marginTop: spacing.md, paddingHorizontal: spacing.lg, textAlign: "center" },
+  poPayRow: { flexDirection: "row", gap: spacing.sm },
+  poPayBtn: { flex: 1 },
 });

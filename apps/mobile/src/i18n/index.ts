@@ -2,6 +2,9 @@ import * as SecureStore from "expo-secure-store";
 import { create } from "zustand";
 import { defaultLocale, interpolate, lookup, type Locale } from "@matgary/i18n";
 import { asDictionary, mobileDictionaries } from "@matgary/i18n/mobile";
+import { me as meApi } from "@matgary/api-client";
+
+import { api } from "@/api/client";
 
 /**
  * Locale — switchable LIVE, no reload.
@@ -51,6 +54,11 @@ export const useLocale = create<LocaleState>((set) => ({
     } catch {
       /* the choice still applies for this session */
     }
+    // Sync to the server so notification/email copy renders in the chosen
+    // language (dispatcher reads users.locale at write time). Fire-and-forget:
+    // a 401 (not yet signed in) is fine — the next sign-in will pass locale
+    // through the standard auth flow. Any other failure is non-fatal here.
+    void meApi.updateLocale(api, next).catch(() => undefined);
   },
 }));
 

@@ -25,6 +25,7 @@ import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
 
+import { SkeletonListRow } from "@/components/ui/skeleton";
 import { t } from "@/i18n";
 
 /**
@@ -141,8 +142,8 @@ export default function SuppliersScreen() {
         </Pressable>
       ) : null}
 
-      {q.isLoading ? (
-        <ActivityIndicator color={colors.accent} />
+      {q.isPending && !q.data ? (
+        <SkeletonListRow count={6} avatarSize={40} trailingWidth={72} height={72} />
       ) : q.isError && !q.data ? (
         <View>
           <EmptyState title={errorMessage(q.error, t("mobile.common.serverError"))} />

@@ -13,6 +13,9 @@ import { ArrowCounterClockwiseIcon as ArrowCounterClockwise } from "phosphor-rea
 import { CameraIcon as Camera } from "phosphor-react-native/src/icons/Camera";
 import { CaretDownIcon as CaretDown } from "phosphor-react-native/src/icons/CaretDown";
 import { CaretUpIcon as CaretUp } from "phosphor-react-native/src/icons/CaretUp";
+import { TextAlignLeftIcon as TextAlignLeft } from "phosphor-react-native/src/icons/TextAlignLeft";
+import { TextAlignCenterIcon as TextAlignCenter } from "phosphor-react-native/src/icons/TextAlignCenter";
+import { TextAlignRightIcon as TextAlignRight } from "phosphor-react-native/src/icons/TextAlignRight";
 import { EyeIcon as Eye } from "phosphor-react-native/src/icons/Eye";
 import { EyeSlashIcon as EyeSlash } from "phosphor-react-native/src/icons/EyeSlash";
 import { PencilSimpleIcon as PencilSimple } from "phosphor-react-native/src/icons/PencilSimple";
@@ -33,6 +36,7 @@ import { useLogoPicker } from "@/lib/useLogoPicker";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT, directionStyle } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
+import { SkeletonFormField } from "@/components/ui/skeleton";
 import { t } from "@/i18n";
 
 /**
@@ -59,7 +63,16 @@ type ShopSettings = settings.ShopSettings;
 type ReceiptBlockKey = settings.ReceiptBlockKey;
 type ReceiptFixedBlock = settings.ReceiptFixedBlock;
 type ReceiptCustomBlock = settings.ReceiptCustomBlock;
-type Draft = Pick<ShopSettings, (typeof settings.RECEIPT_SETTINGS_FIELDS)[number]>;
+// The Receipt Settings screen is the ONE place to configure what prints on
+// the receipt — including the phone number. `shopPhone` belongs to the
+// Store-info surface in the schema but editing it from here saves the Owner
+// a round-trip to a second settings page. The write still goes through the
+// same PATCH /api/settings column.
+type Draft = Pick<
+  ShopSettings,
+  (typeof settings.RECEIPT_SETTINGS_FIELDS)[number] | "shopPhone"
+>;
+type Align = "left" | "center" | "right";
 
 const pickDraft = (s: ShopSettings): Draft => ({
   receiptLogoSize: s.receiptLogoSize,
@@ -71,7 +84,49 @@ const pickDraft = (s: ShopSettings): Draft => ({
   receiptCustomBlocks: Object.fromEntries(
     Object.entries(s.receiptCustomBlocks).map(([id, b]) => [id, { ...b }]),
   ),
+  receiptTaxRegistration: s.receiptTaxRegistration,
+  receiptTaxCardNumber: s.receiptTaxCardNumber,
+  receiptSlogan: s.receiptSlogan,
+  receiptReturnPolicy: s.receiptReturnPolicy,
+  receiptAddress: s.receiptAddress,
+  receiptReferencePrefix: s.receiptReferencePrefix,
+  receiptShowAddress: s.receiptShowAddress,
+  receiptShowSlogan: s.receiptShowSlogan,
+  receiptShowTaxInfo: s.receiptShowTaxInfo,
+  receiptShowReturnPolicy: s.receiptShowReturnPolicy,
+  receiptBlockAlignments: { ...s.receiptBlockAlignments },
+  shopPhone: s.shopPhone,
 });
+
+/** Thin helpers over the (intentionally sparse) alignment map — centre
+ *  entries are dropped by the server normaliser, so missing keys mean
+ *  centre. These wrappers keep the JSX tight. */
+const alignOf = (
+  map: Record<string, Align> | undefined,
+  key: string,
+): Align => {
+  const v = map?.[key];
+  return v === "left" || v === "right" ? v : "center";
+};
+const withAlign = (
+  map: Record<string, Align> | undefined,
+  key: string,
+  value: Align,
+): Record<string, Align> => {
+  const next: Record<string, Align> = { ...(map ?? {}) };
+  if (value === "center") delete next[key];
+  else next[key] = value;
+  return next;
+};
+
+/** One-tap slogan presets — bilingual so the Owner picks what matches the
+ *  receipt language. Same list the web spotlight card offers. */
+const SLOGAN_PRESETS = [
+  "شكراً لتسوقكم معنا",
+  "شكراً لثقتكم بنا ❤️",
+  "نتمنى زيارتكم مرة أخرى",
+  "Thank you for shopping with us",
+];
 
 /** Same id shape as the web designer: matches the repo's /^[a-z0-9]{6,32}$/. */
 const newCustomId = () => Math.random().toString(36).slice(2, 10);
@@ -98,12 +153,19 @@ export default function ReceiptSettingsScreen() {
   const server = q.data?.data ?? null;
   const logo = useLogoPicker(() => qc.invalidateQueries({ queryKey: ["shop-settings"] }));
 
+  // Receipt-page fields include shopPhone, which lives in the Store-info
+  // namespace schema-side but is edited from here too (phone is one of the
+  // identity rows the Owner asked to configure in one place).
+  const RECEIPT_PAGE_FIELDS = useMemo(
+    () => [...settings.RECEIPT_SETTINGS_FIELDS, "shopPhone" as const],
+    [],
+  );
   const dirty = useMemo(
     () =>
       !!server &&
       !!draft &&
-      !settings.settingsFieldsEqual(server, draft, settings.RECEIPT_SETTINGS_FIELDS),
-    [server, draft],
+      !settings.settingsFieldsEqual(server, draft, RECEIPT_PAGE_FIELDS),
+    [server, draft, RECEIPT_PAGE_FIELDS],
   );
 
   // Seed from the server; re-seed on refetch only while nothing is edited.
@@ -118,7 +180,7 @@ export default function ReceiptSettingsScreen() {
   const save = useMutation({
     mutationFn: async () => {
       if (!server || !draft) return;
-      const patch = settings.diffSettings(server, draft, settings.RECEIPT_SETTINGS_FIELDS);
+      const patch = settings.diffSettings(server, draft, RECEIPT_PAGE_FIELDS);
       await settings.updateShopSettings(api, patch);
     },
     onSuccess: async () => {
@@ -238,7 +300,11 @@ export default function ReceiptSettingsScreen() {
           />
         </Card>
       ) : !server || !draft ? (
-        <ActivityIndicator color={colors.accent} />
+        <>
+          <SkeletonFormField />
+          <SkeletonFormField />
+          <SkeletonFormField />
+        </>
       ) : (
         <>
           {/* المعاينة المباشرة */}
@@ -248,6 +314,278 @@ export default function ReceiptSettingsScreen() {
             </View>
             <Text style={[styles.hint, { marginTop: spacing.sm }]}>
               {t("mobile.settings.fontNote")}
+            </Text>
+          </Card>
+
+          {/* هوية الفاتورة — نص + مفتاح إظهار + محاذاة لكل سطر. السطر
+              يختفي لو النص فاضي أو لو المفتاح مُقفل. الشعار في بطاقة بارزة
+              أعلى القسم عشان صاحب المتجر يلاحظه فورًا. */}
+          <Card title={t("app.settingsPage.receiptCard.identityHeading")}>
+            <Text style={[styles.hint, { marginBottom: spacing.sm }]}>
+              {t("app.settingsPage.receiptCard.identitySubhead")}
+            </Text>
+          </Card>
+
+          {/* الهاتف — كان على صفحة معلومات المتجر فقط. يعرض هنا كمان لأن
+              صاحب المتجر طلب تعديله من مكان واحد. العمود شائع
+              (shopPhone) نفسه، مش حقل جديد. */}
+          <Card>
+            <View style={styles.identityRowHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.identityLabel}>
+                  {t("app.settingsPage.receiptCard.phoneLabel")}
+                </Text>
+                <Text style={styles.identityHint}>
+                  {t("app.settingsPage.receiptCard.phoneHint")}
+                </Text>
+              </View>
+              <AlignmentPicker
+                value={alignOf(draft.receiptBlockAlignments, "phone")}
+                onChange={(v) =>
+                  update(
+                    "receiptBlockAlignments",
+                    withAlign(draft.receiptBlockAlignments, "phone", v),
+                  )
+                }
+              />
+            </View>
+            <Field
+              label=""
+              placeholder={t("app.settingsPage.receiptCard.phonePlaceholder")}
+              value={draft.shopPhone}
+              onChangeText={(v) => update("shopPhone", v)}
+              maxLength={40}
+              keyboardType="phone-pad"
+              ltr
+            />
+            <View style={[styles.identityRowHeader, { marginTop: spacing.sm }]}>
+              <Text style={[styles.identityLabel, { flex: 1 }]}>
+                {t("app.settingsPage.receiptCard.nameAlignmentLabel")}
+              </Text>
+              <AlignmentPicker
+                value={alignOf(draft.receiptBlockAlignments, "name")}
+                onChange={(v) =>
+                  update(
+                    "receiptBlockAlignments",
+                    withAlign(draft.receiptBlockAlignments, "name", v),
+                  )
+                }
+              />
+            </View>
+          </Card>
+
+          {/* الشعار / رسالة الشكر — بطاقة مميزة لأن المالك طلبها كخانة بارزة. */}
+          <Card>
+            <View style={styles.identityRowHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.identityLabel}>
+                  {t("app.settingsPage.receiptCard.sloganLabel")}
+                </Text>
+                <Text style={styles.identityHint}>
+                  {t("app.settingsPage.receiptCard.sloganHint")}
+                </Text>
+              </View>
+              <View style={styles.identityControls}>
+                <AlignmentPicker
+                  value={alignOf(draft.receiptBlockAlignments, "slogan")}
+                  onChange={(v) =>
+                    update(
+                      "receiptBlockAlignments",
+                      withAlign(draft.receiptBlockAlignments, "slogan", v),
+                    )
+                  }
+                />
+                <ShowToggle
+                  checked={draft.receiptShowSlogan}
+                  onChange={(v) => update("receiptShowSlogan", v)}
+                  label={t("app.settingsPage.receiptCard.showToggle")}
+                />
+              </View>
+            </View>
+            <Field
+              label=""
+              placeholder={t("app.settingsPage.receiptCard.sloganPlaceholder")}
+              value={draft.receiptSlogan}
+              onChangeText={(v) => update("receiptSlogan", v)}
+              maxLength={200}
+              multiline
+            />
+            <View style={styles.sloganChips}>
+              {SLOGAN_PRESETS.map((preset) => (
+                <Pressable
+                  key={preset}
+                  onPress={() => update("receiptSlogan", preset)}
+                  style={styles.sloganChip}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.sloganChipText} numberOfLines={1}>
+                    {preset}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </Card>
+
+          {/* العنوان — سطر اختياري في رأس الفاتورة. */}
+          <Card>
+            <View style={styles.identityRowHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.identityLabel}>
+                  {t("app.settingsPage.receiptCard.addressLabel")}
+                </Text>
+                <Text style={styles.identityHint}>
+                  {t("app.settingsPage.receiptCard.addressHint")}
+                </Text>
+              </View>
+              <View style={styles.identityControls}>
+                <AlignmentPicker
+                  value={alignOf(draft.receiptBlockAlignments, "address")}
+                  onChange={(v) =>
+                    update(
+                      "receiptBlockAlignments",
+                      withAlign(draft.receiptBlockAlignments, "address", v),
+                    )
+                  }
+                />
+                <ShowToggle
+                  checked={draft.receiptShowAddress}
+                  onChange={(v) => update("receiptShowAddress", v)}
+                  label={t("app.settingsPage.receiptCard.showToggle")}
+                />
+              </View>
+            </View>
+            <Field
+              label=""
+              placeholder={t("app.settingsPage.receiptCard.addressPlaceholder")}
+              value={draft.receiptAddress}
+              onChangeText={(v) => update("receiptAddress", v)}
+              maxLength={200}
+              multiline
+            />
+          </Card>
+
+          {/* بيانات الضرائب — السجل + البطاقة يتحكم فيهما مفتاح واحد. محاذاة
+              كل سطر مستقلة لأن صاحب المتجر قد يحبّ السجل على اليمين والبطاقة
+              على اليسار (أو العكس). */}
+          <Card>
+            <View style={styles.identityRowHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.identityLabel}>
+                  {t("app.settingsPage.receiptCard.taxRegLabel")} ·{" "}
+                  {t("app.settingsPage.receiptCard.taxCardLabel")}
+                </Text>
+              </View>
+              <ShowToggle
+                checked={draft.receiptShowTaxInfo}
+                onChange={(v) => update("receiptShowTaxInfo", v)}
+                label={t("app.settingsPage.receiptCard.showTaxToggle")}
+              />
+            </View>
+            <View style={styles.identityRowHeader}>
+              <Text style={[styles.identityLabel, { flex: 1 }]}>
+                {t("app.settingsPage.receiptCard.taxRegLabel")}
+              </Text>
+              <AlignmentPicker
+                value={alignOf(draft.receiptBlockAlignments, "taxReg")}
+                onChange={(v) =>
+                  update(
+                    "receiptBlockAlignments",
+                    withAlign(draft.receiptBlockAlignments, "taxReg", v),
+                  )
+                }
+              />
+            </View>
+            <Field
+              label=""
+              placeholder={t("app.settingsPage.receiptCard.taxRegPlaceholder")}
+              value={draft.receiptTaxRegistration}
+              onChangeText={(v) => update("receiptTaxRegistration", v)}
+              maxLength={80}
+            />
+            <View style={styles.identityRowHeader}>
+              <Text style={[styles.identityLabel, { flex: 1 }]}>
+                {t("app.settingsPage.receiptCard.taxCardLabel")}
+              </Text>
+              <AlignmentPicker
+                value={alignOf(draft.receiptBlockAlignments, "taxCard")}
+                onChange={(v) =>
+                  update(
+                    "receiptBlockAlignments",
+                    withAlign(draft.receiptBlockAlignments, "taxCard", v),
+                  )
+                }
+              />
+            </View>
+            <Field
+              label=""
+              placeholder={t("app.settingsPage.receiptCard.taxCardPlaceholder")}
+              value={draft.receiptTaxCardNumber}
+              onChangeText={(v) => update("receiptTaxCardNumber", v)}
+              maxLength={80}
+            />
+          </Card>
+
+          {/* سياسة الاستبدال — تظهر تحت سطر الشكر. */}
+          <Card>
+            <View style={styles.identityRowHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.identityLabel}>
+                  {t("app.settingsPage.receiptCard.returnPolicyLabel")}
+                </Text>
+                <Text style={styles.identityHint}>
+                  {t("app.settingsPage.receiptCard.returnPolicyHint")}
+                </Text>
+              </View>
+              <View style={styles.identityControls}>
+                <AlignmentPicker
+                  value={alignOf(draft.receiptBlockAlignments, "returnPolicy")}
+                  onChange={(v) =>
+                    update(
+                      "receiptBlockAlignments",
+                      withAlign(draft.receiptBlockAlignments, "returnPolicy", v),
+                    )
+                  }
+                />
+                <ShowToggle
+                  checked={draft.receiptShowReturnPolicy}
+                  onChange={(v) => update("receiptShowReturnPolicy", v)}
+                  label={t("app.settingsPage.receiptCard.showToggle")}
+                />
+              </View>
+            </View>
+            <Field
+              label=""
+              placeholder={t("app.settingsPage.receiptCard.returnPolicyPlaceholder")}
+              value={draft.receiptReturnPolicy}
+              onChangeText={(v) => update("receiptReturnPolicy", v)}
+              maxLength={500}
+              multiline
+            />
+          </Card>
+
+          {/* بادئة رقم الفاتورة — بدون مفتاح إظهار (دائمًا يظهر رقم ما). */}
+          <Card>
+            <Text style={styles.identityLabel}>
+              {t("app.settingsPage.receiptCard.referencePrefixLabel")}
+            </Text>
+            <Text style={styles.identityHint}>
+              {t("app.settingsPage.receiptCard.referencePrefixHint")}
+            </Text>
+            <Field
+              label=""
+              placeholder={t("app.settingsPage.receiptCard.referencePrefixPlaceholder")}
+              value={draft.receiptReferencePrefix}
+              onChangeText={(v) =>
+                update(
+                  "receiptReferencePrefix",
+                  v.replace(/[^A-Za-z0-9-]/g, "").toUpperCase().slice(0, 8),
+                )
+              }
+              maxLength={8}
+              autoCapitalize="characters"
+            />
+            <Text style={styles.identityHint}>
+              {t("app.settingsPage.receiptCard.emptyHidesHint")}
             </Text>
           </Card>
 
@@ -666,17 +1004,51 @@ function ReceiptPreview({
           </View>
         );
       }
-      case "shopInfo":
+      case "shopInfo": {
+        // Identity rows honor BOTH the text ("empty = hidden") AND the per-
+        // row visibility toggle AND the per-row alignment override; the mock
+        // mirrors the production renderer so the Owner sees exactly what the
+        // customer gets. The preview uses draft.shopPhone (not server) so
+        // typing in the Phone field updates it live before save.
+        const showAddr = draft.receiptShowAddress && draft.receiptAddress.trim();
+        const showSlog = draft.receiptShowSlogan && draft.receiptSlogan.trim();
+        const showTaxReg =
+          draft.receiptShowTaxInfo && draft.receiptTaxRegistration.trim();
+        const showTaxCard =
+          draft.receiptShowTaxInfo && draft.receiptTaxCardNumber.trim();
+        // RN Text supports textAlign "left" | "center" | "right" directly; no
+        // RTL swap needed — these are physical sides (matches html.ts).
+        const alignStyle = (key: string) => ({
+          textAlign: alignOf(draft.receiptBlockAlignments, key) as
+            | "left"
+            | "center"
+            | "right",
+        });
         return (
           <>
-            {/* p.center LAST: p.bold/p.black spread RTL_TEXT (textAlign left) and
-                were overriding the centring — the paper centres these. */}
-            <Text style={[p.bold, tracked, p.center]}>{shopName}</Text>
-            {server.shopPhone ? (
-              <Text style={[p.center, p.ltr]}>{T("TEL", "هاتف")}: {server.shopPhone}</Text>
+            <Text style={[p.bold, tracked, alignStyle("name")]}>{shopName}</Text>
+            {showAddr ? (
+              <Text style={[p.small, alignStyle("address")]}>{draft.receiptAddress}</Text>
+            ) : null}
+            {draft.shopPhone ? (
+              <Text style={[p.ltr, alignStyle("phone")]}>{T("TEL", "هاتف")}: {draft.shopPhone}</Text>
+            ) : null}
+            {showSlog ? (
+              <Text style={[p.small, alignStyle("slogan")]}>{draft.receiptSlogan}</Text>
+            ) : null}
+            {showTaxReg ? (
+              <Text style={[p.small, alignStyle("taxReg")]}>
+                {T("TAX REG", "س.ت")}: {draft.receiptTaxRegistration}
+              </Text>
+            ) : null}
+            {showTaxCard ? (
+              <Text style={[p.small, alignStyle("taxCard")]}>
+                {T("TAX CARD", "ب.ض")}: {draft.receiptTaxCardNumber}
+              </Text>
             ) : null}
           </>
         );
+      }
       case "purchaseDate":
         return (
           <View style={p.row}>
@@ -685,13 +1057,24 @@ function ReceiptPreview({
           </View>
         );
       case "items":
+        // Two items + one line discount makes the preview feel like a real
+        // receipt rather than a form sample; still representative, no real
+        // sale data.
         return (
           <>
             <Text style={[p.black, tracked, p.center]}>{T("*** RECEIPT ***", "*** فاتورة ***")}</Text>
             <View style={p.row}>
-              <Text style={p.body}>{T("SAMPLE ITEM", "صنف تجريبي")}</Text>
-              <Text style={[p.body, p.ltr]}>{receiptMoney(100)}</Text>
+              <Text style={p.body}>{T("SHIRT · BLUE", "قميص · أزرق")}</Text>
+              <Text style={[p.body, p.ltr]}>{receiptMoney(250)}</Text>
             </View>
+            <Text style={[p.small, p.muted]}>x2 @ {receiptMoney(125)}</Text>
+            <View style={p.row}>
+              <Text style={p.body}>{T("CAP · BLACK", "كاب · أسود")}</Text>
+              <Text style={[p.body, p.ltr]}>{receiptMoney(80)}</Text>
+            </View>
+            <Text style={[p.small, p.muted]}>
+              {T("DISCOUNT", "الخصم")} (- {receiptMoney(10)})
+            </Text>
           </>
         );
       case "totals":
@@ -699,7 +1082,11 @@ function ReceiptPreview({
           <>
             <View style={p.row}>
               <Text style={p.body}>{T("SUBTOTAL", "المجموع")}</Text>
-              <Text style={[p.body, p.ltr]}>{receiptMoney(100)}</Text>
+              <Text style={[p.body, p.ltr]}>{receiptMoney(330)}</Text>
+            </View>
+            <View style={p.row}>
+              <Text style={p.body}>{T("LINE DISCOUNTS", "خصومات الأصناف")}</Text>
+              <Text style={[p.body, p.ltr]}>- {receiptMoney(10)}</Text>
             </View>
             {showLoyaltyRows ? (
               <View style={p.row}>
@@ -710,7 +1097,11 @@ function ReceiptPreview({
             <View style={p.hr} />
             <View style={p.row}>
               <Text style={[p.body, p.black]}>{T("TOTAL AMOUNT", "الإجمالي")}</Text>
-              <Text style={[p.body, p.black, tracked, p.ltr]}>{receiptMoney(showLoyaltyRows ? 90 : 100)}</Text>
+              <Text style={[p.body, p.black, tracked, p.ltr]}>{receiptMoney(showLoyaltyRows ? 310 : 320)}</Text>
+            </View>
+            <View style={p.row}>
+              <Text style={[p.body, p.small]}>{T("PAID BY", "طريقة الدفع")}</Text>
+              <Text style={[p.body, p.small, p.ltr]}>{T("Cash", "نقدي")}</Text>
             </View>
           </>
         );
@@ -723,17 +1114,34 @@ function ReceiptPreview({
         ) : (
           <Text style={p.muted}>{t("app.receiptDesigner.blockBody.loyaltyDisabled")}</Text>
         );
-      case "footer":
+      case "footer": {
+        const showPol =
+          draft.receiptShowReturnPolicy && draft.receiptReturnPolicy.trim();
+        const refCode = draft.receiptReferencePrefix
+          ? `${draft.receiptReferencePrefix}-A1B2C3D4E5`
+          : "A1B2C3D4E5";
+        const alignStyle = (key: string) => ({
+          textAlign: alignOf(draft.receiptBlockAlignments, key) as
+            | "left"
+            | "center"
+            | "right",
+        });
         return (
           <>
             <Text style={[p.bold, tracked, p.center]}>
               {T("THANK YOU FOR SHOPPING!", "شكراً لتسوقكم معنا")}
             </Text>
-            {draft.receiptFooterText ? (
-              <Text style={[p.center, p.small]}>{draft.receiptFooterText}</Text>
+            {showPol ? (
+              <Text style={[p.small, alignStyle("returnPolicy")]}>{draft.receiptReturnPolicy}</Text>
             ) : null}
+            {draft.receiptFooterText ? (
+              <Text style={[p.small, alignStyle("footerText")]}>{draft.receiptFooterText}</Text>
+            ) : null}
+            <View style={p.hr} />
+            <Text style={[p.center, p.body, p.ltr]}>#{refCode}</Text>
           </>
         );
+      }
       default:
         return null;
     }
@@ -940,4 +1348,180 @@ const styles = StyleSheet.create({
   dirtyText: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
   dirtyTextActive: { ...RTL_TEXT, color: colors.warningStrong, fontFamily: fonts.medium },
   saveButtons: { flexDirection: "row", justifyContent: "flex-end", gap: spacing.sm, minHeight: MIN_TOUCH },
+
+  // Identity card header — label + hint on the start, show-toggle on the end.
+  identityRowHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  identityLabel: {
+    ...RTL_TEXT,
+    fontFamily: fonts.semibold,
+    fontSize: 14,
+    color: colors.text,
+  },
+  identityHint: {
+    ...RTL_TEXT,
+    fontFamily: fonts.regular,
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  // Native switch mimic — the app has no Switch wrapper so render the chrome
+  // here. Matches the web ShowToggle visually (track + thumb slides to end).
+  showToggleWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  showToggleLabel: {
+    ...RTL_TEXT,
+    fontFamily: fonts.regular,
+    fontSize: 11,
+    color: colors.textSecondary,
+  },
+  showToggleTrack: {
+    width: 36,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: "center",
+    padding: 2,
+  },
+  showToggleTrackOn: { backgroundColor: colors.accent },
+  showToggleTrackOff: { backgroundColor: colors.border },
+  showToggleThumb: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: colors.card,
+  },
+  showToggleThumbOn: { alignSelf: "flex-end" },
+  showToggleThumbOff: { alignSelf: "flex-start" },
+
+  sloganChips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs, marginTop: spacing.sm },
+  sloganChip: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.bg,
+  },
+  sloganChipText: {
+    ...RTL_TEXT,
+    fontFamily: fonts.regular,
+    fontSize: 12,
+    color: colors.text,
+  },
+
+  // Row for controls on the right of an identity card header (alignment
+  // picker + show toggle together, or either alone).
+  identityControls: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  alignPickerWrap: {
+    flexDirection: "row",
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    overflow: "hidden",
+  },
+  alignPickerBtn: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    backgroundColor: colors.card,
+  },
+  alignPickerBtnActive: {
+    backgroundColor: colors.accent,
+  },
+  alignPickerGlyph: {
+    fontFamily: fonts.medium,
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
+  alignPickerGlyphActive: {
+    color: colors.card,
+  },
 });
+
+/** 3-way alignment picker using Phosphor TextAlign icons. Previously used
+ *  the ⯇ ◆ ⯈ glyphs (U+2BC7–8), but the system font has no coverage for
+ *  those codepoints on iOS/Android so they rendered as ? boxes. The Phosphor
+ *  SVGs always render — same icon set the rest of the app uses. */
+function AlignmentPicker({
+  value,
+  onChange,
+}: {
+  value: Align;
+  onChange: (v: Align) => void;
+}) {
+  type IconT = typeof TextAlignLeft;
+  const options: { v: Align; Icon: IconT; label: string }[] = [
+    { v: "left", Icon: TextAlignLeft, label: t("app.settingsPage.receiptCard.alignLeft") },
+    { v: "center", Icon: TextAlignCenter, label: t("app.settingsPage.receiptCard.alignCenter") },
+    { v: "right", Icon: TextAlignRight, label: t("app.settingsPage.receiptCard.alignRight") },
+  ];
+  return (
+    <View style={styles.alignPickerWrap} accessibilityRole="radiogroup">
+      {options.map(({ v, Icon, label }) => {
+        const active = value === v;
+        return (
+          <Pressable
+            key={v}
+            onPress={() => onChange(v)}
+            accessibilityRole="radio"
+            accessibilityLabel={label}
+            accessibilityState={{ selected: active }}
+            style={[styles.alignPickerBtn, active && styles.alignPickerBtnActive]}
+          >
+            <Icon
+              size={16}
+              color={active ? colors.card : colors.textSecondary}
+              weight={active ? "bold" : "regular"}
+            />
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/** Show/hide switch for an identity row. Pressed → flips the boolean; the
+ *  draft bubbles to the parent and the receipt preview + real print follow. */
+function ShowToggle({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+}) {
+  return (
+    <Pressable
+      onPress={() => onChange(!checked)}
+      accessibilityRole="switch"
+      accessibilityState={{ checked }}
+      style={styles.showToggleWrap}
+    >
+      <Text style={styles.showToggleLabel}>{label}</Text>
+      <View
+        style={[
+          styles.showToggleTrack,
+          checked ? styles.showToggleTrackOn : styles.showToggleTrackOff,
+        ]}
+      >
+        <View
+          style={[
+            styles.showToggleThumb,
+            checked ? styles.showToggleThumbOn : styles.showToggleThumbOff,
+          ]}
+        />
+      </View>
+    </Pressable>
+  );
+}

@@ -1,0 +1,129 @@
+# Team / Add member — owner lands on /team, taps Add member, fills the
+# REQUIRED fields (username, display name, password), grants Dashboard, submits,
+# lands on the new user's detail page with the Permissions card visible.
+#
+# Optional fields (phone, national id, address) are left blank on purpose:
+# the phone field opens the iOS number pad which overlays the submit button,
+# and dismissing it after the permission toggles is flaky on the sim. The
+# backend accepts null for all three. Broader coverage lives in the API-level
+# matrix in apps/mobile/src/api/__tests__/team-create.test.ts.
+#
+# Pass a unique USERNAME via `--env USERNAME=qaXXXX` on each run — re-running
+# without a fresh username trips the server's 409 on duplicate and fails the
+# post-submit assertion. The default "qae2e" is fine for one run.
+appId: com.thestoro.app
+env:
+  USERNAME: "qae2e"
+  DISPLAY_NAME: "QA Test Employee"
+  PASSWORD: "Letmein1!"
+---
+- launchApp
+- runFlow: helpers/dev-launcher.yaml
+- extendedWaitUntil:
+    visible:
+      text: "المزيد|More|تسجيل الدخول|Sign in"
+    timeout: 45000
+
+- runFlow:
+    when:
+      visible:
+        id: "login-identifier"
+    file: login.yaml
+- runFlow: helpers/dismiss-logbox.yaml
+
+# More → Team
+- tapOn:
+    text: "المزيد|More"
+- scrollUntilVisible:
+    element:
+      text: "الموظفون|Team"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    text: "الموظفون|Team"
+- extendedWaitUntil:
+    visible:
+      id: "team-add-member"
+    timeout: 30000
+
+# Add member → form
+- tapOn:
+    id: "team-add-member"
+- extendedWaitUntil:
+    visible:
+      id: "new-username"
+    timeout: 30000
+
+# Required fields only. After each input, blur with keyboard-down-ios so the
+# next tap lands on the real field and not a key on the software keyboard.
+- tapOn:
+    id: "new-username"
+- inputText: ${USERNAME}
+- runFlow:
+    file: helpers/keyboard-down-ios.yaml
+    env:
+      ID: "new-username"
+
+- tapOn:
+    id: "new-display-name"
+- inputText: ${DISPLAY_NAME}
+- runFlow:
+    file: helpers/keyboard-down-ios.yaml
+    env:
+      ID: "new-display-name"
+
+- scrollUntilVisible:
+    element:
+      id: "new-password"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: "new-password"
+- inputText: ${PASSWORD}
+- runFlow:
+    file: helpers/keyboard-down-ios.yaml
+    env:
+      ID: "new-password"
+
+# Grant Dashboard — the detail page's permission card then shows this label.
+- scrollUntilVisible:
+    element:
+      id: "new-perms-view_dashboard-switch"
+    direction: DOWN
+    centerElement: true
+    visibilityPercentage: 60
+    timeout: 20000
+- tapOn:
+    id: "new-perms-view_dashboard-switch"
+
+# Submit. Maestro's visibility check under-counts an element pinned just above
+# the bottom tab bar (Screen renders the tabs on form routes too), so
+# scrollUntilVisible + tapOn id/text both fail on the sim with "not visible"
+# while the button is clearly on screen. Tapping at the button's known position
+# (50% × 86% — centred, just above the tab bar) is the one path that works.
+- tapOn:
+    point: "50%,86%"
+
+# Landed on the new member's detail page — header + Permissions card visible.
+- extendedWaitUntil:
+    visible:
+      text: ${DISPLAY_NAME}
+    timeout: 45000
+- scrollUntilVisible:
+    element:
+      text: "الصلاحيات|Permissions"
+    direction: DOWN
+    centerElement: true
+    visibilityPercentage: 60
+    timeout: 20000
+- assertVisible:
+    text: "الصلاحيات|Permissions"
+- scrollUntilVisible:
+    element:
+      text: "(?s).*(لوحة التحكم|Dashboard).*"
+    direction: DOWN
+    centerElement: true
+    visibilityPercentage: 60
+    timeout: 20000

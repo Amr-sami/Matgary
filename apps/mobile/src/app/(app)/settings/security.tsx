@@ -27,6 +27,7 @@ import { shortDate } from "@/lib/format";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
 import { colors, fonts, MIN_TOUCH, radius, spacing } from "@/theme/tokens";
+import { SkeletonListRow } from "@/components/ui/skeleton";
 import { t } from "@/i18n";
 
 /**
@@ -440,8 +441,8 @@ export default function SecurityScreen() {
       </View>
       <Text style={styles.hint}>{t("mobile.security.devices.intro")}</Text>
       <View style={styles.deviceList}>
-        {devicesQuery.isLoading ? (
-          <ActivityIndicator color={colors.accent} />
+        {devicesQuery.isPending && !devicesQuery.data ? (
+          <SkeletonListRow count={3} avatarSize={40} trailingWidth={48} height={64} />
         ) : devicesQuery.isError ? (
           <View style={styles.stackTight}>
             <Text style={styles.errorInline}>{t("mobile.security.devices.loadFailed")}</Text>

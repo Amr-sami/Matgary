@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Pressable,
   ScrollView,
@@ -29,6 +28,7 @@ import { countLabel } from "@/lib/format";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
+import { SkeletonListRow } from "@/components/ui/skeleton";
 import { t } from "@/i18n";
 
 /**
@@ -148,7 +148,9 @@ export default function BrandsSettingsScreen() {
   };
 
   const busy = create.isPending || update.isPending || remove.isPending;
-  const loading = categoriesQ.isLoading || brandsQ.isLoading;
+  const loading =
+    (categoriesQ.isPending && !categoriesQ.data) ||
+    (brandsQ.isPending && !brandsQ.data);
   const error = categoriesQ.error ?? brandsQ.error;
   const refetch = () => {
     void categoriesQ.refetch();
@@ -185,7 +187,7 @@ export default function BrandsSettingsScreen() {
       {!canManage && me ? <Text style={styles.readOnly}>{t("mobile.catalog.readOnly")}</Text> : null}
 
       {loading ? (
-        <ActivityIndicator color={colors.accent} style={{ marginTop: spacing.xl }} />
+        <SkeletonListRow count={5} avatarSize={0} trailingWidth={48} height={56} />
       ) : error ? (
         <Card>
           <Text style={styles.hint}>{errText(error)}</Text>

@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocalSearchParams } from "expo-router";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  SkeletonChart,
+  SkeletonListRow,
+  SkeletonStatCard,
+} from "@/components/ui/skeleton";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { CaretRightIcon as CaretRight } from "phosphor-react-native/src/icons/CaretRight";
 import { CoinsIcon as Coins } from "phosphor-react-native/src/icons/Coins";
 import { PercentIcon as Percent } from "phosphor-react-native/src/icons/Percent";
 import { ShoppingCartIcon as ShoppingCart } from "phosphor-react-native/src/icons/ShoppingCart";
@@ -112,8 +118,9 @@ function rangeWindow(key: Range): { from: string; to: string } | null {
  * fixed on the web (session-record §1g); two-up is the correct layout here.
  */
 export default function InsightsScreen() {
+  const router = useRouter();
   // `insights?tab=deep|staff` deep-links straight to a tab (notifications, dev probes).
-  const params = useLocalSearchParams<{ tab?: string; range?: string; report?: string; branchId?: string }>();
+  const params = useLocalSearchParams<{ tab?: string; range?: string; report?: string }>();
   const [tab, setTab] = useState<Tab>(isTab(params.tab) ? params.tab : "overview");
   const [range, setRange] = useState<Range>(isRange(params.range) ? params.range : "all");
   // Tab screens stay mounted, so a later deep link only changes the params.
@@ -170,6 +177,32 @@ export default function InsightsScreen() {
       onRefresh={() => void onRefresh()}
       refreshing={refreshing}
     >
+      {/* AI entry — top-of-page hero so it reads as the primary way to query
+          the store. The reports below are the structured drilldowns; this is
+          the "just ask" door. */}
+      <Pressable
+        onPress={() => router.push("/ai-chat")}
+        accessibilityRole="button"
+        accessibilityLabel={t("mobile.insights.ai.entryTitle")}
+        style={({ pressed }) => [styles.aiEntry, pressed && styles.aiEntryPressed]}
+      >
+        <View style={styles.aiEntryIcon}>
+          <Image
+            source={require("../../../assets/images/amr.png")}
+            style={styles.aiEntryIconImage}
+          />
+        </View>
+        <View style={styles.aiEntryBody}>
+          <Text numberOfLines={1} style={styles.aiEntryTitle}>
+            {t("mobile.insights.ai.entryTitle")}
+          </Text>
+          <Text numberOfLines={2} style={styles.aiEntrySub}>
+            {t("mobile.insights.ai.entrySubtitle")}
+          </Text>
+        </View>
+        <CaretRight size={18} color={colors.onAccent} weight="bold" />
+      </Pressable>
+
       <Segmented
         value={tab}
         onChange={setTab}
@@ -197,12 +230,18 @@ export default function InsightsScreen() {
           from={window?.from}
           to={window?.to}
           initialReport={params.report}
-          initialBranchId={params.branchId}
         />
       ) : tab === "staff" ? (
         <StaffTab range={range} from={window?.from} to={window?.to} />
-      ) : overview.isLoading ? (
-        <ActivityIndicator color={colors.accent} />
+      ) : overview.isPending && !overview.data ? (
+        <>
+          <View style={{ flexDirection: "row", gap: spacing.md }}>
+            <SkeletonStatCard style={{ flex: 1 }} />
+            <SkeletonStatCard style={{ flex: 1 }} />
+          </View>
+          <SkeletonChart height={200} />
+          <SkeletonListRow count={3} avatarSize={0} trailingWidth={60} height={56} />
+        </>
       ) : !m ? (
         <Card>
           <Text style={styles.soon}>{t("mobile.insights.loadFailed")}</Text>
@@ -335,6 +374,29 @@ function TrendStat({
 }
 
 const styles = StyleSheet.create({
+  // Accent-filled press target that leads to the AI chat. Top-of-page because
+  // it is the one "just ask" surface above the structured reports.
+  aiEntry: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    borderRadius: radius.lg,
+    backgroundColor: colors.accent,
+  },
+  aiEntryPressed: { opacity: 0.9 },
+  aiEntryIcon: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  aiEntryIconImage: { width: 44, height: 44, resizeMode: "contain" },
+  aiEntryBody: { flex: 1, gap: 2 },
+  aiEntryTitle: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 16, color: colors.onAccent },
+  aiEntrySub: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 12, color: "rgba(255,255,255,0.82)" },
+
   chipRow: { flexDirection: "row", gap: spacing.sm },
   rangeChip: {
     flexGrow: 1,

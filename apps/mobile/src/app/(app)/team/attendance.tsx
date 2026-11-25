@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Modal,
   Pressable,
@@ -38,6 +37,7 @@ import { shortDate } from "@/lib/format";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT, directionStyle } from "@/theme/rtl";
 import { colors, elevation, fonts, radius, spacing, MIN_TOUCH } from "@/theme/tokens";
+import { SkeletonListRow } from "@/components/ui/skeleton";
 import { errorText as sharedErrorText } from "@/lib/errors";
 
 /**
@@ -362,7 +362,7 @@ export default function TeamAttendanceScreen() {
           ) : null}
 
           {loading ? (
-            <ActivityIndicator color={colors.accent} />
+            <SkeletonListRow count={4} avatarSize={40} trailingWidth={56} height={64} />
           ) : error ? (
             <EmptyState title={errorText(error, t("app.team.roster.loadFailed"))} />
           ) : roster.length === 0 ? (

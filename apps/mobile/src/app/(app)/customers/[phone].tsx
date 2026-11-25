@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -12,6 +12,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarBlankIcon as CalendarBlank } from "phosphor-react-native/src/icons/CalendarBlank";
 import { CheckCircleIcon as CheckCircle } from "phosphor-react-native/src/icons/CheckCircle";
 import { CoinsIcon as Coins } from "phosphor-react-native/src/icons/Coins";
+import { FileTextIcon as FileText } from "phosphor-react-native/src/icons/FileText";
 import { PhoneIcon as Phone } from "phosphor-react-native/src/icons/Phone";
 import { ReceiptIcon as Receipt } from "phosphor-react-native/src/icons/Receipt";
 import { ShoppingCartIcon as ShoppingCart } from "phosphor-react-native/src/icons/ShoppingCart";
@@ -48,11 +49,21 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
 import { Segmented } from "@/components/ui/Segmented";
 import { Sheet } from "@/components/ui/Sheet";
+import {
+  shareCustomerStatement,
+  StatementShareUnavailableError,
+} from "@/customer-statement/share";
+import { loadReceiptSettings } from "@/receipt/share";
 import { money, shortDate } from "@/lib/format";
 import { customerPhoneParam } from "@/lib/customer-phone";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
 import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
+import {
+  SkeletonDetailHeader,
+  SkeletonListRow,
+  SkeletonText,
+} from "@/components/ui/skeleton";
 import { t } from "@/i18n";
 
 /**
@@ -219,6 +230,7 @@ export default function CustomerDetailScreen() {
   const markAll = useMutation({
     mutationFn: () => catalog.markCustomerAllPaid(api, phone),
     onSuccess: async (result) => {
+      setMarkAllOpen(false);
       setNotice({
         kind: "success",
         text: t("mobile.customers.markAllDone", { n: result.markedCount, amount: money(result.markedTotal) }),
@@ -227,6 +239,48 @@ export default function CustomerDetailScreen() {
     },
     onError: () => setNotice({ kind: "error", text: t("mobile.customers.updateFailed") }),
   });
+
+  // Partial-pay sheet: the owner's complaint was that only "Mark all paid"
+  // was discoverable. Per-invoice tap-to-settle existed but got hidden by
+  // the "legacy" check (sales without an INV- id are rejected one-by-one).
+  // This button sits next to Mark-all-paid and submits to /api/sales/settle
+  // WITHOUT invoiceIds — the server then allocates oldest-first against
+  // the whole ledger (settleCustomerPayment default behaviour). No backend
+  // change required.
+  const [partialOpen, setPartialOpen] = useState(false);
+  const [partialAmount, setPartialAmount] = useState("");
+  const [partialMethod, setPartialMethod] = useState<Method>("cash");
+  const partialKeyRef = useRef<string | null>(null);
+  const openPartial = () => {
+    setPartialAmount("");
+    setPartialMethod("cash");
+    partialKeyRef.current = newIdempotencyKey();
+    setPartialOpen(true);
+  };
+  const closePartial = () => {
+    setPartialOpen(false);
+    partialKeyRef.current = null;
+  };
+
+  const partialPay = useMutation({
+    mutationFn: (input: { amount: number; method: Method; key: string }) =>
+      catalog.settleCustomer(
+        api,
+        { customerPhone: phone, amount: input.amount, method: input.method },
+        input.key,
+      ),
+    onSuccess: async (result) => {
+      closePartial();
+      setNotice({
+        kind: "success",
+        text: t("mobile.customers.settleDone", { amount: money(result.appliedAmount) }),
+      });
+      await invalidateAll();
+      if (result.collectionId) await invalidateCollections(qc);
+    },
+    onError: (e) => setNotice({ kind: "error", text: settleErrorMessage(e) }),
+  });
+
 
   const refresh = () => {
     void ledgerQ.refetch();
@@ -237,6 +291,45 @@ export default function CustomerDetailScreen() {
   const ledger = ledgerQ.data?.data ?? null;
   const branchName = ledgerQ.data?.branchName ?? "";
   const hasDebt = (ledger?.outstandingBalance ?? 0) > 0;
+
+  // "كشف حساب العميل" — resolve shop settings (same path receipts use so the
+  // header, phone and branch match whatever is printing today) and hand the
+  // ledger + payments the UI is currently showing to the PDF builder.
+  const shareStatement = useMutation({
+    mutationFn: async () => {
+      if (!ledger) throw new Error("NO_LEDGER");
+      const { settings } = await loadReceiptSettings(qc);
+      await shareCustomerStatement({
+        shopName: settings.shopName || null,
+        shopPhone: settings.shopPhone || null,
+        branchName: branchName || null,
+        customer: {
+          name: ledger.customerName,
+          phone: ledger.customerPhone,
+        },
+        ledger,
+        payments: paymentsQ.data ?? [],
+      });
+    },
+    onError: (e) =>
+      setNotice({
+        kind: "error",
+        text:
+          e instanceof StatementShareUnavailableError
+            ? t("mobile.customers.statementUnavailable")
+            : t("mobile.customers.statementFailed"),
+      }),
+  });
+
+  // Partial-pay derived values — depend on `ledger`, so computed here.
+  const partialTyped = Number(partialAmount.replace(/[^\d.]/g, "")) || 0;
+  const partialMax = ledger?.outstandingBalance ?? 0;
+  const partialResolved = Math.max(0, Math.min(partialTyped, partialMax));
+  const partialOverpay = partialTyped > partialMax && partialMax > 0;
+  const submitPartial = () => {
+    if (!partialKeyRef.current || partialResolved <= 0) return;
+    partialPay.mutate({ amount: partialResolved, method: partialMethod, key: partialKeyRef.current });
+  };
   const unpaid = useMemo(() => ledger?.invoices.filter((i) => !i.isPaid) ?? [], [ledger]);
   const oldestUnpaid = useMemo(() => {
     let oldest: number | null = null;
@@ -247,16 +340,17 @@ export default function CustomerDetailScreen() {
     return oldest;
   }, [unpaid]);
 
+  // Mark-all confirmation uses the app's own Sheet (white + brand blue) rather
+  // than the system Alert.alert (whose dark iOS panel + red "Confirm" clashed
+  // with every other confirm flow on this page).
+  const [markAllOpen, setMarkAllOpen] = useState(false);
   const confirmMarkAll = () => {
     if (!ledger || !hasDebt || markAll.isPending) return;
-    Alert.alert(
-      t("mobile.customers.markAllPaid"),
-      t("mobile.customers.markAllConfirm", { amount: money(ledger.outstandingBalance) }),
-      [
-        { text: t("app.common.cancel"), style: "cancel" },
-        { text: t("app.common.confirm"), style: "destructive", onPress: () => markAll.mutate() },
-      ],
-    );
+    setMarkAllOpen(true);
+  };
+  const closeMarkAll = () => {
+    if (markAll.isPending) return;
+    setMarkAllOpen(false);
   };
 
   return (
@@ -285,8 +379,11 @@ export default function CustomerDetailScreen() {
         </View>
       ) : null}
 
-      {ledgerQ.isLoading ? (
-        <ActivityIndicator color={colors.accent} />
+      {ledgerQ.isPending && !ledgerQ.data ? (
+        <>
+          <SkeletonDetailHeader withAvatar avatarSize={56} />
+          <SkeletonListRow count={5} avatarSize={0} trailingWidth={80} height={64} />
+        </>
       ) : !ledger ? (
         <View style={styles.emptyWrap}>
           <ShoppingCart size={44} color={colors.textSecondary} />
@@ -305,43 +402,85 @@ export default function CustomerDetailScreen() {
         </View>
       ) : (
         <>
-          <Card>
-            <View style={styles.headRow}>
+          {/* Identity — who this customer is. Avatar circle + name + phone
+              + branch. The card used to be overloaded with debt + stats +
+              action buttons; those live in their own cards below now. */}
+          <Card style={styles.identityCard}>
+            <View style={styles.identityRow}>
+              <View style={styles.avatar}>
+                <Image
+                  source={require("../../../../assets/images/user.png")}
+                  style={styles.avatarImage}
+                  tintColor={colors.onAccent}
+                />
+              </View>
               <View style={styles.headMain}>
-                <Text numberOfLines={1} style={styles.name}>
+                <Text numberOfLines={1} style={[styles.name, styles.onAccentText]}>
                   {ledger.customerName?.trim() || ledger.customerPhone || phone}
                 </Text>
                 {ledger.customerPhone ? (
                   <View style={styles.phoneRow}>
-                    <Phone size={14} color={colors.textSecondary} />
+                    <Phone size={14} color={colors.onAccent} />
                     {/* LRI…PDI: writingDirection is iOS-only; Android would trail the plus. */}
-                    <Text numberOfLines={1} style={[styles.meta, styles.ltr]}>
+                    <Text numberOfLines={1} style={[styles.meta, styles.ltr, styles.onAccentMeta]}>
                       {`\u2066${ledger.customerPhone}\u2069`}
                     </Text>
                   </View>
                 ) : null}
                 {branchName ? (
-                  <Text numberOfLines={1} style={styles.branch}>
+                  <Text numberOfLines={1} style={[styles.branch, styles.onAccentMeta]}>
                     {t("mobile.customers.branchData", { branch: branchName })}
                   </Text>
                 ) : null}
               </View>
-
-              {hasDebt ? (
-                <View style={styles.debtBlock}>
-                  <Text numberOfLines={1} style={styles.debtLabel}>
-                    {t("mobile.customers.outstandingFromCustomer")}
-                  </Text>
-                  <Text numberOfLines={1} style={styles.debtValue} testID="customer-outstanding">
-                    {money(ledger.outstandingBalance)}
-                  </Text>
-                </View>
-              ) : null}
             </View>
 
-            {hasDebt ? (
+            {/* كشف حساب العميل — a read-only share action, so no permission
+                gate: anyone looking at the ledger can hand the customer a
+                printable copy of it. Renders a PDF and opens the OS share
+                sheet (WhatsApp / Files / Mail). */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("mobile.customers.accountStatement")}
+              onPress={() => shareStatement.mutate()}
+              disabled={shareStatement.isPending}
+              testID="customer-share-statement"
+              style={({ pressed }) => [
+                styles.statementRow,
+                styles.statementRowOnAccent,
+                pressed && styles.statementRowPressed,
+                shareStatement.isPending && styles.statementRowDisabled,
+              ]}
+            >
+              <View style={styles.statementIcon}>
+                {shareStatement.isPending ? (
+                  <ActivityIndicator size="small" color={colors.onAccent} />
+                ) : (
+                  <FileText size={18} color={colors.onAccent} />
+                )}
+              </View>
+              <Text style={[styles.statementLabel, styles.onAccentText]}>
+                {t("mobile.customers.accountStatement")}
+              </Text>
+            </Pressable>
+          </Card>
+
+          {/* Debt — its own card, warning-tinted, with the big number + badges
+              + action buttons grouped together. A customer at zero debt
+              never sees this. */}
+          {hasDebt ? (
+            <Card style={styles.debtCard}>
+              <Text style={styles.debtLabel}>
+                {t("mobile.customers.outstandingFromCustomer")}
+              </Text>
+              <Text style={styles.debtValue} testID="customer-outstanding">
+                {money(ledger.outstandingBalance)}
+              </Text>
               <View style={styles.debtMeta}>
-                <Badge label={t(`mobile.customers.unpaidCount${countForm(unpaid.length)}`, { n: unpaid.length })} variant="outofstock" />
+                <Badge
+                  label={t(`mobile.customers.unpaidCount${countForm(unpaid.length)}`, { n: unpaid.length })}
+                  variant="outofstock"
+                />
                 {oldestUnpaid !== null ? (
                   <Badge
                     label={t("mobile.customers.oldestUnpaidDays", { n: oldestUnpaid })}
@@ -349,8 +488,29 @@ export default function CustomerDetailScreen() {
                   />
                 ) : null}
               </View>
-            ) : null}
+              {canModifySales ? (
+                <View style={styles.actions}>
+                  <Button
+                    label={t("mobile.customers.payPartial")}
+                    variant="outline"
+                    onPress={openPartial}
+                    loading={partialPay.isPending}
+                    testID="customer-pay-partial"
+                  />
+                  <Button
+                    label={t("mobile.customers.markAllPaid")}
+                    onPress={confirmMarkAll}
+                    loading={markAll.isPending}
+                  />
+                </View>
+              ) : null}
+            </Card>
+          ) : null}
 
+          {/* Stats — lifetime value, paid balance, invoice count, last visit.
+              Pulled out of the identity card so it reads as a separate "KPI
+              block" the way the dashboard's figures do. */}
+          <Card>
             <View style={styles.statGrid}>
               <Stat
                 icon={<Wallet size={14} color={colors.textSecondary} />}
@@ -373,16 +533,6 @@ export default function CustomerDetailScreen() {
                 value={ledger.lastVisit ? shortDate(ledger.lastVisit) : "—"}
               />
             </View>
-
-            {hasDebt && canModifySales ? (
-              <View style={styles.actions}>
-                <Button
-                  label={t("mobile.customers.markAllPaid")}
-                  onPress={confirmMarkAll}
-                  loading={markAll.isPending}
-                />
-              </View>
-            ) : null}
           </Card>
 
           {/* Loyalty wallet — points + store credit for this branch. Zero
@@ -393,8 +543,8 @@ export default function CustomerDetailScreen() {
               <Coins size={18} color={colors.textSecondary} />
               <Text style={styles.sectionTitle}>{t("mobile.customers.walletTitle")}</Text>
             </View>
-            {walletQ.isLoading ? (
-              <ActivityIndicator color={colors.accent} />
+            {walletQ.isPending && !walletQ.data ? (
+              <SkeletonText lines={2} />
             ) : walletQ.isError ? (
               <Text style={styles.meta}>{t("app.common.error")}</Text>
             ) : (
@@ -623,6 +773,73 @@ export default function CustomerDetailScreen() {
           settle.mutate({ invoice: settleTarget, amount, method, extras, key });
         }}
       />
+
+      {/* Partial-pay sheet — settles the ledger oldest-first with a typed
+          amount. Collections (instapay/wallet) deliberately absent here to
+          keep the top-level flow simple; owners who want per-invoice settle
+          with a transfer still tap an invoice row. */}
+      <Sheet
+        visible={partialOpen}
+        onClose={partialPay.isPending ? () => {} : closePartial}
+        title={t("mobile.customers.payPartialTitle")}
+        testID="partial-pay"
+        primaryAction={{
+          label: `${t("app.customers.settle.submit")} · ${money(partialResolved)}`,
+          onPress: submitPartial,
+          loading: partialPay.isPending,
+          disabled: partialResolved <= 0,
+          testID: "partial-pay-submit",
+        }}
+        secondaryAction={{
+          label: t("app.common.cancel"),
+          onPress: closePartial,
+          disabled: partialPay.isPending,
+        }}
+      >
+        <Text style={styles.sheetSub}>
+          {t("mobile.customers.payPartialMax", { amount: money(partialMax) })}
+        </Text>
+        <Field
+          label={t("app.customers.settle.amountLabel")}
+          value={partialAmount}
+          onChangeText={setPartialAmount}
+          keyboardType="decimal-pad"
+          editable={!partialPay.isPending}
+          testID="partial-pay-amount"
+        />
+        {partialOverpay ? (
+          <Text style={styles.hint}>{t("app.customers.settle.overpayHint")}</Text>
+        ) : null}
+        <Text style={styles.fieldLabel}>{t("app.customers.settle.methodLabel")}</Text>
+        <Segmented items={METHODS(collectionsOn)} value={partialMethod} onChange={(m) => setPartialMethod(m as Method)} />
+        <Text style={styles.sheetSub}>{t("mobile.customers.payPartialHint")}</Text>
+      </Sheet>
+
+      {/* Confirm-before-wipe sheet for Mark-all-paid. Matches the app's
+          Sheet + brand-blue primary / grey secondary — no more red native alert. */}
+      <Sheet
+        visible={markAllOpen}
+        onClose={closeMarkAll}
+        title={t("mobile.customers.markAllPaid")}
+        testID="mark-all-confirm"
+        primaryAction={{
+          label: t("app.common.confirm"),
+          onPress: () => markAll.mutate(),
+          loading: markAll.isPending,
+          testID: "mark-all-confirm-submit",
+        }}
+        secondaryAction={{
+          label: t("app.common.cancel"),
+          onPress: closeMarkAll,
+          disabled: markAll.isPending,
+        }}
+      >
+        <Text style={styles.sheetSub}>
+          {t("mobile.customers.markAllConfirm", {
+            amount: money(ledger?.outstandingBalance ?? 0),
+          })}
+        </Text>
+      </Sheet>
     </Screen>
   );
 }
@@ -853,6 +1070,16 @@ const styles = StyleSheet.create({
   emptyWrap: { alignItems: "center", paddingTop: spacing.xxl * 2, gap: spacing.md },
 
   headRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md },
+  identityRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  avatar: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  // tintColor is applied as a prop on <Image> (Fabric's style path doesn't
+  // consistently tint PNGs on both platforms); here we size + fit only.
+  avatarImage: { width: 32, height: 32, resizeMode: "contain" },
   headMain: { flex: 1, minWidth: 0, gap: 4 },
   name: { fontFamily: fonts.bold, fontSize: 20, color: colors.text, ...RTL_TEXT },
   phoneRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
@@ -862,14 +1089,56 @@ const styles = StyleSheet.create({
   ltr: { writingDirection: "ltr" },
   branch: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
 
+  // Identity card is the hero of the detail page — paints it in the brand
+  // accent so a customer feels distinct from the generic info cards below.
+  // All text/icons on this card use `onAccentText` / `onAccentMeta` so they
+  // stay AAA readable on blue.
+  identityCard: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  onAccentText: { color: colors.onAccent },
+  onAccentMeta: { color: "rgba(255,255,255,0.78)" },
+
+  // The "كشف حساب" row sits inside the identity card as a secondary action:
+  // a divider above (marginTop + borderTop) echoes the receipt page's "pay"
+  // row pattern and keeps the identity card from looking like plain text.
+  statementRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  statementRowPressed: { opacity: 0.7 },
+  statementRowDisabled: { opacity: 0.6 },
+  // Divider needs to be visible on blue — the default border is nearly the
+  // same hue, so swap to a soft white at low opacity.
+  statementRowOnAccent: { borderTopColor: "rgba(255,255,255,0.22)" },
+  statementIcon: {
+    width: 24,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  statementLabel: {
+    ...RTL_TEXT,
+    flex: 1,
+    fontFamily: fonts.bold,
+    fontSize: 14,
+    color: colors.accent,
+  },
+
   // The trailing block is end-aligned as a unit ("right" = END under the
   // Fabric swap) so label and amount share the card's far edge.
   debtBlock: { alignItems: "flex-end", flexShrink: 0, gap: 2 },
-  debtLabel: { textAlign: "right", fontFamily: fonts.regular, fontSize: 11, color: colors.textSecondary },
+  debtLabel: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary },
   debtValue: {
-    textAlign: "right",
+    ...RTL_TEXT,
     fontFamily: fonts.bold,
-    fontSize: 22,
+    fontSize: 26,
     color: colors.warningStrong,
     fontVariant: ["tabular-nums"],
   },
@@ -878,11 +1147,12 @@ const styles = StyleSheet.create({
   statGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    marginTop: spacing.lg,
-    paddingTop: spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
     rowGap: spacing.md,
+  },
+  debtCard: {
+    backgroundColor: colors.warningLight,
+    borderColor: colors.warning,
+    gap: spacing.sm,
   },
   // 50% columns with an end-side gutter so the left column's value never
   // butts up against the right column's label. Web uses `gap-3`.
@@ -890,7 +1160,7 @@ const styles = StyleSheet.create({
   // value Text falls back to its own first-strong character and drifts left.
   stat: { width: "50%", paddingEnd: spacing.md, gap: 2, alignItems: "flex-start" },
   statLabelRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
-  statLabel: { flexShrink: 1, fontFamily: fonts.regular, fontSize: 11, color: colors.textSecondary, ...RTL_TEXT },
+  statLabel: { flexShrink: 1, fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
   statValue: {
     fontFamily: fonts.bold,
     fontSize: 14,
@@ -898,7 +1168,7 @@ const styles = StyleSheet.create({
     fontVariant: ["tabular-nums"],
     ...RTL_TEXT,
   },
-  actions: { marginTop: spacing.lg },
+  actions: { marginTop: spacing.lg, gap: spacing.sm },
 
   // Same 50% + end-gutter columns as `stat`, so the wallet's second column
   // starts on the stats grid's second column (a row gap + flex:1 put it ~6pt off).
@@ -906,7 +1176,7 @@ const styles = StyleSheet.create({
   walletCell: { width: "50%", paddingEnd: spacing.md, gap: 2, alignItems: "flex-start" },
   walletValue: {
     fontFamily: fonts.bold,
-    fontSize: 18,
+    fontSize: 16,
     color: colors.text,
     fontVariant: ["tabular-nums"],
     ...RTL_TEXT,
@@ -937,21 +1207,21 @@ const styles = StyleSheet.create({
   invoiceTotal: {
     ...RTL_TEXT,
     fontFamily: fonts.bold,
-    fontSize: 17,
+    fontSize: 16,
     color: colors.text,
     fontVariant: ["tabular-nums"],
   },
   paidLine: {
     ...RTL_TEXT,
     fontFamily: fonts.regular,
-    fontSize: 11,
+    fontSize: 12,
     color: colors.successStrong,
     fontVariant: ["tabular-nums"],
   },
   dueLine: {
     ...RTL_TEXT,
     fontFamily: fonts.semibold,
-    fontSize: 11,
+    fontSize: 12,
     color: colors.warningStrong,
     fontVariant: ["tabular-nums"],
   },

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Pressable,
   ScrollView,
@@ -31,6 +30,7 @@ import { countLabel } from "@/lib/format";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
+import { SkeletonListRow } from "@/components/ui/skeleton";
 import { t } from "@/i18n";
 
 /**
@@ -256,8 +256,8 @@ export default function AttributesSettingsScreen() {
 
       {!canManage && me ? <Text style={styles.readOnly}>{t("mobile.catalog.readOnly")}</Text> : null}
 
-      {categoriesQ.isLoading ? (
-        <ActivityIndicator color={colors.accent} style={{ marginTop: spacing.xl }} />
+      {categoriesQ.isPending && !categoriesQ.data ? (
+        <SkeletonListRow count={4} avatarSize={0} trailingWidth={0} height={48} />
       ) : categoriesQ.isError ? (
         <Card>
           <Text style={styles.hint}>{errText(categoriesQ.error)}</Text>
@@ -284,8 +284,8 @@ export default function AttributesSettingsScreen() {
 
           {!categoryId ? (
             <EmptyState title={t("mobile.catalog.pickCategoryFirst")} />
-          ) : attrsQ.isLoading ? (
-            <ActivityIndicator color={colors.accent} style={{ marginTop: spacing.lg }} />
+          ) : attrsQ.isPending && !attrsQ.data ? (
+            <SkeletonListRow count={3} avatarSize={0} trailingWidth={48} height={56} />
           ) : attrsQ.isError ? (
             <Card>
               <Text style={styles.hint}>{errText(attrsQ.error)}</Text>

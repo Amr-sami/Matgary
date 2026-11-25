@@ -8,10 +8,10 @@ import { colors } from "@/theme/tokens";
  * Settings is the one tab that is a STACK rather than a single screen.
  *
  * Declaring this layout is what keeps the route name the tab navigator sees at
- * `settings` — without it expo-router hoists `settings/index`, `settings/branches`
+ * `settings` — without it expo-router hoists `settings/index`, `settings/store`
  * … straight into the (app) Tabs navigator, which would have forced a rename in
  * `(app)/_layout.tsx` and turned every sub-page into a sibling tab with no back
- * stack. With it, `router.push("/settings/branches")` is a real push, the system
+ * stack. With it, `router.push("/settings/store")` is a real push, the system
  * back gesture / hardware button pops it, and the bottom bar stays mounted the
  * whole time — which is exactly what the captures show.
  *

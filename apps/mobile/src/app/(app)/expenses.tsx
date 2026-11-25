@@ -1,6 +1,5 @@
 import { useState } from "react";
 import {
-  ActivityIndicator,
   StyleSheet,
   Text,
   View,
@@ -21,6 +20,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { money, shortDate } from "@/lib/format";
 import { RTL_TEXT } from "@/theme/rtl";
 import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
+import { SkeletonListRow } from "@/components/ui/skeleton";
 
 /**
  * The expense categories, in the web's own order.
@@ -107,8 +107,8 @@ export default function ExpensesScreen() {
     >
       <Button label={t("mobile.expenses.add")} onPress={() => setFormOpen(true)} />
 
-      {q.isLoading ? (
-        <ActivityIndicator color={colors.accent} />
+      {q.isPending && !q.data ? (
+        <SkeletonListRow count={5} avatarSize={0} trailingWidth={80} height={64} />
       ) : rows.length === 0 ? (
         <EmptyState title={t("mobile.expenses.empty")} />
       ) : (

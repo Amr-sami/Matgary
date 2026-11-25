@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { SkeletonFormField } from "@/components/ui/skeleton";
 import { useLocalSearchParams } from "expo-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { collections } from "@matgary/api-client";
 
 import { api } from "@/api/client";
 import { localYmd, newIdempotencyKey, useCollectionAccounts, useCollectionSettings } from "@/collections/queries";
-import { BranchSheet } from "@/components/collections/setup/BranchSheet";
-import { branchChoices, collectionsScreenGate } from "@/components/collections/setup/access";
+import { collectionsScreenGate } from "@/components/collections/setup/access";
 import { ProviderSheet } from "@/components/collections/setup/ProviderSheet";
 import {
   draftFromDto,
@@ -119,7 +119,9 @@ export default function CollectionAccountScreen() {
     if (waiting) {
       return (
         <Screen header={header}>
-          <ActivityIndicator color={colors.accent} />
+          <SkeletonFormField />
+          <SkeletonFormField />
+          <SkeletonFormField />
         </Screen>
       );
     }
@@ -174,7 +176,6 @@ function AccountForm({
   const [errors, setErrors] = useState<AccountErrors>({});
   const [notice, setNotice] = useState<string | null>(null);
   const [providerOpen, setProviderOpen] = useState(false);
-  const [branchOpen, setBranchOpen] = useState(false);
   // One key per screen visit, reused for every retry of the create (09 §4.4).
   const [idempotencyKey] = useState(newIdempotencyKey);
   const today = localYmd();
@@ -278,14 +279,6 @@ function AccountForm({
     ) : null;
 
   const ipa = rail === "instapay" ? ipaFromDraft(draft, ACCOUNT_RULES) : null;
-  const choices = branchChoices(me, t("app.collectionsSettings.form.fields.branch.all"));
-  const branchOptions = choices.filter((c): c is { id: string; name: string } => c.id != null);
-  const branchName =
-    draft.branchId == null
-      ? t("app.collectionsSettings.form.fields.branch.all")
-      : ((me?.branches ?? []).find((b) => b.id === draft.branchId)?.name ??
-        (me?.branch?.id === draft.branchId ? me?.branch?.name : null) ??
-        "—");
   const branchAutoConfirmOff = access.ingest && settingsQ.data ? !settingsQ.data.collectionsAutoConfirmEnabled : false;
 
   return (
@@ -432,15 +425,6 @@ function AccountForm({
             </>
           )}
 
-          <PickerRow
-            testID="collection-account-form-branch_id"
-            label={t("app.collectionsSettings.form.fields.branch.label")}
-            value={branchName}
-            // Staff with their own branch already picked have nothing to choose.
-            disabled={busy || (choices.length <= 1 && draft.branchId === (choices[0]?.id ?? null))}
-            onPress={() => setBranchOpen(true)}
-          />
-
           <ToggleRow
             testID="collection-account-form-is_pos_default"
             label={t("app.collectionsSettings.form.fields.isPosDefault.label")}
@@ -537,19 +521,11 @@ function AccountForm({
         }}
         onClose={() => setProviderOpen(false)}
       />
-      <BranchSheet
-        visible={branchOpen}
-        value={draft.branchId}
-        branches={branchOptions}
-        allowAll={choices.some((c) => c.id == null)}
-        onPick={(b) => set("branchId", b)}
-        onClose={() => setBranchOpen(false)}
-      />
     </>
   );
 }
 
-/** A labelled row that opens a picker sheet (provider, branch). */
+/** A labelled row that opens a picker sheet (provider). */
 function PickerRow({
   label,
   value,

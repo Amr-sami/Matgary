@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -33,6 +32,10 @@ import { groupDigits, money, shortDate } from "@/lib/format";
 import { useSession } from "@/stores/session";
 import { RTL, RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
+import {
+  SkeletonListRow,
+  SkeletonPaginationFooter,
+} from "@/components/ui/skeleton";
 
 /**
  * Doc 02 §1.1 row 2 (POS SPLIT): the web's /sales page is a POS form on top
@@ -75,10 +78,6 @@ const PAYMENT_LABELS = (): Record<Payment, string> => ({
   deferred: t("app.activityLabels.paymentMethods.deferred"),
 });
 
-/** Arabic counts 1 / 2 / 3–10 / 11+ differently; the dictionary carries One/Two/Few beside the default. */
-function countForm(n: number): string {
-  return n === 1 ? "One" : n === 2 ? "Two" : n >= 3 && n <= 10 ? "Few" : "";
-}
 /** `wallet` only while digital collections are on for the branch (doc 15 spec 08 §4.9). */
 const PAYMENT_ORDER = (collectionsOn: boolean): Payment[] =>
   collectionsOn ? ["cash", "instapay", "wallet", "card", "deferred"] : ["cash", "instapay", "card", "deferred"];
@@ -163,6 +162,9 @@ export default function SalesHistoryScreen() {
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [payment, setPayment] = useState<Payment | null>(null);
+  // Sales channel (migration 0057). null = both; filters client-side like
+  // every other chip here (the paginated route has none).
+  const [channel, setChannel] = useState<"store" | "online" | null>(null);
   // "Awaiting confirmation" — digital sales the owner has not confirmed yet.
   // Client-side like every other filter here (the paginated route has none).
   const [awaitingOnly, setAwaitingOnly] = useState(false);
@@ -216,6 +218,7 @@ export default function SalesHistoryScreen() {
       if (start && at < start.getTime()) return false;
       if (end && at > end.getTime()) return false;
       if (payment && inv.paymentMethod !== payment) return false;
+      if (channel && inv.channel !== channel) return false;
       if (awaitingOnly && inv.collectionStatus !== "pending") return false;
       if (needle) {
         const hay = `${inv.invoiceId ?? ""} ${inv.customerName ?? ""} ${inv.customerPhone ?? ""}`.toLowerCase();
@@ -223,7 +226,7 @@ export default function SalesHistoryScreen() {
       }
       return true;
     });
-  }, [rows, q.hasNextPage, start, end, payment, awaitingOnly, query]);
+  }, [rows, q.hasNextPage, start, end, payment, channel, awaitingOnly, query]);
 
   const totalCount = invoices.length;
   const totalSum = useMemo(() => invoices.reduce((s, inv) => s + inv.netTotal, 0), [invoices]);
@@ -318,6 +321,36 @@ export default function SalesHistoryScreen() {
         ) : null}
       </ScrollView>
 
+      {/* Channel chip row (migration 0057). Sits as its own row because the
+          payment-method row above is already long enough that mixing in two
+          more chips would push them off-screen on a narrow phone. */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.chipsWrap}
+        contentContainerStyle={styles.chips}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Chip
+          label={t("mobile.salesHistory.channelAll")}
+          active={channel === null}
+          onPress={() => setChannel(null)}
+          testID="sales-history-channel-all"
+        />
+        <Chip
+          label={t("mobile.pos.channelStore")}
+          active={channel === "store"}
+          onPress={() => setChannel(channel === "store" ? null : "store")}
+          testID="sales-history-channel-store"
+        />
+        <Chip
+          label={t("mobile.pos.channelOnline")}
+          active={channel === "online"}
+          onPress={() => setChannel(channel === "online" ? null : "online")}
+          testID="sales-history-channel-online"
+        />
+      </ScrollView>
+
       <View style={styles.stats}>
         <StatCard title={t("mobile.salesHistory.invoices")} value={groupDigits(totalCount)} icon={Receipt} />
         <StatCard title={t("mobile.salesHistory.total")} value={money(totalSum)} icon={Coins} color="success" />
@@ -331,18 +364,19 @@ export default function SalesHistoryScreen() {
   );
 
   const footer = q.isFetchingNextPage ? (
-    <ActivityIndicator color={colors.accent} style={styles.footer} />
+    <SkeletonPaginationFooter count={2} rowHeight={72} avatarSize={40} />
   ) : q.isFetchNextPageError ? (
     // Network dropped mid-scroll: the list would otherwise just stop.
     <Pressable accessibilityRole="button" onPress={() => void fetchNextPage()} style={styles.retry}>
       <Text style={styles.retryText}>{t("app.common.errorRetry")}</Text>
     </Pressable>
-  ) : !q.isLoading && rows.length > 0 && !moreInRange ? (
+  ) : !q.isPending && rows.length > 0 && !moreInRange ? (
     <Text style={styles.endText}>{t("mobile.salesHistory.endOfList")}</Text>
   ) : null;
 
-  const empty = q.isLoading ? (
-    <ActivityIndicator color={colors.accent} style={styles.footer} />
+  const empty = q.isPending && !q.data ? (
+    // First load: skeleton rows match the real sale-row shape.
+    <SkeletonListRow count={6} avatarSize={40} trailingWidth={64} height={72} />
   ) : q.isError ? (
     <Card>
       <EmptyState title={t("app.common.errorRetry")} />
@@ -352,7 +386,7 @@ export default function SalesHistoryScreen() {
     </Card>
   ) : moreInRange ? (
     // The auto-fill effect is still paging towards the range.
-    <ActivityIndicator color={colors.accent} style={styles.footer} />
+    <SkeletonListRow count={3} avatarSize={40} trailingWidth={64} height={72} />
   ) : (
     <Card>
       <EmptyState title={t("mobile.salesHistory.empty")} hint={t("mobile.salesHistory.emptyHint")} />
@@ -395,6 +429,7 @@ function InvoiceRow({ inv, onPress }: { inv: salesApi.Invoice; onPress: () => vo
   // Only the states that need attention; "confirmed" is the normal state and
   // shows on the detail screen (spec 08 §4.9).
   const collection = inv.collectionStatus;
+  const productTitle = productSummary(inv.lines);
   return (
     <Pressable
       accessibilityRole="button"
@@ -404,8 +439,8 @@ function InvoiceRow({ inv, onPress }: { inv: salesApi.Invoice; onPress: () => vo
     >
       <View style={styles.rowMain}>
         <View style={styles.rowTop}>
-          <Text style={styles.invoice} numberOfLines={1}>
-            {inv.invoiceId ?? inv.lines[0]?.productName ?? "—"}
+          <Text style={styles.invoice} numberOfLines={2}>
+            {productTitle}
           </Text>
           {/* A fully returned invoice strikes what the receipt SAID (total),
               not the 0 the shop kept — a struck-through 0 conveys nothing. */}
@@ -414,11 +449,13 @@ function InvoiceRow({ inv, onPress }: { inv: salesApi.Invoice; onPress: () => vo
           </Text>
         </View>
         <Text style={styles.meta} numberOfLines={1}>
-          {shortDate(inv.saleDate)} · {ltr(timeOf(inv.saleDate))} · {customer} ·{" "}
-          {t(`mobile.salesHistory.lineCount${countForm(inv.lines.length)}`, { n: inv.lines.length })}
+          {shortDate(inv.saleDate)} · {ltr(timeOf(inv.saleDate))} · {customer}
         </Text>
         <View style={styles.badges}>
           <Badge label={paymentLabel(inv.paymentMethod)} variant={inv.paymentMethod === "deferred" ? "lowstock" : "accent"} />
+          {inv.discount > 0 ? (
+            <Badge label={t("mobile.salesHistory.discountBadge", { amount: money(inv.discount) })} variant="accent" />
+          ) : null}
           {inv.fullyReturned ? (
             <Badge label={t("app.sales.status.returned")} variant="outofstock" />
           ) : inv.hasReturn ? (
@@ -433,6 +470,19 @@ function InvoiceRow({ inv, onPress }: { inv: salesApi.Invoice; onPress: () => vo
       <ChevronForward size={16} color={colors.textSecondary} />
     </Pressable>
   );
+}
+
+/**
+ * Up to two lines as "N × Name"; anything else collapses into a "+K more" tail
+ * so a wide invoice stays on one visual row. Qty is wrapped in an LTR isolate
+ * (U+2066…U+2069) so "2 ×" doesn't flip under RTL.
+ */
+function productSummary(lines: salesApi.SaleRecord[]): string {
+  if (lines.length === 0) return "—";
+  const MAX = 2;
+  const head = lines.slice(0, MAX).map((l) => `⁦${l.quantitySold}⁩ × ${l.productName}`);
+  if (lines.length > MAX) head.push(t("mobile.salesHistory.moreLines", { n: lines.length - MAX }));
+  return head.join(" · ");
 }
 
 const styles = StyleSheet.create({

@@ -10,9 +10,10 @@
 
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
+import { File, Paths } from "expo-file-system";
 import type { QueryClient } from "@tanstack/react-query";
 import { createMMKV } from "react-native-mmkv";
-import { calcLineDiscount, type DiscountType } from "@matgary/domain";
+import { calcLineDiscount, receiptFilename, type DiscountType } from "@matgary/domain";
 import { settings as settingsApi, type sales as salesApi } from "@matgary/api-client";
 
 import { API_BASE_URL, api } from "@/api/client";
@@ -297,7 +298,25 @@ export async function shareReceipt(
     height: prepared.height,
     margins: { left: 0, top: 0, right: 0, bottom: 0 },
   });
-  await Sharing.shareAsync(uri, {
+  // expo-print writes to a tmp path with a random name; WhatsApp / Mail /
+  // Files use that name as the attachment title verbatim, so rename the file
+  // first — "Invoice-2026-11-22-INV-A1B2C3D4E5.pdf" lands in the chat instead
+  // of "Print_1234567890.pdf". Same pattern as customer-statement/share.ts.
+  const fileName = receiptFilename({
+    invoiceId: sale.invoiceId,
+    saleDate: sale.saleDate,
+    referencePrefix: prepared.settings.receiptReferencePrefix,
+  });
+  let shareUri = uri;
+  try {
+    const dest = new File(Paths.cache, fileName);
+    await new File(uri).move(dest, { overwrite: true });
+    shareUri = dest.uri;
+  } catch {
+    // Rename failure is cosmetic — fall through and share the original so
+    // the user does not lose the doc.
+  }
+  await Sharing.shareAsync(shareUri, {
     mimeType: "application/pdf",
     UTI: "com.adobe.pdf",
     dialogTitle: t("mobile.receipt.shareTitle", { invoiceId: sale.invoiceId }),

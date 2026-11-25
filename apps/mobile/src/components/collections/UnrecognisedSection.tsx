@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { collectionCredits } from "@matgary/api-client";
 
@@ -9,6 +9,7 @@ import { ltr, timeOf } from "@/components/collections/CreditRow";
 import { collectionErrorText } from "@/components/collections/useCollectionDecisions";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { SkeletonListRow } from "@/components/ui/skeleton";
 import { t } from "@/i18n";
 import { shortDate } from "@/lib/format";
 import { RTL_TEXT } from "@/theme/rtl";
@@ -60,8 +61,8 @@ export function UnrecognisedSection({ online }: { online: boolean }) {
             {error}
           </Text>
         ) : null}
-        {q.isLoading ? (
-          <ActivityIndicator color={colors.accent} />
+        {q.isPending && rows.length === 0 ? (
+          <SkeletonListRow count={3} avatarSize={36} trailingWidth={0} height={64} />
         ) : q.isError ? (
           <View style={styles.body}>
             <Text style={styles.hint}>{collectionErrorText(q.error)}</Text>

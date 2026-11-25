@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   Pressable,
   StyleSheet,
   Text,
@@ -23,6 +22,7 @@ import { ToggleRow } from "@/components/ui/ToggleRow";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
+import { SkeletonFormField } from "@/components/ui/skeleton";
 import { getLocale, t } from "@/i18n";
 
 /**
@@ -148,7 +148,11 @@ export default function DigestSettingsScreen() {
           </Text>
         </Card>
       ) : !settings ? (
-        <ActivityIndicator color={colors.accent} />
+        <>
+          <SkeletonFormField />
+          <SkeletonFormField />
+          <SkeletonFormField />
+        </>
       ) : (
         <>
           {/* تفعيل الملخص */}

@@ -1,11 +1,12 @@
 import { useMemo } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 
 import { api } from "@/api/client";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { SkeletonChart, SkeletonListRow, SkeletonStatCard } from "@/components/ui/skeleton";
 import { countLabel, money } from "@/lib/format";
 import { RTL_TEXT } from "@/theme/rtl";
 import { colors, fonts, radius, spacing } from "@/theme/tokens";
@@ -59,7 +60,15 @@ export function StaffTab({ range, from, to }: { range: InsightsRange; from?: str
     };
   }, [q.data]);
 
-  if (q.isLoading) return <ActivityIndicator color={colors.accent} style={{ marginVertical: spacing.xl }} />;
+  if (q.isPending && !q.data) {
+    return (
+      <Card>
+        <SkeletonStatCard />
+        <SkeletonChart height={140} />
+        <SkeletonListRow count={3} avatarSize={0} trailingWidth={56} height={48} />
+      </Card>
+    );
+  }
   if (!q.data) {
     return (
       <Card>

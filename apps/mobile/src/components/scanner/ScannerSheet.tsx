@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Linking,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -10,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAudioPlayer, setAudioModeAsync } from "expo-audio";
 import {
   CameraView,
   useCameraPermissions,
@@ -25,11 +27,21 @@ import { useSheetPresence } from "@/components/ui/Sheet";
 import { isRTL, t } from "@/i18n";
 import { clearMark, mark, measure } from "@/observability/perf";
 import { RTL_TEXT, directionStyle } from "@/theme/rtl";
-import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
+import { MIN_TOUCH, colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
 
 /**
  * Every symbology the shop might scan (doc 06 §2.8). itf14 is left out on
  * purpose: it is a carton code and a false positive at a till.
+ *
+ * QR is DELIBERATELY EXCLUDED. Many products print a QR code next to or
+ * behind their 1D barcode (brand marketing link, warranty registration,
+ * loyalty signup). When both are visible the camera decodes whichever
+ * stabilises first — and the QR typically carries a URL, which then opens
+ * the browser instead of looking up the product by SKU/barcode. The shop
+ * only cares about the 1D product code (EAN / UPC / Code128 / Code39 serial
+ * numbers). If a tenant ever needs a QR-only workflow we add a separate
+ * scanner mode with its own code-type list; the retail-scan path stays
+ * 1D-only.
  *
  * Doc URL: https://docs.expo.dev/versions/v57.0.0/sdk/camera/ — CameraView +
  * barcodeScannerSettings + onBarcodeScanned, useCameraPermissions.
@@ -41,11 +53,27 @@ const BARCODE_TYPES: BarcodeType[] = [
   "upc_e",
   "code128",
   "code39",
-  "qr",
 ];
 
 /** The same code fired again inside this window is the decoder re-reading the same label. */
 const REPEAT_WINDOW_MS = 1500;
+// A real cashier can't aim at a second real barcode in less than ~400 ms.
+// Any decode faster than this is almost always a mis-read in the same decode
+// burst (shaky hand, two barcodes glimpsed at once). Reject it even if the
+// code string is different — the SAME-code gate above already covers a slow
+// re-aim at the same product.
+const BURST_WINDOW_MS = 400;
+// Stability threshold: require the SAME code to be decoded this many times
+// in a row before we actually accept it. Real barcodes decode consistently
+// across many camera frames (hold still → 10+ identical decodes in a second);
+// ghost / stray decodes flicker between different codes and never stabilise.
+// Two is the sweet spot — ~33 ms extra latency at 30fps, but phantom reads
+// (Mac serial / nearby packaging) are filtered out entirely.
+const STABILITY_REQUIRED = 2;
+// How long a pending (unconfirmed) decode is "fresh". If no matching second
+// frame arrives inside this window, we discard the pending state and treat
+// the next decode as a fresh start.
+const STABILITY_WINDOW_MS = 300;
 
 export type ScanTone = "info" | "success" | "error";
 
@@ -62,6 +90,18 @@ export interface ScannerSheetProps {
   /** Toast strip at the bottom — the last-scanned product's name, or the error. */
   message?: string | null;
   tone?: ScanTone;
+  /**
+   * "Not found → add this product?" overlay. When set, a centered card is
+   * drawn over the camera view with the scanned code + an action row. The
+   * card belongs to the scanner (not the opening screen) so the camera stays
+   * running underneath: the owner can dismiss the card and try another scan
+   * without leaving the sheet.
+   */
+  notFound?: {
+    code: string;
+    onAdd: () => void;
+    onDismiss: () => void;
+  } | null;
 }
 
 /**
@@ -90,12 +130,38 @@ export function ScannerSheet({
   mode = "continuous",
   message,
   tone = "info",
+  notFound = null,
 }: ScannerSheetProps) {
   const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
-  const [available, setAvailable] = useState<boolean | null>(null);
+  // Preloaded "Tink" beep — played on every accepted scan. useAudioPlayer
+  // keeps one player instance across renders; seekTo(0)+play() in accept()
+  // lets rapid consecutive scans each fire the full sound.
+  const beep = useAudioPlayer(require("@/assets/sounds/scan-beep.wav"));
+  useEffect(() => {
+    // Routes the player through iOS's "Playback" category so the beep is
+    // audible even when the Ring/Silent switch is set to silent — a cashier
+    // at a till does not want to miss confirmation because the phone is on
+    // silent in the drawer. Fire-and-forget; a failure (older iOS) just means
+    // the beep follows the Silent switch like any other sound.
+    setAudioModeAsync({ playsInSilentMode: true }).catch(() => {});
+  }, []);
+  // On iOS physical devices, CameraView.isAvailableAsync() calls into a
+  // native method the current expo-camera iOS module does not register, so the
+  // Promise rejects and the probe falsely reports "no camera" on hardware that
+  // very much has one. Default `true` on iOS (every iPhone/iPad has a camera);
+  // the probe can still PROMOTE a null to false on web/Android/sim where the
+  // native path actually answers.
+  const [available, setAvailable] = useState<boolean | null>(Platform.OS === "ios" ? true : null);
   const [manual, setManual] = useState("");
   const last = useRef<{ code: string; at: number } | null>(null);
+  // Rolling stability buffer for camera decodes. The decoder fires per frame
+  // (~30fps); a real barcode produces the same `code` on every frame while
+  // the camera holds it in view, so requiring STABILITY_REQUIRED matching
+  // frames before accepting rejects one-off ghost reads that briefly decode
+  // nearby packaging / monitor edges / Mac serial labels into a value that
+  // happens to collide with an existing SKU.
+  const pending = useRef<{ code: string; firstAt: number; hits: number } | null>(null);
   const finished = useRef(false);
   // Effective visibility: the owner's `visible` minus route blur (closes it)
   // and app lock (hides it). Everything below that used to read `visible` for
@@ -107,8 +173,17 @@ export function ScannerSheet({
     if (!visible) return;
     finished.current = false;
     last.current = null;
+    pending.current = null;
     setManual("");
     let cancelled = false;
+    // iOS: the native CameraView.isAvailableAsync is not registered in the
+    // current expo-camera module; the Promise rejects, we fall into .catch,
+    // and `available` snaps to false — so the sheet showed "camera not
+    // available" on every iPhone that very much had a camera. Every iOS
+    // device has at least one camera, so skip the probe on iOS entirely and
+    // let the initial state (`true` on iOS) stand. Android + web still probe
+    // because those platforms genuinely answer the method.
+    if (Platform.OS === "ios") return () => { cancelled = true; };
     CameraView.isAvailableAsync()
       .then((ok) => {
         if (!cancelled) setAvailable(ok);
@@ -126,8 +201,14 @@ export function ScannerSheet({
       const code = raw.trim();
       if (!code || finished.current) return;
       const now = Date.now();
-      if (last.current && last.current.code === code && now - last.current.at < REPEAT_WINDOW_MS) {
-        return;
+      // Two gates: same-code within 1.5 s (owner re-aims at same product) AND
+      // any-code within 0.4 s (prevents "scan unknown item → got Casio +1" —
+      // the camera decoded two different symbols in the same burst). The
+      // ANY-code gate only fires for camera decodes; a human typing in the
+      // manual field is never faster than 400 ms.
+      if (last.current) {
+        if (last.current.code === code && now - last.current.at < REPEAT_WINDOW_MS) return;
+        if (source === "camera" && now - last.current.at < BURST_WINDOW_MS) return;
       }
       last.current = { code, at: now };
       if (source === "camera") {
@@ -144,6 +225,16 @@ export function ScannerSheet({
       // Fire-and-forget: a device without a Taptic engine rejects, and that
       // must never block the scan.
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      // Short "Tink" beep — fired for every scan (camera or manual) so the
+      // cashier hears confirmation even if the phone is in silent mode (the
+      // audio category sets playsInSilentModeIOS=true in the mount effect).
+      try {
+        beep.seekTo(0);
+        beep.play();
+      } catch {
+        // The audio engine is optional for the scanner's correctness — never
+        // throw out of accept() if it's not ready.
+      }
       onScan(code);
       if (mode === "single") {
         finished.current = true;
@@ -154,7 +245,26 @@ export function ScannerSheet({
   );
 
   const onBarcode = useCallback(
-    (r: BarcodeScanningResult) => accept(r.data, "camera"),
+    (r: BarcodeScanningResult) => {
+      const code = r.data?.trim();
+      if (!code) return;
+      const now = Date.now();
+      const p = pending.current;
+      // Same code as pending AND inside the stability window → it's stable.
+      if (p && p.code === code && now - p.firstAt < STABILITY_WINDOW_MS) {
+        const hits = p.hits + 1;
+        if (hits >= STABILITY_REQUIRED) {
+          pending.current = null;
+          accept(code, "camera");
+          return;
+        }
+        pending.current = { code, firstAt: p.firstAt, hits };
+        return;
+      }
+      // Different code OR window expired → start a new pending. The old
+      // ghost is forgotten; the next frame has to agree with THIS code.
+      pending.current = { code, firstAt: now, hits: 1 };
+    },
     [accept],
   );
 
@@ -270,7 +380,7 @@ export function ScannerSheet({
             </View>
           )}
 
-          {message ? (
+          {message && !notFound ? (
             <View
               style={[
                 styles.toast,
@@ -289,6 +399,36 @@ export function ScannerSheet({
               >
                 {message}
               </Text>
+            </View>
+          ) : null}
+
+          {/* Not-found popup — a centered card on top of the camera. The
+              scanner sheet stays open underneath, so after dismiss the owner
+              is right back on the viewfinder with no mode switch. */}
+          {notFound ? (
+            <View style={styles.notFoundOverlay} pointerEvents="box-none">
+              <View style={styles.notFoundCard} accessibilityLiveRegion="polite">
+                <Text style={styles.notFoundTitle}>
+                  {t("app.sales.form.productSearch.notFoundTitle")}
+                </Text>
+                <Text style={styles.notFoundBody}>
+                  {t("app.sales.form.productSearch.notFoundBody", { code: notFound.code })}
+                </Text>
+                <View style={styles.notFoundActions}>
+                  <Button
+                    label={t("app.common.cancel")}
+                    variant="outline"
+                    onPress={notFound.onDismiss}
+                    style={styles.notFoundBtn}
+                  />
+                  <Button
+                    label={t("app.sales.form.productSearch.notFoundAddCta")}
+                    onPress={notFound.onAdd}
+                    style={styles.notFoundBtn}
+                    testID="scanner-not-found-add"
+                  />
+                </View>
+              </View>
             </View>
           ) : null}
         </View>
@@ -437,6 +577,49 @@ const styles = StyleSheet.create({
   },
   toastTextSuccess: { color: colors.successStrong },
   toastTextError: { color: colors.danger },
+  // Not-found popup — a centred card over the camera. `box-none` on the
+  // overlay lets taps outside the card fall through to… nothing yet; the
+  // dismiss button on the card is the deliberate exit. (Tap-outside-to-close
+  // on a decision prompt would feel accidental.)
+  notFoundOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.scrim,
+  },
+  notFoundCard: {
+    width: "100%",
+    maxWidth: 360,
+    backgroundColor: colors.card,
+    borderRadius: radius.xl,
+    padding: spacing.xl,
+    gap: spacing.md,
+    ...elevation.modal,
+  },
+  notFoundTitle: {
+    ...RTL_TEXT,
+    fontFamily: fonts.bold,
+    fontSize: 17,
+    color: colors.text,
+  },
+  notFoundBody: {
+    ...RTL_TEXT,
+    fontFamily: fonts.regular,
+    fontSize: 14,
+    color: colors.textSecondary,
+    lineHeight: 20,
+  },
+  notFoundActions: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  notFoundBtn: { flex: 1 },
   footer: {
     backgroundColor: colors.bg,
     borderTopLeftRadius: radius.xl,

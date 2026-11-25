@@ -51,6 +51,24 @@ const COLLECTIONS_CHANNEL = "collections";
 export const SALES_CHANNEL: typeof SALE_ALERT_CHANNEL = "sales";
 export const SALE_SOUND: typeof SALE_ALERT_SOUND = "cha_ching.wav";
 
+/**
+ * Generic alerts channel — reports, expense/product/inventory/attendance
+ * events. Sound is Universfield's "new notification" (apps/mobile/assets/
+ * sounds/generic_notification.wav), different from the sales cha-ching so a
+ * shopkeeper's ear can tell them apart in the same minute. Must match the
+ * server's channelId for `report.*` and other generic events.
+ */
+export const GENERIC_CHANNEL = "generic";
+export const GENERIC_SOUND = "generic_notification.wav";
+
+/**
+ * Critical channel — low stock, supplier payment due, attendance.late. Falls
+ * back to the system default sound until a bespoke tone is shipped; the
+ * channel is pre-registered so critical pushes display with the right
+ * importance the first time one arrives.
+ */
+export const CRITICAL_CHANNEL = "critical";
+
 // Foreground presentation: banner + list + sound + badge. Set at module scope
 // so it is in place before the first notification can arrive. Sale alerts
 // (doc 16 §5) need nothing extra: the banner shows over whatever screen is
@@ -200,6 +218,8 @@ async function register(userId: string, opts: { prompt: boolean }): Promise<void
       // Sale alerts (doc 16 §4): every sale push carries channelId "sales".
       // Created unconditionally so it exists before the first sale rings.
       await ensureSalesChannel();
+      await ensureGenericChannel();
+      await ensureCriticalChannel();
     }
     let perm = await Notifications.getPermissionsAsync();
     if (!perm.granted && perm.canAskAgain && opts.prompt) {
@@ -234,6 +254,38 @@ export async function ensureSalesChannel(): Promise<void> {
     vibrationPattern: [0, 120, 80, 120],
   });
   if (__DEV__) void warnIfSalesChannelSilent();
+}
+
+/**
+ * Android "generic" channel — same sound-lock-on-create rule as sales
+ * (doc 16 §13 R2): a dev client built before `generic_notification.wav` was
+ * added to the plugin `sounds` option will lock this channel to the default
+ * sound. The rebuild is unconditional once the sound file ships.
+ */
+export async function ensureGenericChannel(): Promise<void> {
+  if (Platform.OS !== "android") return;
+  await Notifications.setNotificationChannelAsync(GENERIC_CHANNEL, {
+    name: t("mobile.push.channelGeneric"),
+    importance: Notifications.AndroidImportance.DEFAULT,
+    sound: GENERIC_SOUND,
+    vibrationPattern: [0, 100],
+  });
+}
+
+/**
+ * Android "critical" channel — low stock, supplier payment due,
+ * attendance.late. Uses the system default sound until a bespoke tone is
+ * added to the bundle. Importance HIGH so it bypasses Do Not Disturb-silent
+ * modes for a shop manager.
+ */
+export async function ensureCriticalChannel(): Promise<void> {
+  if (Platform.OS !== "android") return;
+  await Notifications.setNotificationChannelAsync(CRITICAL_CHANNEL, {
+    name: t("mobile.push.channelCritical"),
+    importance: Notifications.AndroidImportance.HIGH,
+    sound: "default",
+    vibrationPattern: [0, 200, 100, 200],
+  });
 }
 
 /**

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo } from "react";
 import {
-  ActivityIndicator,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -40,6 +39,10 @@ import { useGoBack } from "@/lib/nav";
 import { useSession } from "@/stores/session";
 import { RTL, RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
+import {
+  SkeletonListRow,
+  SkeletonPaginationFooter,
+} from "@/components/ui/skeleton";
 
 type Item = notifications.NotificationItem;
 type Me = MeResponse;
@@ -209,11 +212,8 @@ export default function NotificationsScreen() {
     </View>
   );
 
-  const empty = q.isLoading ? (
-    <View style={styles.center}>
-      <ActivityIndicator color={colors.accent} />
-      <Text style={styles.centerText}>{t("app.shell.notifications.loading")}</Text>
-    </View>
+  const empty = q.isPending && !q.data ? (
+    <SkeletonListRow count={6} avatarSize={40} trailingWidth={48} height={72} />
   ) : q.isError ? (
     <View style={styles.center}>
       <Text style={styles.centerText}>{t("mobile.notifications.loadError")}</Text>
@@ -233,7 +233,7 @@ export default function NotificationsScreen() {
   );
 
   const footer = q.isFetchingNextPage ? (
-    <ActivityIndicator color={colors.accent} style={styles.footer} />
+    <SkeletonPaginationFooter count={2} rowHeight={72} avatarSize={40} />
   ) : null;
 
   return (

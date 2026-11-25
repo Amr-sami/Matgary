@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, AppState, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, AppState, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { SkeletonListRow } from "@/components/ui/skeleton";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { collectionCredits } from "@matgary/api-client";
@@ -159,8 +160,8 @@ export default function CollectionDevicesScreen() {
           <Text style={[styles.notice, notice.tone === "ok" ? styles.noticeOk : styles.noticeErr]}>{notice.text}</Text>
         </Pressable>
       ) : null}
-      {devicesQ.isPending ? (
-        <ActivityIndicator color={colors.accent} />
+      {devicesQ.isPending && !devicesQ.data ? (
+        <SkeletonListRow count={3} avatarSize={40} trailingWidth={48} height={64} />
       ) : devicesQ.isError && !devicesQ.data ? (
         <Card>
           <Text style={styles.body}>{t("mobile.settings.loadFailed")}</Text>

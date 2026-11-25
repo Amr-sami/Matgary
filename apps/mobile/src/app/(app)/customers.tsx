@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { ClockIcon as Clock } from "phosphor-react-native/src/icons/Clock";
@@ -14,11 +14,16 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SearchField } from "@/components/ui/SearchField";
+import { StatCard } from "@/components/ui/StatCard";
 import { Segmented } from "@/components/ui/Segmented";
 import { money, shortDate } from "@/lib/format";
 import { customerRoute } from "@/lib/customer-phone";
 import { RTL_TEXT } from "@/theme/rtl";
 import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
+import {
+  SkeletonListRow,
+  SkeletonPaginationFooter,
+} from "@/components/ui/skeleton";
 import { t } from "@/i18n";
 
 /**
@@ -200,37 +205,48 @@ export default function CustomersScreen() {
         />
       </View>
 
-      {/* The web's four KPI tiles, collapsed into one strip — only the
-          receivables numbers survive, because they are the ones that change
-          what the shop does next. */}
+      {/* KPI tiles — replaced the custom inline "Kpi" strip with StatCard
+          tiles (2026-11-02). Matches the dashboard / insights / sales-history
+          look so the three list screens read as one family. The "owed" tile
+          is washed warning-light only when there IS debt, so a shop at zero
+          sees a calm neutral card and not a false alarm. */}
       {all.length > 0 ? (
-        <View testID="customers-summary" style={styles.kpis}>
-          <View style={styles.kpiRow}>
-            <Kpi
-              icon={<HandCoins size={14} color={colors.warningStrong} />}
-              label={t("app.customers.receivables.totalLabel")}
+        <View testID="customers-summary">
+          <View style={styles.kpiGrid}>
+            <StatCard
+              title={t("app.customers.receivables.totalLabel")}
               value={money(summary.owed)}
-              tone="warning"
+              icon={HandCoins}
+              color="warning"
+              tint={summary.owed > 0}
             />
-            <Kpi
-              icon={<Users size={14} color={colors.textSecondary} />}
-              label={t("mobile.customers.debtors")}
+            <StatCard
+              title={t("mobile.customers.debtors")}
               value={String(summary.debtors)}
-              testID="customers-debtors-count"
+              icon={Users}
+              color="accent"
             />
-            <Kpi
-              icon={<Clock size={14} color={colors.textSecondary} />}
-              label={t("app.customers.receivables.oldestLabel")}
+          </View>
+          <View style={[styles.kpiGrid, styles.kpiGridSecond]}>
+            <StatCard
+              title={t("app.customers.receivables.oldestLabel")}
               value={
                 summary.debtors
                   ? t("app.customers.receivables.daysFormat", { n: summary.oldest })
                   : "—"
               }
+              icon={Clock}
+              color={summary.oldest >= 30 ? "danger" : "accent"}
+            />
+            <StatCard
+              title={t("mobile.customers.totalCustomers")}
+              value={String(all.length)}
+              icon={Users}
+              color="accent"
             />
           </View>
           {partial ? (
             <View style={styles.partialRow}>
-              {autoPaging ? <ActivityIndicator size="small" color={colors.textSecondary} /> : null}
               <Text style={styles.partialText}>
                 {t("mobile.customers.kpiPartial", { n: all.length })}
               </Text>
@@ -272,8 +288,8 @@ export default function CustomersScreen() {
         <Segmented items={filters()} value={filter} onChange={setFilter} />
       </View>
 
-      {list.isLoading ? (
-        <ActivityIndicator color={colors.accent} />
+      {list.isPending && !list.data ? (
+        <SkeletonListRow count={8} avatarSize={0} trailingWidth={80} height={84} />
       ) : list.isError ? (
         <View style={styles.errorWrap}>
           <EmptyState title={t("mobile.customers.loadFailed")} />
@@ -338,7 +354,7 @@ export default function CustomersScreen() {
           })}
 
           {autoPaging ? (
-            <ActivityIndicator color={colors.accent} />
+            <SkeletonPaginationFooter count={2} rowHeight={72} avatarSize={0} />
           ) : list.hasNextPage ? (
             <Button
               variant="outline"
@@ -353,60 +369,9 @@ export default function CustomersScreen() {
   );
 }
 
-function Kpi({
-  icon,
-  label,
-  value,
-  tone,
-  testID,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  tone?: "warning";
-  testID?: string;
-}) {
-  return (
-    <View style={styles.kpi}>
-      <View style={styles.kpiLabelRow}>
-        {icon}
-        <Text numberOfLines={1} style={styles.kpiLabel}>
-          {label}
-        </Text>
-      </View>
-      <Text
-        testID={testID}
-        numberOfLines={1}
-        style={[styles.kpiValue, tone === "warning" && styles.kpiWarning]}
-      >
-        {value}
-      </Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  kpis: {
-    gap: spacing.sm,
-    backgroundColor: colors.card,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    ...elevation.card,
-  },
-  kpi: { flex: 1, minWidth: 0, gap: 2 },
-  kpiLabelRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
-  kpiLabel: { flexShrink: 1, fontFamily: fonts.regular, fontSize: 11, color: colors.textSecondary, ...RTL_TEXT },
-  kpiValue: {
-    fontFamily: fonts.bold,
-    fontSize: 15,
-    color: colors.text,
-    fontVariant: ["tabular-nums"],
-    ...RTL_TEXT,
-  },
-  kpiWarning: { color: colors.warningStrong },
-  kpiRow: { flexDirection: "row", gap: spacing.sm },
+  kpiGrid: { flexDirection: "row", gap: spacing.sm },
+  kpiGridSecond: { marginTop: spacing.sm },
   partialRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   partialText: { flex: 1, minWidth: 0, fontFamily: fonts.regular, fontSize: 11, color: colors.textSecondary, ...RTL_TEXT },
 

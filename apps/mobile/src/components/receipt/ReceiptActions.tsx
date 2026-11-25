@@ -1,8 +1,11 @@
 import { useMemo, useRef, useState, type ReactNode } from "react";
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import { PrinterIcon as Printer } from "phosphor-react-native/src/icons/Printer";
 import { ShareNetworkIcon as ShareNetwork } from "phosphor-react-native/src/icons/ShareNetwork";
+import { WhatsappLogoIcon as WhatsappLogo } from "phosphor-react-native/src/icons/WhatsappLogo";
+
+import { toE164 } from "@/lib/customer-phone";
 
 import { Segmented } from "@/components/ui/Segmented";
 import { t } from "@/i18n";
@@ -35,6 +38,14 @@ interface ReceiptActionsProps {
   extraActions?: ReactNode;
   /** Hide the 58/80 mm picker where the width is decided elsewhere. */
   showPaperWidth?: boolean;
+  /**
+   * Customer phone captured on the sale (or null when the cashier left it
+   * blank). When present AND it normalises to an E.164 number, a
+   * "Send via WhatsApp" action appears that deep-links to wa.me/<digits>
+   * prefilled with the receipt number. Share a PDF from the OS sheet after.
+   * This is a MANUAL flow — no WhatsApp API integration.
+   */
+  customerPhone?: string | null;
 }
 
 /**
@@ -68,12 +79,35 @@ function confirmDefaultLayout(): Promise<boolean> {
  * defaults are available the cashier is asked first, because the notice
  * after the share sheet closes would arrive after the customer has the PDF.
  */
-export function ReceiptActions({ sale, extraActions, showPaperWidth = true }: ReceiptActionsProps) {
+export function ReceiptActions({
+  sale,
+  extraActions,
+  showPaperWidth = true,
+  customerPhone,
+}: ReceiptActionsProps) {
   const qc = useQueryClient();
   const [busy, setBusy] = useState<Busy>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [width, setWidth] = useState<ReceiptWidth>(() => getReceiptWidth());
+  // E.164 digits (no +). Null when phone is blank, invalid, or too short —
+  // the WhatsApp action hides entirely in that case so the sale success
+  // never looks broken because of a bad phone number.
+  const waDigits = useMemo(() => {
+    const e164 = toE164(customerPhone);
+    return e164 ? e164.replace(/^\+/, "") : null;
+  }, [customerPhone]);
+  const openWhatsApp = async () => {
+    if (!waDigits) return;
+    const shortCode = sale.invoiceId.slice(-10).toUpperCase();
+    const msg = t("mobile.receipt.whatsappMessage", { code: shortCode });
+    const url = `https://wa.me/${waDigits}?text=${encodeURIComponent(msg)}`;
+    try {
+      await Linking.openURL(url);
+    } catch {
+      setError(t("mobile.receipt.whatsappUnavailable"));
+    }
+  };
   // `busy` is React state and lags a frame; two taps (or Share + Print in the
   // same frame) both read null. The ref is set synchronously, so only the
   // first one runs — a second shareAsync while the sheet is open rejects on
@@ -123,6 +157,17 @@ export function ReceiptActions({ sale, extraActions, showPaperWidth = true }: Re
           disabled={busy !== null}
           onPress={() => void run("share")}
         />
+        {waDigits ? (
+          <View testID="receipt-whatsapp-action">
+            <Action
+              icon={<WhatsappLogo size={20} color={colors.success} weight="bold" />}
+              label={t("mobile.receipt.whatsappShare")}
+              loading={false}
+              disabled={busy !== null}
+              onPress={() => void openWhatsApp()}
+            />
+          </View>
+        ) : null}
         <Action
           icon={<Printer size={20} color={colors.accent} weight="bold" />}
           label={t("mobile.receipt.print")}

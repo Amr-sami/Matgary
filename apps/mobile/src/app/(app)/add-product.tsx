@@ -394,14 +394,9 @@ export default function AddProductScreen() {
       {step === "details" ? (
         <Card>
           <View style={styles.form}>
-            <PhotoTile
-              photo={photo}
-              note={photoNote}
-              onTake={() => void takePhoto()}
-              onChoose={() => void choosePhoto()}
-              onRemove={removePhoto}
-              onRetry={retryUpload}
-            />
+            {/* Photo tile removed by owner's request (2026-10-31) — no product
+                images for this store. The upload/picker logic above is kept
+                in case we add it back behind a feature flag later. */}
             <Field testID="add-product-name" label={t("app.sales.form.quickAddProduct.name")} value={name} onChangeText={setName} placeholder={t("app.sales.form.quickAddProduct.namePlaceholder")} />
             <View>
               <BarcodeField

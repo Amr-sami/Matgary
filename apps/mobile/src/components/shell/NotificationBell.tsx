@@ -10,6 +10,7 @@ import { PackageIcon as Package } from "phosphor-react-native/src/icons/Package"
 import { ArrowDownLeftIcon as ArrowDownLeft } from "phosphor-react-native/src/icons/ArrowDownLeft";
 import { ClockIcon as Clock } from "phosphor-react-native/src/icons/Clock";
 import { GaugeIcon as Gauge } from "phosphor-react-native/src/icons/Gauge";
+import { ChartBarIcon as ChartBar } from "phosphor-react-native/src/icons/ChartBar";
 import { WalletIcon as Wallet } from "phosphor-react-native/src/icons/Wallet";
 import { WifiSlashIcon as WifiSlash } from "phosphor-react-native/src/icons/WifiSlash";
 import { notifications } from "@matgary/api-client";
@@ -71,11 +72,13 @@ export const KIND_ICON: Record<NotificationKind, Icon> = {
   collection_unmatched: ArrowDownLeft,
   collection_source_silent: WifiSlash,
   collection_limit: Gauge,
+  report: ChartBar,
 };
 
 /** Web KIND_TONE, measured pairs from the token sheet (no hex literals). */
 export const KIND_TONE: Record<NotificationKind, { bg: string; fg: string }> = {
-  low_stock: { bg: colors.warningTint, fg: colors.warningStrong },
+  // User preference: no filled background bubble around kind icons.
+  low_stock: { bg: "transparent", fg: colors.warningStrong },
   task_assigned: { bg: colors.accentLight, fg: colors.accent },
   task_started: { bg: colors.warningLight, fg: colors.warningStrong },
   task_done: { bg: colors.successLight, fg: colors.successStrong },
@@ -87,6 +90,9 @@ export const KIND_TONE: Record<NotificationKind, { bg: string; fg: string }> = {
   collection_stale: { bg: colors.warningLight, fg: colors.warningStrong },
   collection_unmatched: { bg: colors.successLight, fg: colors.successStrong },
   collection_source_silent: { bg: colors.dangerLight, fg: colors.danger },
+  // Reports render the icon without the tinted circle (user preference —
+  // matches the flatter Team-page row style).
+  report: { bg: "transparent", fg: colors.accent },
   collection_limit: { bg: colors.warningTint, fg: colors.warningStrong },
 };
 

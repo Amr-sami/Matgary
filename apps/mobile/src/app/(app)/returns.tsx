@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  SkeletonListRow,
+  SkeletonSelectorRows,
+} from "@/components/ui/skeleton";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowCounterClockwiseIcon as ArrowCounterClockwise } from "phosphor-react-native/src/icons/ArrowCounterClockwise";
@@ -406,8 +410,8 @@ export default function ReturnsScreen() {
         </View>
       ) : null}
 
-      {q.isLoading ? (
-        <ActivityIndicator color={colors.accent} />
+      {q.isPending && !q.data ? (
+        <SkeletonListRow count={5} avatarSize={0} trailingWidth={72} height={72} />
       ) : q.isError ? (
         <View style={styles.errorBox}>
           <Text style={styles.err}>{t("mobile.returns.loadFailed")}</Text>
@@ -461,8 +465,8 @@ export default function ReturnsScreen() {
             {error ? <Text style={styles.err}>{error}</Text> : null}
             <Text style={styles.meta}>{t("mobile.returns.pickLine")}</Text>
             <SearchField value={pick} onChangeText={setPick} placeholder={t("mobile.returns.searchPlaceholder")} />
-            {sales.isLoading ? (
-              <ActivityIndicator color={colors.accent} />
+            {sales.isPending && !sales.data ? (
+              <SkeletonSelectorRows count={4} avatarSize={0} />
             ) : sales.isError ? (
               <View style={styles.errorBox}>
                 <Text style={styles.err}>{t("mobile.returns.salesLoadFailed")}</Text>

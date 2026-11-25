@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Modal,
   Pressable,
   RefreshControl,
@@ -28,6 +27,10 @@ import { shortDate } from "@/lib/format";
 import { useSession } from "@/stores/session";
 import { RTL, RTL_TEXT, directionStyle } from "@/theme/rtl";
 import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
+import {
+  SkeletonListRow,
+  SkeletonPaginationFooter,
+} from "@/components/ui/skeleton";
 
 /**
  * Port of app__activity.png — the tenant-wide audit trail.
@@ -312,15 +315,11 @@ export default function ActivityScreen() {
   );
 
   const footer = q.isFetchingNextPage ? (
-    <View style={styles.footer}>
-      <ActivityIndicator color={colors.accent} />
-    </View>
+    <SkeletonPaginationFooter count={2} rowHeight={72} avatarSize={0} />
   ) : null;
 
-  const empty = !allowed ? null : q.isPending ? (
-    <View style={styles.footer}>
-      <ActivityIndicator color={colors.accent} />
-    </View>
+  const empty = !allowed ? null : q.isPending && !q.data ? (
+    <SkeletonListRow count={6} avatarSize={0} trailingWidth={56} height={72} />
   ) : (
     <View style={styles.listCard}>
       <EmptyState title={t("app.activity.empty")} />

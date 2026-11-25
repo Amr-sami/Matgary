@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Pressable,
   StyleSheet,
@@ -28,6 +27,7 @@ import { useSession } from "@/stores/session";
 import { shortDate } from "@/lib/format";
 import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
+import { SkeletonListRow } from "@/components/ui/skeleton";
 
 /**
  * Port of mobile-fold/app__leave.png — the web's LeaveTab (components/leave/
@@ -236,8 +236,8 @@ export default function LeaveScreen() {
         </Text>
       ) : null}
 
-      {q.isLoading ? (
-        <ActivityIndicator color={colors.accent} />
+      {q.isPending && !q.data ? (
+        <SkeletonListRow count={4} avatarSize={0} trailingWidth={72} height={80} />
       ) : q.isError ? (
         <Text numberOfLines={3} style={styles.error}>
           {errorMessage(q.error, t("mobile.common.serverError"))}

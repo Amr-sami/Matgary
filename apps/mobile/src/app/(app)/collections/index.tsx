@@ -44,6 +44,11 @@ import { useOffline } from "@/stores/offline";
 import { useSession } from "@/stores/session";
 import { RTL, RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
+import {
+  SkeletonListRow,
+  SkeletonPaginationFooter,
+  SkeletonStatCard,
+} from "@/components/ui/skeleton";
 
 type Collection = collections.CollectionDTO;
 type Credit = collectionCredits.CreditDTO;
@@ -343,8 +348,8 @@ export default function CollectionsScreen() {
           </View>
         </Card>
       ) : tab === "totals" ? (
-        summaryQ.isLoading ? (
-          <ActivityIndicator color={colors.accent} style={styles.footer} />
+        summaryQ.isPending && !summaryQ.data ? (
+          <SkeletonStatCard />
         ) : summaryQ.isError ? (
           <ErrorCard text={errorText(summaryQ.error, t("app.collections.inbox.loadFailed"))} onRetry={() => void summaryQ.refetch()} />
         ) : summaryQ.data ? (
@@ -356,8 +361,8 @@ export default function CollectionsScreen() {
 
   const listTab = tab !== "totals" && online;
   const emptyKey = tab === "pending" ? "pending" : tab === "confirmed" ? "confirmed" : tab === "credits" ? "credits" : "rejected";
-  const empty = !listTab ? null : activeQ.isLoading ? (
-    <ActivityIndicator color={colors.accent} style={styles.footer} />
+  const empty = !listTab ? null : activeQ.isPending && !activeQ.data ? (
+    <SkeletonListRow count={5} avatarSize={40} trailingWidth={72} height={72} />
   ) : activeQ.isError ? (
     <ErrorCard text={errorText(activeQ.error, t("app.collections.inbox.loadFailed"))} onRetry={() => void activeQ.refetch()} />
   ) : (
@@ -372,7 +377,7 @@ export default function CollectionsScreen() {
   );
 
   const pager = listTab && activeQ.isFetchingNextPage ? (
-    <ActivityIndicator color={colors.accent} style={styles.footer} />
+    <SkeletonPaginationFooter count={2} rowHeight={72} avatarSize={40} />
   ) : listTab && activeQ.isFetchNextPageError ? (
     <Pressable accessibilityRole="button" onPress={() => void activeQ.fetchNextPage()} style={styles.retry}>
       <Text style={styles.retryText}>{t("app.common.errorRetry")}</Text>

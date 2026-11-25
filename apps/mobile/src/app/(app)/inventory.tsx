@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
-import { useRouter } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { FlashList } from "@shopify/flash-list";
 import { Image } from "expo-image";
@@ -24,9 +24,14 @@ import { StatCard } from "@/components/ui/StatCard";
 import { money } from "@/lib/format";
 import { RTL, RTL_TEXT } from "@/theme/rtl";
 import { colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
+import { SkeletonListRow } from "@/components/ui/skeleton";
 import { t } from "@/i18n";
 
-type StatusFilter = "all" | "in" | "low" | "out";
+type StatusFilter = "all" | "in" | "low" | "out" | "alert";
+
+function isStatusFilter(v: unknown): v is StatusFilter {
+  return v === "all" || v === "in" || v === "low" || v === "out" || v === "alert";
+}
 
 /**
  * Port of app__inventory.png.
@@ -50,10 +55,24 @@ type StatusFilter = "all" | "in" | "low" | "out";
 export default function InventoryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  // `?status=low|out|alert|…` lets the dashboard alerts card land here already
+  // filtered: `alert` is the combined low+out view the alerts tile shows, so
+  // the two surfaces stay in sync without the user re-filtering by hand.
+  const params = useLocalSearchParams<{ status?: string | string[] }>();
+  const paramStatus = Array.isArray(params.status) ? params.status[0] : params.status;
+  const initialStatus: StatusFilter = isStatusFilter(paramStatus) ? paramStatus : "all";
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<string>("all");
-  const [status, setStatus] = useState<StatusFilter>("all");
+  const [status, setStatus] = useState<StatusFilter>(initialStatus);
   const [scannerOpen, setScannerOpen] = useState(false);
+
+  // Honour a later deep link that re-opens this screen with a different
+  // `?status` (focus returns, a new tap from the dashboard). Only when the
+  // param changes AND is valid — a stale param should not override the chip
+  // the user just tapped.
+  useEffect(() => {
+    if (isStatusFilter(paramStatus)) setStatus(paramStatus);
+  }, [paramStatus]);
 
   const products = useQuery({
     queryKey: ["products"],
@@ -86,6 +105,9 @@ export default function InventoryScreen() {
       if (status === "in" && p.quantity <= p.lowStockThreshold) return false;
       if (status === "low" && !(p.quantity > 0 && p.quantity <= p.lowStockThreshold))
         return false;
+      // Combined "needs restock" view — the same shelf the dashboard alert
+      // tile shows: anything at or under its threshold, 0 included.
+      if (status === "alert" && p.quantity > p.lowStockThreshold) return false;
       if (!q) return true;
       return (
         p.name.toLowerCase().includes(q) ||
@@ -184,6 +206,7 @@ export default function InventoryScreen() {
 
       <ChipRow>
         <Chip label={t("app.inventory.filters.allStatuses")} active={status === "all"} onPress={() => setStatus("all")} />
+        <Chip label={t("app.inventory.filters.stockStatus.alert")} active={status === "alert"} onPress={() => setStatus("alert")} />
         <Chip label={t("app.inventory.filters.stockStatus.in")} active={status === "in"} onPress={() => setStatus("in")} />
         <Chip label={t("app.inventory.summary.lowStock")} active={status === "low"} onPress={() => setStatus("low")} />
         <Chip label={t("app.inventory.filters.stockStatus.out")} active={status === "out"} onPress={() => setStatus("out")} />
@@ -199,8 +222,10 @@ export default function InventoryScreen() {
     </View>
   );
 
-  const empty = products.isLoading ? (
-    <ActivityIndicator color={colors.accent} />
+  const empty = products.isPending && !products.data ? (
+    // First-paint: skeleton rows match the ProductRow shape (image + name +
+    // sku/stock + price). Background refetch keeps prior rows visible.
+    <SkeletonListRow count={8} avatarSize={44} trailingWidth={56} height={72} />
   ) : (
     <EmptyState
       title={t("mobile.inventory.empty")}

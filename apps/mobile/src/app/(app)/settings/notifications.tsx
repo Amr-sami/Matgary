@@ -1,6 +1,5 @@
 import { useState } from "react";
 import {
-  ActivityIndicator,
   Linking,
   Platform,
   Pressable,
@@ -31,6 +30,7 @@ import {
 import { usePush, type PushStatus } from "@/stores/push";
 import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
+import { SkeletonListRow } from "@/components/ui/skeleton";
 import { t } from "@/i18n";
 
 /**
@@ -121,6 +121,37 @@ const EVENTS = (): Record<EventType, { title: string; hint: string }> => ({
     title: t("app.notificationSettings.events.collection.limit_warning.title"),
     hint: t("app.notificationSettings.events.collection.limit_warning.hint"),
   },
+  // Phase B events (reports + instant business events). Labels + hints must
+  // never fall back to the raw event id — the UI shows `attendance.check_in`
+  // to the user otherwise.
+  "report.weekly": {
+    title: t("app.notificationSettings.events.report.weekly.title"),
+    hint: t("app.notificationSettings.events.report.weekly.hint"),
+  },
+  "report.monthly": {
+    title: t("app.notificationSettings.events.report.monthly.title"),
+    hint: t("app.notificationSettings.events.report.monthly.hint"),
+  },
+  "expense.recorded": {
+    title: t("app.notificationSettings.events.expense.recorded.title"),
+    hint: t("app.notificationSettings.events.expense.recorded.hint"),
+  },
+  "product.added": {
+    title: t("app.notificationSettings.events.product.added.title"),
+    hint: t("app.notificationSettings.events.product.added.hint"),
+  },
+  "inventory.adjusted": {
+    title: t("app.notificationSettings.events.inventory.adjusted.title"),
+    hint: t("app.notificationSettings.events.inventory.adjusted.hint"),
+  },
+  "return.recorded": {
+    title: t("app.notificationSettings.events.return.recorded.title"),
+    hint: t("app.notificationSettings.events.return.recorded.hint"),
+  },
+  "attendance.check_in": {
+    title: t("app.notificationSettings.events.attendance.check_in.title"),
+    hint: t("app.notificationSettings.events.attendance.check_in.hint"),
+  },
 });
 
 const DELIVERY = () => ([
@@ -209,8 +240,8 @@ export default function NotificationSettingsScreen() {
         </Pressable>
       ) : null}
 
-      {q.isLoading ? (
-        <ActivityIndicator color={colors.accent} />
+      {q.isPending && !q.data ? (
+        <SkeletonListRow count={6} avatarSize={0} trailingWidth={48} height={56} />
       ) : q.isError && !q.data ? (
         // A failed FIRST load used to render nothing at all between the header
         // and the This-device card — no message, no retry. A refetch that fails

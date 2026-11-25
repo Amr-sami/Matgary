@@ -191,12 +191,21 @@ export default function LoginScreen() {
 
           <View style={styles.rule} />
 
-          <Text style={styles.noAccount}>{t("auth.login.noAccount")}</Text>
-          <Button
-            label={t("auth.login.createAccount")}
-            variant="outline"
-            onPress={() => router.push("/signup")}
-          />
+          {/* Compact inline sentence — "Don't have an account? Create a
+              new account" with the trailing phrase as the blue underlined
+              link. Replaces the previous full-width outlined button so the
+              signup affordance stays secondary to the primary Sign-in CTA. */}
+          <Text style={styles.noAccountInline}>
+            {t("auth.login.noAccount")}{" "}
+            <Text
+              style={styles.inlineLink}
+              accessibilityRole="link"
+              accessibilityLabel={t("auth.login.createAccount")}
+              onPress={() => router.push("/signup")}
+            >
+              {t("auth.login.createAccount")}
+            </Text>
+          </Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -257,11 +266,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
     marginVertical: spacing.xl,
   },
-  noAccount: {
+  noAccountInline: {
     fontFamily: fonts.regular,
     fontSize: 14,
+    lineHeight: 22,
     color: colors.textSecondary,
     textAlign: "center",
     marginBottom: spacing.lg,
+  },
+  inlineLink: {
+    fontFamily: fonts.semibold,
+    color: colors.accent,
+    textDecorationLine: "underline",
+    textDecorationColor: colors.accent,
   },
 });

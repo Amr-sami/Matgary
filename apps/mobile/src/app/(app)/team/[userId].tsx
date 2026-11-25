@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Pressable,
   StyleSheet,
@@ -27,11 +26,16 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
 import { Segmented } from "@/components/ui/Segmented";
 import { Sheet } from "@/components/ui/Sheet";
-import { ToggleRow } from "@/components/ui/ToggleRow";
+import { PermissionPicker } from "@/components/team/PermissionPicker";
 import { money, shortDate } from "@/lib/format";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
 import { colors, elevation, fonts, radius, spacing, MIN_TOUCH } from "@/theme/tokens";
+import {
+  SkeletonDetailHeader,
+  SkeletonListRow,
+  SkeletonText,
+} from "@/components/ui/skeleton";
 import { errorText as sharedErrorText } from "@/lib/errors";
 
 /**
@@ -61,66 +65,11 @@ const ROLE = (): Record<string, string> => ({
   cashier: t("features.team.members.cashier.role"),
 });
 
-// Mirrors apps/web/lib/permissions.ts PERMISSION_GROUPS + the i18n group keys
-// in usePermissionCopy.ts. The web's editor omits manage_digest_settings from
-// its groups entirely; it is listed here under its own heading so a manager
-// can actually grant it from the phone.
-const PERMISSION_GROUPS = (): { title: string; permissions: string[] }[] => [
-  {
-    title: t("app.permissions.groups.pages"),
-    permissions: [
-      "view_dashboard",
-      "view_inventory",
-      "view_sales",
-      "view_customers",
-      "view_expenses",
-      "view_returns",
-      "view_insights",
-      "view_settings",
-      "view_suppliers",
-      "view_purchases",
-    ],
-  },
-  {
-    title: t("app.permissions.groups.edit"),
-    permissions: [
-      "manage_inventory",
-      "record_sales",
-      "modify_sales",
-      "manage_returns",
-      "manage_expenses",
-      "manage_catalog",
-      "manage_whatsapp",
-    ],
-  },
-  {
-    title: t("app.permissions.groups.suppliersPurchases"),
-    permissions: ["manage_suppliers", "manage_purchases"],
-  },
-  {
-    title: t("app.permissions.groups.tasksLeaves"),
-    permissions: ["manage_tasks", "request_leave", "manage_leave"],
-  },
-  { title: t("app.permissions.groups.audit"), permissions: ["view_activity_log"] },
-  { title: t("app.permissions.groups.attendance"), permissions: ["attendance_self_manual"] },
-  { title: t("app.digestSettings.title"), permissions: ["manage_digest_settings"] },
-  {
-    title: t("app.permissions.groups.collections"),
-    permissions: ["view_collections", "confirm_collections", "manage_collection_accounts"],
-  },
-];
-
 const PAY_TYPES = (): { key: PayType; label: string }[] => [
   { key: "fixed", label: t("app.team.compensation.form.payTypes.fixed") },
   { key: "hourly", label: t("app.team.compensation.form.payTypes.hourly") },
   { key: "hybrid", label: t("app.team.compensation.form.payTypes.hybrid") },
 ];
-
-function permissionLabel(p: string): string {
-  const label = t(`app.permissions.labels.${p}`);
-  // t() echoes the path for a missing key — fall back to the raw permission.
-  return label.startsWith("app.permissions.labels.") ? p : label;
-}
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -403,8 +352,11 @@ export default function TeamMemberScreen() {
 
       {!canManage ? (
         <EmptyState title={t("mobile.common.forbidden")} />
-      ) : teamQ.isLoading ? (
-        <ActivityIndicator color={colors.accent} />
+      ) : teamQ.isPending && !teamQ.data ? (
+        <>
+          <SkeletonDetailHeader withAvatar avatarSize={64} />
+          <SkeletonListRow count={4} avatarSize={0} trailingWidth={48} height={56} />
+        </>
       ) : teamQ.error ? (
         <EmptyState title={errorText(teamQ.error, t("app.teamAdmin.toast.loadFailed"))} />
       ) : !member ? (
@@ -460,25 +412,12 @@ export default function TeamMemberScreen() {
                 {!meIsOwner ? (
                   <Text style={styles.hint}>{t("mobile.team.permissionsOwnerOnly")}</Text>
                 ) : null}
-                {PERMISSION_GROUPS().map((g) => (
-                  <View key={g.title} style={styles.group}>
-                    <Text style={styles.groupTitle}>{g.title}</Text>
-                    {g.permissions.map((p) => (
-                      <ToggleRow
-                        key={p}
-                        label={permissionLabel(p)}
-                        value={effectivePerms.has(p)}
-                        disabled={busy || isSelf || !meIsOwner}
-                        onValueChange={(v) => {
-                          const next = new Set(effectivePerms);
-                          if (v) next.add(p);
-                          else next.delete(p);
-                          setPerms(next);
-                        }}
-                      />
-                    ))}
-                  </View>
-                ))}
+                <PermissionPicker
+                  value={[...effectivePerms]}
+                  disabled={busy || isSelf || !meIsOwner}
+                  onChange={(next) => setPerms(new Set(next))}
+                  testID="team-perms"
+                />
                 {meIsOwner && permsDirty ? (
                   <Button
                     label={t("app.teamAdmin.row.savePermissions")}
@@ -520,8 +459,8 @@ export default function TeamMemberScreen() {
             <Card title={t("app.team.tabs.payroll")}>
               {!meIsOwner ? (
                 <Text style={styles.hint}>{t("app.team.compensation.ownerOnly")}</Text>
-              ) : compQ.isLoading ? (
-                <ActivityIndicator color={colors.accent} />
+              ) : compQ.isPending && !compQ.data ? (
+                <SkeletonText lines={2} />
               ) : (
                 <>
                   {latestComp ? (
@@ -550,8 +489,8 @@ export default function TeamMemberScreen() {
           {/* Attendance this month */}
           {!targetIsOwner ? (
             <Card title={t("mobile.team.attendanceMonth")}>
-              {monthlyQ.isLoading ? (
-                <ActivityIndicator color={colors.accent} />
+              {monthlyQ.isPending && !monthlyQ.data ? (
+                <SkeletonListRow count={3} avatarSize={0} trailingWidth={48} height={48} divider={false} />
               ) : monthlyQ.error ? (
                 <Text style={styles.hint}>{t("app.team.monthly.loadFailed")}</Text>
               ) : !monthlyRow || monthlyRow.shifts.length === 0 ? (
@@ -864,7 +803,6 @@ const styles = StyleSheet.create({
   infoLabel: { ...RTL_TEXT, fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary },
   infoValue: { fontFamily: fonts.medium, fontSize: 14, color: colors.text, flexShrink: 1, ...RTL_TEXT },
   ltr: { writingDirection: "ltr" },
-  group: { marginTop: spacing.md, gap: spacing.xs },
   groupTitle: {
     fontFamily: fonts.semibold,
     fontSize: 12,

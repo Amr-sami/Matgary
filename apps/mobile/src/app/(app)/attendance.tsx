@@ -42,6 +42,7 @@ import {
 import { useSession } from "@/stores/session";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
 import { RTL_TEXT } from "@/theme/rtl";
+import { SkeletonListRow } from "@/components/ui/skeleton";
 
 /**
  * Geofenced self check-in — doc 02 §3.2, promoted from the web's dashboard
@@ -485,8 +486,8 @@ export default function AttendanceScreen() {
             />
           ) : null}
         </View>
-        {statusQ.isPending ? (
-          <ActivityIndicator color={colors.accent} style={styles.spinner} />
+        {statusQ.isPending && !statusQ.data ? (
+          <SkeletonListRow count={2} avatarSize={0} trailingWidth={60} height={56} divider={false} />
         ) : statusQ.isError ? (
           <>
             <Text style={styles.errText}>{t("mobile.attendance.loadFailed")}</Text>
@@ -759,8 +760,8 @@ export default function AttendanceScreen() {
         <Text style={styles.cardTitle}>{t("mobile.attendance.history.title")}</Text>
         {!canReadTeam ? (
           <Text style={styles.muted}>{t("mobile.attendance.history.managersOnly")}</Text>
-        ) : historyQ.isPending ? (
-          <ActivityIndicator color={colors.accent} style={styles.spinner} />
+        ) : historyQ.isPending && !historyQ.data ? (
+          <SkeletonListRow count={5} avatarSize={0} trailingWidth={48} height={48} divider={false} />
         ) : historyQ.isError ? (
           <>
             <Text style={styles.errText}>{t("mobile.attendance.loadFailed")}</Text>

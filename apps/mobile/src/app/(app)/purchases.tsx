@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PackageIcon as Package } from "phosphor-react-native/src/icons/Package";
 import { ReceiptIcon as Receipt } from "phosphor-react-native/src/icons/Receipt";
@@ -18,6 +18,7 @@ import { Segmented } from "@/components/ui/Segmented";
 import { StatCard } from "@/components/ui/StatCard";
 import { money, shortDate } from "@/lib/format";
 import { useSession } from "@/stores/session";
+import { SkeletonListRow } from "@/components/ui/skeleton";
 import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
 
@@ -155,16 +156,9 @@ export default function PurchasesScreen() {
         <StatCard title={t("mobile.purchases.orderCount")} value={String(stats.count)} icon={Receipt} color="accent" />
         <StatCard title={t("app.purchases.kpi.totalPurchases")} value={money(stats.total)} icon={Package} color="accent" />
       </View>
-      {/* Full-width on its own row: a 2x2 grid with one blank cell read as
-          unfinished, so the third KPI spans the row instead. */}
-      <View style={styles.gridRow}>
-        <StatCard
-          title={t("mobile.purchases.owedToSuppliers")}
-          value={money(stats.outstanding)}
-          icon={Wallet}
-          color={stats.outstanding > 0 ? "danger" : "success"}
-        />
-      </View>
+      {/* "Owed to suppliers" KPI removed by owner's call (2026-10-31) — the
+          Purchases page now only reports purchase activity; outstanding debt
+          lives on the Suppliers tab (per-supplier balance + pay buttons). */}
 
       {canManage ? (
         <View testID="po-new-order">
@@ -191,8 +185,8 @@ export default function PurchasesScreen() {
 
       <Segmented items={FILTERS()} value={filter} onChange={setFilter} />
 
-      {pos.isLoading ? (
-        <ActivityIndicator color={colors.accent} />
+      {pos.isPending && !pos.data ? (
+        <SkeletonListRow count={5} avatarSize={0} trailingWidth={80} height={76} />
       ) : pos.isError ? (
         <EmptyState title={describeError(pos.error, t("mobile.common.serverError"))} />
       ) : shown.length === 0 ? (
@@ -204,7 +198,6 @@ export default function PurchasesScreen() {
         <View style={styles.list}>
           {shown.map((o) => {
             const s = STATUS()[o.status] ?? { label: o.status, variant: "neutral" as const };
-            const due = o.total - o.paidAmount;
             const busy = act.isPending && act.variables?.id === o.id;
             return (
               <View key={o.id} style={styles.row} testID="po-row">
@@ -223,9 +216,8 @@ export default function PurchasesScreen() {
                 {o.status === "received" && o.receivedDate ? (
                   <Text style={styles.meta}>{t("app.purchases.row.received", { date: shortDate(o.receivedDate) })}</Text>
                 ) : null}
-                {o.status === "received" && due > 0 ? (
-                  <Text style={styles.due}>{t("mobile.purchases.remaining", { amount: money(due) })}</Text>
-                ) : null}
+                {/* "Remaining" per-row removed by owner's call (2026-10-31)
+                    — same reason as the KPI above; see Supplier → balance. */}
                 {o.notes ? <Text numberOfLines={2} style={styles.meta}>{o.notes}</Text> : null}
 
                 {canManage && o.status === "draft" ? (

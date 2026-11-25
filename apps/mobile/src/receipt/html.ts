@@ -44,6 +44,21 @@ export interface ReceiptSettings {
   receiptBlockOrder: ReceiptBlockKey[];
   receiptCustomBlocks: Record<string, { text: string; align: "right" | "center" | "left" }>;
   receiptFontFamily?: string;
+  /** Receipt identity (0065). Empty string → row omitted entirely. */
+  receiptTaxRegistration?: string;
+  receiptTaxCardNumber?: string;
+  receiptSlogan?: string;
+  receiptReturnPolicy?: string;
+  receiptAddress?: string;
+  receiptReferencePrefix?: string;
+  /** Visibility toggles (0066). Default true; a filled field prints unless
+   *  the toggle is off. */
+  receiptShowAddress?: boolean;
+  receiptShowSlogan?: boolean;
+  receiptShowTaxInfo?: boolean;
+  receiptShowReturnPolicy?: boolean;
+  /** Per-row alignment overrides (0067). Missing key → center. */
+  receiptBlockAlignments?: Record<string, "left" | "center" | "right">;
 }
 
 export const DEFAULT_RECEIPT_SETTINGS: ReceiptSettings = {
@@ -56,6 +71,17 @@ export const DEFAULT_RECEIPT_SETTINGS: ReceiptSettings = {
   receiptShowLoyalty: true,
   receiptBlockOrder: ["logo", "shopInfo", "purchaseDate", "items", "totals", "loyalty", "footer"],
   receiptCustomBlocks: {},
+  receiptTaxRegistration: "",
+  receiptTaxCardNumber: "",
+  receiptSlogan: "",
+  receiptReturnPolicy: "",
+  receiptAddress: "",
+  receiptReferencePrefix: "",
+  receiptShowAddress: true,
+  receiptShowSlogan: true,
+  receiptShowTaxInfo: true,
+  receiptShowReturnPolicy: true,
+  receiptBlockAlignments: {},
 };
 
 export interface ReceiptLine {
@@ -118,6 +144,8 @@ const LABELS = {
   thankYou: { en: "THANK YOU FOR SHOPPING!", ar: "شكراً لتسوقكم معنا" },
   brand: { en: "BRAND", ar: "الماركة" },
   tel: { en: "TEL", ar: "هاتف" },
+  taxRegistration: { en: "TAX REG", ar: "س.ت" },
+  taxCard: { en: "TAX CARD", ar: "ب.ض" },
 } as const;
 
 type LabelKey = keyof typeof LABELS;
@@ -153,6 +181,16 @@ export function receiptDate(d: Date): string {
 export function receiptCode(sale: Pick<ReceiptSale, "invoiceId" | "saleDate">): string {
   const base = sale.invoiceId || String(sale.saleDate.getTime());
   return base.slice(-10).toUpperCase();
+}
+
+/** `{prefix}-{shortCode}` when prefix is set, otherwise the plain short code. */
+export function receiptReference(
+  sale: Pick<ReceiptSale, "invoiceId" | "saleDate">,
+  settings: Pick<ReceiptSettings, "receiptReferencePrefix">,
+): string {
+  const code = receiptCode(sale);
+  const prefix = (settings.receiptReferencePrefix || "").trim().toUpperCase();
+  return prefix ? `${prefix}-${code}` : code;
 }
 
 /** What the web encodes in the QR: the invoice id when there is one. */
@@ -207,7 +245,27 @@ export function buildReceiptHtml(
   const dir = lang === "ar" ? "rtl" : "ltr";
   const shopName = (settings.shopName || "STORE").toUpperCase();
   const shopPhone = settings.shopPhone || "";
-  const code = receiptCode(sale);
+  // Identity rows honor BOTH the text ("empty = hidden") AND the per-row
+  // visibility toggle ("show flag off → hidden even when text is set"). Tax
+  // reg + tax card share a single toggle. `?? true` defaults any undefined
+  // flag to true so pre-migration clients still print their configured text.
+  const showAddress = settings.receiptShowAddress ?? true;
+  const showSlogan = settings.receiptShowSlogan ?? true;
+  const showTaxInfo = settings.receiptShowTaxInfo ?? true;
+  const showReturnPolicy = settings.receiptShowReturnPolicy ?? true;
+  const shopAddress = showAddress ? (settings.receiptAddress || "").trim() : "";
+  const slogan = showSlogan ? (settings.receiptSlogan || "").trim() : "";
+  const taxReg = showTaxInfo ? (settings.receiptTaxRegistration || "").trim() : "";
+  const taxCard = showTaxInfo ? (settings.receiptTaxCardNumber || "").trim() : "";
+  const returnPolicy = showReturnPolicy ? (settings.receiptReturnPolicy || "").trim() : "";
+  // Per-row alignment overrides (0067). Missing key → center (today's shape).
+  // Returned as a CSS `text-align:…` snippet ready to drop into style="".
+  const aligns = settings.receiptBlockAlignments ?? {};
+  const alignCss = (key: string) => {
+    const v = aligns[key];
+    return v === "left" || v === "right" ? `text-align:${v}` : "text-align:center";
+  };
+  const code = receiptReference(sale, settings);
 
   const lineDiscountsTotal = sale.lines.reduce((s, l) => s + l.lineDiscountAmount, 0);
   const showLoyalty =
@@ -255,15 +313,20 @@ export function buildReceiptHtml(
         ? `<img class="receipt-logo receipt-logo--${settings.receiptLogoSize}" src="${esc(opts.logoDataUri)}" alt="">`
         : "",
     shopInfo:
-      `<div class="receipt-slogan">${esc(shopName)}</div>` +
-      (shopPhone ? `<div class="receipt-contact">${rl("tel", lang)}: <span class="num">${esc(shopPhone)}</span></div>` : ""),
+      `<div class="receipt-slogan" style="${alignCss("name")}">${esc(shopName)}</div>` +
+      (shopAddress ? `<div class="receipt-contact" dir="auto" style="${alignCss("address")}">${escMultiline(shopAddress)}</div>` : "") +
+      (shopPhone ? `<div class="receipt-contact" style="${alignCss("phone")}">${rl("tel", lang)}: <span class="num">${esc(shopPhone)}</span></div>` : "") +
+      (slogan ? `<div class="receipt-contact" dir="auto" style="${alignCss("slogan")}">${escMultiline(slogan)}</div>` : "") +
+      (taxReg ? `<div class="receipt-contact" dir="auto" style="${alignCss("taxReg")}">${rl("taxRegistration", lang)}: <span class="num">${esc(taxReg)}</span></div>` : "") +
+      (taxCard ? `<div class="receipt-contact" dir="auto" style="${alignCss("taxCard")}">${rl("taxCard", lang)}: <span class="num">${esc(taxCard)}</span></div>` : ""),
     purchaseDate: row(esc(shopName), receiptDate(sale.saleDate)),
     items: `<h1 class="receipt-title">${rl("receipt", lang)}</h1><div class="receipt-items">${items}</div>`,
     totals,
     loyalty,
     footer:
       `<div class="receipt-thankyou">${rl("thankYou", lang)}</div>` +
-      (settings.receiptFooterText ? `<div class="receipt-footer">${escMultiline(settings.receiptFooterText)}</div>` : "") +
+      (returnPolicy ? `<div class="receipt-footer" dir="auto" style="${alignCss("returnPolicy")}">${escMultiline(returnPolicy)}</div>` : "") +
+      (settings.receiptFooterText ? `<div class="receipt-footer" style="${alignCss("footerText")}">${escMultiline(settings.receiptFooterText)}</div>` : "") +
       `<div class="receipt-eta-notice">إيصال للأغراض التشغيلية — ليس فاتورة ضريبية إلكترونية معتمدة من ETA.</div>` +
       DIVIDER +
       (opts.qrDataUri ? `<div class="receipt-qr"><img class="receipt-qr-img" src="${esc(opts.qrDataUri)}" alt=""></div>` : "") +

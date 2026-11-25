@@ -37,6 +37,11 @@ export const KIND_ROUTE: Record<NotificationKind, string | null> = {
   collection_unmatched: "/collections",
   collection_limit: "/collections",
   collection_source_silent: "/settings/collections/devices",
+  // Scheduled report (weekly / monthly). `link` carries the specific period —
+  // the dispatcher sends `/reports/weekly?period=YYYY-Www` or similar — so the
+  // kind default here is just the hub (which doesn't exist yet, so point at
+  // notifications as a safe fallback).
+  report: "/notifications",
 };
 
 /**
@@ -63,6 +68,7 @@ const KNOWN_TOP = new Set([
   "notifications",
   "onboarding",
   "purchases",
+  "reports",
   "returns",
   "sales",
   "settings",
@@ -72,6 +78,14 @@ const KNOWN_TOP = new Set([
   "team",
   "whatsapp",
 ]);
+
+/** Scheduled report child screens under app/(app)/reports/ — weekly ships
+ *  first; monthly follows the same shape. Pushes carry the `period` query. */
+const REPORT_CHILDREN = new Set(["weekly", "monthly"]);
+/** Keep `period` on the report routes; the screen reads it from the URL. */
+const REPORT_QUERY: readonly (readonly [string, RegExp])[] = [
+  ["period", /^[0-9]{4}-(?:W[0-9]{2}|[0-9]{2})$/],
+];
 
 /**
  * Routes that have a dynamic child screen on mobile (inventory/[id] …).
@@ -138,6 +152,24 @@ function inboxQuery(query: string): string {
   return out.length > 0 ? `?${out.join("&")}` : "";
 }
 
+/** The report query, filtered to REPORT_QUERY (format-validated). */
+function reportQuery(query: string): string {
+  const seen = new Map<string, string>();
+  for (const pair of query.split("&")) {
+    if (!pair) continue;
+    const eq = pair.indexOf("=");
+    const k = safeDecode(eq < 0 ? pair : pair.slice(0, eq));
+    const v = safeDecode(eq < 0 ? "" : pair.slice(eq + 1));
+    if (!seen.has(k)) seen.set(k, v);
+  }
+  const out: string[] = [];
+  for (const [key, re] of REPORT_QUERY) {
+    const v = seen.get(key);
+    if (v !== undefined && re.test(v)) out.push(`${key}=${v}`);
+  }
+  return out.length > 0 ? `?${out.join("&")}` : "";
+}
+
 /**
  * Map a web `link` ("/purchases/<id>", "/inventory?low=1") or a push
  * `data.route` onto a route this app actually has. Unknown → null, so the
@@ -160,6 +192,14 @@ export function toAppRoute(path: string | null | undefined): string | null {
     if (!second) return `/collections${inboxQuery(query)}`;
     if (second === "credit") return third ? `/collections/credit/${third}` : "/collections";
     return `/collections/${second}`;
+  }
+  if (top === "reports") {
+    // Only /reports/weekly and /reports/monthly exist — unknown children
+    // degrade to the notifications inbox so the user still lands somewhere
+    // reasonable.
+    if (!second) return "/notifications";
+    if (REPORT_CHILDREN.has(second)) return `/reports/${second}${reportQuery(query)}`;
+    return "/notifications";
   }
   if (second) {
     if (top === "settings" && second === "collections") {
@@ -199,6 +239,8 @@ const ROUTE_GATE: Record<string, string | null | ((me: MeResponse) => boolean)> 
   leave: (me) => me.permissions.includes("request_leave") || me.permissions.includes("manage_leave"),
   // Billing is owner-only on the web (app.billing.ownerOnly).
   billing: (me) => me.isOwner,
+  // Scheduled reports mirror the Insights dashboard gate.
+  reports: "view_insights",
 };
 
 /**

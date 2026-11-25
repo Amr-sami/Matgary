@@ -29,7 +29,7 @@ export function StockAlerts({ items }: { items: LowStockItem[] }) {
         <Text style={styles.heading}>{t("app.dashboard.lowStock.title")}</Text>
         {items.length > 0 ? (
           <Pressable
-            onPress={() => router.push("/inventory")}
+            onPress={() => router.push("/inventory?status=alert")}
             hitSlop={8}
             accessibilityRole="link"
             style={styles.viewAllHit}

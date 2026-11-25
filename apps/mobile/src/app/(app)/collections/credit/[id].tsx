@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  SkeletonDetailHeader,
+  SkeletonListRow,
+} from "@/components/ui/skeleton";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ApiError, collectionCredits } from "@matgary/api-client";
@@ -132,11 +136,12 @@ export default function CreditScreen() {
       </Screen>
     );
   }
-  if (q.isLoading) {
+  if (q.isPending && !q.data) {
     return (
       <Screen>
         <Crumb onPress={goBack} />
-        <ActivityIndicator color={colors.accent} />
+        <SkeletonDetailHeader />
+        <SkeletonListRow count={3} avatarSize={0} trailingWidth={60} height={56} />
       </Screen>
     );
   }

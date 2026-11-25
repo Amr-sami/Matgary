@@ -28,6 +28,10 @@ import { useSession } from "@/stores/session";
 import { shortDate } from "@/lib/format";
 import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
+import {
+  SkeletonListRow,
+  SkeletonSelectorRows,
+} from "@/components/ui/skeleton";
 
 /** Measured pairs from doc 03 §2: عاجلة on danger-light, عادية on accent-light. */
 const PRIORITY = (): Record<string, { label: string; variant: "outofstock" | "accent" | "neutral" }> => ({
@@ -168,8 +172,8 @@ export default function TasksScreen() {
         </Text>
       ) : null}
 
-      {q.isLoading ? (
-        <ActivityIndicator color={colors.accent} />
+      {q.isPending && !q.data ? (
+        <SkeletonListRow count={5} avatarSize={0} trailingWidth={64} height={88} />
       ) : rows.length === 0 ? (
         <EmptyState
           title={canManageTasks ? t("app.tasks.empty.managerTitle") : t("app.tasks.empty.staffTitle")}
@@ -385,8 +389,8 @@ function TaskFormSheet({
       {canReadTeam ? (
         <View>
           <Text style={styles.label}>{t("mobile.common.assignTo")}</Text>
-          {team.isLoading ? (
-            <ActivityIndicator color={colors.accent} />
+          {team.isPending && !team.data ? (
+            <SkeletonSelectorRows count={4} avatarSize={32} />
           ) : (team.data ?? []).length === 0 ? (
             <Text style={styles.hint}>{t("mobile.common.noStaffYet")}</Text>
           ) : (

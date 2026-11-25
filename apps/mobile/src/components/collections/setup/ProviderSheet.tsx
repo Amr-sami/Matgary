@@ -59,7 +59,7 @@ export function ProviderSheet({
   );
 }
 
-/** One radio row inside a picker sheet (shared with BranchSheet). */
+/** One radio row inside a picker sheet. */
 export function SheetOption({
   label,
   active,

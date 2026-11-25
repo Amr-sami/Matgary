@@ -1,5 +1,9 @@
 import { useCallback, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  SkeletonFormField,
+  SkeletonListRow,
+} from "@/components/ui/skeleton";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { collections } from "@matgary/api-client";
@@ -205,8 +209,8 @@ export default function CollectionsSettingsScreen() {
       </Card>
 
       {/* Branch switches */}
-      {settingsQ.isLoading && !settings ? (
-        <ActivityIndicator color={colors.accent} />
+      {settingsQ.isPending && !settings ? (
+        <SkeletonFormField />
       ) : !settings ? (
         <Card>
           <Text style={styles.hint}>{t("mobile.settings.loadFailed")}</Text>
@@ -316,7 +320,7 @@ export default function CollectionsSettingsScreen() {
         ) : null}
 
         {accountsQ.isLoading && !accounts ? (
-          <ActivityIndicator color={colors.accent} />
+          <SkeletonListRow count={3} avatarSize={0} trailingWidth={48} height={56} />
         ) : !accounts ? (
           <View style={styles.gap}>
             <Text style={styles.hint}>{t("mobile.settings.loadFailed")}</Text>

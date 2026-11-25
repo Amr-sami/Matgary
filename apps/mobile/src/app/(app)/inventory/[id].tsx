@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Pressable,
   StyleSheet,
   Text,
@@ -13,7 +12,6 @@ import { Image } from "expo-image";
 import { ArrowCounterClockwiseIcon as ArrowCounterClockwise } from "phosphor-react-native/src/icons/ArrowCounterClockwise";
 import { ArrowDownIcon as ArrowDown } from "phosphor-react-native/src/icons/ArrowDown";
 import { ArrowUpIcon as ArrowUp } from "phosphor-react-native/src/icons/ArrowUp";
-import { CameraIcon as Camera } from "phosphor-react-native/src/icons/Camera";
 import { CoinsIcon as Coins } from "phosphor-react-native/src/icons/Coins";
 import { MinusIcon as Minus } from "phosphor-react-native/src/icons/Minus";
 import { PackageIcon as Package } from "phosphor-react-native/src/icons/Package";
@@ -26,7 +24,6 @@ import { WalletIcon as Wallet } from "phosphor-react-native/src/icons/Wallet";
 import { ApiError, catalog, type Product, type Supplier } from "@matgary/api-client";
 
 import { API_BASE_URL, api } from "@/api/client";
-import { pickLibraryPhoto, uploadErrorText } from "@/lib/productPhoto";
 import { Screen } from "@/components/layout/Screen";
 import { BackLink } from "@/components/ui/BackLink";
 import { Badge } from "@/components/ui/Badge";
@@ -39,6 +36,11 @@ import { money, shortDate } from "@/lib/format";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT } from "@/theme/rtl";
 import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
+import {
+  SkeletonDetailHeader,
+  SkeletonListRow,
+  SkeletonStatCard,
+} from "@/components/ui/skeleton";
 import { t } from "@/i18n";
 
 /** History rows shown before the first "show more"; each tap adds another page. */
@@ -254,43 +256,6 @@ export default function ProductDetailScreen() {
   });
   const canSaveEdit = canManage && editValid && editChanged && !update.isPending;
 
-  // ---- photo: pick → upload → PATCH imageUrl ------------------------------
-  // Same picker as add-product.tsx (src/lib/productPhoto: Android permission,
-  // MIME inference, > 3 MB refused before the network). Upload and PATCH run
-  // in ONE mutation: `update`'s error only renders inside the edit modal,
-  // which is closed here, so a failed PATCH after a good upload would have
-  // been silent and the file orphaned.
-  const [photoError, setPhotoError] = useState<string | null>(null);
-  const photoUpload = useMutation({
-    mutationFn: async (v: { id: string; file: { uri: string; name: string; type: string } }) => {
-      const { url } = await catalog.uploadProductImage(api, v.file);
-      await catalog.updateProduct(api, v.id, { imageUrl: url });
-      return { id: v.id, url };
-    },
-    onSuccess: ({ id: pid, url }) => {
-      patchCache(pid, { imageUrl: url });
-      void qc.invalidateQueries({ queryKey: ["products"] });
-      void qc.invalidateQueries({ queryKey: ["productHistory", pid] });
-      if (pid !== idRef.current) return;
-      setNotice(t("app.inventory.toast.productUpdated"));
-    },
-    onError: (e, v) => {
-      if (v.id !== idRef.current) return;
-      setPhotoError(uploadErrorText(e));
-    },
-  });
-  const changePhoto = async () => {
-    if (!product) return;
-    setPhotoError(null);
-    const res = await pickLibraryPhoto();
-    if (res.kind === "cancelled") return;
-    if (res.kind === "tooBig") return setPhotoError(t("mobile.product.photoInvalid"));
-    if (res.kind === "denied") return setPhotoError(t("mobile.product.libraryDenied"));
-    if (res.kind === "pickFailed") return setPhotoError(t("mobile.product.photoPickFailed"));
-    const { uri, name, type } = res.photo;
-    photoUpload.mutate({ id: product.id, file: { uri, name, type } });
-  };
-  const photoBusy = photoUpload.isPending;
   const imageUri = catalog.resolveUploadUrl(API_BASE_URL, product?.imageUrl);
   const saveEdit = () => {
     if (!product) return;
@@ -351,8 +316,14 @@ export default function ProductDetailScreen() {
       }
     >
 
-      {productsQ.isLoading ? (
-        <ActivityIndicator color={colors.accent} />
+      {productsQ.isPending && !productsQ.data ? (
+        // Product detail header + body skeleton — matches the StatCard+Card
+        // layout that appears once the product loads.
+        <>
+          <SkeletonDetailHeader withAvatar avatarSize={64} />
+          <SkeletonStatCard />
+          <SkeletonListRow count={3} avatarSize={0} trailingWidth={0} height={64} />
+        </>
       ) : productsQ.isError && !productsQ.data ? (
         // Cold start / offline / 5xx with nothing cached: "could not load" is a
         // network state, not "this product does not exist".
@@ -391,30 +362,7 @@ export default function ProductDetailScreen() {
                   <Package size={28} color={colors.accent} />
                 </View>
               )}
-              {canManage ? (
-                <Pressable
-                  onPress={() => void changePhoto()}
-                  disabled={photoBusy}
-                  accessibilityRole="button"
-                  accessibilityLabel={imageUri ? t("mobile.product.changePhoto") : t("mobile.product.addPhoto")}
-                  style={({ pressed }) => [styles.photoBtn, (pressed || photoBusy) && styles.photoBtnPressed]}
-                >
-                  {photoBusy ? (
-                    <ActivityIndicator size="small" color={colors.accent} />
-                  ) : (
-                    <Camera size={18} color={colors.accent} />
-                  )}
-                  <Text style={styles.photoBtnText}>
-                    {photoBusy
-                      ? t("mobile.product.photoUploading")
-                      : imageUri
-                        ? t("mobile.product.changePhoto")
-                        : t("mobile.product.addPhoto")}
-                  </Text>
-                </Pressable>
-              ) : null}
             </View>
-            {photoError ? <Text style={styles.photoError}>{photoError}</Text> : null}
             <Text style={styles.name}>{product.name}</Text>
             {product.brand ? (
               <Text numberOfLines={1} style={styles.brand}>
@@ -473,7 +421,7 @@ export default function ProductDetailScreen() {
                     onPress={() => step(-1)}
                     style={({ pressed }) => [styles.stepBtn, pressed && styles.stepBtnPressed]}
                   >
-                    <Minus size={22} color={colors.accent} weight="bold" />
+                    <Minus size={22} color={colors.onAccent} weight="bold" />
                   </Pressable>
                   <TextInput
                     testID="adjust-delta"
@@ -496,7 +444,7 @@ export default function ProductDetailScreen() {
                     onPress={() => step(1)}
                     style={({ pressed }) => [styles.stepBtn, pressed && styles.stepBtnPressed]}
                   >
-                    <Plus size={22} color={colors.accent} weight="bold" />
+                    <Plus size={22} color={colors.onAccent} weight="bold" />
                   </Pressable>
                 </View>
                 <View style={styles.quickRow}>
@@ -580,8 +528,8 @@ export default function ProductDetailScreen() {
 
           {/* ---- Movement history ---- */}
           <Card title={t("app.inventory.table.actions.history")}>
-            {historyQ.isLoading ? (
-              <ActivityIndicator color={colors.accent} />
+            {historyQ.isPending && !historyQ.data ? (
+              <SkeletonListRow count={4} avatarSize={0} trailingWidth={60} height={56} divider={false} />
             ) : historyQ.isError ? (
               <View style={styles.historyState}>
                 <Text style={styles.err}>{t("mobile.inventoryDetail.historyFailed")}</Text>
@@ -838,23 +786,10 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   heroImage: { width: 96, height: 96, borderRadius: radius.lg, backgroundColor: colors.neutralTint },
-  photoBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-    minHeight: MIN_TOUCH,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.full,
-    backgroundColor: colors.accentLight,
-  },
-  photoBtnPressed: { opacity: 0.7 },
-  photoBtnText: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 13, color: colors.accent },
-  photoError: { fontFamily: fonts.regular, fontSize: 13, color: colors.danger, marginBottom: spacing.sm, ...RTL_TEXT },
   avatar: {
     width: 56,
     height: 56,
     borderRadius: radius.full,
-    backgroundColor: colors.accentLight,
     alignItems: "center",
     justifyContent: "center",
     alignSelf: "flex-start",
@@ -893,9 +828,7 @@ const styles = StyleSheet.create({
     height: 52,
     minHeight: MIN_TOUCH,
     borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.accentLight,
+    backgroundColor: colors.accent,
     alignItems: "center",
     justifyContent: "center",
   },

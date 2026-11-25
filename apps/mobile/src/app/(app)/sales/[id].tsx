@@ -1,5 +1,9 @@
 import { useMemo } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  SkeletonDetailHeader,
+  SkeletonListRow,
+} from "@/components/ui/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ArrowUUpLeftIcon as ArrowUUpLeft } from "phosphor-react-native/src/icons/ArrowUUpLeft";
@@ -177,8 +181,11 @@ export default function SaleDetailScreen() {
         <Text style={styles.crumbText}>{t("mobile.salesHistory.title")}</Text>
       </Pressable>
 
-      {lineQ.isLoading ? (
-        <ActivityIndicator color={colors.accent} />
+      {lineQ.isPending && !lineQ.data ? (
+        <>
+          <SkeletonDetailHeader />
+          <SkeletonListRow count={4} avatarSize={0} trailingWidth={64} height={56} />
+        </>
       ) : !inv ? (
         <Card>
           <EmptyState title={notFound ? t("mobile.saleDetail.notFound") : t("app.common.errorRetry")} />

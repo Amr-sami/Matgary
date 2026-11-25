@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Modal,
   Pressable,
   ScrollView,
@@ -9,7 +8,7 @@ import {
   View,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AtIcon as At } from "phosphor-react-native/src/icons/At";
 import { MapPinIcon as MapPin } from "phosphor-react-native/src/icons/MapPin";
 import { PencilSimpleIcon as PencilSimple } from "phosphor-react-native/src/icons/PencilSimple";
@@ -27,11 +26,16 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Field } from "@/components/ui/Field";
+import { Sheet } from "@/components/ui/Sheet";
 import { money, shortDate } from "@/lib/format";
 import { useSession } from "@/stores/session";
 import { RTL_TEXT, directionStyle } from "@/theme/rtl";
 import { MIN_TOUCH, colors, elevation, fonts, radius, spacing } from "@/theme/tokens";
 import { errorText } from "@/lib/errors";
+import {
+  SkeletonDetailHeader,
+  SkeletonListRow,
+} from "@/components/ui/skeleton";
 
 /**
  * Port of app__supplier-detail.png (/suppliers/<id>).
@@ -145,6 +149,57 @@ export default function SupplierDetailScreen() {
   );
 
   const supplier = supplierQ.data ?? null;
+  const canPay = new Set(permissions ?? []).has("manage_expenses");
+  const owedToSupplier = supplier && supplier.balance > 0 ? supplier.balance : 0;
+
+  // Supplier payment = POST /api/expenses with category:"supplier" + supplierId
+  // (same pattern the web's SupplierPaymentModal uses — the server debits the
+  // supplier balance from the linked expense rows). Two actions on the sheet:
+  // the amount field defaults to the full balance; typing a smaller number
+  // makes it a partial payment, tapping "دفع الكل" skips the sheet entirely.
+  const [payOpen, setPayOpen] = useState(false);
+  const [payAmount, setPayAmount] = useState("");
+  const [payNote, setPayNote] = useState("");
+  const [payNotice, setPayNotice] = useState<string | null>(null);
+  const openPay = () => {
+    setPayAmount(String(owedToSupplier));
+    setPayNote("");
+    setPayNotice(null);
+    setPayOpen(true);
+  };
+  const closePay = () => setPayOpen(false);
+
+  const payMutation = useMutation({
+    mutationFn: (amount: number) =>
+      catalog.createExpense(api, {
+        title: `دفعة إلى ${supplier?.name ?? ""}`.trim(),
+        amount,
+        category: "supplier",
+        supplierId: id,
+        ...(payNote.trim() ? { note: payNote.trim() } : {}),
+      }),
+    onSuccess: async () => {
+      setPayOpen(false);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["supplier", id] }),
+        queryClient.invalidateQueries({ queryKey: ["expenses"] }),
+        queryClient.invalidateQueries({ queryKey: ["suppliers"] }),
+      ]);
+    },
+    onError: (e) => setPayNotice(errorText(e, t("mobile.common.offline"))),
+  });
+
+  const payTyped = Number(payAmount.replace(/[^\d.]/g, "")) || 0;
+  const payClamped = Math.max(0, Math.min(payTyped, owedToSupplier));
+  const payOverBalance = payTyped > owedToSupplier && owedToSupplier > 0;
+  const submitPay = () => {
+    if (payClamped <= 0 || payMutation.isPending) return;
+    payMutation.mutate(payClamped);
+  };
+  const payAll = () => {
+    if (owedToSupplier <= 0 || payMutation.isPending) return;
+    payMutation.mutate(owedToSupplier);
+  };
 
   const refresh = () => {
     void supplierQ.refetch();
@@ -172,8 +227,11 @@ export default function SupplierDetailScreen() {
         <Text style={styles.breadcrumbText}>{t("app.suppliers.title")}</Text>
       </Pressable>
 
-      {supplierQ.isLoading ? (
-        <ActivityIndicator color={colors.accent} />
+      {supplierQ.isPending && !supplierQ.data ? (
+        <>
+          <SkeletonDetailHeader />
+          <SkeletonListRow count={3} avatarSize={0} trailingWidth={60} height={56} />
+        </>
       ) : !supplier ? (
         <Card>
           <Text style={styles.notFound}>{t("app.suppliers.detail.notFound")}</Text>
@@ -235,6 +293,26 @@ export default function SupplierDetailScreen() {
             value={money(supplier.balance)}
             tone={supplier.balance > 0 ? "danger" : "default"}
           />
+
+          {owedToSupplier > 0 && canPay ? (
+            <View style={styles.payActions}>
+              <Button
+                label={t("mobile.suppliers.payPartial")}
+                variant="outline"
+                onPress={openPay}
+                style={styles.payBtn}
+                testID="supplier-pay-partial"
+              />
+              <Button
+                label={t("mobile.suppliers.payAll")}
+                onPress={payAll}
+                loading={payMutation.isPending}
+                style={styles.payBtn}
+                testID="supplier-pay-all"
+              />
+            </View>
+          ) : null}
+
           <Figure label={t("app.purchases.kpi.totalPurchases")} value={money(totalReceived)} />
           <Figure label={t("app.suppliers.detail.stats.totalPayments")} value={money(totalPaid)} tone="success" />
 
@@ -250,9 +328,9 @@ export default function SupplierDetailScreen() {
               <Receipt size={20} color={colors.text} />
               <Text style={styles.sectionTitle}>{t("app.suppliers.detail.purchaseOrders")}</Text>
             </View>
-            {ordersQ.isLoading ? (
-              <ActivityIndicator color={colors.accent} />
-            ) : orders.length === 0 ? (
+            {ordersQ.isPending && !ordersQ.data ? (
+              <SkeletonListRow count={3} avatarSize={0} trailingWidth={64} height={56} divider={false} />
+            ) :orders.length === 0 ? (
               <Text style={styles.sectionEmpty}>{t("app.suppliers.detail.purchaseOrdersEmpty")}</Text>
             ) : (
               <View style={styles.rows}>
@@ -290,9 +368,9 @@ export default function SupplierDetailScreen() {
               <Wallet size={20} color={colors.text} />
               <Text style={styles.sectionTitle}>{t("app.suppliers.detail.payments")}</Text>
             </View>
-            {expensesQ.isLoading ? (
-              <ActivityIndicator color={colors.accent} />
-            ) : payments.length === 0 ? (
+            {expensesQ.isPending && !expensesQ.data ? (
+              <SkeletonListRow count={3} avatarSize={0} trailingWidth={64} height={56} divider={false} />
+            ) :payments.length === 0 ? (
               <Text style={styles.sectionEmpty}>
                 {t("app.suppliers.detail.paymentsEmpty")}
               </Text>
@@ -334,6 +412,49 @@ export default function SupplierDetailScreen() {
           ) : null}
         </>
       )}
+
+      {/* Pay supplier sheet — amount defaults to balance, note is optional.
+          The server records it as an expense with category:"supplier" which
+          debits the supplier's running balance. */}
+      <Sheet
+        visible={payOpen}
+        onClose={payMutation.isPending ? () => {} : closePay}
+        title={t("mobile.suppliers.payTitle")}
+        testID="supplier-pay-sheet"
+        primaryAction={{
+          label: `${t("mobile.suppliers.paySubmit")} · ${money(payClamped)}`,
+          onPress: submitPay,
+          loading: payMutation.isPending,
+          disabled: payClamped <= 0,
+          testID: "supplier-pay-submit",
+        }}
+        secondaryAction={{
+          label: t("app.common.cancel"),
+          onPress: closePay,
+          disabled: payMutation.isPending,
+        }}
+      >
+        <Text style={styles.payMeta}>
+          {t("mobile.suppliers.payOwed", { amount: money(owedToSupplier) })}
+        </Text>
+        <Field
+          label={t("app.customers.settle.amountLabel")}
+          value={payAmount}
+          onChangeText={setPayAmount}
+          keyboardType="decimal-pad"
+          editable={!payMutation.isPending}
+        />
+        {payOverBalance ? (
+          <Text style={styles.payHint}>{t("app.customers.settle.overpayHint")}</Text>
+        ) : null}
+        <Field
+          label={t("app.common.notes")}
+          value={payNote}
+          onChangeText={setPayNote}
+          editable={!payMutation.isPending}
+        />
+        {payNotice ? <Text style={styles.payError}>{payNotice}</Text> : null}
+      </Sheet>
     </Screen>
   );
 }
@@ -491,6 +612,26 @@ const styles = StyleSheet.create({
   metaItem: { flexDirection: "row", alignItems: "center", gap: spacing.xs, flexShrink: 1 },
   meta: { ...RTL_TEXT, flexShrink: 1, fontFamily: fonts.regular, fontSize: 14, color: colors.textSecondary },
   editButton: { marginTop: spacing.lg },
+  payActions: { flexDirection: "row", gap: spacing.sm },
+  payBtn: { flex: 1 },
+  payMeta: {
+    fontFamily: fonts.regular,
+    fontSize: 13,
+    color: colors.textSecondary,
+    ...RTL_TEXT,
+  },
+  payHint: {
+    fontFamily: fonts.regular,
+    fontSize: 12,
+    color: colors.warningStrong,
+    ...RTL_TEXT,
+  },
+  payError: {
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    color: colors.danger,
+    ...RTL_TEXT,
+  },
 
   figureLabel: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
   figureValue: {

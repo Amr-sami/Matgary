@@ -40,7 +40,19 @@ export default function AppLayout() {
       // sibling tabs, so the default "firstRoute" made every back link land
       // on Home. "history" pops to the screen the user actually came from.
       backBehavior="history"
-      screenOptions={{ headerShown: false }}
+      screenOptions={{
+        headerShown: false,
+        // The custom BottomNav draws its own curved background (hump + raised
+        // FAB). Transparent so our SVG shape is the only visible surface;
+        // borderTopWidth + elevation zeroed to kill the default hairline /
+        // Android shadow that would cut a straight line across the whole
+        // screen width through the curved shoulders.
+        tabBarStyle: {
+          backgroundColor: "transparent",
+          borderTopWidth: 0,
+          elevation: 0,
+        },
+      }}
     >
       <Tabs.Screen name="index" />
       <Tabs.Screen name="inventory" />
@@ -67,6 +79,7 @@ export default function AppLayout() {
       <Tabs.Screen name="notifications" />
       <Tabs.Screen name="attendance" />
       <Tabs.Screen name="sync" />
+      <Tabs.Screen name="ai-chat" />
     </Tabs>
   );
 }
