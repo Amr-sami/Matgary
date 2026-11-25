@@ -31,7 +31,11 @@ export type NotificationKind =
   | "collection_stale"
   | "collection_unmatched"
   | "collection_source_silent"
-  | "collection_limit";
+  | "collection_limit"
+  // Scheduled roll-ups (weekly + monthly). Shares one kind so the inbox icon
+  // and the push channel / sound resolve uniformly; the `link` carries the
+  // specific route (/reports/weekly?period=..., /reports/monthly?period=...).
+  | "report";
 
 export interface NotificationDto {
   id: string;
@@ -287,6 +291,14 @@ export const DEFAULT_PUSH: Record<
     "collection.unmatched_credit": true,
     "collection.source_silent": true,
     "collection.limit_warning": false,
+    // Scheduled roll-ups push so the owner can tap through to the report.
+    "report.weekly": true,
+    "report.monthly": true,
+    "expense.recorded": true,
+    "product.added": true,
+    "inventory.adjusted": true,
+    "return.recorded": true,
+    "attendance.check_in": true,
   },
   staff: {
     "sale.created": false,
@@ -301,6 +313,13 @@ export const DEFAULT_PUSH: Record<
     "collection.unmatched_credit": true,
     "collection.source_silent": true,
     "collection.limit_warning": false,
+    "report.weekly": false,
+    "report.monthly": false,
+    "expense.recorded": false,
+    "product.added": false,
+    "inventory.adjusted": false,
+    "return.recorded": false,
+    "attendance.check_in": false,
   },
 };
 

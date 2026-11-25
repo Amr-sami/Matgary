@@ -146,6 +146,8 @@ export interface Sale {
   /** Digital-collection verification axis (migration 0055): null = not a
    *  digital sale (or collections off when it was rung). */
   collectionStatus?: "pending" | "confirmed" | "rejected" | null;
+  /** Sales channel (migration 0057). 'store' | 'online'. */
+  channel?: "store" | "online";
 }
 
 export interface CartLine {

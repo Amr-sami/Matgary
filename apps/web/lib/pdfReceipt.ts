@@ -31,6 +31,25 @@ export interface PdfInvoiceData {
    *  routes pass the body through as z.unknown(), so the helper's filtering
    *  is the validation. Never a confirmation status. */
   payment?: ReceiptPayment | null;
+  /** Receipt identity (0065). Each field is optional; a blank value means
+   *  the row is omitted entirely rather than printed as a placeholder. */
+  shopAddress?: string;
+  slogan?: string;
+  taxRegistration?: string;
+  taxCardNumber?: string;
+  returnPolicy?: string;
+  /** Short uppercase prefix stamped before the invoice short code in the
+   *  footer reference (e.g. "INV" → "#INV-A1B2C3D4"). */
+  referencePrefix?: string;
+  /** Visibility toggles (0066). Undefined / omitted → treated as true, so
+   *  pre-migration clients still print the text they send. Tax reg and tax
+   *  card share a single toggle (showTaxInfo). */
+  showAddress?: boolean;
+  showSlogan?: boolean;
+  showTaxInfo?: boolean;
+  showReturnPolicy?: boolean;
+  /** Per-row alignment overrides (0067). Missing key → center. */
+  blockAlignments?: Record<string, "left" | "center" | "right">;
 }
 
 const PT_PER_MM = 2.83465;
@@ -111,6 +130,15 @@ export async function generateReceiptPdf(data: PdfInvoiceData): Promise<Uint8Arr
   estHeight += 2;
   estHeight += 14 * 2;
   if (data.customerName || data.customerPhone) estHeight += 14 * 2;
+  // Identity rows: each present adds one wrapped line of ~12pt. Toggles honored
+  // so a hidden row is not reserved for in the height estimate.
+  if (data.showAddress !== false && data.shopAddress)
+    estHeight += 14 + 12 * Math.ceil(data.shopAddress.length / 50);
+  if (data.showSlogan !== false && data.slogan) estHeight += 14;
+  if (data.showTaxInfo !== false && data.taxRegistration) estHeight += 12;
+  if (data.showTaxInfo !== false && data.taxCardNumber) estHeight += 12;
+  if (data.showReturnPolicy !== false && data.returnPolicy)
+    estHeight += 14 + 12 * Math.ceil(data.returnPolicy.length / 50);
   estHeight += PAD;
 
   const pageHeight = Math.max(estHeight, 200);
@@ -137,6 +165,36 @@ export async function generateReceiptPdf(data: PdfInvoiceData): Promise<Uint8Arr
       // Skip logo if embedding fails
     }
   }
+
+  // Per-row alignment overrides (0067). Missing key → center (default). The
+  // PDF page is mono-directional (LTR); "right" sits the row at PAGE_W - PAD,
+  // "left" at PAD — physical alignment, same semantics as the HTML renderer.
+  const aligns = data.blockAlignments ?? {};
+  const alignFor = (key: string): "left" | "center" | "right" => {
+    const v = aligns[key];
+    return v === "left" || v === "right" ? v : "center";
+  };
+
+  const drawAlignedMono = (
+    text: string,
+    size: number,
+    key: string,
+    font = monoFont,
+  ) => {
+    const w = font.widthOfTextAtSize(text, size);
+    const a = alignFor(key);
+    const x = a === "center" ? (PAGE_W - w) / 2 : a === "left" ? PAD : PAGE_W - PAD - w;
+    page.drawText(text, { x, y: y - size, size, font });
+    y -= size + 2;
+  };
+
+  const drawAlignedArabic = (text: string, size: number, key: string) => {
+    const w = arabicFont.widthOfTextAtSize(text, size);
+    const a = alignFor(key);
+    const x = a === "center" ? (PAGE_W - w) / 2 : a === "left" ? PAD : PAGE_W - PAD - w;
+    page.drawText(text, { x, y: y - size, size, font: arabicFont });
+    y -= size + 2;
+  };
 
   const drawCenteredMono = (text: string, size: number, font = monoFont) => {
     const w = font.widthOfTextAtSize(text, size);
@@ -184,9 +242,24 @@ export async function generateReceiptPdf(data: PdfInvoiceData): Promise<Uint8Arr
     y -= size + 4;
   };
 
-  drawCenteredMono(`*** ${data.shopName.toUpperCase()} ***`, 11, monoBoldFont);
-  drawCenteredMono(`TEL: ${data.shopPhone}`, 8);
-  drawCenteredArabic("العاشر من رمضان · الأردنية، خلف فودافون", 9);
+  drawAlignedMono(`*** ${data.shopName.toUpperCase()} ***`, 11, "name", monoBoldFont);
+  if (data.shopPhone) drawAlignedMono(`TEL: ${data.shopPhone}`, 8, "phone");
+  // Address, slogan, tax info — each printed ONLY when the tenant filled it
+  // in AND its visibility toggle is on. `!== false` keeps the default (true)
+  // behavior for pre-migration clients that don't pass the flag.
+  const showAddr = data.showAddress !== false;
+  const showSlog = data.showSlogan !== false;
+  const showTax = data.showTaxInfo !== false;
+  if (showAddr && data.shopAddress) {
+    for (const row of data.shopAddress.split(/\r?\n/)) {
+      if (row.trim()) drawAlignedArabic(row.trim(), 9, "address");
+    }
+  }
+  if (showSlog && data.slogan) drawAlignedArabic(data.slogan, 9, "slogan");
+  if (showTax && data.taxRegistration)
+    drawAlignedMono(`TAX REG: ${data.taxRegistration}`, 8, "taxReg");
+  if (showTax && data.taxCardNumber)
+    drawAlignedMono(`TAX CARD: ${data.taxCardNumber}`, 8, "taxCard");
 
   drawDivider();
 
@@ -250,12 +323,22 @@ export async function generateReceiptPdf(data: PdfInvoiceData): Promise<Uint8Arr
   drawCenteredMono("THANK YOU FOR SHOPPING!", 9, monoBoldFont);
   drawCenteredArabic("شكراً لتسوقكم معنا ❤", 9);
 
+  const showPol = data.showReturnPolicy !== false;
+  if (showPol && data.returnPolicy) {
+    drawDivider();
+    for (const row of data.returnPolicy.split(/\r?\n/)) {
+      if (row.trim()) drawAlignedArabic(row.trim(), 8, "returnPolicy");
+    }
+  }
+
   drawDivider();
 
+  const prefix = (data.referencePrefix || "").trim().toUpperCase();
+  const shortCode = data.invoiceId.slice(-10).toUpperCase();
   drawCenteredMono(
-    `#${data.invoiceId.slice(-10).toUpperCase()}`,
+    prefix ? `#${prefix}-${shortCode}` : `#${shortCode}`,
     8,
-    monoBoldFont
+    monoBoldFont,
   );
 
   return pdf.save();

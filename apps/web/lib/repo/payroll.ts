@@ -16,6 +16,7 @@ import {
 import {
   computeGrossFromShifts,
   pickEffectiveCompensation,
+  type CommissionBase,
   type CompensationDto,
   type PayType,
 } from "@/lib/repo/payroll-compute";
@@ -24,6 +25,7 @@ import {
 // from @/lib/repo/payroll. The canonical source is now payroll-compute.
 export {
   pickEffectiveCompensation,
+  type CommissionBase,
   type CompensationDto,
   type PayType,
 };
@@ -40,6 +42,9 @@ function rowToDto(row: EmployeeCompensationRow): CompensationDto {
       row.standardMonthlyHours == null
         ? null
         : Number(row.standardMonthlyHours),
+    commissionRate: Number(row.commissionRate ?? "0"),
+    commissionBase: (row.commissionBase ?? "gross_sales") as CommissionBase,
+    bonusEligible: Boolean(row.bonusEligible),
     effectiveFrom: row.effectiveFrom,
     createdByUserId: row.createdByUserId,
     createdAt: row.createdAt,
@@ -72,6 +77,12 @@ export interface CreateCompensationInput {
   baseSalaryMonthly: number | null;
   hourlyRate: number | null;
   standardMonthlyHours: number | null;
+  /** V1 — percentage 0..100. Omit to inherit 0. */
+  commissionRate?: number;
+  /** V1 — defaults to 'gross_sales' when omitted. */
+  commissionBase?: CommissionBase;
+  /** V1 — Owner opt-in. Defaults false. */
+  bonusEligible?: boolean;
   effectiveFrom: Date;
   createdByUserId: string;
 }
@@ -97,6 +108,9 @@ export async function createCompensation(
           input.standardMonthlyHours == null
             ? null
             : String(input.standardMonthlyHours),
+        commissionRate: String(input.commissionRate ?? 0),
+        commissionBase: input.commissionBase ?? "gross_sales",
+        bonusEligible: input.bonusEligible ?? false,
         effectiveFrom: input.effectiveFrom,
         createdByUserId: input.createdByUserId,
       })

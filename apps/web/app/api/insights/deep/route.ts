@@ -6,6 +6,7 @@ import {
   resolveActiveBranch,
 } from "@/lib/api/branch-context";
 import {
+  loadBrandBreakdown,
   loadBranchComparison,
   loadCompareReport,
   loadHeatmapReport,
@@ -27,6 +28,7 @@ const REPORTS = [
   "heatmap",
   "payments",
   "branches",
+  "brands",
   "product",
   "product-search",
 ] as const;
@@ -147,6 +149,14 @@ export async function GET(req: NextRequest) {
           );
         }
         const data = await loadBranchComparison(r.ctx.tenantId, window);
+        return NextResponse.json({ report, ...data });
+      }
+      case "brands": {
+        const data = await loadBrandBreakdown(
+          r.ctx.tenantId,
+          window,
+          branchFilter,
+        );
         return NextResponse.json({ report, ...data });
       }
       case "product": {

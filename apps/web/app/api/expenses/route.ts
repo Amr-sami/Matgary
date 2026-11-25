@@ -6,6 +6,7 @@ import { resolveBranchFilter } from "@/lib/api/branch-context";
 import { resolveSinceWindow } from "@/lib/api/list-window";
 import { addExpense, listExpenses } from "@/lib/repo/operations";
 import { logActivity } from "@/lib/repo/activity";
+import { fanoutEvent } from "@/lib/notifications/dispatch";
 import { withTenant } from "@/lib/db";
 import { branches } from "@/lib/db/schema";
 import { checkTenantRateLimit } from "@/lib/api/tenant-rate-limit";
@@ -109,6 +110,16 @@ export async function POST(req: NextRequest) {
     entityLabel: parsed.data.title,
     branchId: resolvedBranchId,
     metadata: { amount: parsed.data.amount, category: parsed.data.category },
+  });
+  // Notification fan-out. Fire-and-forget: a failure never rolls back the
+  // expense, and the dispatcher excludes the actor from its own alert.
+  void fanoutEvent(r.ctx.tenantId, resolvedBranchId, "expense.recorded", {
+    expenseId: (result as { id?: string }).id ?? "",
+    title: parsed.data.title,
+    amountEgp: parsed.data.amount,
+    category: parsed.data.category,
+    actorUserId: r.ctx.userId,
+    link: `/expenses`,
   });
   return NextResponse.json(result, { status: 201 });
 }

@@ -33,6 +33,13 @@ interface CompensationRow {
   baseSalaryMonthly: number | null;
   hourlyRate: number | null;
   standardMonthlyHours: number | null;
+  /** V1 — flat % 0..100 commission on attributed revenue. Present on rows
+   *  written after migration 0068; pre-0068 rows arrive as 0. */
+  commissionRate?: number;
+  /** V1 — defaults to 'gross_sales'. */
+  commissionBase?: "gross_sales" | "profit_contribution";
+  /** V1 — Owner opt-in for monthly bonuses. */
+  bonusEligible?: boolean;
   effectiveFrom: string;
 }
 
@@ -353,6 +360,10 @@ function MemberRow({
   const [baseSalary, setBaseSalary] = useState("");
   const [hourlyRate, setHourlyRate] = useState("");
   const [standardHours, setStandardHours] = useState("");
+  // V1 payroll additions — commission % + bonus-eligibility toggle.
+  const [commissionEnabled, setCommissionEnabled] = useState(false);
+  const [commissionRate, setCommissionRate] = useState("");
+  const [bonusEligible, setBonusEligible] = useState(false);
   const [effectiveFrom, setEffectiveFrom] = useState(
     new Date().toISOString().slice(0, 10),
   );
@@ -373,6 +384,10 @@ function MemberRow({
         setBaseSalary(cur.baseSalaryMonthly?.toString() ?? "");
         setHourlyRate(cur.hourlyRate?.toString() ?? "");
         setStandardHours(cur.standardMonthlyHours?.toString() ?? "");
+        const curRate = cur.commissionRate ?? 0;
+        setCommissionEnabled(curRate > 0);
+        setCommissionRate(curRate > 0 ? String(curRate) : "");
+        setBonusEligible(Boolean(cur.bonusEligible));
       }
     } catch (e) {
       onToast({
@@ -398,6 +413,9 @@ function MemberRow({
           baseSalaryMonthly: baseSalary ? Number(baseSalary) : null,
           hourlyRate: hourlyRate ? Number(hourlyRate) : null,
           standardMonthlyHours: standardHours ? Number(standardHours) : null,
+          commissionRate: commissionEnabled && commissionRate ? Number(commissionRate) : 0,
+          commissionBase: "gross_sales",
+          bonusEligible,
           effectiveFrom: new Date(effectiveFrom).toISOString(),
         }),
       });
@@ -488,6 +506,54 @@ function MemberRow({
               value={effectiveFrom}
               onChange={(e) => setEffectiveFrom(e.target.value)}
             />
+          </div>
+
+          {/* V1 payroll — commission + bonus eligibility toggles */}
+          <div className="rounded-md border border-border-default bg-surface-tint/50 p-3 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <label className="text-sm font-medium text-text-primary flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={commissionEnabled}
+                    onChange={(e) => setCommissionEnabled(e.target.checked)}
+                  />
+                  Commission on sales
+                </label>
+                <p className="text-xs text-text-secondary mt-1">
+                  Paid as a % of the employee&apos;s attributed sales minus returns for the month.
+                </p>
+              </div>
+              {commissionEnabled && (
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  value={commissionRate}
+                  onChange={(e) => setCommissionRate(e.target.value)}
+                  placeholder="e.g. 5"
+                  className="w-28"
+                  aria-label="Commission %"
+                />
+              )}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-text-primary flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={bonusEligible}
+                  onChange={(e) => setBonusEligible(e.target.checked)}
+                />
+                Eligible for monthly bonuses
+              </label>
+              <p className="text-xs text-text-secondary mt-1">
+                Owner can add one-off bonuses or deductions to this employee&apos;s payroll each month.
+              </p>
+            </div>
+            <p className="text-xs text-text-secondary">
+              Changes apply from the <strong>Effective date</strong> onward. They do NOT rewrite
+              payroll sheets that are already finalized — void the sheet first if you need to redo
+              a previous month.
+            </p>
           </div>
 
           <div className="flex justify-end">

@@ -86,11 +86,32 @@ export function routeForNotification(kind: string, link: string | null | undefin
   return KIND_ROUTES[kind as NotificationKind] ?? DEFAULT_ROUTE;
 }
 
-/** Android channel for a notification kind: every `collection_*` kind goes to
- *  the "collections" channel (importance HIGH, created unconditionally by the
- *  app's PushRegistrar); everything else stays on "default". */
-export function channelForKind(kind: string): "collections" | undefined {
-  return kind.startsWith("collection_") ? "collections" : undefined;
+/** Android channel for a notification kind.
+ *  - `collection_*` → the "collections" channel
+ *  - `report`       → the "generic" channel (Universfield sound)
+ *  - `info`         → the "generic" channel (new instant business events
+ *                     mapped to `info`: expense/product/inventory/return/
+ *                     attendance check-in — see event-types.ts EVENT_TO_KIND)
+ *  - `low_stock`    → the "critical" channel (importance HIGH, system default
+ *                     sound) — the one existing kind that routes here today;
+ *                     attendance.late / supplier.payment_due will join once
+ *                     their producers land.
+ *  - everything else → undefined (dispatcher / caller passes an override or
+ *    falls back to the Android default channel). Sales ride a separate push
+ *    path (sale-alerts.ts) and never reach this function.
+ */
+export function channelForKind(kind: string): "collections" | "generic" | "critical" | undefined {
+  if (kind.startsWith("collection_")) return "collections";
+  if (kind === "report" || kind === "info") return "generic";
+  if (kind === "low_stock") return "critical";
+  return undefined;
+}
+
+/** iOS sound for a notification kind. Android's channel.sound wins, but iOS
+ *  takes the name here (`aps.sound`). */
+export function soundForKind(kind: string): "generic_notification.wav" | undefined {
+  if (kind === "report" || kind === "info") return "generic_notification.wav";
+  return undefined;
 }
 
 // ─── Preference gate ─────────────────────────────────────────────────────────
@@ -176,13 +197,14 @@ export async function notifyUserDevices(
     if (tokens.length === 0) return { status: "no_tokens", outcomes: [], disabled: [] };
 
     const channelId = input.channelId ?? channelForKind(input.data.type);
+    const sound = input.sound ?? soundForKind(input.data.type);
     const messages: PushMessage[] = tokens.map((to) => ({
       to,
       title: input.title,
       body: input.body ?? undefined,
       data: input.data,
       ...(channelId ? { channelId } : {}),
-      ...(input.sound ? { sound: input.sound } : {}),
+      ...(sound ? { sound } : {}),
     }));
     const outcomes = await sendPush(messages, opts);
     const disabled = await handleOutcomes(tenantId, userId, outcomes);

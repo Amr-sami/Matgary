@@ -115,6 +115,25 @@ const patchSchema = z.object({
       }),
     )
     .optional(),
+  // Receipt identity (0065). All optional; empty string clears the column
+  // so the row disappears from the printed receipt.
+  receiptTaxRegistration: z.string().max(80).optional(),
+  receiptTaxCardNumber: z.string().max(80).optional(),
+  receiptSlogan: z.string().max(200).optional(),
+  receiptReturnPolicy: z.string().max(500).optional(),
+  receiptAddress: z.string().max(200).optional(),
+  receiptReferencePrefix: z.string().max(16).optional(),
+  // Per-row visibility toggles (0066).
+  receiptShowAddress: z.boolean().optional(),
+  receiptShowSlogan: z.boolean().optional(),
+  receiptShowTaxInfo: z.boolean().optional(),
+  receiptShowReturnPolicy: z.boolean().optional(),
+  // Per-row alignment overrides (0067). Server-side normaliser drops unknown
+  // keys; schema shape is permissive to avoid rejecting valid patches when
+  // the UI grows a new row key before the server has deployed.
+  receiptBlockAlignments: z
+    .record(z.string(), z.enum(["left", "center", "right"]))
+    .optional(),
 });
 
 export async function PATCH(req: NextRequest) {

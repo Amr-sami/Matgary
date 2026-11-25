@@ -93,6 +93,11 @@ function rowToSale(r: typeof sales.$inferSelect): Sale {
     partialPaidAt: r.partialPaidAt ?? undefined,
     // Digital collections (0055): the invoice-level verification status.
     collectionStatus: (r.collectionStatus as Sale["collectionStatus"]) ?? null,
+    // Sales channel (migration 0057). Defaults to 'store' for any row
+    // whose column is unexpectedly null (shouldn't happen — the migration
+    // sets NOT NULL + default 'store' — but belt and braces for pre-0057
+    // rows read before the migration applied).
+    channel: (r.channel === "online" ? "online" : "store") as "store" | "online",
   };
 }
 
@@ -435,6 +440,8 @@ export interface RecordSaleInput {
   alertOrigin?: string | null;
   /** `X-Outbox-Replay: 1` — an offline sale syncing now (doc 16 §1.2). */
   outboxReplay?: boolean;
+  /** Sales channel (migration 0057). Default 'store'. */
+  channel?: "store" | "online";
 }
 
 export interface RecordSaleResult {
@@ -513,6 +520,8 @@ export async function recordSale(
         // counter (often 0). is_paid mirrors amount_paid >= total.
         ...computePaidFields(paymentMethod, totalPrice, input.amountPaidNow),
         recordedByUserId: input.recordedByUserId ?? null,
+        // Migration 0057.
+        channel: input.channel ?? "store",
       })
       .returning({ id: sales.id });
 
@@ -590,6 +599,8 @@ export async function recordSale(
     paymentMethod: input.paymentMethod || "cash",
     sellerUserId: input.recordedByUserId ?? null,
     saleDate: input.customDate ?? new Date(),
+    firstProductName: result.productName,
+    lineCount: 1,
     origin: input.alertOrigin ?? null,
     outboxReplay: input.outboxReplay === true,
   });
@@ -702,6 +713,9 @@ export interface CartSaleOptions {
    *  reflects exactly the unpaid remainder. Ignored for non-deferred sales
    *  (those are always fully paid). Defaults to 0. */
   amountPaidNow?: number;
+  /** Sales channel (migration 0057). Default 'store'. Written on EVERY line
+   *  of the cart; analytics splits by this. */
+  channel?: "store" | "online";
   /** S7 (doc 06 §6.5): the offline POS replaying a sale the customer already
    *  walked out with. When true, a line that exceeds stock still books —
    *  the product is driven to 0 and a discrepancy row is appended to
@@ -744,6 +758,8 @@ export interface CartSaleResult {
   /** Final total (after all discounts), in tenant currency. */
   total: number;
   paymentMethod: PaymentMethod;
+  /** 'store' | 'online' — the channel the cart was rung on (migration 0057). */
+  channel: "store" | "online";
   customerName: string | null;
   customerPhone: string | null;
   note: string | null;
@@ -1083,6 +1099,8 @@ async function recordCartSaleImpl(
           recordedByUserId: options.recordedByUserId ?? null,
           // Anchor row only — see CartSaleOptions.idempotencyKey.
           idempotencyKey: i === 0 ? options.idempotencyKey ?? null : null,
+          // Migration 0057 — written on every line of the cart.
+          channel: options.channel ?? "store",
         })
         .returning({ id: sales.id });
 
@@ -1289,6 +1307,8 @@ async function recordCartSaleImpl(
       paymentMethod: result.paymentMethod,
       sellerUserId: options.recordedByUserId ?? null,
       saleDate,
+      firstProductName: result.lines[0]?.productName ?? null,
+      lineCount: result.lines.length,
       origin: options.alertOrigin ?? null,
       outboxReplay: options.outboxReplay === true,
     });
@@ -1327,6 +1347,7 @@ async function recordCartSaleImpl(
     lines: result.lines,
     total: result.total,
     paymentMethod: result.paymentMethod,
+    channel: options.channel ?? "store",
     customerName: result.customerName,
     customerPhone: result.customerPhone,
     note: result.note,
@@ -1404,6 +1425,7 @@ export async function findCartSaleByIdempotencyKey(
         lines,
         total: Math.round(lines.reduce((s, l) => s + l.lineTotal, 0) * 100) / 100,
         paymentMethod: (first.paymentMethod ?? "cash") as PaymentMethod,
+        channel: (first.channel === "online" ? "online" : "store") as "store" | "online",
         customerName: first.customerName,
         customerPhone: first.customerPhone,
         note: first.note,

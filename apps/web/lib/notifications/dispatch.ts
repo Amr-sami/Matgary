@@ -140,6 +140,65 @@ export interface CollectionLimitPayload extends BaseEventPayload {
   limitEgp: number | null;
 }
 
+/**
+ * Weekly / monthly report fan-out payload (doc 16 §report-nav).
+ *
+ * Kept tiny on purpose: the push data carries only the period identifier and
+ * optional preview numbers; the authoritative report fetch happens on tap
+ * (`GET /api/reports/<kind>?period=`), so the push stays well under Expo's
+ * 4 KB cap and the report always reflects the latest DB state at the moment
+ * the owner opens it.
+ */
+export interface ReportPayload extends BaseEventPayload {
+  /** Period identifier: ISO week `2026-W47` for weekly, `2026-11` for monthly. */
+  period: string;
+  /** Headline revenue for the period — rendered inline so the owner sees it
+   *  on the lock screen without having to open the app. Null if unavailable. */
+  totalRevenueEgp?: number | null;
+  /** Count of sales in the period, for the subtitle. */
+  salesCount?: number | null;
+}
+
+/** Instant generic events. Each carries an actor name (for the body line) and
+ *  a stable route-worthy identifier (expenseId, productId, …). Kept tiny:
+ *  the detail screens fetch the authoritative row on tap. */
+export interface ExpenseRecordedPayload extends BaseEventPayload {
+  expenseId: string;
+  title: string;
+  amountEgp: number;
+  category: string;
+  actorName?: string | null;
+}
+
+export interface ProductAddedPayload extends BaseEventPayload {
+  productId: string;
+  productName: string;
+  actorName?: string | null;
+}
+
+export interface InventoryAdjustedPayload extends BaseEventPayload {
+  productId: string;
+  productName: string;
+  deltaQty: number;
+  newQty: number;
+  actorName?: string | null;
+}
+
+export interface ReturnRecordedPayload extends BaseEventPayload {
+  returnId: string;
+  invoiceId: string | null;
+  /** Null when the producer didn't fetch the amount (cheap-path fire). */
+  amountEgp: number | null;
+  actorName?: string | null;
+}
+
+export interface AttendanceCheckInPayload extends BaseEventPayload {
+  employeeUserId: string;
+  employeeName: string;
+  /** ISO timestamp of the check-in. */
+  occurredAt: string;
+}
+
 export type EventPayloadMap = {
   "sale.created": SaleCreatedPayload;
   // Never fanned out (EVENT_RECIPIENT_ROLES is empty); alertSale delivers it.
@@ -153,6 +212,13 @@ export type EventPayloadMap = {
   "collection.unmatched_credit": CollectionUnmatchedPayload;
   "collection.source_silent": CollectionSourceSilentPayload;
   "collection.limit_warning": CollectionLimitPayload;
+  "report.weekly": ReportPayload;
+  "report.monthly": ReportPayload;
+  "expense.recorded": ExpenseRecordedPayload;
+  "product.added": ProductAddedPayload;
+  "inventory.adjusted": InventoryAdjustedPayload;
+  "return.recorded": ReturnRecordedPayload;
+  "attendance.check_in": AttendanceCheckInPayload;
 };
 
 // Notification `kind` column values. We reuse the existing loose enum
@@ -171,6 +237,13 @@ export const EVENT_TO_KIND: Record<NotificationEventType, NotificationKind> = {
   "collection.unmatched_credit": "collection_unmatched",
   "collection.source_silent": "collection_source_silent",
   "collection.limit_warning": "collection_limit",
+  "report.weekly": "report",
+  "report.monthly": "report",
+  "expense.recorded": "info",
+  "product.added": "info",
+  "inventory.adjusted": "info",
+  "return.recorded": "info",
+  "attendance.check_in": "info",
 };
 
 // ─── Public API ──────────────────────────────────────────────────────────────
@@ -231,6 +304,11 @@ async function doFanout<E extends NotificationEventType>(
         email: users.email,
         name: users.name,
         locale: users.locale,
+        // `receive_all_alerts` (permissions.ts) is a preference override, not
+        // an authz bypass — a member who already is in `eligible` opts into
+        // every event they are role-eligible for, regardless of whether they
+        // toggled it off on the notification-preferences screen.
+        permissions: tenantMembers.permissions,
       })
       .from(tenantMembers)
       .innerJoin(users, eq(users.id, tenantMembers.userId))
@@ -292,11 +370,20 @@ async function doFanout<E extends NotificationEventType>(
 
   await withTenant(tenantId, async (tx) => {
     for (const r of eligible) {
-      const pref = resolveMemberPref(
+      const basePref = resolveMemberPref(
         r.role as TenantMemberRole,
         eventType,
         storedByUser.get(r.userId) ?? null,
       );
+      // receive_all_alerts (permissions.ts) upgrades the in-app + push
+      // delivery for any event this member is already role/permission-eligible
+      // for. It does NOT flip email on — email is a separate channel the
+      // owner opts into explicitly. Owner always has every permission.
+      const hasAllAlerts =
+        r.role === "owner" || (Array.isArray(r.permissions) && r.permissions.includes("receive_all_alerts"));
+      const pref: EventPreference = hasAllAlerts
+        ? { inApp: true, email: basePref.email, digestMode: "instant" }
+        : basePref;
       const locale = (r.locale === "en" ? "en" : "ar") as "ar" | "en";
 
       if (pref.inApp) {
@@ -320,8 +407,9 @@ async function doFanout<E extends NotificationEventType>(
           push:
             eventType !== "sale.created" &&
             pref.digestMode !== "digest" &&
-            (storedByUser.get(r.userId)?.push ??
-              (DEFAULT_PUSH[role] ?? DEFAULT_PUSH.staff)[eventType]),
+            (hasAllAlerts
+              || (storedByUser.get(r.userId)?.push ??
+                (DEFAULT_PUSH[role] ?? DEFAULT_PUSH.staff)[eventType])),
         });
       }
 
@@ -670,6 +758,85 @@ export function renderInApp<E extends NotificationEventType>(
       return renderCollectionSourceSilent(payload as CollectionSourceSilentPayload, ar);
     case "collection.limit_warning":
       return renderCollectionLimit(payload as CollectionLimitPayload, ar);
+    case "report.weekly":
+    case "report.monthly": {
+      const p = payload as ReportPayload;
+      const isWeek = eventType === "report.weekly";
+      const titleAr = isWeek ? "التقرير الأسبوعي جاهز" : "التقرير الشهري جاهز";
+      const titleEn = isWeek ? "Weekly report ready" : "Monthly report ready";
+      const bodyParts: string[] = [p.period];
+      if (p.totalRevenueEgp != null) {
+        bodyParts.push(ar ? `${fmtEgp(p.totalRevenueEgp)} ج.م` : `EGP ${fmtEgp(p.totalRevenueEgp)}`);
+      }
+      if (p.salesCount != null) {
+        bodyParts.push(ar ? `${p.salesCount} فاتورة` : `${p.salesCount} sales`);
+      }
+      return ar
+        ? { title: titleAr, body: bodyParts.join(" · ") }
+        : { title: titleEn, body: bodyParts.join(" · ") };
+    }
+    case "expense.recorded": {
+      const p = payload as ExpenseRecordedPayload;
+      return ar
+        ? {
+            title: `مصروف جديد — ${fmtEgp(p.amountEgp)} ج.م`,
+            body: p.actorName ? `${p.title} · ${p.actorName}` : p.title,
+          }
+        : {
+            title: `New expense — EGP ${fmtEgp(p.amountEgp)}`,
+            body: p.actorName ? `${p.title} · ${p.actorName}` : p.title,
+          };
+    }
+    case "product.added": {
+      const p = payload as ProductAddedPayload;
+      return ar
+        ? {
+            title: "منتج جديد",
+            body: p.actorName ? `${p.productName} · ${p.actorName}` : p.productName,
+          }
+        : {
+            title: "New product",
+            body: p.actorName ? `${p.productName} · ${p.actorName}` : p.productName,
+          };
+    }
+    case "inventory.adjusted": {
+      const p = payload as InventoryAdjustedPayload;
+      const sign = p.deltaQty >= 0 ? "+" : "";
+      return ar
+        ? {
+            title: `تعديل مخزون — ${p.productName}`,
+            body: `${sign}${p.deltaQty} · المتاح ${p.newQty}${p.actorName ? ` · ${p.actorName}` : ""}`,
+          }
+        : {
+            title: `Stock adjusted — ${p.productName}`,
+            body: `${sign}${p.deltaQty} · on hand ${p.newQty}${p.actorName ? ` · ${p.actorName}` : ""}`,
+          };
+    }
+    case "return.recorded": {
+      const p = payload as ReturnRecordedPayload;
+      const inv = p.invoiceId ? ` · ${p.invoiceId}` : "";
+      const amtAr = p.amountEgp != null ? ` — ${fmtEgp(p.amountEgp)} ج.م` : "";
+      const amtEn = p.amountEgp != null ? ` — EGP ${fmtEgp(p.amountEgp)}` : "";
+      return ar
+        ? {
+            title: `مرتجع جديد${amtAr}`,
+            body: `${p.actorName ?? ""}${inv}`.trim(),
+          }
+        : {
+            title: `New return${amtEn}`,
+            body: `${p.actorName ?? ""}${inv}`.trim(),
+          };
+    }
+    case "attendance.check_in": {
+      const p = payload as AttendanceCheckInPayload;
+      const d = new Date(p.occurredAt);
+      const hhmm = isNaN(d.getTime())
+        ? ""
+        : `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+      return ar
+        ? { title: `${p.employeeName} سجَّل الحضور`, body: hhmm }
+        : { title: `${p.employeeName} checked in`, body: hhmm };
+    }
     default:
       return { title: eventType, body: null };
   }

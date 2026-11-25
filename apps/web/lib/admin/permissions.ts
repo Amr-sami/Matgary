@@ -13,6 +13,11 @@ export type AdminPermission =
   | "tenant.suspend"
   | "tenant.extend_trial"
   | "tenant.impersonate"
+  // Super-admin only: reset the owner's password. A reset bumps their token
+  // version (sign out everywhere) and sets must_change_password so the next
+  // login forces a rotation. Deliberately gated separately from suspend/trial
+  // so an ops admin cannot take over an owner's account.
+  | "tenant.reset_owner_password"
   | "plan.read"
   | "plan.update"
   | "admin.read"
@@ -26,6 +31,7 @@ const SUPER_ADMIN_PERMS = new Set<AdminPermission>([
   "tenant.suspend",
   "tenant.extend_trial",
   "tenant.impersonate",
+  "tenant.reset_owner_password",
   "plan.read",
   "plan.update",
   "admin.read",

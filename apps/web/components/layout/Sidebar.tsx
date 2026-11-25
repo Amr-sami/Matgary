@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useActiveBranchName } from "./ActiveBranchProvider";
 import {
   LayoutDashboard,
   Package,
@@ -31,7 +30,6 @@ import { useUnreadTaskCount } from "@/hooks/useUnreadTaskCount";
 import { useCollectionsAccess, usePendingCollectionsCount } from "@/hooks/useCollections";
 import { ShellNotificationBell } from "@/components/notifications/ShellNotificationBell";
 import { useLeaveUnread } from "@/hooks/useLeaveUnread";
-import { useBranches } from "@/hooks/useBranches";
 import { useDictionary } from "@/components/i18n/DictionaryProvider";
 
 interface NavItem {
@@ -50,6 +48,11 @@ const primaryItems: NavItem[] = [
   { href: "/add-product", labelKey: "addProduct", icon: PlusSquare, requires: "manage_inventory" },
   { href: "/purchases", labelKey: "purchases", icon: Receipt, requires: "view_purchases" },
   { href: "/insights", labelKey: "insights", icon: BarChart3, requires: "view_insights" },
+  // Financial Management (Slice 2a). Lives directly under Insights so the
+  // URL (/insights/financials/*) matches the navigation metaphor, but gets
+  // its own primary slot because it is a distinct permission gate
+  // (view_financials, enforced server-side).
+  { href: "/insights/financials", labelKey: "financials", icon: Wallet, requires: "view_financials" },
 ];
 
 const secondaryItems: NavItem[] = [
@@ -106,34 +109,15 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     return can(principal, i.requires);
   });
 
-  // Multi-store: tenant name = the company (whole account); branch name =
-  // the active store. Show the active branch as the headline and the
-  // tenant as a thin subtitle so the user always knows which store they're
-  // operating in.
-  //
-  // The branch heading is server-driven now: the root layout reads the
-  // `mg.branch_name` companion cookie and passes it through context. SSR
-  // and the first client render see the SAME value, so the heading is
-  // pixel-stable from the very first paint — no swap, no layout shift.
-  // The live useBranches() result is preferred when it lands (e.g. you
-  // switched branches in this tab) but its identity matches the cookie
-  // value 99% of the time, so there's nothing visible to swap.
-  const ssrBranchName = useActiveBranchName();
+  // Storo has no branches — the sidebar heading is simply the shop name
+  // (settings.shopName) with the tenant slug as a thin subtitle when they
+  // differ. No branch heading, no branch switcher.
   const tenantName =
     session?.user?.tenantSlug?.replace(/-/g, " ") || shellT.storeFallback;
-  const { current: activeBranch } = useBranches();
-  const branchLabel =
-    activeBranch?.name?.trim() || ssrBranchName?.trim() || undefined;
-  const storeName =
-    branchLabel || settings.shopName?.trim() || tenantName;
-  // Show the tenant subtitle whenever the branch name is meaningfully
-  // different from the tenant name. Both inputs are resolvable on the
-  // server (cookie + JWT slug) so the result is identical between SSR
-  // and the first client render — the line no longer disappears on
-  // hard refresh and then reappears after the branches API resolves.
+  const storeName = settings.shopName?.trim() || tenantName;
   const showSubtenant =
-    !!branchLabel &&
-    branchLabel.toLowerCase() !== tenantName.toLowerCase();
+    storeName.toLowerCase() !== tenantName.toLowerCase() &&
+    !!session?.user?.tenantSlug;
   const { count: unreadTasks } = useUnreadTaskCount();
   const { counts: leaveUnread } = useLeaveUnread();
 

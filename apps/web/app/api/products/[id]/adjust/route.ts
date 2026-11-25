@@ -3,6 +3,10 @@ import { z } from "zod";
 import { requirePermissionWithBranch } from "@/lib/api/auth-helpers";
 import { adjustProductQuantity } from "@/lib/repo/catalog";
 import { logActivity } from "@/lib/repo/activity";
+import { fanoutEvent } from "@/lib/notifications/dispatch";
+import { withTenant } from "@/lib/db";
+import { products as productsTable } from "@/lib/db/schema";
+import { eq, and } from "drizzle-orm";
 
 const schema = z.object({ delta: z.number().int() });
 
@@ -39,6 +43,22 @@ export async function POST(
       entityId: id,
       branchId: r.ctx.branchId,
       metadata: { delta: parsed.data.delta, newQuantity },
+    });
+    // One cheap read to resolve the product name for the push body.
+    const [p] = await withTenant(r.ctx.tenantId, (tx) =>
+      tx
+        .select({ name: productsTable.name })
+        .from(productsTable)
+        .where(and(eq(productsTable.tenantId, r.ctx.tenantId), eq(productsTable.id, id)))
+        .limit(1),
+    );
+    void fanoutEvent(r.ctx.tenantId, r.ctx.branchId, "inventory.adjusted", {
+      productId: id,
+      productName: p?.name ?? "?",
+      deltaQty: parsed.data.delta,
+      newQty: newQuantity,
+      actorUserId: r.ctx.userId,
+      link: `/inventory/${id}`,
     });
     return NextResponse.json({ newQuantity });
   } catch (err) {

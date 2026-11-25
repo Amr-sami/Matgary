@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { headers, cookies } from "next/headers";
+import { headers } from "next/headers";
 import { Cairo, Tajawal, Lemonada } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
 import { QueryProvider } from "@/components/providers/QueryProvider";
@@ -7,8 +7,6 @@ import { IconProvider } from "@/components/IconProvider";
 import { defaultLocale, dirOf, isLocale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/get-dictionary";
 import { DictionaryProvider } from "@/components/i18n/DictionaryProvider";
-import { ActiveBranchNameProvider } from "@/components/layout/ActiveBranchProvider";
-import { BRANCH_NAME_COOKIE } from "@/lib/api/branch-name-cookie";
 import "./globals.css";
 
 const cairo = Cairo({
@@ -80,14 +78,6 @@ export default async function RootLayout({
   // URL-derived locale; the nested provider wins (React context shadow),
   // so this root one is the fallback for any page outside [lang].
   const dict = await getDictionary(locale);
-  // Active branch name from the non-HttpOnly companion cookie. Lets the
-  // Sidebar render the right store heading on the SSR HTML — no
-  // "ستورو → elhenawystore → Main" cascade on hard refresh. Null when
-  // the cookie isn't set yet (first ever load); falls back to the
-  // locale's storeFallback until `/api/branches` populates the cookie.
-  const cookieStore = await cookies();
-  const activeBranchName =
-    cookieStore.get(BRANCH_NAME_COOKIE)?.value ?? null;
 
   // Demo-store reset hook. Middleware (Edge runtime) flags the request with
   // x-demo-reset on every full-page navigation belonging to a demo session;
@@ -157,9 +147,7 @@ export default async function RootLayout({
           <QueryProvider>
             <IconProvider>
               <DictionaryProvider locale={locale} dict={dict}>
-                <ActiveBranchNameProvider initialName={activeBranchName}>
-                  {children}
-                </ActiveBranchNameProvider>
+                {children}
               </DictionaryProvider>
             </IconProvider>
           </QueryProvider>

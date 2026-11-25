@@ -6,6 +6,10 @@ import {
   recordAttendanceEvent,
   AttendanceStateError,
 } from "@/lib/repo/attendance-events";
+import { fanoutEvent } from "@/lib/notifications/dispatch";
+import { withTenant } from "@/lib/db";
+import { users as usersTable, tenantMembers } from "@/lib/db/schema";
+import { eq, and } from "drizzle-orm";
 
 const TYPES = ["check_in", "check_out"] as const;
 const SOURCES = ["manual", "geofence", "qr", "manager_attest"] as const;
@@ -47,6 +51,32 @@ export async function POST(req: NextRequest) {
       note: parsed.data.note ?? null,
       recordedByUserId: r.ctx.userId,
     });
+    // Only announce check-ins (not check-outs) in this phase. attendance.late
+    // is a separate cron-driven event (see cron/attendance-late).
+    if (parsed.data.type === "check_in") {
+      const [emp] = await withTenant(r.ctx.tenantId, (tx) =>
+        tx
+          .select({ name: tenantMembers.displayName, fallback: usersTable.name })
+          .from(tenantMembers)
+          .innerJoin(usersTable, eq(usersTable.id, tenantMembers.userId))
+          .where(
+            and(
+              eq(tenantMembers.tenantId, r.ctx.tenantId),
+              eq(tenantMembers.userId, parsed.data.employeeId),
+            ),
+          )
+          .limit(1),
+      );
+      void fanoutEvent(r.ctx.tenantId, null, "attendance.check_in", {
+        employeeUserId: parsed.data.employeeId,
+        employeeName: emp?.name ?? emp?.fallback ?? "?",
+        occurredAt: event.occurredAt instanceof Date
+          ? event.occurredAt.toISOString()
+          : String(event.occurredAt),
+        actorUserId: r.ctx.userId,
+        link: `/team/${encodeURIComponent(parsed.data.employeeId)}`,
+      });
+    }
     return NextResponse.json({ event }, { status: 201 });
   } catch (err) {
     if (err instanceof AttendanceStateError) {

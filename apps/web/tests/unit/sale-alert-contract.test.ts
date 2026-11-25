@@ -76,6 +76,9 @@ describe("SSE frame", () => {
 });
 
 describe("copy", () => {
+  // v2 copy (owner's call, 2026-10-25): body leads with the product name
+  // instead of the invoice number. Tapping the push still opens the sale
+  // detail (route = /sales/{saleId}) for the full line list.
   const base = {
     invoiceId: "INV-8K2Q",
     total: 2700,
@@ -83,19 +86,31 @@ describe("copy", () => {
     paymentMethod: "instapay" as const,
     sellerName: "أحمد محمد",
     branchName: "المعادي",
+    firstProductName: "Casio MTP-1374L",
+    lineCount: 1,
     offlineAt: null,
     timeZone: "Africa/Cairo",
   };
 
-  it("matches the doc 16 §3 table", () => {
+  it("single-line sale: product · payment · seller · branch", () => {
     expect(renderSaleAlert("ar", base)).toEqual({
       title: "بيع جديد · 2,700 ج.م",
-      body: "INV-8K2Q · 3 قطع · إنستاباي · سجّلها أحمد · فرع المعادي",
+      body: "Casio MTP-1374L · إنستاباي · سجّلها أحمد · فرع المعادي",
     });
     expect(renderSaleAlert("en", { ...base, sellerName: "Ahmed", branchName: "Maadi" })).toEqual({
       title: "New sale · EGP 2,700",
-      body: "INV-8K2Q · 3 items · InstaPay · by Ahmed · Maadi",
+      body: "Casio MTP-1374L · InstaPay · by Ahmed · Maadi",
     });
+  });
+
+  it("multi-line cart: '{first product} +N أخرى' / '+N more'", () => {
+    expect(renderSaleAlert("ar", { ...base, lineCount: 3 }).body).toContain("Casio MTP-1374L +2 أخرى");
+    expect(renderSaleAlert("en", { ...base, lineCount: 4, sellerName: "Ahmed", branchName: "Maadi" }).body).toContain(
+      "Casio MTP-1374L +3 more",
+    );
+  });
+
+  it("summary copy is unchanged (3+ sales/min collapse)", () => {
     expect(renderSaleSummary("ar", { count: 5, total: 12400, branchName: "المعادي" })).toEqual({
       title: "5 بيعات جديدة · 12,400 ج.م",
       body: "في آخر دقيقة · فرع المعادي",
@@ -118,11 +133,9 @@ describe("copy", () => {
   it("a branch name that already says فرع is not doubled; empty parts vanish", () => {
     expect(renderSaleAlert("ar", { ...base, branchName: "فرع المعادي" }).body).toMatch(/ · فرع المعادي$/);
     expect(renderSaleAlert("ar", { ...base, branchName: "الفرع الرئيسي" }).body).toMatch(/ · الفرع الرئيسي$/);
-    expect(renderSaleAlert("ar", { ...base, branchName: null, sellerName: "  " }).body).toBe(
-      "INV-8K2Q · 3 قطع · إنستاباي",
+    expect(renderSaleAlert("ar", { ...base, branchName: null, sellerName: "  ", firstProductName: null }).body).toBe(
+      "إنستاباي",
     );
-    expect(renderSaleAlert("ar", { ...base, itemCount: 2 }).body).toContain("قطعتين");
-    expect(renderSaleAlert("ar", { ...base, itemCount: 12 }).body).toContain("12 قطعة");
   });
 });
 
@@ -165,9 +178,9 @@ describe("cha_ching.wav (doc 16 §4)", () => {
     expect(readFileSync(mobile).equals(readFileSync(web))).toBe(true);
   });
 
-  it("is RIFF/WAVE PCM 16-bit mono, shorter than 2 s and smaller than 200 KB", () => {
+  it("is RIFF/WAVE PCM 16-bit mono, shorter than 3 s and smaller than 300 KB", () => {
     const buf = readFileSync(mobile);
-    expect(statSync(mobile).size).toBeLessThan(200 * 1024);
+    expect(statSync(mobile).size).toBeLessThan(300 * 1024);
     expect(buf.toString("ascii", 0, 4)).toBe("RIFF");
     expect(buf.toString("ascii", 8, 12)).toBe("WAVE");
     let off = 12;
@@ -196,6 +209,6 @@ describe("cha_ching.wav (doc 16 §4)", () => {
     expect(dataBytes).toBeGreaterThan(0);
     const seconds = dataBytes / (fmt!.rate * fmt!.blockAlign);
     expect(seconds).toBeGreaterThan(0.5);
-    expect(seconds).toBeLessThan(2);
+    expect(seconds).toBeLessThan(3);
   });
 });

@@ -679,6 +679,20 @@ export function SaleForm({
               note: note || undefined,
               shopName: settings.shopName,
               shopPhone: settings.shopPhone,
+              // Receipt identity + per-row visibility toggles — sent as-is;
+              // the PDF renderer applies the toggles so a hidden row is
+              // omitted from the attachment the customer receives.
+              shopAddress: settings.receiptAddress,
+              slogan: settings.receiptSlogan,
+              taxRegistration: settings.receiptTaxRegistration,
+              taxCardNumber: settings.receiptTaxCardNumber,
+              returnPolicy: settings.receiptReturnPolicy,
+              referencePrefix: settings.receiptReferencePrefix,
+              showAddress: settings.receiptShowAddress,
+              showSlogan: settings.receiptShowSlogan,
+              showTaxInfo: settings.receiptShowTaxInfo,
+              showReturnPolicy: settings.receiptShowReturnPolicy,
+              blockAlignments: settings.receiptBlockAlignments,
             };
             fetch("/api/whatsapp/cloud/send-pdf", {
               method: "POST",
@@ -766,6 +780,20 @@ export function SaleForm({
               note: note || undefined,
               shopName: settings.shopName,
               shopPhone: settings.shopPhone,
+              // Receipt identity + per-row visibility toggles — sent as-is;
+              // the PDF renderer applies the toggles so a hidden row is
+              // omitted from the attachment the customer receives.
+              shopAddress: settings.receiptAddress,
+              slogan: settings.receiptSlogan,
+              taxRegistration: settings.receiptTaxRegistration,
+              taxCardNumber: settings.receiptTaxCardNumber,
+              returnPolicy: settings.receiptReturnPolicy,
+              referencePrefix: settings.receiptReferencePrefix,
+              showAddress: settings.receiptShowAddress,
+              showSlogan: settings.receiptShowSlogan,
+              showTaxInfo: settings.receiptShowTaxInfo,
+              showReturnPolicy: settings.receiptShowReturnPolicy,
+              blockAlignments: settings.receiptBlockAlignments,
             };
             fetch("/api/whatsapp/send-pdf", {
               method: "POST",

@@ -10,6 +10,7 @@ import {
   categories,
 } from "@/lib/db/schema";
 import { adjustSupplierBalance } from "./suppliers";
+import { _recordPaymentTx } from "./purchase-payments";
 import { fanoutEvent } from "@/lib/notifications/dispatch";
 
 export type PurchaseOrderStatus = "draft" | "received" | "cancelled";
@@ -269,12 +270,30 @@ export async function deletePurchaseOrder(
  * the latest unit cost from the PO so future margin calculations reflect the
  * new buy price.
  */
-export async function receivePurchaseOrder(
+/**
+ * Tx-scoped receive. Does everything receivePurchaseOrder does EXCEPT opening
+ * the outer `withTenant` and firing the post-commit `fanoutEvent`. Returns the
+ * summary the caller needs for fan-out.
+ *
+ * Extracted so composite orchestrators (e.g. AI "create + receive + pay in
+ * one preview") can share the single transaction with createPurchaseOrder +
+ * recordPayment without rebuilding this logic. Public callers use
+ * receivePurchaseOrder below, which keeps behaviour identical.
+ */
+export async function _receivePurchaseOrderTx(
+  tx: Parameters<Parameters<typeof withTenant>[1]>[0],
   tenantId: string,
   id: string,
   options: { updateCost?: boolean; actorUserId?: string | null } = {},
-): Promise<void> {
-  const summary = await withTenant(tenantId, async (tx) => {
+): Promise<{
+  branchId: string | null;
+  shortId: string;
+  totalEgp: number;
+  itemCount: number;
+  supplierName: string | null;
+  branchName: string | null;
+}> {
+  {
     const [po] = await tx
       .select()
       .from(purchaseOrders)
@@ -557,7 +576,19 @@ export async function receivePurchaseOrder(
       supplierName: supplier?.name ?? null,
       branchName,
     };
-  });
+  }
+}
+
+/** Public receive. Opens its own transaction, delegates to the tx-scoped
+ *  inner, then fires the post-commit notification fanout. */
+export async function receivePurchaseOrder(
+  tenantId: string,
+  id: string,
+  options: { updateCost?: boolean; actorUserId?: string | null } = {},
+): Promise<void> {
+  const summary = await withTenant(tenantId, (tx) =>
+    _receivePurchaseOrderTx(tx, tenantId, id, options),
+  );
 
   void fanoutEvent(tenantId, summary.branchId, "purchase.received", {
     poShortId: summary.shortId,
@@ -568,4 +599,143 @@ export async function receivePurchaseOrder(
     link: `/purchases/${id}`,
     actorUserId: options.actorUserId ?? null,
   });
+}
+
+/* ──────────────── Composite: create + receive + optional payment ──────────────── */
+
+export interface CreateReceivedPurchaseInput {
+  supplierId: string;
+  items: CreatePurchaseOrderItem[];
+  /** Immediate supplier payment to apply after receiving. 0 or undefined = pure credit. */
+  paidNow?: number;
+  /** Payment method; defaults to "cash" when `paidNow > 0` and left unset. */
+  paymentMethod?: "cash" | "bank" | "vfcash" | "instapay" | "other";
+  /** Free-text notes. The orchestrator appends an audit trailer. */
+  notes?: string | null;
+  /** When true (AI default), update each existing product's cost_price to the
+   *  new unit cost — matches the Owner's mental model of "this is what I paid
+   *  this time". Historical `cost_price_at_sale` snapshots are untouched. */
+  updateCost?: boolean;
+  /** Actor used for audit + the post-commit fanout. */
+  actorUserId?: string | null;
+  /** Suffix stamped into notes so auditors can see non-UI origins. */
+  originTag?: string | null;
+}
+
+export interface CreateReceivedPurchaseResult {
+  purchaseOrderId: string;
+  total: number;
+  paid: number;
+  outstanding: number;
+  paymentId: string | null;
+}
+
+/**
+ * Atomic composite for the AI "اشتريت من حسين …" flow and any other caller
+ * that needs create + receive + payment as ONE transaction. Rolls back the
+ * entire thing on any failure — no half-finished PO, no stale stock delta,
+ * no orphan supplier-balance adjustment.
+ *
+ * Internally composes the SAME three primitives the REST routes use:
+ *   • createPurchaseOrder → draft
+ *   • _receivePurchaseOrderTx → stock in, cost update, supplier balance
+ *   • _recordPaymentTx → (optional) supplier settlement
+ *
+ * Post-commit fanout mirrors the stand-alone receivePurchaseOrder so a
+ * notification/digest subscriber doesn't need to know about this path.
+ */
+export async function createReceivedPurchaseWithOptionalPayment(
+  tenantId: string,
+  input: CreateReceivedPurchaseInput,
+): Promise<CreateReceivedPurchaseResult> {
+  if (input.items.length === 0) {
+    throw new PurchaseOrderConflictError("لا يمكن إنشاء أمر شراء بدون أصناف");
+  }
+  const paidNow = Math.round(Math.max(0, input.paidNow ?? 0) * 100) / 100;
+  const expectedTotal =
+    Math.round(input.items.reduce((s, i) => s + i.quantity * i.unitCost, 0) * 100) / 100;
+  if (paidNow > expectedTotal + 0.001) {
+    throw new PurchaseOrderConflictError(
+      `المبلغ المدفوع (${paidNow.toFixed(2)}) أكبر من إجمالي الشراء (${expectedTotal.toFixed(2)})`,
+    );
+  }
+
+  const notesTrailer = input.originTag ?? "via AI Agent";
+  const notes = input.notes?.trim()
+    ? `${input.notes.trim()} — ${notesTrailer}`
+    : notesTrailer;
+
+  const outcome = await withTenant(tenantId, async (tx) => {
+    // 1) Create PO (draft).
+    const [created] = await tx
+      .insert(purchaseOrders)
+      .values({
+        tenantId,
+        supplierId: input.supplierId,
+        status: "draft",
+        notes,
+        total: expectedTotal.toFixed(2),
+      })
+      .returning({ id: purchaseOrders.id });
+    const purchaseOrderId = created.id;
+
+    await tx.insert(purchaseOrderItems).values(
+      input.items.map((i) => ({
+        tenantId,
+        purchaseOrderId,
+        productId: i.productId,
+        productName: i.productName,
+        quantity: i.quantity,
+        unitCost: i.unitCost.toFixed(2),
+        lineTotal: (i.quantity * i.unitCost).toFixed(2),
+        categoryId: i.categoryId ?? null,
+      })),
+    );
+
+    // 2) Receive — reuses the same tx; handles new-product materialisation,
+    //    stock, cost snapshot, supplier balance += total.
+    const summary = await _receivePurchaseOrderTx(tx, tenantId, purchaseOrderId, {
+      updateCost: input.updateCost ?? true,
+      actorUserId: input.actorUserId ?? null,
+    });
+
+    // 3) Optional immediate payment.
+    let paymentId: string | null = null;
+    if (paidNow > 0) {
+      const res = await _recordPaymentTx(tx, tenantId, purchaseOrderId, {
+        amount: paidNow,
+        method: input.paymentMethod ?? "cash",
+        notes: `via AI Agent`,
+      });
+      paymentId = res.id;
+    }
+
+    return {
+      summary,
+      purchaseOrderId,
+      total: expectedTotal,
+      paid: paidNow,
+      outstanding: Math.round((expectedTotal - paidNow) * 100) / 100,
+      paymentId,
+    };
+  });
+
+  // Post-commit — fire the same fan-out receivePurchaseOrder does.
+  void fanoutEvent(tenantId, outcome.summary.branchId, "purchase.received", {
+    poShortId: outcome.summary.shortId,
+    supplierName: outcome.summary.supplierName,
+    totalEgp: outcome.summary.totalEgp,
+    itemCount: outcome.summary.itemCount,
+    branchName: outcome.summary.branchName,
+    link: `/purchases/${outcome.purchaseOrderId}`,
+    actorUserId: input.actorUserId ?? null,
+  });
+
+  return {
+    purchaseOrderId: outcome.purchaseOrderId,
+    total: outcome.total,
+    paid: outcome.paid,
+    outstanding: outcome.outstanding,
+    paymentId: outcome.paymentId,
+  };
 }

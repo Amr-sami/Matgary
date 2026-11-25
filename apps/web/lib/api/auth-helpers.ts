@@ -19,6 +19,10 @@ import {
   resolveActiveBranchResult,
   type BranchContext,
 } from "./branch-context";
+import {
+  type HeartbeatTransport,
+  touchHeartbeat,
+} from "@/lib/admin/presence";
 
 /**
  * Ensure the in-flight request has an AsyncLocalStorage context. The
@@ -192,7 +196,15 @@ type SessionResult =
    *  it was minted (H4). 401, distinct from "none" so the client signs out
    *  instead of retrying the refresh. */
   | { kind: "revoked" }
-  | { kind: "ok"; ctx: AuthedContext }
+  | {
+      kind: "ok";
+      ctx: AuthedContext;
+      /** Phase 2 presence — internal plumbing for the heartbeat hook in
+       *  requireTenant. Carries just enough to identify WHICH presence
+       *  row to touch (mobile device row vs web session row). Never
+       *  surfaced to route handlers. */
+      _heartbeat?: HeartbeatTransport;
+    }
   /** A valid token whose tenant/account state blocks the request. Mirrors the
    *  bodies middleware returns for cookie sessions, so a client handles one
    *  contract regardless of transport. */
@@ -287,6 +299,13 @@ async function resolveSession(opts: ResolveOptions = {}): Promise<SessionResult>
         permissions: claims.permissions,
         walls,
       },
+      // Internal — consumed by requireTenant to fire the presence heartbeat.
+      // Not part of the public AuthedContext shape to prevent handlers
+      // from poking at it.
+      _heartbeat: {
+        kind: "bearer",
+        deviceId: claims.did ?? null,
+      },
     };
   }
 
@@ -300,6 +319,10 @@ async function resolveSession(opts: ResolveOptions = {}): Promise<SessionResult>
       role: session.user.role,
       permissions: (session.user.permissions ?? []) as Permission[],
       walls: [],
+    },
+    _heartbeat: {
+      kind: "cookie",
+      userAgent: h.get("user-agent"),
     },
   };
 }
@@ -328,6 +351,13 @@ export async function requireTenant(opts: ResolveOptions = {}): Promise<
     };
   }
   setRequestContext({ tenantId: r.ctx.tenantId, userId: r.ctx.userId });
+  // Phase 2 presence — fire-and-forget. touchHeartbeat() swallows every
+  // error internally; a DB blip on a presence write must never fail an
+  // authenticated request. Throttled to one UPDATE per 60s per row by the
+  // SQL itself; this call is cheap on the throttled path.
+  if (r._heartbeat) {
+    void touchHeartbeat(r.ctx.userId, r.ctx.tenantId, r._heartbeat);
+  }
   return { ok: true, ctx: r.ctx };
 }
 

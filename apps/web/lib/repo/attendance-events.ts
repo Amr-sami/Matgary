@@ -280,3 +280,54 @@ export function pairShifts(events: AttendanceEventDto[]): Shift[] {
   }
   return out;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Per-employee aggregate — used by the AI agent's attendance summary tool
+// (apps/web/lib/ai/tools/employees.ts). Shape mirrors what a shop owner wants
+// to see at a glance: hours worked, days present, open shifts (forgot to
+// clock out) across every member of the tenant/branch in a window.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface AttendanceSummaryRow {
+  employeeId: string;
+  totalHours: number;
+  daysPresent: number;
+  openShifts: number;
+}
+
+export async function attendanceSummaryInWindow(
+  tenantId: string,
+  args: { from: Date; to: Date },
+): Promise<AttendanceSummaryRow[]> {
+  const events = await listAttendanceEvents(tenantId, {
+    fromDate: args.from,
+    toDate: args.to,
+  });
+  if (events.length === 0) return [];
+  // Partition by employee, pair shifts per person, then aggregate.
+  const byEmployee = new Map<string, AttendanceEventDto[]>();
+  for (const e of events) {
+    const bucket = byEmployee.get(e.employeeId);
+    if (bucket) bucket.push(e);
+    else byEmployee.set(e.employeeId, [e]);
+  }
+  const out: AttendanceSummaryRow[] = [];
+  for (const [employeeId, es] of byEmployee) {
+    const shifts = pairShifts(es);
+    const totalHours = shifts.reduce((s, sh) => s + sh.hours, 0);
+    // Count unique calendar days the employee was present (any closed shift).
+    const days = new Set(
+      shifts
+        .filter((sh) => sh.end != null)
+        .map((sh) => sh.start.toISOString().slice(0, 10)),
+    );
+    const openShifts = shifts.filter((sh) => sh.end == null).length;
+    out.push({
+      employeeId,
+      totalHours: Math.round(totalHours * 100) / 100,
+      daysPresent: days.size,
+      openShifts,
+    });
+  }
+  return out.sort((a, b) => b.totalHours - a.totalHours);
+}

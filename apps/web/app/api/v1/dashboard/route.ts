@@ -73,6 +73,15 @@ interface RecentSaleSummary {
   createdAt: string;
   /** Units sold across the invoice (sum of quantitySold) — what "{n} قطعة" counts. */
   itemCount: number;
+  /** Per-line product summary (first 3 lines, newest-first within the invoice)
+   *  — the dashboard row shows "N × Name" instead of the invoice ref so a
+   *  shopkeeper reads WHAT was sold, not an opaque code. */
+  lines: { productName: string; quantitySold: number }[];
+  /** Total number of distinct product lines on the invoice — drives the
+   *  "+K more" tail when `lines` is truncated. */
+  lineCount: number;
+  /** Σ discountAmount across lines — surfaces as a chip when > 0. */
+  discount: number;
   /** True when every line on the invoice has been returned. */
   isReturned: boolean;
   isPaid: boolean;
@@ -80,6 +89,10 @@ interface RecentSaleSummary {
    *  non-null line value); null = not a digital sale. */
   collectionStatus: Sale["collectionStatus"] | null;
 }
+
+/** Keep the payload small — the dashboard row only needs a couple of names,
+ *  plus a tail count. Anything past this is summarised as "+K more". */
+const MAX_INVOICE_LINES_IN_SUMMARY = 3;
 
 /**
  * Fold newest-first sale rows into invoices, keyed on invoiceId (a legacy row
@@ -110,6 +123,11 @@ function foldRecentSales(rows: Sale[], hasMore: boolean): RecentSaleSummary[] {
     if (current) {
       current.itemCount += row.quantitySold;
       current.total += row.totalPrice;
+      current.discount += row.discountAmount ?? 0;
+      current.lineCount += 1;
+      if (current.lines.length < MAX_INVOICE_LINES_IN_SUMMARY) {
+        current.lines.push({ productName: row.productName, quantitySold: row.quantitySold });
+      }
       current.isReturned = current.isReturned && row.isReturned;
       current.isPaid = current.isPaid && row.isPaid !== false;
       // A cart carries one customer/payment, but a legacy row may lack the
@@ -129,6 +147,9 @@ function foldRecentSales(rows: Sale[], hasMore: boolean): RecentSaleSummary[] {
       paymentMethod: row.paymentMethod ?? null,
       createdAt: row.saleDate.toISOString(),
       itemCount: row.quantitySold,
+      lines: [{ productName: row.productName, quantitySold: row.quantitySold }],
+      lineCount: 1,
+      discount: row.discountAmount ?? 0,
       isReturned: row.isReturned,
       isPaid: row.isPaid !== false,
       collectionStatus: row.collectionStatus ?? null,
@@ -151,6 +172,7 @@ function foldRecentSales(rows: Sale[], hasMore: boolean): RecentSaleSummary[] {
       // Line totals are numeric(…,2) in Postgres; summing floats can leave
       // 149.99000000000001 behind. Round once at the boundary.
       total: Math.round(g.total * 100) / 100,
+      discount: Math.round(g.discount * 100) / 100,
     }));
 }
 

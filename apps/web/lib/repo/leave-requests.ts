@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { withTenant } from "@/lib/db";
 import { leaveRequests, users, tenantMembers } from "@/lib/db/schema";
 import { createNotification } from "./notifications";
@@ -90,6 +90,69 @@ export async function listLeaveRequests(
       decidedByName: r.request.decidedByUserId
         ? deciderById.get(r.request.decidedByUserId) ?? null
         : null,
+      decidedAt: r.request.decidedAt,
+      decisionNote: r.request.decisionNote,
+      createdAt: r.request.createdAt,
+    }));
+  });
+}
+
+/**
+ * Leave requests whose [startDate, endDate] window OVERLAPS the provided
+ * [from, to] range. Overlap semantics: `end >= from AND start <= to`. Added
+ * for the AI agent's "who is on leave next week" tool (apps/web/lib/ai/tools/
+ * employees.ts); kept here so the drizzle query sits next to the other leave
+ * reads instead of a dangling repo file.
+ */
+export async function listLeavesInWindow(
+  tenantId: string,
+  opts: {
+    branchId?: string | null;
+    from: Date;
+    to: Date;
+    /** Default: ["approved"] — the user usually asks "who is actually off". */
+    statuses?: LeaveStatus[];
+  },
+): Promise<LeaveRequestDto[]> {
+  const statuses = opts.statuses ?? ["approved"];
+  return withTenant(tenantId, async (tx) => {
+    const filters = [
+      eq(leaveRequests.tenantId, tenantId),
+      inArray(leaveRequests.status, statuses),
+      // Overlap: a leave intersects the window iff it ends after the start
+      // of the window AND starts before the end.
+      gte(leaveRequests.endDate, opts.from),
+      lte(leaveRequests.startDate, opts.to),
+    ];
+    if (opts.branchId) filters.push(eq(leaveRequests.branchId, opts.branchId));
+
+    const rows = await tx
+      .select({
+        request: leaveRequests,
+        userName: NAME_EXPR,
+      })
+      .from(leaveRequests)
+      .leftJoin(
+        tenantMembers,
+        and(
+          eq(tenantMembers.userId, leaveRequests.userId),
+          eq(tenantMembers.tenantId, tenantId),
+        ),
+      )
+      .leftJoin(users, eq(users.id, leaveRequests.userId))
+      .where(and(...filters))
+      .orderBy(leaveRequests.startDate);
+
+    return rows.map((r) => ({
+      id: r.request.id,
+      userId: r.request.userId,
+      userName: r.userName,
+      startDate: r.request.startDate,
+      endDate: r.request.endDate,
+      reason: r.request.reason,
+      status: r.request.status as LeaveStatus,
+      decidedByUserId: r.request.decidedByUserId,
+      decidedByName: null,
       decidedAt: r.request.decidedAt,
       decisionNote: r.request.decisionNote,
       createdAt: r.request.createdAt,

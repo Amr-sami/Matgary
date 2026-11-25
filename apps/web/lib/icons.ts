@@ -14,6 +14,9 @@
 export {
   WarningCircle as AlertCircle,
   Warning as AlertTriangle,
+  TextAlignLeft,
+  TextAlignCenter,
+  TextAlignRight,
   ArrowLineDown as ArrowDownToLine,
   ArrowsDownUp as ArrowUpDown,
   ArrowLineUp as ArrowUpFromLine,

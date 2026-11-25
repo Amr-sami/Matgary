@@ -25,7 +25,6 @@ import { Input } from "@/components/ui/Input";
 import { Toast } from "@/components/ui/Toast";
 import { useShopSettings } from "@/hooks/useShopSettings";
 import { useSettings } from "@/components/settings-context";
-import { useBranches } from "@/hooks/useBranches";
 import { useCollectionsAccess } from "@/hooks/useCollections";
 import {
   DEFAULT_TEMPLATE,
@@ -189,8 +188,6 @@ function SettingsPageInner() {
   // even when this branch's switch is off (so it can be turned on).
   const collectionsAccess = useCollectionsAccess();
   const showCollectionsTile = collectionsAccess.canManage && collectionsAccess.available;
-  const { branches: accessibleBranches } = useBranches();
-  const branchCount = accessibleBranches.length;
   const { settings, loading, refresh: refreshLocalSettings } = useShopSettings();
   const { refresh: refreshGlobalSettings } = useSettings();
   const [draft, setDraft] = useState<ShopSettings>(settings);
@@ -477,30 +474,7 @@ function SettingsPageInner() {
   return (
     <AppShell title={t.title}>
       <div className="max-w-3xl mx-auto space-y-4">
-        {/* Branches — owner-only entry point. */}
-        {isOwner && (
-          <Link
-            href="/settings/branches"
-            className="group block bg-white rounded-xl border border-border p-5 hover:border-accent transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <Store className="w-5 h-5 text-text-secondary shrink-0 group-hover:text-accent transition-colors" />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="font-bold text-text-primary">{t.branches.title}</h3>
-                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-bg-main text-text-secondary tabular-nums">
-                    {branchCount}{" "}
-                    {branchCount === 1 ? t.branches.countOne : t.branches.countMany}
-                  </span>
-                </div>
-                <p className="text-xs text-text-secondary mt-0.5">
-                  {branchCount <= 1 ? t.branches.hintOne : t.branches.hintMany}
-                </p>
-              </div>
-              <ChevronLeft className="w-5 h-5 text-text-secondary shrink-0 group-hover:text-accent transition-colors" />
-            </div>
-          </Link>
-        )}
+        {/* Branches tile removed — Storo has no branches. */}
 
         {/* Daily owner digest — owner-only. */}
         {isOwner && (

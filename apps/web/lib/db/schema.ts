@@ -13,6 +13,7 @@ import {
   numeric,
   smallint,
   date,
+  doublePrecision,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 
@@ -334,6 +335,31 @@ export const shopSettings = pgTable(
      *  splices in by ID via the "custom:<id>" entries in block order. */
     receiptCustomBlocks: jsonb("receipt_custom_blocks")
       .$type<Record<string, { text: string; align: "right" | "center" | "left" }>>()
+      .notNull()
+      .default({}),
+    /** Receipt identity fields (migration 0065). All optional — when blank
+     *  the renderer omits the row entirely, never a placeholder. */
+    receiptTaxRegistration: text("receipt_tax_registration"),
+    receiptTaxCardNumber: text("receipt_tax_card_number"),
+    receiptSlogan: text("receipt_slogan"),
+    receiptReturnPolicy: text("receipt_return_policy"),
+    receiptAddress: text("receipt_address"),
+    /** Short uppercase prefix stamped in front of the invoice short code at
+     *  the receipt footer ("INV-A1B2C3"). Max 8 chars in the UI. */
+    receiptReferencePrefix: text("receipt_reference_prefix"),
+    /** Per-row visibility toggles (migration 0066). Default TRUE so a filled
+     *  field still prints unless the Owner flips it off. Lets them hide a row
+     *  WITHOUT clearing the text (e.g. suspend return policy during a promo). */
+    receiptShowAddress: boolean("receipt_show_address").notNull().default(true),
+    receiptShowSlogan: boolean("receipt_show_slogan").notNull().default(true),
+    receiptShowTaxInfo: boolean("receipt_show_tax_info").notNull().default(true),
+    receiptShowReturnPolicy: boolean("receipt_show_return_policy").notNull().default(true),
+    /** Per-row alignment overrides (migration 0067). Keys are identity row
+     *  names ("name", "address", "phone", "slogan", "taxReg", "taxCard",
+     *  "returnPolicy", "footerText"); values are "left" | "center" | "right".
+     *  Missing key → center fallback (today's shape). */
+    receiptBlockAlignments: jsonb("receipt_block_alignments")
+      .$type<Record<string, "left" | "center" | "right">>()
       .notNull()
       .default({}),
     /** Cash drawer reconciliation (migration 0032). When enabled, every cash
@@ -721,6 +747,12 @@ export const sales = pgTable(
      *  'rejected' (CHECK); NULL = not a digital sale or collections were off.
      *  Orthogonal to isPaid/amountPaid; written on EVERY line of the invoice. */
     collectionStatus: text("collection_status"),
+    /** Sales channel (migration 0057): 'store' (in-person at the till) or
+     *  'online' (WhatsApp / Instagram / phone orders). Default 'store' so the
+     *  POS stays one tap; the mobile Sales screen exposes a toggle at the
+     *  top. Written on EVERY line of a cart. Analytics splits today's
+     *  revenue and the insights chart on this. */
+    channel: text("channel").notNull().default("store"),
   },
   (t) => [
     index("sales_tenant_date_idx").on(t.tenantId, t.saleDate),
@@ -814,7 +846,26 @@ export const expenses = pgTable(
     }),
     title: text("title").notNull(),
     amount: text("amount").notNull(), // numeric via migration tune
-    category: text("category").notNull(), // global enum: rent | salaries | electricity | water | internet | supplier | other
+    /** LEGACY: flat enum (rent | salaries | electricity | water | internet |
+     *  supplier | other). Migration 0064 added `categoryId` as the new source
+     *  of truth; the legacy string is backfilled onto a seeded subcategory and
+     *  kept for back-compat with code paths that have not switched yet. */
+    category: text("category").notNull(),
+    /** Migration 0064. FK into the hierarchical financial_categories tree.
+     *  Nullable because: pre-migration rows survive without FK; backfill sets
+     *  it; new writers set it; code paths that still use the legacy string
+     *  continue to insert with categoryId NULL safely. */
+    categoryId: uuid("category_id"),
+    /** Migration 0064. Payment method — same enum as salePayments.method. */
+    paymentMethod: text("payment_method"),
+    referenceNumber: text("reference_number"),
+    /** Migration 0064. Lifecycle — 'posted' (default) | 'voided'. Voided
+     *  rows are excluded from every P&L aggregation. */
+    status: text("status").notNull().default("posted"),
+    voidedAt: timestamp("voided_at", { withTimezone: true }),
+    voidedByUserId: uuid("voided_by_user_id"),
+    voidReason: text("void_reason"),
+    createdByUserId: uuid("created_by_user_id"),
     /** Optional supplier this expense pays. When set, the supplier's running balance is debited. */
     supplierId: uuid("supplier_id"),
     /** When true, this expense is a recurring template; child instances spawn at next_occurrence_date. */
@@ -823,7 +874,10 @@ export const expenses = pgTable(
     recurrencePeriod: text("recurrence_period"),
     /** Next time this template should spawn a child instance (null when not recurring or done). */
     nextOccurrenceDate: timestamp("next_occurrence_date", { withTimezone: true }),
-    /** Set on auto-generated child instances; points back at the recurring template. */
+    /** Set on auto-generated child instances; points back at the recurring template.
+     *  Migration 0064 adds a partial UNIQUE index on
+     *  (tenant_id, parent_expense_id, date) so repeated generation never
+     *  creates a second child for the same template/date pair. */
     parentExpenseId: uuid("parent_expense_id"),
     date: timestamp("date", { withTimezone: true })
       .notNull()
@@ -838,6 +892,7 @@ export const expenses = pgTable(
     index("expenses_tenant_supplier_idx").on(t.tenantId, t.supplierId),
     index("expenses_tenant_recurring_idx").on(t.tenantId, t.isRecurring, t.nextOccurrenceDate),
     index("expenses_tenant_branch_date_idx").on(t.tenantId, t.branchId, t.date),
+    index("expenses_tenant_status_date_idx").on(t.tenantId, t.status, t.date),
   ],
 );
 
@@ -1300,6 +1355,12 @@ export const employeeCompensation = pgTable(
     hourlyRate: text("hourly_rate"), // numeric(12,2) via migration tune
     /** Hours included in the base monthly salary (hybrid only). Beyond this counts as overtime. */
     standardMonthlyHours: text("standard_monthly_hours"),
+    /** Flat % 0..100 applied to the commission base. V1 ships a single rate per employee. */
+    commissionRate: text("commission_rate").notNull().default("0"),
+    /** 'gross_sales' | 'profit_contribution'. V1 only supports gross_sales. */
+    commissionBase: text("commission_base").notNull().default("gross_sales"),
+    /** Owner opt-in: when true, this employee may receive monthly `payrollAdjustments` rows. */
+    bonusEligible: boolean("bonus_eligible").notNull().default(false),
     /** Date the row becomes effective. Lookups use the row whose effective_from ≤ shift date. */
     effectiveFrom: timestamp("effective_from", { mode: "date", withTimezone: true })
       .notNull()
@@ -1335,14 +1396,35 @@ export const payrollPeriods = pgTable(
     regularHours: text("regular_hours").notNull().default("0"),
     overtimeHours: text("overtime_hours").notNull().default("0"),
     grossAmount: text("gross_amount").notNull().default("0"),
+    /** Legacy pre-V1 "lump adjustment" column. V1 writes `adjustmentsTotal`
+     *  instead; kept here so reads of pre-V1 rows still work. */
     adjustmentsAmount: text("adjustments_amount").notNull().default("0"),
     adjustmentsNote: text("adjustments_note"),
-    /** 'draft' | 'finalized' */
+    /** Engine's full output at finalize: hours, leave, sales, commission math,
+     *  per-adjustment breakdown, warnings. Shape evolves with `calculationVersion`. */
+    snapshot: jsonb("snapshot"),
+    /** The `employeeCompensation` row that was in force at finalize time,
+     *  frozen so later edits cannot rewrite history. */
+    compensationSnapshot: jsonb("compensation_snapshot"),
+    /** Bump when the engine's math changes. Readers can surface "v2 math" context. */
+    calculationVersion: integer("calculation_version").notNull().default(1),
+    /** V1 totals, stored even though derivable from `snapshot`. */
+    commissionAmount: text("commission_amount").notNull().default("0"),
+    /** Sum of `payrollAdjustments.amount` (signed) folded in at finalize. */
+    adjustmentsTotal: text("adjustments_total").notNull().default("0"),
+    /** `grossAmount + commissionAmount + adjustmentsTotal`. */
+    netAmount: text("net_amount").notNull().default("0"),
+    /** 'draft' | 'finalized' | 'voided' */
     status: text("status").notNull().default("draft"),
     finalizedAt: timestamp("finalized_at", { withTimezone: true }),
     finalizedByUserId: uuid("finalized_by_user_id").references(() => users.id, {
       onDelete: "restrict",
     }),
+    voidedAt: timestamp("voided_at", { withTimezone: true }),
+    voidedByUserId: uuid("voided_by_user_id").references(() => users.id, {
+      onDelete: "restrict",
+    }),
+    voidReason: text("void_reason"),
   },
   (t) => [
     index("payroll_periods_tenant_employee_period_idx").on(
@@ -1350,6 +1432,54 @@ export const payrollPeriods = pgTable(
       t.employeeId,
       t.periodStart,
     ),
+    index("payroll_periods_tenant_period_status_idx").on(
+      t.tenantId,
+      t.periodStart,
+      t.status,
+    ),
+  ],
+);
+
+/**
+ * Owner-authored monthly bonus / deduction entries. Summed into
+ * `payroll_periods.adjustments_total` at calculate time and frozen into the
+ * snapshot at finalize. Positive for bonuses, negative for deductions /
+ * advance repayments; `kind` is a UI label the Owner picks.
+ */
+export const payrollAdjustments = pgTable(
+  "payroll_adjustments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    employeeId: uuid("employee_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** First-of-month UTC midnight. Joins to `payrollPeriods.periodStart`. */
+    periodMonth: timestamp("period_month", { withTimezone: true }).notNull(),
+    /** 'bonus' | 'deduction' | 'advance_repayment' | 'correction' */
+    kind: text("kind").notNull(),
+    amount: text("amount").notNull(),
+    reason: text("reason"),
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    voidedAt: timestamp("voided_at", { withTimezone: true }),
+    voidedByUserId: uuid("voided_by_user_id").references(() => users.id, {
+      onDelete: "restrict",
+    }),
+  },
+  (t) => [
+    index("payroll_adjustments_tenant_employee_month_idx").on(
+      t.tenantId,
+      t.employeeId,
+      t.periodMonth,
+    ),
+    index("payroll_adjustments_tenant_month_idx").on(t.tenantId, t.periodMonth),
   ],
 );
 
@@ -1415,6 +1545,9 @@ export const leaveRequests = pgTable(
     startDate: timestamp("start_date", { withTimezone: true }).notNull(),
     endDate: timestamp("end_date", { withTimezone: true }).notNull(),
     reason: text("reason"),
+    /** 'paid' | 'unpaid'. Paid leave counts toward fixed salary; unpaid reduces it.
+     *  The approver sets this when approving the request. */
+    kind: text("kind").notNull().default("unpaid"),
     /** 'pending' | 'approved' | 'rejected' */
     status: text("status").notNull().default("pending"),
     decidedByUserId: uuid("decided_by_user_id").references(() => users.id, {
@@ -2209,6 +2342,9 @@ export type NewWaConversation = typeof waConversations.$inferInsert;
 export type WaTemplateRow = typeof waTemplates.$inferSelect;
 export type NewWaTemplate = typeof waTemplates.$inferInsert;
 export type PayrollPeriodRow = typeof payrollPeriods.$inferSelect;
+export type NewPayrollPeriod = typeof payrollPeriods.$inferInsert;
+export type PayrollAdjustmentRow = typeof payrollAdjustments.$inferSelect;
+export type NewPayrollAdjustment = typeof payrollAdjustments.$inferInsert;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Platform admin (godmode) — see docs/specs/platform-admin-dashboard.md.
@@ -2710,3 +2846,638 @@ export const collectionCredits = pgTable(
 export type CollectionIngestDeviceRow = typeof collectionIngestDevices.$inferSelect;
 export type CollectionRawMessageRow = typeof collectionRawMessages.$inferSelect;
 export type CollectionCreditRow = typeof collectionCredits.$inferSelect;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AI write confirmation — F5 §3. Server-side truth for every destructive AI
+// action between preview and execute. Migration: 0058_ai_pending_actions.sql.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const aiPendingActions = pgTable(
+  "ai_pending_actions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id").references(() => branches.id, {
+      onDelete: "cascade",
+    }),
+    /** e.g. 'update_product_price' | 'update_product_quantity' | 'create_customer'. */
+    action: text("action").notNull(),
+    /** Validated executor params captured at preview time. */
+    params: jsonb("params").notNull().$type<Record<string, unknown>>(),
+    /** What we showed the user (UI hint only — executor ignores). */
+    preview: jsonb("preview").notNull().$type<Record<string, unknown>>(),
+    /** HMAC-SHA256 hex over id|tenant|user|branch|action|canonical(params)|expires_at. */
+    hmac: text("hmac").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [
+    index("ai_pending_actions_tenant_user_idx").on(
+      t.tenantId,
+      t.userId,
+      t.createdAt,
+    ),
+    index("ai_pending_actions_expiry_idx").on(t.expiresAt),
+  ],
+);
+
+export type AiPendingActionRow = typeof aiPendingActions.$inferSelect;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// F9 — AI knowledge / RAG. Tenant-isolated document + chunk store. Embedding
+// stored as double precision[] (pgvector not available on postgres:16-alpine
+// at the moment; migrating to vector(768) is a straight column-type swap).
+// Migration: 0059_ai_knowledge.sql.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const aiKnowledgeDocuments = pgTable(
+  "ai_knowledge_documents",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id").references(() => branches.id, {
+      onDelete: "cascade",
+    }),
+    title: text("title").notNull(),
+    description: text("description"),
+    /** policy | sop | manual | faq | training | product_documentation | supplier_documentation | other */
+    documentType: text("document_type").notNull(),
+    /** upload | seed | api — diagnostic only. */
+    source: text("source").notNull().default("upload"),
+    fileName: text("file_name"),
+    mimeType: text("mime_type"),
+    /** ISO 639-1. Supports the F7 locales: ar, en, pt, fr, es. */
+    language: text("language").notNull().default("en"),
+    version: integer("version").notNull().default(1),
+    /** Only is_current = true docs normally participate in retrieval. */
+    isCurrent: boolean("is_current").notNull().default(true),
+    /** pending | processing | ready | failed | archived */
+    status: text("status").notNull().default("pending"),
+    statusDetail: text("status_detail"),
+    /** SHA-256 of normalised text — enables content-change detection. */
+    contentHash: text("content_hash"),
+    metadata: jsonb("metadata")
+      .notNull()
+      .default(sql`'{}'::jsonb`)
+      .$type<Record<string, unknown>>(),
+    createdBy: uuid("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [
+    index("ai_knowledge_documents_tenant_idx").on(
+      t.tenantId,
+      t.isCurrent,
+      t.status,
+    ),
+    index("ai_knowledge_documents_tenant_branch_idx").on(
+      t.tenantId,
+      t.branchId,
+      t.isCurrent,
+      t.status,
+    ),
+  ],
+);
+
+export const aiKnowledgeChunks = pgTable(
+  "ai_knowledge_chunks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id").references(() => branches.id, {
+      onDelete: "cascade",
+    }),
+    documentId: uuid("document_id")
+      .notNull()
+      .references(() => aiKnowledgeDocuments.id, { onDelete: "cascade" }),
+    documentVersion: integer("document_version").notNull(),
+    chunkIndex: integer("chunk_index").notNull(),
+    section: text("section"),
+    language: text("language").notNull().default("en"),
+    content: text("content").notNull(),
+    /** Gemini text-embedding-004 → 768 dims. */
+    embedding: doublePrecision("embedding").array().notNull(),
+    embeddingModel: text("embedding_model")
+      .notNull()
+      .default("gemini-embedding-001"),
+    tokenCount: integer("token_count").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [
+    index("ai_knowledge_chunks_tenant_idx").on(t.tenantId),
+    index("ai_knowledge_chunks_document_idx").on(t.documentId, t.chunkIndex),
+  ],
+);
+
+export type AiKnowledgeDocumentRow = typeof aiKnowledgeDocuments.$inferSelect;
+export type AiKnowledgeChunkRow = typeof aiKnowledgeChunks.$inferSelect;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// F10.0 — Reversible AI operations. Every AI-executed mutation records one row
+// here with the before/after state needed to safely restore. Rollback is a
+// NEW operation that cites the original; audit trail stays immutable.
+// Migration: 0060_ai_operations.sql.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const aiOperationGroups = pgTable(
+  "ai_operation_groups",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id").references(() => branches.id, {
+      onDelete: "cascade",
+    }),
+    /** 'import' | 'bulk_price_update' | 'batch' | … */
+    groupType: text("group_type").notNull(),
+    entityType: text("entity_type").notNull(),
+    label: text("label").notNull(),
+    /** created | in_progress | completed | failed | rolled_back | partially_rolled_back */
+    status: text("status").notNull().default("created"),
+    totalOperations: integer("total_operations").notNull().default(0),
+    reversedOperations: integer("reversed_operations").notNull().default(0),
+    conflictedOperations: integer("conflicted_operations").notNull().default(0),
+    metadata: jsonb("metadata")
+      .notNull()
+      .default(sql`'{}'::jsonb`)
+      .$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [index("ai_operation_groups_tenant_idx").on(t.tenantId, t.createdAt)],
+);
+
+export const aiOperations = pgTable(
+  "ai_operations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id").references(() => branches.id, {
+      onDelete: "cascade",
+    }),
+    conversationId: uuid("conversation_id"),
+    /** 'product.price.update' | 'product.quantity.update' |
+     *  'product.quantity.adjust' | 'customer.create' | future. */
+    operationType: text("operation_type").notNull(),
+    pendingActionId: uuid("pending_action_id").references(
+      () => aiPendingActions.id,
+      { onDelete: "set null" },
+    ),
+    operationGroupId: uuid("operation_group_id").references(
+      () => aiOperationGroups.id,
+      { onDelete: "set null" },
+    ),
+    entityType: text("entity_type").notNull(),
+    entityId: uuid("entity_id"),
+    entityLabel: text("entity_label").notNull(),
+    /** For composite-keyed entities (customer_wallets uses tenant/branch/phone). */
+    entityKey: jsonb("entity_key").$type<Record<string, unknown> | null>(),
+    beforeState: jsonb("before_state").notNull().$type<Record<string, unknown>>(),
+    afterState: jsonb("after_state").notNull().$type<Record<string, unknown>>(),
+    affectedFields: text("affected_fields").array().notNull().default(sql`'{}'::text[]`),
+    reversible: boolean("reversible").notNull().default(true),
+    /** recorded | rolled_back | rollback_blocked | partially_rolled_back */
+    status: text("status").notNull().default("recorded"),
+    statusReason: text("status_reason"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    rollbackOperationId: uuid("rollback_operation_id"),
+    actorName: text("actor_name"),
+    idempotencyKey: text("idempotency_key"),
+    metadata: jsonb("metadata")
+      .notNull()
+      .default(sql`'{}'::jsonb`)
+      .$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [
+    index("ai_operations_recent_idx").on(
+      t.tenantId,
+      t.userId,
+      t.conversationId,
+      t.createdAt,
+    ),
+    index("ai_operations_group_idx").on(t.operationGroupId, t.createdAt),
+    index("ai_operations_entity_idx").on(
+      t.tenantId,
+      t.entityType,
+      t.entityId,
+      t.createdAt,
+    ),
+  ],
+);
+
+export type AiOperationGroupRow = typeof aiOperationGroups.$inferSelect;
+export type AiOperationRow = typeof aiOperations.$inferSelect;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// F10.1 — AI Data Import Engine. Durable import sessions + row-level state so
+// the conversational correction flow survives chat restarts and request retries.
+// Migration: 0061_ai_import.sql.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const aiImportSessions = pgTable(
+  "ai_import_sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id").references(() => branches.id, {
+      onDelete: "cascade",
+    }),
+    conversationId: uuid("conversation_id"),
+    entityType: text("entity_type").notNull(),
+    fileName: text("file_name").notNull(),
+    mimeType: text("mime_type").notNull(),
+    fileHash: text("file_hash").notNull(),
+    fileSize: integer("file_size").notNull(),
+    status: text("status").notNull().default("uploaded"),
+    statusDetail: text("status_detail"),
+    fieldMapping: jsonb("field_mapping")
+      .notNull()
+      .default(sql`'{}'::jsonb`)
+      .$type<Record<string, string>>(),
+    corrections: jsonb("corrections")
+      .notNull()
+      .default(sql`'{}'::jsonb`)
+      .$type<Record<string, unknown>>(),
+    rowCount: integer("row_count").notNull().default(0),
+    validCount: integer("valid_count").notNull().default(0),
+    invalidCount: integer("invalid_count").notNull().default(0),
+    ambiguousCount: integer("ambiguous_count").notNull().default(0),
+    missingCount: integer("missing_count").notNull().default(0),
+    operationGroupId: uuid("operation_group_id").references(
+      () => aiOperationGroups.id,
+      { onDelete: "set null" },
+    ),
+    metadata: jsonb("metadata")
+      .notNull()
+      .default(sql`'{}'::jsonb`)
+      .$type<Record<string, unknown>>(),
+    expiresAt: timestamp("expires_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now() + interval '24 hours'`),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [
+    index("ai_import_sessions_recent_idx").on(t.tenantId, t.userId, t.createdAt),
+  ],
+);
+
+export const aiImportRows = pgTable(
+  "ai_import_rows",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    importSessionId: uuid("import_session_id")
+      .notNull()
+      .references(() => aiImportSessions.id, { onDelete: "cascade" }),
+    rowIndex: integer("row_index").notNull(),
+    /** valid | invalid | ambiguous | missing | ready | imported | failed | skipped */
+    status: text("status").notNull(),
+    /** create | update | skip | none */
+    action: text("action").notNull().default("none"),
+    raw: jsonb("raw")
+      .notNull()
+      .default(sql`'{}'::jsonb`)
+      .$type<Record<string, string>>(),
+    normalised: jsonb("normalised")
+      .notNull()
+      .default(sql`'{}'::jsonb`)
+      .$type<Record<string, unknown>>(),
+    resolution: jsonb("resolution")
+      .notNull()
+      .default(sql`'{}'::jsonb`)
+      .$type<Record<string, unknown>>(),
+    errors: jsonb("errors")
+      .notNull()
+      .default(sql`'[]'::jsonb`)
+      .$type<Array<Record<string, unknown>>>(),
+    issues: jsonb("issues")
+      .notNull()
+      .default(sql`'[]'::jsonb`)
+      .$type<Array<Record<string, unknown>>>(),
+    operationId: uuid("operation_id").references(() => aiOperations.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [
+    index("ai_import_rows_session_idx").on(t.importSessionId, t.rowIndex),
+    index("ai_import_rows_tenant_status_idx").on(
+      t.tenantId,
+      t.importSessionId,
+      t.status,
+    ),
+  ],
+);
+
+export type AiImportSessionRow = typeof aiImportSessions.$inferSelect;
+export type AiImportRowRow = typeof aiImportRows.$inferSelect;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Inventory Count (جرد)
+//
+// Storo has NO branches — these tables carry `tenant_id` only. Reconciliation
+// math at confirm time reads movements from `product_history` (the single
+// source of truth for every quantity change), computes:
+//   adjustment = (counted_qty + Σ movements after counted_at) − current_qty
+// and applies it via the shared `_applyAdjustment` helper in catalog.ts, so
+// counts share one ledger with every other stock-mutating operation.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const inventoryCounts = pgTable(
+  "inventory_counts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    /** 'all' | 'category' | 'brand'. v1 scope kinds; v2 may add 'selected'. */
+    scopeKind: text("scope_kind").notNull(),
+    /** categoryId (uuid text) or brand (free text); null for 'all'. */
+    scopeValue: text("scope_value"),
+    /** 'draft' | 'in_progress' | 'review' | 'completed' | 'cancelled'. */
+    status: text("status").notNull().default("draft"),
+    /** Cached size of the frozen scope — the baseline-row count. Denominator
+     *  of the progress indicator; added-mid-count rows don't inflate it. */
+    scopeProductCount: integer("scope_product_count").notNull().default(0),
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    confirmedByUserId: uuid("confirmed_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    /** `UNIQUE (tenant_id, confirm_idempotency_key)` — a replayed confirm with
+     *  the same key collides and the handler returns the stored result. */
+    confirmIdempotencyKey: text("confirm_idempotency_key"),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    cancelledByUserId: uuid("cancelled_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+  },
+  (t) => [
+    uniqueIndex("inventory_counts_idem_uq")
+      .on(t.tenantId, t.confirmIdempotencyKey)
+      .where(sql`confirm_idempotency_key IS NOT NULL`),
+    index("inventory_counts_tenant_status_idx").on(t.tenantId, t.status, t.createdAt),
+  ],
+);
+
+export const inventoryCountLines = pgTable(
+  "inventory_count_lines",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    countId: uuid("count_id")
+      .notNull()
+      .references(() => inventoryCounts.id, { onDelete: "cascade" }),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    productId: uuid("product_id").notNull(),
+    /** Frozen at line creation — either the bulk-insert at count creation
+     *  (scope baseline) or the moment an out-of-scope product was added. */
+    baselineQty: integer("baseline_qty").notNull(),
+    /** Null until the shopkeeper actually enters a physical count. */
+    countedQty: integer("counted_qty"),
+    countedAt: timestamp("counted_at", { withTimezone: true }),
+    countedByUserId: uuid("counted_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    /** 'scan' | 'manual'; null until counted. */
+    source: text("source"),
+    /** True when this product was added mid-count (not in the frozen scope). */
+    addedMidCount: boolean("added_mid_count").notNull().default(false),
+    /** Set by the confirm preflight; a true value blocks the confirm with
+     *  409 COUNT_HAS_INVALID_LINES until the owner resolves it. */
+    productMissingAtConfirm: boolean("product_missing_at_confirm")
+      .notNull()
+      .default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [
+    uniqueIndex("inventory_count_lines_count_product_uq").on(t.countId, t.productId),
+    index("inventory_count_lines_count_idx").on(t.countId),
+  ],
+);
+
+export const inventoryCountReconciliations = pgTable(
+  "inventory_count_reconciliations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    countId: uuid("count_id")
+      .notNull()
+      .references(() => inventoryCounts.id, { onDelete: "cascade" }),
+    productId: uuid("product_id").notNull(),
+    baselineQty: integer("baseline_qty").notNull(),
+    countedQty: integer("counted_qty").notNull(),
+    countedAt: timestamp("counted_at", { withTimezone: true }).notNull(),
+    movementAfterCount: integer("movement_after_count").notNull(),
+    currentQtyAtConfirm: integer("current_qty_at_confirm").notNull(),
+    expectedPhysical: integer("expected_physical").notNull(),
+    adjustment: integer("adjustment").notNull(),
+    /** FK into product_history — the exact row this confirm wrote. Null when
+     *  adjustment = 0 (no history row needed). */
+    productHistoryId: uuid("product_history_id"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [
+    uniqueIndex("inventory_count_recon_count_product_uq").on(t.countId, t.productId),
+    index("inventory_count_recon_tenant_count_idx").on(t.tenantId, t.countId),
+  ],
+);
+
+export type InventoryCountRow = typeof inventoryCounts.$inferSelect;
+export type InventoryCountLineRow = typeof inventoryCountLines.$inferSelect;
+export type InventoryCountReconciliationRow =
+  typeof inventoryCountReconciliations.$inferSelect;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 2 — Real-time presence (web).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * web_live_sessions — one row per web user with an active browser session,
+ * refreshed on every authenticated request through
+ * `requireTenant()` → `touchHeartbeat()` with a 60-second throttle.
+ *
+ * Primary key on user_id (NOT session_token) because the presence rollup
+ * counts distinct users, and because NextAuth may rotate `session_token`.
+ * Multiple browsers for the same user coalesce into one row — correct for
+ * "online users", intentional for the KPI.
+ *
+ * Mobile presence lives in `auth_devices.last_used_at`; this table covers
+ * web only. The admin SQL unions both for the headline count.
+ *
+ * No branch column: presence is tenant-scoped (Storo has no branches).
+ */
+export const webLiveSessions = pgTable(
+  "web_live_sessions",
+  {
+    userId: uuid("user_id")
+      .primaryKey()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    /** 'web' for a recognised browser UA, 'other' for anything the parser
+     *  cannot classify. Analytics metadata only — never used for authz. */
+    platform: text("platform").notNull().default("web"),
+    userAgent: text("user_agent"),
+    lastActivityAt: timestamp("last_activity_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [
+    index("web_live_sessions_tenant_idx").on(t.tenantId, t.lastActivityAt.desc()),
+    index("web_live_sessions_activity_idx").on(t.lastActivityAt.desc()),
+  ],
+);
+
+export type WebLiveSessionRow = typeof webLiveSessions.$inferSelect;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Financial Management — migration 0064 (Slice 1)
+//
+// Hierarchical categories + money_movements table. The engine (lib/finance/pnl.ts)
+// reads these alongside sales/returns/expenses/payroll to assemble the P&L.
+// Sales/returns/expenses/payroll remain authoritative for their own domains —
+// these tables are additive, not a parallel source of truth.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Two-level category tree. System seeds live with tenant_id=NULL and are
+ * visible to every tenant; custom categories carry a real tenant_id.
+ * `kind` decides which P&L bucket the category sits in.
+ */
+export const financialCategories = pgTable(
+  "financial_categories",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    /** NULL = system default visible to every tenant; set = tenant custom. */
+    tenantId: uuid("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+    /** Two-level only — subcategory.parent_id points at its group row. */
+    parentId: uuid("parent_id"),
+    /** Stable identifier for seeded rows; makes re-running the seed safe. */
+    slug: text("slug").notNull(),
+    nameEn: text("name_en").notNull(),
+    nameAr: text("name_ar").notNull(),
+    /** 'opex' | 'other_income' | 'other_expense' */
+    kind: text("kind").notNull(),
+    isSystem: boolean("is_system").notNull().default(false),
+    sortOrder: integer("sort_order").notNull().default(0),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    createdByUserId: uuid("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
+  },
+  (t) => [
+    // System slug uniqueness + tenant slug uniqueness are expressed as
+    // partial indexes in the SQL migration. Plain indexes here are enough
+    // for Drizzle's introspection; the partials still exist in the DB.
+    index("financial_categories_tenant_parent_idx").on(t.tenantId, t.parentId),
+    index("financial_categories_parent_idx").on(t.parentId),
+  ],
+);
+
+export type FinancialCategoryRow = typeof financialCategories.$inferSelect;
+
+/**
+ * Non-P&L cash movements. Explicitly EXCLUDED from every revenue/expense/
+ * profit aggregation so an owner draw doesn't masquerade as an operating
+ * expense (and so forth).
+ */
+export const moneyMovements = pgTable(
+  "money_movements",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    /** One of: owner_deposit | owner_withdrawal | cash_transfer | loan_received
+     *  | loan_principal_repayment | supplier_payment_direct | customer_deposit | other */
+    kind: text("kind").notNull(),
+    amount: text("amount").notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().default(sql`now()`),
+    description: text("description"),
+    paymentMethod: text("payment_method"),
+    /** Soft reference back to the settled entity (no FK — a deleted supplier
+     *  must not tear the ledger). */
+    relatedEntityType: text("related_entity_type"),
+    relatedEntityId: uuid("related_entity_id"),
+    createdByUserId: uuid("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
+    voidedAt: timestamp("voided_at", { withTimezone: true }),
+    voidedByUserId: uuid("voided_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    voidReason: text("void_reason"),
+  },
+  (t) => [
+    index("money_movements_tenant_date_idx").on(t.tenantId, t.occurredAt),
+    index("money_movements_tenant_kind_idx").on(t.tenantId, t.kind),
+  ],
+);
+
+export type MoneyMovementRow = typeof moneyMovements.$inferSelect;

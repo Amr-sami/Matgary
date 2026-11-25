@@ -8,6 +8,7 @@ import { requirePermissionWithBranch } from "@/lib/api/auth-helpers";
 import { resolveBranchFilter } from "@/lib/api/branch-context";
 import { addProduct, listProducts } from "@/lib/repo/catalog";
 import { logActivity } from "@/lib/repo/activity";
+import { fanoutEvent } from "@/lib/notifications/dispatch";
 import { checkTenantRateLimit } from "@/lib/api/tenant-rate-limit";
 
 export async function GET(req: NextRequest) {
@@ -76,6 +77,12 @@ export async function POST(req: NextRequest) {
     entityLabel: parsed.data.name,
     branchId: r.ctx.branchId,
     metadata: { quantity: parsed.data.quantity, price: parsed.data.price },
+  });
+  void fanoutEvent(r.ctx.tenantId, r.ctx.branchId, "product.added", {
+    productId: id,
+    productName: parsed.data.name,
+    actorUserId: r.ctx.userId,
+    link: `/inventory/${id}`,
   });
   return NextResponse.json({ id }, { status: 201 });
 }

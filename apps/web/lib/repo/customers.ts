@@ -87,21 +87,23 @@ function phoneVariants(normalised: string): string[] {
 
 export async function getCustomerLedger(
   tenantId: string,
-  branchId: string,
+  branchId: string | null,
   customerPhone: string,
 ): Promise<CustomerLedger | null> {
   return withTenant(tenantId, async (tx) => {
+    const filters = [
+      eq(sales.tenantId, tenantId),
+      inArray(sales.customerPhone, phoneVariants(customerPhone)),
+      eq(sales.isReturned, false),
+    ];
+    // Tenant-scoped by default. Legacy `sales.branch_id` filter is applied
+    // only when the caller passes a non-null branch — the AI path always
+    // passes null (Storo has no branch feature).
+    if (branchId) filters.push(eq(sales.branchId, branchId));
     const rows = await tx
       .select()
       .from(sales)
-      .where(
-        and(
-          eq(sales.tenantId, tenantId),
-          eq(sales.branchId, branchId),
-          inArray(sales.customerPhone, phoneVariants(customerPhone)),
-          eq(sales.isReturned, false),
-        ),
-      )
+      .where(and(...filters))
       .orderBy(sql`${sales.saleDate} desc`);
 
     if (rows.length === 0) return null;

@@ -28,6 +28,18 @@ export const NOTIFICATION_EVENT_TYPES = [
   "collection.unmatched_credit",
   "collection.source_silent",
   "collection.limit_warning",
+  // Scheduled roll-ups. The daily digest predates this list (its own cron and
+  // delivery path); the weekly and monthly reports ride the generic dispatch
+  // with payload { period } and tap-navigate to /reports/<kind>?period=.
+  "report.weekly",
+  "report.monthly",
+  // Instant generic events — fired by each producer on commit. All ride the
+  // "generic" Android channel + Universfield sound (soundForKind / channelForKind).
+  "expense.recorded",
+  "product.added",
+  "inventory.adjusted",
+  "return.recorded",
+  "attendance.check_in",
 ] as const;
 
 export type NotificationEventType = (typeof NOTIFICATION_EVENT_TYPES)[number];
@@ -59,6 +71,13 @@ export const EVENT_RECIPIENT_ROLES: Record<NotificationEventType, TenantMemberRo
   "collection.unmatched_credit": ["owner"],
   "collection.source_silent": ["owner"],
   "collection.limit_warning": ["owner"],
+  "report.weekly": ["owner"],
+  "report.monthly": ["owner"],
+  "expense.recorded": ["owner"],
+  "product.added": ["owner"],
+  "inventory.adjusted": ["owner"],
+  "return.recorded": ["owner"],
+  "attendance.check_in": ["owner"],
 };
 
 /** Staff (role 'staff') holding this permission also receive the event — scoped to the event's
@@ -102,6 +121,17 @@ export const DEFAULT_EVENT_PREFERENCE: Record<
     "collection.unmatched_credit": { inApp: true, email: false, digestMode: "instant" },
     "collection.source_silent": { inApp: true, email: true, digestMode: "instant" },
     "collection.limit_warning": { inApp: true, email: false, digestMode: "instant" },
+    // Scheduled roll-ups: push + bell row, no email (the daily digest already
+    // mails). Instant so the owner sees them Monday / 1st of month morning.
+    "report.weekly": { inApp: true, email: false, digestMode: "instant" },
+    "report.monthly": { inApp: true, email: false, digestMode: "instant" },
+    // Business events: instant in-app + push, no email by default. The owner
+    // can opt into email per event from settings/notifications.
+    "expense.recorded": { inApp: true, email: false, digestMode: "instant" },
+    "product.added": { inApp: true, email: false, digestMode: "instant" },
+    "inventory.adjusted": { inApp: true, email: false, digestMode: "instant" },
+    "return.recorded": { inApp: true, email: false, digestMode: "instant" },
+    "attendance.check_in": { inApp: true, email: false, digestMode: "instant" },
   },
   staff: {
     // Staff get in-app pings so they can see activity in their branch UI,
@@ -124,6 +154,13 @@ export const DEFAULT_EVENT_PREFERENCE: Record<
     "collection.unmatched_credit": { inApp: true, email: false, digestMode: "instant" },
     "collection.source_silent": { inApp: true, email: false, digestMode: "instant" },
     "collection.limit_warning": { inApp: true, email: false, digestMode: "instant" },
+    "report.weekly": { inApp: false, email: false, digestMode: "instant" },
+    "report.monthly": { inApp: false, email: false, digestMode: "instant" },
+    "expense.recorded": { inApp: false, email: false, digestMode: "instant" },
+    "product.added": { inApp: false, email: false, digestMode: "instant" },
+    "inventory.adjusted": { inApp: false, email: false, digestMode: "instant" },
+    "return.recorded": { inApp: false, email: false, digestMode: "instant" },
+    "attendance.check_in": { inApp: false, email: false, digestMode: "instant" },
   },
 };
 
@@ -142,6 +179,13 @@ export const EVENT_LABELS: Record<NotificationEventType, { ar: string; en: strin
   "collection.unmatched_credit": { ar: "مبالغ وصلت دون بيع مطابق", en: "Money with no matching sale" },
   "collection.source_silent": { ar: "توقّف التأكيد التلقائي", en: "Automatic confirmation stopped" },
   "collection.limit_warning": { ar: "محافظ اقتربت من الحد", en: "Wallets near their limit" },
+  "report.weekly": { ar: "التقرير الأسبوعي", en: "Weekly report" },
+  "report.monthly": { ar: "التقرير الشهري", en: "Monthly report" },
+  "expense.recorded": { ar: "مصاريف مُسجَّلة", en: "Expenses recorded" },
+  "product.added": { ar: "منتجات جديدة", en: "Products added" },
+  "inventory.adjusted": { ar: "تعديلات مخزون", en: "Inventory adjustments" },
+  "return.recorded": { ar: "مرتجعات", en: "Returns" },
+  "attendance.check_in": { ar: "تسجيلات حضور", en: "Check-ins" },
 };
 
 /** Web link a producer's payload falls back to when it carries none (13 §4.2).

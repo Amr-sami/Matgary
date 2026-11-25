@@ -2,7 +2,6 @@
 
 import { Menu } from "@/lib/icons";
 import { formatDate } from "@/lib/utils";
-import { BranchPicker } from "@/components/branches/BranchPicker";
 import { OfflineIndicator } from "@/components/offline/OfflineIndicator";
 import { SwRegister } from "@/components/offline/SwRegister";
 
@@ -31,9 +30,6 @@ export function Header({ title }: HeaderProps) {
         <div className="flex items-center gap-3">
           {/* OfflineIndicator self-hides when everything is healthy. */}
           <OfflineIndicator />
-          {/* BranchPicker self-hides when the tenant has only one branch, so
-              single-store owners don't see any clutter. */}
-          <BranchPicker />
           <span className="hidden md:block text-sm text-text-secondary">{today}</span>
         </div>
       </div>

@@ -43,12 +43,21 @@ export interface PushData {
  *  (apps/mobile/src/effects/PushRegistrar.tsx). A push naming a channel the
  *  device never created falls back to Expo's fallback channel (13 §4.7 R3),
  *  so only these three. `sales` carries the cha-ching (doc 16 §4). */
-export type PushChannelId = "default" | "collections" | "sales";
+export type PushChannelId =
+  | "default"
+  | "collections"
+  | "sales"
+  // Reports + generic non-critical events. App creates the channel with the
+  // Universfield "new notification" sound (PushRegistrar.ensureGenericChannel).
+  | "generic"
+  // Low stock, supplier payment due, attendance late — importance HIGH,
+  // system default sound until a bespoke tone ships.
+  | "critical";
 
 /** Notification sound. A custom file must ship in the app binary (the
  *  `expo-notifications` plugin `sounds` option); on Android the channel's
  *  sound wins, on iOS this name is `aps.sound`. */
-export type PushSound = "default" | "cha_ching.wav";
+export type PushSound = "default" | "cha_ching.wav" | "generic_notification.wav";
 
 export interface PushMessage {
   to: string;

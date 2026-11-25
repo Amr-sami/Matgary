@@ -14,7 +14,15 @@ export type ActivityCategory =
   | "supplier"
   | "purchase"
   | "attendance"
-  | "collection";
+  | "collection"
+  // F5.1 — dedicated customer taxonomy. Previously, AI-created customers
+  // reused `team.add` because no customer-create action existed; that would
+  // have polluted staff activity feeds with customer records.
+  | "customer"
+  // Payroll V1 — calculate / finalize / void sheets, add / void adjustments,
+  // update compensation. Lives in its own category so "finalized August"
+  // doesn't vanish into the generic team feed.
+  | "payroll";
 
 export const ACTIVITY_CATEGORIES: ActivityCategory[] = [
   "auth",
@@ -29,6 +37,8 @@ export const ACTIVITY_CATEGORIES: ActivityCategory[] = [
   "purchase",
   "attendance",
   "collection",
+  "customer",
+  "payroll",
 ];
 
 // Arabic labels for known actions. The page renders the raw key when missing,
@@ -53,6 +63,13 @@ export const ACTION_LABELS: Record<string, string> = {
   "team.delete": "حذف موظف",
   "team.password_reset": "إعادة ضبط كلمة مرور موظف",
   "team.compensation_set": "تعديل راتب / أجر موظف",
+  "payroll.calculate": "حساب الراتب (تحديث المسودة)",
+  "payroll.finalize": "اعتماد راتب الشهر",
+  "payroll.void": "إلغاء راتب معتمد",
+  "payroll.adjustment_create": "إضافة مكافأة / خصم",
+  "payroll.adjustment_void": "إلغاء مكافأة / خصم",
+  "payroll.compensation_update": "تعديل راتب / عمولة / مكافآت موظف",
+  "payroll.bonus_eligibility_update": "تغيير حق استلام المكافآت",
   "settings.update": "تعديل إعدادات المتجر",
   "settings.attendance_update": "تعديل إعدادات الحضور",
   "leave.submit": "تقديم طلب إجازة",
@@ -65,6 +82,9 @@ export const ACTION_LABELS: Record<string, string> = {
   "product.update": "تعديل منتج",
   "product.delete": "حذف منتج",
   "product.adjust": "تعديل مخزون",
+  "inventory_count.create": "بدء جرد مخزون",
+  "inventory_count.confirm": "اعتماد جرد مخزون",
+  "inventory_count.cancel": "إلغاء جرد مخزون",
   "sale.create": "تسجيل فاتورة",
   "sale.update": "تعديل فاتورة",
   "sale.void": "إلغاء فاتورة",
@@ -72,12 +92,28 @@ export const ACTION_LABELS: Record<string, string> = {
   "expense.create": "تسجيل مصروف",
   "expense.delete": "حذف مصروف",
   "expense.recurring_materialized": "إنشاء مصاريف دورية مستحقة",
+  // Financial Management (Slice 1) — labels used by activity-log rendering.
+  "finance.category.create": "إضافة قسم مصاريف",
+  "finance.category.update": "تعديل قسم مصاريف",
+  "finance.category.archive": "أرشفة قسم مصاريف",
+  "finance.recurring.create": "إضافة مصروف دوري",
+  "finance.recurring.update": "تعديل مصروف دوري",
+  "finance.recurring.cancel": "إلغاء مصروف دوري",
+  "finance.money_movement.create": "تسجيل حركة مالية",
+  "finance.money_movement.update": "تعديل حركة مالية",
+  "finance.money_movement.void": "إلغاء حركة مالية",
+  "finance.expense.create": "تسجيل مصروف من الماليات",
+  "finance.expense.update": "تعديل مصروف من الماليات",
+  "finance.expense.void": "إلغاء مصروف",
   "supplier.create": "إضافة مورد",
   "supplier.update": "تعديل مورد",
   "supplier.delete": "حذف مورد",
+  "supplier.payment": "تسجيل دفعة لمورد",
   "purchase.create": "إنشاء أمر شراء",
   "purchase.receive": "استلام أمر شراء",
   "purchase.cancel": "إلغاء أمر شراء",
+  "customer.create": "إنشاء عميل",
+  "customer.update": "تعديل عميل",
   "attendance.check_in": "تسجيل دخول",
   "attendance.check_out": "تسجيل خروج",
   "attendance.geofence_rejected": "محاولة حضور من خارج نطاق المتجر",
@@ -453,4 +489,6 @@ export const CATEGORY_LABELS: Record<ActivityCategory, string> = {
   purchase: "المشتريات",
   attendance: "الحضور",
   collection: "التحويلات",
+  customer: "العملاء",
+  payroll: "الرواتب",
 };

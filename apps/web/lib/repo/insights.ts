@@ -113,8 +113,14 @@ const DASHBOARD_STATS_TTL_SEC = 60;
 export interface DashboardStats {
   /** Sum of total_price for sales with sale_date >= today (00:00 local). */
   todayRevenue: number;
+  /** Same window, split by channel (migration 0057). Sums ≤ todayRevenue. */
+  todayRevenueStore: number;
+  todayRevenueOnline: number;
   /** Sum of total_price for sales with sale_date >= 1st of current month. */
   monthRevenue: number;
+  /** Same window, split by channel. */
+  monthRevenueStore: number;
+  monthRevenueOnline: number;
   /** Returns recorded since 1st of current month. */
   monthReturns: number;
   /** Total products in catalog (after branch filter, if any). */
@@ -160,9 +166,14 @@ async function computeDashboardStats(
     // SQL aggregation rather than fetching every row + reducing in JS.
     // Money columns are stored as numeric but typed text in Drizzle — sum()
     // on numeric works without an explicit cast.
+    // Channel split (migration 0057): one query, one scan — grouped so the
+    // dashboard shows "today: EGP X · store Y · online Z" without a second
+    // round-trip. SUM FILTER lets us materialise each split in the same row.
     const [todayRow] = await tx
       .select({
         total: sql<string>`coalesce(sum(${sales.totalPrice}), 0)::text`,
+        store: sql<string>`coalesce(sum(${sales.totalPrice}) filter (where ${sales.channel} = 'store'), 0)::text`,
+        online: sql<string>`coalesce(sum(${sales.totalPrice}) filter (where ${sales.channel} = 'online'), 0)::text`,
       })
       .from(sales)
       .where(
@@ -176,6 +187,8 @@ async function computeDashboardStats(
     const [monthRow] = await tx
       .select({
         total: sql<string>`coalesce(sum(${sales.totalPrice}), 0)::text`,
+        store: sql<string>`coalesce(sum(${sales.totalPrice}) filter (where ${sales.channel} = 'store'), 0)::text`,
+        online: sql<string>`coalesce(sum(${sales.totalPrice}) filter (where ${sales.channel} = 'online'), 0)::text`,
       })
       .from(sales)
       .where(
@@ -212,7 +225,11 @@ async function computeDashboardStats(
 
     return {
       todayRevenue: Number(todayRow?.total ?? 0),
+      todayRevenueStore: Number(todayRow?.store ?? 0),
+      todayRevenueOnline: Number(todayRow?.online ?? 0),
       monthRevenue: Number(monthRow?.total ?? 0),
+      monthRevenueStore: Number(monthRow?.store ?? 0),
+      monthRevenueOnline: Number(monthRow?.online ?? 0),
       monthReturns: returnsRow?.count ?? 0,
       productCount: productsRow?.count ?? 0,
     };

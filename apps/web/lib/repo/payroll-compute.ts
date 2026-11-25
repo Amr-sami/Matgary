@@ -12,6 +12,9 @@ import type { AttendanceSettingsDto } from "@/lib/repo/attendance";
 
 export type PayType = "fixed" | "hourly" | "hybrid";
 
+/** V1 commission base — `profit_contribution` is reserved for V2. */
+export type CommissionBase = "gross_sales" | "profit_contribution";
+
 export interface CompensationDto {
   id: string;
   employeeId: string;
@@ -19,6 +22,12 @@ export interface CompensationDto {
   baseSalaryMonthly: number | null;
   hourlyRate: number | null;
   standardMonthlyHours: number | null;
+  /** V1 — flat % 0..100. Default 0 on older rows pre-0068. */
+  commissionRate: number;
+  /** V1 — defaults to 'gross_sales' on older rows pre-0068. */
+  commissionBase: CommissionBase;
+  /** V1 — Owner opt-in flag. Default false on older rows pre-0068. */
+  bonusEligible: boolean;
   effectiveFrom: Date;
   createdByUserId: string;
   createdAt: Date;

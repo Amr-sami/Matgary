@@ -6,8 +6,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { TeamEditor } from "../settings/TeamEditor";
 import { CompensationEditor } from "./CompensationEditor";
+import { PayrollRegister } from "./PayrollRegister";
 import { AttendanceSettingsEditor } from "./AttendanceSettingsEditor";
 import { AttendanceRoster } from "./AttendanceRoster";
 import { LeaveTab } from "../leave/LeaveTab";
@@ -91,7 +93,7 @@ export function TeamPageBody({
 
       {tab === "team" && isManager && <TeamEditor onToast={setToast} />}
       {tab === "attendance" && isManager && <AttendanceRoster onToast={setToast} />}
-      {tab === "payroll" && isManager && <CompensationEditor onToast={setToast} />}
+      {tab === "payroll" && isManager && <PayrollTabBody onToast={setToast} />}
       {tab === "leaves" && canSeeLeaves && (
         <LeaveTab onToast={setToast} onUnreadChange={refreshLeaveUnread} />
       )}
@@ -107,5 +109,36 @@ export function TeamPageBody({
         />
       )}
     </>
+  );
+}
+
+/** Payroll tab: register on top (lifecycle + numbers), compensation editor
+ *  underneath in a collapsible section so Owners can still tweak pay rules
+ *  without leaving the tab. */
+function PayrollTabBody({ onToast }: { onToast: (t: { type: "success" | "error"; message: string }) => void }) {
+  const { data: session } = useSession();
+  const isOwner = session?.user?.role === "owner";
+  const [showCompensation, setShowCompensation] = useState(false);
+  return (
+    <div className="space-y-6">
+      <PayrollRegister isOwner={isOwner} onToast={onToast} />
+      <div className="rounded-md border border-border-default">
+        <button
+          type="button"
+          onClick={() => setShowCompensation((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-text-primary"
+        >
+          <span>Compensation settings</span>
+          <span className="text-text-secondary text-xs">
+            {showCompensation ? "Hide" : "Show"}
+          </span>
+        </button>
+        {showCompensation && (
+          <div className="px-4 pb-4 border-t border-border-default pt-4">
+            <CompensationEditor onToast={onToast} />
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

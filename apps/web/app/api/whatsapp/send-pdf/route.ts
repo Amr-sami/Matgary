@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { normalizePhone } from "@/lib/settings";
 import { generateReceiptPdf, type PdfInvoiceData } from "@/lib/pdfReceipt";
+import { receiptFilename } from "@matgary/domain/receipt/filename";
 import { requirePermissionWithBranch } from "@/lib/api/auth-helpers";
 import { getGreenApiCredentials } from "@/lib/repo/settings";
 import { rateLimit } from "@/lib/ratelimit";
@@ -86,7 +87,11 @@ export async function POST(req: Request) {
     creds.instanceId,
   )}/sendFileByUpload/${encodeURIComponent(creds.token)}`;
 
-  const fileName = `receipt-${invoice.invoiceId.slice(-10).toUpperCase()}.pdf`;
+  const fileName = receiptFilename({
+    invoiceId: invoice.invoiceId,
+    saleDate: invoice.saleDate,
+    referencePrefix: invoice.referencePrefix,
+  });
   const chatId = `${normalized}@c.us`;
 
   const form = new FormData();

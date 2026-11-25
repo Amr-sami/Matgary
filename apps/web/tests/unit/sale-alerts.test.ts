@@ -5,6 +5,11 @@
  * test, the summary timer is captured through the `schedule` seam, and the
  * Redis publish to web tabs is spied.
  *
+ * v2 fanout (owner's call, 2026-10-25):
+ *   • permission filter removed — a stock clerk at the sale's branch rings too
+ *   • origin exclusion removed — the recording device rings
+ *   • branch filter kept    — a sale at branch 1 does NOT page branch 2 staff
+ *
  * Seed: one tenant, two branches, and
  *   owner  (en)  tokens O1, O2
  *   S1     (ar)  branch 1, view_sales             token S1 (+ a disabled one)
@@ -166,6 +171,8 @@ function sale(over: Partial<SaleAlertInput> = {}): SaleAlertInput {
     paymentMethod: "instapay",
     sellerUserId: U.SELLER,
     saleDate: new Date(NOW),
+    firstProductName: "Casio MTP-1374L",
+    lineCount: 1,
     origin: tok("sell"),
     outboxReplay: false,
     ...over,
@@ -177,22 +184,22 @@ const byTo = (sent: Wire[]) => new Map(sent.map((m) => [m.to, m]));
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe("recipients and devices (doc 16 §2)", () => {
-  it("owner + same-branch view_sales staff ring; other-branch / no-view_sales staff and the recording device do not", async () => {
+  it("owner + ALL same-branch staff ring (incl. no-view_sales + the recording device); other-branch staff and dead tokens do not", async () => {
     await seedTokens();
     const expo = fakeExpo();
     await alertSale(sale(), { fetch: expo.fetch, store: new MemoryBurstStore(), now: () => NOW });
 
     const to = expo.sent.map((m) => m.to).sort();
-    expect(to).toEqual([tok("o1"), tok("o2"), tok("s1")].sort());
-    // Not S2 (no view_sales), not S3 (branch 2), not the disabled token, and
-    // not the seller's recording phone.
-    expect(to).not.toContain(tok("s2"));
+    // v2 (2026-10-25): S2 (no view_sales) and the seller's own device BOTH ring.
+    expect(to).toEqual([tok("o1"), tok("o2"), tok("s1"), tok("s2"), tok("sell")].sort());
+    expect(to).toContain(tok("s2"));
+    expect(to).toContain(tok("sell"));
+    // Still excluded: branch-2 staff and tokens we have explicitly disabled.
     expect(to).not.toContain(tok("s3"));
     expect(to).not.toContain(tok("s1dead"));
-    expect(to).not.toContain(tok("sell"));
   });
 
-  it("the seller's OTHER device still rings when a different device recorded the sale (OPEN-8)", async () => {
+  it("every live token for every eligible user rings, regardless of which one was the origin", async () => {
     await seedTokens();
     await withTenant(tenantId, (tx) =>
       tx.insert(pushTokens).values({ tenantId, userId: U.SELLER, expoToken: tok("sell2"), platform: "android" }),
@@ -200,11 +207,12 @@ describe("recipients and devices (doc 16 §2)", () => {
     const expo = fakeExpo();
     await alertSale(sale(), { fetch: expo.fetch, store: new MemoryBurstStore(), now: () => NOW });
     const to = expo.sent.map((m) => m.to);
+    // v2: BOTH seller phones ring — the recording one AND the second one.
     expect(to).toContain(tok("sell2"));
-    expect(to).not.toContain(tok("sell"));
+    expect(to).toContain(tok("sell"));
   });
 
-  it("the origin token is excluded while the same user's second token still gets the push", async () => {
+  it("origin header is ignored for token selection (v2); both of a user's tokens receive", async () => {
     await seedTokens();
     const expo = fakeExpo();
     await alertSale(sale({ origin: tok("o1"), sellerUserId: U.owner }), {
@@ -213,7 +221,7 @@ describe("recipients and devices (doc 16 §2)", () => {
       now: () => NOW,
     });
     const to = expo.sent.map((m) => m.to);
-    expect(to).not.toContain(tok("o1"));
+    expect(to).toContain(tok("o1"));
     expect(to).toContain(tok("o2"));
     expect(to).toContain(tok("sell"));
   });
@@ -276,29 +284,28 @@ describe("wire shape and copy (doc 16 §3-4)", () => {
     const m = byTo(expo.sent);
     expect(m.get(tok("o1"))).toMatchObject({
       title: "New sale · EGP 2,700",
-      body: "INV-8K2Q · 3 items · InstaPay · by Ahmed · المعادي",
+      body: "Casio MTP-1374L · InstaPay · by Ahmed · المعادي",
     });
     expect(m.get(tok("s1"))).toMatchObject({
       title: "بيع جديد · 2,700 ج.م",
       // The seller's display name is used as typed (first word only).
-      body: "INV-8K2Q · 3 قطع · إنستاباي · سجّلها Ahmed · فرع المعادي",
+      body: "Casio MTP-1374L · إنستاباي · سجّلها Ahmed · فرع المعادي",
     });
     for (const w of expo.sent) {
       expect(JSON.stringify(w)).not.toMatch(/customer|01\d{9}/i);
     }
   });
 
-  it("cash omits the payment part; one item; no seller → no seller part", async () => {
+  it("cash omits the payment part; one item, no seller, no product → the body carries only the branch", async () => {
     await seedTokens();
     const expo = fakeExpo();
-    await alertSale(sale({ paymentMethod: "cash", itemCount: 1, sellerUserId: null, origin: null }), {
-      fetch: expo.fetch,
-      store: new MemoryBurstStore(),
-      now: () => NOW,
-    });
+    await alertSale(
+      sale({ paymentMethod: "cash", itemCount: 1, sellerUserId: null, origin: null, firstProductName: null }),
+      { fetch: expo.fetch, store: new MemoryBurstStore(), now: () => NOW },
+    );
     const m = byTo(expo.sent);
-    expect(m.get(tok("o1"))!.body).toBe("INV-8K2Q · 1 item · المعادي");
-    expect(m.get(tok("s1"))!.body).toBe("INV-8K2Q · قطعة واحدة · فرع المعادي");
+    expect(m.get(tok("o1"))!.body).toBe("المعادي");
+    expect(m.get(tok("s1"))!.body).toBe("فرع المعادي");
   });
 
   it("wallet / card / deferred labels", async () => {
@@ -395,7 +402,10 @@ describe("outcomes (doc 16 §8.7)", () => {
     const receipts = await withTenant(tenantId, (tx) =>
       tx.select({ userId: pushReceipts.userId, token: pushReceipts.expoToken }).from(pushReceipts),
     );
-    expect(receipts.map((r) => r.token).sort()).toEqual([tok("o1"), tok("s1")].sort());
+    // v2 fanout: S2 and SELL also receive now; o2 was marked DeviceNotRegistered so it's absent.
+    expect(receipts.map((r) => r.token).sort()).toEqual(
+      [tok("o1"), tok("s1"), tok("s2"), tok("sell")].sort(),
+    );
     expect(receipts.find((r) => r.token === tok("s1"))!.userId).toBe(U.S1);
   });
 });
@@ -407,7 +417,10 @@ describe("web tabs (doc 16 §6)", () => {
     const s = sale();
     await alertSale(s, { fetch: expo.fetch, store: new MemoryBurstStore(), now: () => NOW });
     expect(expo.sent).toHaveLength(0);
-    expect(publishMock.mock.calls.map((c) => c[0]).sort()).toEqual([U.owner, U.S1, U.SELLER].sort());
+    // v2: S2 (no view_sales) also receives the web toast now.
+    expect(publishMock.mock.calls.map((c) => c[0]).sort()).toEqual(
+      [U.owner, U.S1, U.S2, U.SELLER].sort(),
+    );
     for (const [, payload] of publishMock.mock.calls) {
       expect(payload).toMatchObject({ id: s.saleId, link: "/sales", origin: null });
       expect(JSON.stringify(payload)).not.toMatch(/PushToken/);
@@ -441,8 +454,9 @@ describe("burst rule (doc 16 §3)", () => {
       });
     }
     const singles = expo.sent.filter((m) => m.data?.type === "sale_alert");
-    // 3 sales × 4 devices (O1, O2, S1, SELL).
-    expect(singles).toHaveLength(12);
+    // v2: 3 sales × 5 devices (O1, O2, S1, S2, SELL) — S2 added now that
+    // view_sales is no longer required.
+    expect(singles).toHaveLength(15);
     expect(new Set(singles.map((m) => m.data!.id)).size).toBe(3);
     expect(scheduled).toHaveLength(1);
     expect(scheduled[0]!.ms).toBe(SALE_ALERT_SUMMARY_DELAY_MS);
@@ -451,7 +465,9 @@ describe("burst rule (doc 16 §3)", () => {
     scheduled[0]!.fn();
     await settleSaleAlerts();
     const summaries = expo.sent.filter((m) => m.data?.type === "sale_alert_summary");
-    expect(summaries.map((m) => m.to).sort()).toEqual([tok("o1"), tok("o2"), tok("s1"), tok("sell")].sort());
+    expect(summaries.map((m) => m.to).sort()).toEqual(
+      [tok("o1"), tok("o2"), tok("s1"), tok("s2"), tok("sell")].sort(),
+    );
     const o1 = summaries.find((m) => m.to === tok("o1"))!;
     expect(o1).toMatchObject({
       title: "2 new sales · EGP 3,400",

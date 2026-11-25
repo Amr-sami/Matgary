@@ -487,6 +487,159 @@ export async function loadBranchComparison(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 4a) Brand breakdown — totals per brand + store/online split per brand.
+//     Takes the same (window?, branchId?) scope as the per-branch report.
+//     `brand` is a free-text snapshot on sales (nullable); NULLs collapse into
+//     one "—" bucket so the row list isn't padded with empties.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface BrandBreakdownRow {
+  brand: string;
+  revenue: number;
+  cost: number;
+  discounts: number;
+  grossProfit: number;
+  /** 0 when revenue is 0, else (grossProfit / revenue) * 100. */
+  margin: number;
+  unitsSold: number;
+  transactions: number;
+  /** revenue / transactions, 0 when transactions is 0. */
+  aov: number;
+  /** Channel split — zero-filled when a channel has no sales for the brand. */
+  byChannel: {
+    store: { revenue: number; transactions: number };
+    online: { revenue: number; transactions: number };
+  };
+}
+
+export interface BrandBreakdownReport {
+  window: { from: string; to: string } | null;
+  rows: BrandBreakdownRow[];
+  totals: {
+    revenue: number;
+    cost: number;
+    grossProfit: number;
+    margin: number;
+    transactions: number;
+  };
+}
+
+export async function loadBrandBreakdown(
+  tenantId: string,
+  window: { from: Date; to: Date } | null,
+  branchId: string | null,
+): Promise<BrandBreakdownReport> {
+  return withTenant(tenantId, async (tx) => {
+    const branchFilter = branchId ? eq(sales.branchId, branchId) : undefined;
+    const filters = [eq(sales.tenantId, tenantId)];
+    if (window) {
+      filters.push(
+        gte(sales.saleDate, window.from),
+        lte(sales.saleDate, window.to),
+      );
+    }
+    if (branchFilter) filters.push(branchFilter);
+
+    // Totals per brand (NULL brand collapses to one bucket).
+    const totalsRows = await tx
+      .select({
+        brand: sql<string>`coalesce(${sales.brand}, '')`,
+        revenue: sql<string>`coalesce(sum(${sales.totalPrice}), 0)::text`,
+        cost: sql<string>`coalesce(sum(
+          coalesce(${sales.costPriceAtSale}, ${products.costPrice}, 0)
+            * ${sales.quantitySold}
+        ), 0)::text`,
+        discounts: sql<string>`coalesce(sum(coalesce(${sales.discountAmount}, 0)), 0)::text`,
+        unitsSold: sql<number>`coalesce(sum(${sales.quantitySold}), 0)::int`,
+        transactions: sql<number>`count(*)::int`,
+      })
+      .from(sales)
+      .leftJoin(products, eq(products.id, sales.productId))
+      .where(and(...filters))
+      .groupBy(sql`coalesce(${sales.brand}, '')`);
+
+    // Channel split per brand (store | online). Same filters as above so
+    // the two aggregates roll up to identical top-line revenue.
+    const channelRows = await tx
+      .select({
+        brand: sql<string>`coalesce(${sales.brand}, '')`,
+        channel: sales.channel,
+        revenue: sql<string>`coalesce(sum(${sales.totalPrice}), 0)::text`,
+        transactions: sql<number>`count(*)::int`,
+      })
+      .from(sales)
+      .where(and(...filters))
+      .groupBy(sql`coalesce(${sales.brand}, '')`, sales.channel);
+
+    const channelByBrand = new Map<
+      string,
+      BrandBreakdownRow["byChannel"]
+    >();
+    for (const r of channelRows) {
+      const b = String(r.brand ?? "");
+      const bucket =
+        channelByBrand.get(b) ?? {
+          store: { revenue: 0, transactions: 0 },
+          online: { revenue: 0, transactions: 0 },
+        };
+      const slot = r.channel === "online" ? bucket.online : bucket.store;
+      slot.revenue = Number(r.revenue ?? 0);
+      slot.transactions = Number(r.transactions ?? 0);
+      channelByBrand.set(b, bucket);
+    }
+
+    const out: BrandBreakdownRow[] = totalsRows.map((r) => {
+      const key = String(r.brand ?? "");
+      const revenue = Number(r.revenue ?? 0);
+      const cost = Number(r.cost ?? 0);
+      const transactions = Number(r.transactions ?? 0);
+      const grossProfit = revenue - cost;
+      return {
+        brand: key === "" ? "—" : key,
+        revenue,
+        cost,
+        discounts: Number(r.discounts ?? 0),
+        grossProfit,
+        margin: revenue === 0 ? 0 : (grossProfit / revenue) * 100,
+        unitsSold: Number(r.unitsSold ?? 0),
+        transactions,
+        aov: transactions === 0 ? 0 : revenue / transactions,
+        byChannel:
+          channelByBrand.get(key) ?? {
+            store: { revenue: 0, transactions: 0 },
+            online: { revenue: 0, transactions: 0 },
+          },
+      };
+    });
+
+    // Highest-revenue brand on top — matches the branch-comparison ordering.
+    out.sort((a, b) => b.revenue - a.revenue);
+
+    const totals = out.reduce(
+      (acc, r) => {
+        acc.revenue += r.revenue;
+        acc.cost += r.cost;
+        acc.grossProfit += r.grossProfit;
+        acc.transactions += r.transactions;
+        return acc;
+      },
+      { revenue: 0, cost: 0, grossProfit: 0, transactions: 0 },
+    );
+
+    return {
+      window: window
+        ? { from: window.from.toISOString(), to: window.to.toISOString() }
+        : null,
+      rows: out,
+      totals: {
+        ...totals,
+        margin: totals.revenue === 0 ? 0 : (totals.grossProfit / totals.revenue) * 100,
+      },
+    };
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 5) Product drill-down — daily trend + qty + margin for one product
 // ─────────────────────────────────────────────────────────────────────────────
 

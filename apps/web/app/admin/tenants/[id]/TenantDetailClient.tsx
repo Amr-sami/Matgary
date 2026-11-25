@@ -6,7 +6,9 @@ import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
 import { SuspendTenantModal } from "@/components/admin/SuspendTenantModal";
 import { UnsuspendTenantModal } from "@/components/admin/UnsuspendTenantModal";
 import { ExtendTrialModal } from "@/components/admin/ExtendTrialModal";
+import { EnableTrialModal } from "@/components/admin/EnableTrialModal";
 import { ImpersonationConfirmModal } from "@/components/admin/ImpersonationConfirmModal";
+import { ResetOwnerPasswordModal } from "@/components/admin/ResetOwnerPasswordModal";
 import { Toast } from "@/components/ui/Toast";
 
 interface HealthFlag {
@@ -20,7 +22,6 @@ interface SalesPerformance {
   yoyPct: number | null;
   thisMonth: { gross: string; count: number };
   series12mo: { month: string; gross: string; count: number }[];
-  topBranches: { branchId: string; name: string; gross: string; count: number }[];
   topProducts: { productName: string; gross: string; qty: number }[];
   paymentMix: { cash: string; card: string; instapay: string; wallet: string; deferred: string };
 }
@@ -56,21 +57,38 @@ interface Detail {
     failureReason: string | null;
   } | null;
   failedAttempts90d: number;
-  branches: {
-    id: string;
-    name: string;
-    isActive: boolean;
-    employeeCount: number;
-    lastSaleAt: string | null;
-  }[];
   counts: {
     employees: number;
-    branches: number;
     salesLast30d: number;
+    products: number;
+    categories: number;
+    customers: number;
+    suppliers: number;
+    topCategories: { categoryId: string; name: string; productCount: number }[];
   };
   resolvedStatus: string;
   healthFlags: HealthFlag[];
   salesPerformance: SalesPerformance | null;
+  storeHealth: {
+    health: {
+      score: number;
+      status: "healthy" | "attention" | "at_risk";
+      categories: { key: string; score: number; max: number }[];
+      reasons: { key: string; params?: Record<string, string | number> }[];
+    };
+    risk: {
+      level: "healthy" | "low" | "medium" | "high";
+      score: number;
+      reasons: { key: string; params?: Record<string, string | number> }[];
+    };
+  } | null;
+  presence: {
+    onlineNow: number;
+    activeToday: number;
+    activeDevices: number;
+    byPlatform: { ios: number; android: number; web: number; other: number };
+    activityLast24h: { hour: string; users: number }[];
+  } | null;
 }
 
 interface ActivityRow {
@@ -98,6 +116,8 @@ export function TenantDetailClient({ id }: { id: string }) {
   const [unsuspendOpen, setUnsuspendOpen] = useState(false);
   const [extendOpen, setExtendOpen] = useState(false);
   const [impersonateOpen, setImpersonateOpen] = useState(false);
+  const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
+  const [enableTrialOpen, setEnableTrialOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -156,6 +176,36 @@ export function TenantDetailClient({ id }: { id: string }) {
         </div>
       )}
 
+      {/* Health + Risk — Phase 1 Command Center card. */}
+      {data.storeHealth && (
+        <HealthRiskCard
+          health={data.storeHealth.health}
+          risk={data.storeHealth.risk}
+          t={(dict.app.admin.tenants.detail as unknown as { healthRisk: Record<string, unknown> }).healthRisk}
+          healthReasonLabel={(key, params) =>
+            resolveReason(dict as unknown as DictShape, key, params)
+          }
+          riskReasonLabel={(key, params) =>
+            resolveReason(dict as unknown as DictShape, key, params)
+          }
+        />
+      )}
+
+      {/* Presence — Phase 2. */}
+      {data.presence && (
+        <PresenceCard
+          data={data.presence}
+          t={(dict.app.admin.tenants.detail as unknown as { presence: Record<string, unknown> }).presence}
+        />
+      )}
+
+      {/* Usage — Phase 3. Products / categories / customers / suppliers +
+          top categories breakdown. */}
+      <UsageCard
+        counts={data.counts}
+        t={(dict.app.admin.tenants.detail as unknown as { usage: Record<string, unknown> }).usage}
+      />
+
       {/* Identity header */}
       <header className="bg-white rounded-2xl border border-border p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -197,6 +247,11 @@ export function TenantDetailClient({ id }: { id: string }) {
               </ActionButton>
             )}
             <ActionButton
+              onClick={() => setEnableTrialOpen(true)}
+            >
+              {t.actions.enableTrial}
+            </ActionButton>
+            <ActionButton
               onClick={() => setExtendOpen(true)}
               disabled={!data.subscription}
             >
@@ -213,6 +268,13 @@ export function TenantDetailClient({ id }: { id: string }) {
               tone="danger"
             >
               {t.actions.impersonate}
+            </ActionButton>
+            <ActionButton
+              onClick={() => setResetPasswordOpen(true)}
+              disabled={!data.owner}
+              tone="danger"
+            >
+              {t.actions.resetOwnerPassword}
             </ActionButton>
             <Link
               href={`/admin/tenants/${data.tenant.id}/activity`}
@@ -270,57 +332,6 @@ export function TenantDetailClient({ id }: { id: string }) {
         ) : (
           <p className="text-xs text-text-secondary">—</p>
         )}
-      </section>
-
-      {/* Branches */}
-      <section className="bg-white rounded-2xl border border-border overflow-hidden">
-        <header className="px-5 py-3 border-b border-border">
-          <h2 className="text-sm font-semibold">
-            {t.branches.title.replace("{n}", String(data.branches.length))}
-          </h2>
-        </header>
-        <table className="w-full text-sm">
-          <thead className="bg-bg-main/40">
-            <tr className="text-xs text-text-secondary">
-              <th className="text-start font-medium px-4 py-2">
-                {t.branches.name}
-              </th>
-              <th className="text-start font-medium px-4 py-2">Status</th>
-              <th className="text-end font-medium px-4 py-2">
-                {t.branches.employees}
-              </th>
-              <th className="text-start font-medium px-4 py-2">
-                {t.branches.lastSale}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.branches.map((b) => (
-              <tr key={b.id} className="border-t border-border">
-                <td className="px-4 py-2" dir="auto">
-                  {b.name}
-                </td>
-                <td className="px-4 py-2 text-xs">
-                  <span
-                    className={`px-2 py-0.5 rounded-full ${
-                      b.isActive
-                        ? "bg-success-light text-success"
-                        : "bg-bg-main text-text-secondary"
-                    }`}
-                  >
-                    {b.isActive ? t.branches.active : t.branches.inactive}
-                  </span>
-                </td>
-                <td className="px-4 py-2 text-end tabular-nums">
-                  {b.employeeCount}
-                </td>
-                <td className="px-4 py-2 text-xs text-text-secondary">
-                  {b.lastSaleAt ? formatDate(b.lastSaleAt) : t.branches.none}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
       </section>
 
       {/* Sales performance — Spec 09. Only renders when there's a
@@ -441,10 +452,389 @@ export function TenantDetailClient({ id }: { id: string }) {
         onClose={() => setImpersonateOpen(false)}
         onError={(m) => setToast({ type: "error", message: m })}
       />
+      <ResetOwnerPasswordModal
+        isOpen={resetPasswordOpen}
+        tenantId={data.tenant.id}
+        tenantName={data.tenant.name}
+        ownerEmail={data.owner?.email ?? null}
+        onClose={() => setResetPasswordOpen(false)}
+        onError={(m) => setToast({ type: "error", message: m })}
+      />
+      <EnableTrialModal
+        isOpen={enableTrialOpen}
+        tenantId={data.tenant.id}
+        tenantName={data.tenant.name}
+        onClose={() => setEnableTrialOpen(false)}
+        onSuccess={async () => {
+          setEnableTrialOpen(false);
+          setToast({
+            type: "success",
+            message: t.actions.enableTrialModal.successToast,
+          });
+          await load();
+        }}
+        onError={(m) => setToast({ type: "error", message: m })}
+      />
       {toast && (
         <Toast type={toast.type} message={toast.message} onClose={() => setToast(null)} />
       )}
     </div>
+  );
+}
+
+/**
+ * Walk a dictionary by a dotted key and interpolate numeric/string params.
+ * Returns the key itself when not found so missing translations show up.
+ */
+type DictShape = { [k: string]: unknown };
+function resolveReason(
+  dict: DictShape,
+  key: string,
+  params?: Record<string, string | number>,
+): string {
+  const parts = key.split(".");
+  let cur: unknown = dict;
+  for (const p of parts) {
+    if (cur && typeof cur === "object" && p in (cur as DictShape)) {
+      cur = (cur as DictShape)[p];
+    } else {
+      return key;
+    }
+  }
+  if (typeof cur !== "string") return key;
+  if (!params) return cur;
+  return cur.replace(/\{(\w+)\}/g, (_, k) =>
+    params[k] !== undefined ? String(params[k]) : `{${k}}`,
+  );
+}
+
+function HealthRiskCard({
+  health,
+  risk,
+  t,
+  healthReasonLabel,
+  riskReasonLabel,
+}: {
+  health: {
+    score: number;
+    status: "healthy" | "attention" | "at_risk";
+    categories: { key: string; score: number; max: number }[];
+    reasons: { key: string; params?: Record<string, string | number> }[];
+  };
+  risk: {
+    level: "healthy" | "low" | "medium" | "high";
+    score: number;
+    reasons: { key: string; params?: Record<string, string | number> }[];
+  };
+  t: Record<string, unknown>;
+  healthReasonLabel: (key: string, params?: Record<string, string | number>) => string;
+  riskReasonLabel: (key: string, params?: Record<string, string | number>) => string;
+}) {
+  const healthTone =
+    health.status === "healthy"
+      ? "text-success bg-success-light"
+      : health.status === "attention"
+        ? "text-orange-700 bg-orange-100"
+        : "text-danger bg-danger-light";
+  const riskTone =
+    risk.level === "healthy"
+      ? "text-success bg-success-light"
+      : risk.level === "low"
+        ? "text-text-secondary bg-bg-main"
+        : risk.level === "medium"
+          ? "text-orange-700 bg-orange-100"
+          : "text-danger bg-danger-light";
+
+  const tt = t as {
+    title: string;
+    scoreLabel: string;
+    status: Record<string, string>;
+    riskLabel: string;
+    risk: Record<string, string>;
+    categories: Record<string, string>;
+    whyHealth: string;
+    whyRisk: string;
+    noReasons: string;
+  };
+
+  return (
+    <section className="bg-white rounded-2xl border border-border p-5 space-y-4">
+      <h2 className="text-sm font-semibold">{tt.title}</h2>
+
+      {/* Score + status + risk badge */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="rounded-xl border border-border p-4">
+          <p className="text-[11px] text-text-secondary uppercase tracking-wider">
+            {tt.scoreLabel}
+          </p>
+          <p className="text-3xl font-bold mt-1 tabular-nums" dir="ltr">
+            {health.score}
+            <span className="text-base text-text-secondary">/100</span>
+          </p>
+          <span
+            className={`inline-flex items-center px-2 py-0.5 mt-2 rounded-full text-[11px] font-semibold ${healthTone}`}
+          >
+            {tt.status[health.status]}
+          </span>
+        </div>
+        <div className="rounded-xl border border-border p-4">
+          <p className="text-[11px] text-text-secondary uppercase tracking-wider">
+            {tt.riskLabel}
+          </p>
+          <p className="text-3xl font-bold mt-1" dir="ltr">
+            <span
+              className={`inline-flex items-center px-2 py-0.5 rounded-full text-sm font-semibold ${riskTone}`}
+            >
+              {tt.risk[risk.level]}
+            </span>
+          </p>
+        </div>
+        <div className="rounded-xl border border-border p-4 space-y-1.5">
+          {health.categories.map((c) => {
+            const label =
+              tt.categories[c.key as keyof typeof tt.categories] ?? c.key;
+            const pct = Math.round((c.score / c.max) * 100);
+            return (
+              <div key={c.key}>
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-text-secondary">{label}</span>
+                  <span className="font-medium tabular-nums" dir="ltr">
+                    {c.score}/{c.max}
+                  </span>
+                </div>
+                <div className="h-1 rounded bg-bg-main overflow-hidden mt-0.5">
+                  <div
+                    className="h-full bg-accent"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Reasons — "Why?" explanations */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <h3 className="text-xs font-semibold text-text-secondary mb-1.5">
+            {tt.whyHealth}
+          </h3>
+          {health.reasons.length === 0 ? (
+            <p className="text-xs text-text-secondary">{tt.noReasons}</p>
+          ) : (
+            <ul className="space-y-1 text-sm">
+              {health.reasons.map((r, i) => (
+                <li key={`${r.key}-${i}`} className="flex items-start gap-2 text-orange-700">
+                  <span>⚠</span>
+                  <span>{healthReasonLabel(r.key, r.params)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div>
+          <h3 className="text-xs font-semibold text-text-secondary mb-1.5">
+            {tt.whyRisk}
+          </h3>
+          {risk.reasons.length === 0 ? (
+            <p className="text-xs text-text-secondary">{tt.noReasons}</p>
+          ) : (
+            <ul className="space-y-1 text-sm">
+              {risk.reasons.map((r, i) => (
+                <li key={`${r.key}-${i}`} className="flex items-start gap-2 text-danger">
+                  <span>⚠</span>
+                  <span>{riskReasonLabel(r.key, r.params)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function UsageCard({
+  counts,
+  t,
+}: {
+  counts: Detail["counts"];
+  t: Record<string, unknown>;
+}) {
+  const tt = t as {
+    title: string;
+    products: string;
+    categories: string;
+    customers: string;
+    suppliers: string;
+    employees: string;
+    salesLast30d: string;
+    topCategories: string;
+    topCategoriesEmpty: string;
+  };
+  const tiles = [
+    { label: tt.products, value: counts.products },
+    { label: tt.categories, value: counts.categories },
+    { label: tt.customers, value: counts.customers },
+    { label: tt.suppliers, value: counts.suppliers },
+    { label: tt.employees, value: counts.employees },
+    { label: tt.salesLast30d, value: counts.salesLast30d },
+  ];
+  const maxCount = Math.max(1, ...counts.topCategories.map((c) => c.productCount));
+  return (
+    <section className="bg-white rounded-2xl border border-border p-5 space-y-4">
+      <h2 className="text-sm font-semibold">{tt.title}</h2>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        {tiles.map((tile) => (
+          <div key={tile.label} className="rounded-xl border border-border p-3">
+            <p className="text-[11px] text-text-secondary uppercase tracking-wider">
+              {tile.label}
+            </p>
+            <p className="text-2xl font-bold mt-1 tabular-nums" dir="ltr">
+              {tile.value.toLocaleString("en-US")}
+            </p>
+          </div>
+        ))}
+      </div>
+      <div className="pt-3 border-t border-border">
+        <p className="text-[11px] text-text-secondary uppercase tracking-wider mb-2">
+          {tt.topCategories}
+        </p>
+        {counts.topCategories.length === 0 ? (
+          <p className="text-xs text-text-secondary">{tt.topCategoriesEmpty}</p>
+        ) : (
+          <ul className="space-y-1.5">
+            {counts.topCategories.map((c) => (
+              <li key={c.categoryId}>
+                <div className="flex items-baseline justify-between text-sm">
+                  <span dir="auto" className="truncate">
+                    {c.name}
+                  </span>
+                  <span className="font-bold tabular-nums ps-3" dir="ltr">
+                    {c.productCount.toLocaleString("en-US")}
+                  </span>
+                </div>
+                <div className="h-1 rounded bg-bg-main overflow-hidden mt-0.5">
+                  <div
+                    className="h-full bg-accent"
+                    style={{
+                      width: `${Math.max(2, (c.productCount / maxCount) * 100)}%`,
+                    }}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function PresenceCard({
+  data,
+  t,
+}: {
+  data: {
+    onlineNow: number;
+    activeToday: number;
+    activeDevices: number;
+    byPlatform: { ios: number; android: number; web: number; other: number };
+    activityLast24h: { hour: string; users: number }[];
+  };
+  t: Record<string, unknown>;
+}) {
+  const tt = t as {
+    title: string;
+    onlineNow: string;
+    activeToday: string;
+    activeDevices: string;
+    byPlatform: string;
+    platform: { ios: string; android: string; web: string; other: string };
+    last24h: string;
+  };
+  const max = Math.max(1, ...data.activityLast24h.map((h) => h.users));
+  return (
+    <section className="bg-white rounded-2xl border border-border p-5 space-y-4">
+      <div className="flex items-center gap-2">
+        <span className="relative inline-flex w-2 h-2">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
+        </span>
+        <h2 className="text-sm font-semibold">{tt.title}</h2>
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        <div className="rounded-xl border border-border p-4">
+          <p className="text-[11px] text-text-secondary uppercase tracking-wider">
+            {tt.onlineNow}
+          </p>
+          <p className="text-3xl font-bold mt-1 text-success tabular-nums" dir="ltr">
+            {data.onlineNow.toLocaleString("en-US")}
+          </p>
+        </div>
+        <div className="rounded-xl border border-border p-4">
+          <p className="text-[11px] text-text-secondary uppercase tracking-wider">
+            {tt.activeToday}
+          </p>
+          <p className="text-3xl font-bold mt-1 tabular-nums" dir="ltr">
+            {data.activeToday.toLocaleString("en-US")}
+          </p>
+        </div>
+        <div className="rounded-xl border border-border p-4">
+          <p className="text-[11px] text-text-secondary uppercase tracking-wider">
+            {tt.activeDevices}
+          </p>
+          <p className="text-3xl font-bold mt-1 tabular-nums" dir="ltr">
+            {data.activeDevices.toLocaleString("en-US")}
+          </p>
+        </div>
+      </div>
+      <div className="grid grid-cols-4 gap-3 pt-3 border-t border-border">
+        <div>
+          <p className="text-[11px] text-text-secondary">{tt.platform.ios}</p>
+          <p className="text-lg font-semibold tabular-nums" dir="ltr">
+            {data.byPlatform.ios}
+          </p>
+        </div>
+        <div>
+          <p className="text-[11px] text-text-secondary">{tt.platform.android}</p>
+          <p className="text-lg font-semibold tabular-nums" dir="ltr">
+            {data.byPlatform.android}
+          </p>
+        </div>
+        <div>
+          <p className="text-[11px] text-text-secondary">{tt.platform.web}</p>
+          <p className="text-lg font-semibold tabular-nums" dir="ltr">
+            {data.byPlatform.web}
+          </p>
+        </div>
+        <div>
+          <p className="text-[11px] text-text-secondary">{tt.platform.other}</p>
+          <p className="text-lg font-semibold tabular-nums" dir="ltr">
+            {data.byPlatform.other}
+          </p>
+        </div>
+      </div>
+      <div className="pt-3 border-t border-border">
+        <p className="text-[11px] text-text-secondary uppercase tracking-wider mb-2">
+          {tt.last24h}
+        </p>
+        <div className="flex items-end gap-[2px] h-14">
+          {data.activityLast24h.map((h) => {
+            const height = Math.max(2, (h.users / max) * 100);
+            return (
+              <div
+                key={h.hour}
+                title={`${h.hour}: ${h.users}`}
+                style={{ height: `${height}%` }}
+                className="flex-1 bg-accent rounded-sm"
+              />
+            );
+          })}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -486,11 +876,9 @@ interface SalesPerfT {
   yoyLabel: string;
   thisMonthLabel: string;
   chartTitle: string;
-  topBranches: string;
   topProducts: string;
   paymentMix: string;
   paymentMethods: { cash: string; card: string; instapay: string; wallet: string; deferred: string };
-  noBranches: string;
   noProducts: string;
 }
 
@@ -581,49 +969,26 @@ function SalesPerformanceSection({
         <SalesBarChart rows={perf.series12mo} />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <p className="text-xs text-text-secondary uppercase tracking-wider mb-1">
-            {t.topBranches}
-          </p>
-          {perf.topBranches.length === 0 ? (
-            <p className="text-xs text-text-secondary py-2">{t.noBranches}</p>
-          ) : (
-            <ul className="divide-y divide-border text-sm">
-              {perf.topBranches.map((b) => (
-                <li key={b.branchId} className="flex justify-between py-1.5">
-                  <span className="font-medium" dir="auto">
-                    {b.name}
-                  </span>
-                  <span className="text-text-secondary" dir="ltr">
-                    {fmtCurrencyShort(b.gross)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        <div>
-          <p className="text-xs text-text-secondary uppercase tracking-wider mb-1">
-            {t.topProducts}
-          </p>
-          {perf.topProducts.length === 0 ? (
-            <p className="text-xs text-text-secondary py-2">{t.noProducts}</p>
-          ) : (
-            <ul className="divide-y divide-border text-sm">
-              {perf.topProducts.map((p) => (
-                <li key={p.productName} className="flex justify-between py-1.5">
-                  <span className="font-medium truncate" dir="auto">
-                    {p.productName}
-                  </span>
-                  <span className="text-text-secondary" dir="ltr">
-                    {p.qty}× · {fmtCurrencyShort(p.gross)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+      <div>
+        <p className="text-xs text-text-secondary uppercase tracking-wider mb-1">
+          {t.topProducts}
+        </p>
+        {perf.topProducts.length === 0 ? (
+          <p className="text-xs text-text-secondary py-2">{t.noProducts}</p>
+        ) : (
+          <ul className="divide-y divide-border text-sm">
+            {perf.topProducts.map((p) => (
+              <li key={p.productName} className="flex justify-between py-1.5">
+                <span className="font-medium truncate" dir="auto">
+                  {p.productName}
+                </span>
+                <span className="text-text-secondary" dir="ltr">
+                  {p.qty}× · {fmtCurrencyShort(p.gross)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </section>
   );

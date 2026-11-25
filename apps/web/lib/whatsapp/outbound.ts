@@ -32,6 +32,7 @@ import {
 import { getApprovedTemplate } from "./templates";
 import { checkSendWindow, explainClosedWindow } from "./window";
 import type { PdfInvoiceData } from "@/lib/pdfReceipt";
+import { receiptFilename } from "@matgary/domain/receipt/filename";
 
 export type OutboundStatus = "queued" | "sent" | "failed";
 
@@ -196,7 +197,11 @@ export async function sendOutboundDocument(
   }
 
   const clientMessageId = randomUUID();
-  const fileName = `receipt-${input.invoice.invoiceId.slice(-10).toUpperCase()}.pdf`;
+  const fileName = receiptFilename({
+    invoiceId: input.invoice.invoiceId,
+    saleDate: input.invoice.saleDate,
+    referencePrefix: input.invoice.referencePrefix,
+  });
   const rowId = await recordOutboundQueued({
     tenantId: input.tenantId,
     branchId: input.branchId,

@@ -80,6 +80,14 @@ export interface SaleAlertCopyInput {
   /** First word of the seller's display name; null/empty → part omitted. */
   sellerName: string | null;
   branchName: string | null;
+  /** Primary product name — on a single-line sale this is "the" product;
+   *  on a cart sale it is the first line (added for the v2 user-visible body
+   *  copy, 2026-10-25). Null → the product line is omitted from the body. */
+  firstProductName: string | null;
+  /** How many DISTINCT product lines are in the sale. 1 → body shows just
+   *  the product name; 2+ → body shows "{first} +{N-1} more". itemCount is
+   *  the total quantity across lines and is still used for the summary. */
+  lineCount: number;
   /** When the sale was rung up offline and synced later: its time. */
   offlineAt: Date | null;
   /** IANA zone for the offline time (tenants.timezone). */
@@ -141,11 +149,20 @@ export function firstName(name: string | null | undefined): string | null {
 
 export function renderSaleAlert(locale: SaleAlertLocale, p: SaleAlertCopyInput): RenderedAlert {
   const ar = locale === "ar";
-  const n = Math.max(1, Math.round(p.itemCount || 1));
   const seller = firstName(p.sellerName);
+  const otherLines = Math.max(0, Math.round(p.lineCount - 1));
+  // The product phrase — v2 copy (2026-10-25): the body leads with WHAT sold
+  // rather than the invoice number. Tapping the push still opens the invoice
+  // (route = /sales/{saleId}), so the full line list is one tap away.
+  const productPhrase = p.firstProductName
+    ? otherLines > 0
+      ? ar
+        ? `${p.firstProductName} +${otherLines} أخرى`
+        : `${p.firstProductName} +${otherLines} more`
+      : p.firstProductName
+    : null;
   const parts = [
-    p.invoiceId,
-    ar ? countAr(n, "قطعة واحدة", "قطعتين", "قطع", "قطعة") : n === 1 ? "1 item" : `${n} items`,
+    productPhrase,
     paymentLabel(p.paymentMethod, ar),
     seller && (ar ? `سجّلها ${seller}` : `by ${seller}`),
     branchLabel(p.branchName, ar),
@@ -307,6 +324,11 @@ async function loadAudience(
   originToken: string | null,
 ): Promise<Audience> {
   return withTenant(tenantId, async (tx) => {
+    // v2 fanout (owner's call, 2026-10-25): every member of the branch rings,
+    // not only the ones holding `view_sales`. Rationale: the owner wants a
+    // cashier/stock clerk to hear sales from their own branch regardless of
+    // whether they can OPEN the sales screen. Branch is still enforced — a
+    // Maadi cashier should not be interrupted by a Nasr City sale.
     const members = await tx
       .select({ userId: tenantMembers.userId, locale: users.locale })
       .from(tenantMembers)
@@ -316,12 +338,7 @@ async function loadAudience(
           eq(tenantMembers.tenantId, tenantId),
           or(
             eq(tenantMembers.role, "owner"),
-            and(
-              eq(tenantMembers.role, "staff"),
-              eq(tenantMembers.branchId, branchId),
-              // Bound parameter, never interpolated text.
-              sql`${tenantMembers.permissions} @> ARRAY[${SALE_ALERT_PERMISSION}]::text[]`,
-            ),
+            and(eq(tenantMembers.role, "staff"), eq(tenantMembers.branchId, branchId)),
           ),
         ),
       );
@@ -364,6 +381,9 @@ async function loadAudience(
       .map((m) => ({ userId: m.userId, locale: m.locale === "en" ? "en" : "ar" }));
     if (recipients.length === 0) return { recipients, tokens: [], sellerName, timeZone };
 
+    // v2 (owner's call, 2026-10-25): the recording device IS included. The
+    // originToken param is kept for callers but no longer filtered on.
+    void originToken;
     const tokenRows = await tx
       .select({ userId: pushTokens.userId, token: pushTokens.expoToken })
       .from(pushTokens)
@@ -375,7 +395,6 @@ async function loadAudience(
             recipients.map((r) => r.userId),
           ),
           isNull(pushTokens.disabledAt),
-          originToken ? ne(pushTokens.expoToken, originToken) : undefined,
         ),
       )
       .orderBy(pushTokens.createdAt);
@@ -397,7 +416,14 @@ export interface SaleAlertInput {
   paymentMethod: PaymentMethod;
   sellerUserId: string | null;
   saleDate: Date;
-  /** Parsed `X-Alert-Origin`: the recording device's Expo token or `web:<uuid>`. */
+  /** Primary product name — single-sale: the product; cart sale: lines[0]. */
+  firstProductName: string | null;
+  /** How many DISTINCT product lines are in the sale (used to render
+   *  "{first} +N أخرى" when the cart carries more than one product). */
+  lineCount: number;
+  /** Parsed `X-Alert-Origin`: the recording device's Expo token or `web:<uuid>`.
+   *  v2 (2026-10-25): kept for the summary + web-tab dedupe path, no longer
+   *  used to exclude the device's push token. */
   origin: string | null;
   /** `X-Outbox-Replay: 1` — an offline sale syncing now. */
   outboxReplay: boolean;
@@ -631,6 +657,8 @@ export async function alertSale(input: SaleAlertInput, opts: SaleAlertOptions = 
           paymentMethod: input.paymentMethod,
           sellerName: audience.sellerName,
           branchName: input.branchName,
+          firstProductName: input.firstProductName,
+          lineCount: input.lineCount,
           offlineAt,
           timeZone: audience.timeZone,
         }),

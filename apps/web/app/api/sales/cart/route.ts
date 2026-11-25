@@ -70,6 +70,9 @@ const schema = z.object({
       // Partial payment: amount the customer paid at the counter on a
       // deferred sale. Distributed proportionally across the lines.
       amountPaidNow: z.number().min(0).max(10_000_000).optional(),
+      // Sales channel (migration 0057). Omit = store. Online tags WhatsApp /
+      // Instagram / phone orders so analytics can split the two numbers.
+      channel: z.enum(["store", "online"]).optional(),
       // S7 (doc 06 §6.5): offline replay of a sale the customer already
       // walked out with. Books the sale even when a line exceeds stock —
       // quantity floors at 0 and a discrepancy row lands in product_history.

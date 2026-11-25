@@ -32,6 +32,8 @@ export const RECEIPT_LABELS = {
   brand: { en: "BRAND", ar: "الماركة" },
   scanToVisit: { en: "SCAN TO VISIT", ar: "امسح للزيارة" },
   tel: { en: "TEL", ar: "هاتف" },
+  taxRegistration: { en: "TAX REG", ar: "س.ت" },
+  taxCard: { en: "TAX CARD", ar: "ب.ض" },
 } as const satisfies Record<string, LabelPair>;
 
 export type ReceiptLabelKey = keyof typeof RECEIPT_LABELS;

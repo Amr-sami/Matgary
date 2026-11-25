@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { withTenant } from "@/lib/db";
-import { shopSettings } from "@/lib/db/schema";
+import { branches, shopSettings, tenants } from "@/lib/db/schema";
 import { DEFAULT_MESSAGE_TEMPLATE } from "@/lib/settings.defaults";
 import { decryptSecret, encryptSecret } from "@/lib/crypto";
 import { cacheDel, cacheRemember, tenantKey } from "@/lib/cache";
@@ -59,6 +59,26 @@ export interface ShopSettingsDto {
   receiptBlockOrder: ReceiptBlockKey[];
   receiptFontFamily: ReceiptFontFamily;
   receiptCustomBlocks: Record<string, ReceiptCustomBlock>;
+  /** Receipt identity (0065). Empty string = owner left it blank → renderer
+   *  omits that row entirely. Never contains a placeholder. */
+  receiptTaxRegistration: string;
+  receiptTaxCardNumber: string;
+  receiptSlogan: string;
+  receiptReturnPolicy: string;
+  receiptAddress: string;
+  /** Short uppercase prefix stamped before the invoice short code. */
+  receiptReferencePrefix: string;
+  /** Per-row visibility toggles (0066). Default true; a filled field still
+   *  prints unless the Owner flips it off — lets them hide a row without
+   *  clearing the typed text. */
+  receiptShowAddress: boolean;
+  receiptShowSlogan: boolean;
+  receiptShowTaxInfo: boolean;
+  receiptShowReturnPolicy: boolean;
+  /** Per-row alignment overrides (0067). Empty object → every row centres
+   *  (today's behavior). Owner sets any subset of identity row names to
+   *  "left" | "center" | "right" to control physical placement. */
+  receiptBlockAlignments: Record<string, "left" | "center" | "right">;
 }
 
 export type ReceiptFixedBlock =
@@ -169,6 +189,36 @@ function normalizeBlockOrder(
 function clampAlign(v: unknown): ReceiptBlockAlign {
   return v === "right" || v === "center" || v === "left" ? v : "center";
 }
+/** Identity row keys the renderer knows about. Unknown keys are dropped so
+ *  a stale client (or a hand-rolled curl) can't poison the JSON with garbage
+ *  that would print nothing but take up a slot in the Owner's UI. */
+const RECEIPT_BLOCK_ALIGNMENT_KEYS = new Set([
+  "name",
+  "address",
+  "phone",
+  "slogan",
+  "taxReg",
+  "taxCard",
+  "returnPolicy",
+  "footerText",
+]);
+
+export function normalizeBlockAlignments(
+  v: unknown,
+): Record<string, "left" | "center" | "right"> {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return {};
+  const out: Record<string, "left" | "center" | "right"> = {};
+  for (const [k, raw] of Object.entries(v as Record<string, unknown>)) {
+    if (!RECEIPT_BLOCK_ALIGNMENT_KEYS.has(k)) continue;
+    if (raw !== "left" && raw !== "center" && raw !== "right") continue;
+    // Center is the renderer's default — drop redundant entries so the
+    // stored JSON stays minimal.
+    if (raw === "center") continue;
+    out[k] = raw;
+  }
+  return out;
+}
+
 function normalizeCustomBlocks(
   v: unknown,
 ): Record<string, ReceiptCustomBlock> {
@@ -224,6 +274,17 @@ export const DEFAULT_DTO: ShopSettingsDto = {
   receiptBlockOrder: DEFAULT_RECEIPT_BLOCK_ORDER,
   receiptFontFamily: "cairo",
   receiptCustomBlocks: {},
+  receiptTaxRegistration: "",
+  receiptTaxCardNumber: "",
+  receiptSlogan: "",
+  receiptReturnPolicy: "",
+  receiptAddress: "",
+  receiptReferencePrefix: "",
+  receiptShowAddress: true,
+  receiptShowSlogan: true,
+  receiptShowTaxInfo: true,
+  receiptShowReturnPolicy: true,
+  receiptBlockAlignments: {},
 };
 
 /** Load settings for the UI — never exposes the raw Green API token. */
@@ -277,6 +338,17 @@ export async function getShopSettings(
           new Set(Object.keys(normalizeCustomBlocks(row.receiptCustomBlocks))),
         ),
         receiptFontFamily: clampFontFamily(row.receiptFontFamily),
+        receiptTaxRegistration: row.receiptTaxRegistration ?? "",
+        receiptTaxCardNumber: row.receiptTaxCardNumber ?? "",
+        receiptSlogan: row.receiptSlogan ?? "",
+        receiptReturnPolicy: row.receiptReturnPolicy ?? "",
+        receiptAddress: row.receiptAddress ?? "",
+        receiptReferencePrefix: row.receiptReferencePrefix ?? "",
+        receiptShowAddress: row.receiptShowAddress,
+        receiptShowSlogan: row.receiptShowSlogan,
+        receiptShowTaxInfo: row.receiptShowTaxInfo,
+        receiptShowReturnPolicy: row.receiptShowReturnPolicy,
+        receiptBlockAlignments: normalizeBlockAlignments(row.receiptBlockAlignments),
       };
     }),
   );
@@ -478,6 +550,49 @@ export async function saveShopSettings(
     if (patch.receiptFontFamily !== undefined)
       set.receiptFontFamily = clampFontFamily(patch.receiptFontFamily);
 
+    // Receipt identity (0065). Empty string → NULL so a cleared field
+    // disappears from the printed receipt entirely. Caps match the
+    // /api/settings Zod schema; the renderer handles multiline strings.
+    const cleanIdentity = (v: unknown, max: number): string | null => {
+      if (typeof v !== "string") return null;
+      const trimmed = v.replace(/\r/g, "").trim();
+      if (trimmed.length === 0) return null;
+      return trimmed.slice(0, max);
+    };
+    if (patch.receiptTaxRegistration !== undefined)
+      set.receiptTaxRegistration = cleanIdentity(patch.receiptTaxRegistration, 80);
+    if (patch.receiptTaxCardNumber !== undefined)
+      set.receiptTaxCardNumber = cleanIdentity(patch.receiptTaxCardNumber, 80);
+    if (patch.receiptSlogan !== undefined)
+      set.receiptSlogan = cleanIdentity(patch.receiptSlogan, 200);
+    if (patch.receiptReturnPolicy !== undefined)
+      set.receiptReturnPolicy = cleanIdentity(patch.receiptReturnPolicy, 500);
+    if (patch.receiptAddress !== undefined)
+      set.receiptAddress = cleanIdentity(patch.receiptAddress, 200);
+    if (patch.receiptReferencePrefix !== undefined) {
+      const raw = typeof patch.receiptReferencePrefix === "string"
+        ? patch.receiptReferencePrefix.replace(/[^A-Za-z0-9-]/g, "").toUpperCase().slice(0, 8)
+        : "";
+      set.receiptReferencePrefix = raw.length > 0 ? raw : null;
+    }
+    // Visibility toggles (0066) — store as-is; `!!v` keeps the write honest
+    // when a non-boolean sneaks through the client despite the zod schema.
+    if (patch.receiptShowAddress !== undefined)
+      set.receiptShowAddress = !!patch.receiptShowAddress;
+    if (patch.receiptShowSlogan !== undefined)
+      set.receiptShowSlogan = !!patch.receiptShowSlogan;
+    if (patch.receiptShowTaxInfo !== undefined)
+      set.receiptShowTaxInfo = !!patch.receiptShowTaxInfo;
+    if (patch.receiptShowReturnPolicy !== undefined)
+      set.receiptShowReturnPolicy = !!patch.receiptShowReturnPolicy;
+    if (patch.receiptBlockAlignments !== undefined) {
+      // Normaliser drops unknown row keys and redundant centres — store
+      // only the non-default entries so the column stays small.
+      set.receiptBlockAlignments = normalizeBlockAlignments(
+        patch.receiptBlockAlignments,
+      );
+    }
+
     await tx
       .update(shopSettings)
       .set(set)
@@ -487,6 +602,31 @@ export async function saveShopSettings(
           eq(shopSettings.branchId, branchId),
         ),
       );
+
+    // Mirror shopName → tenants.name on the PRIMARY branch only. The home
+    // dashboard greeting (both web `Greeting.tsx` and mobile `index.tsx`)
+    // reads the tenant name when the user is the owner; without this mirror
+    // the greeting kept the signup-time name forever even after the owner
+    // renamed their store in Settings → Store Information. Non-primary
+    // branches intentionally stay local: a secondary branch's shop_settings
+    // row can carry a per-branch display name without re-labelling the
+    // tenant everywhere else (reports, admin, receipts for other branches).
+    if (patch.shopName !== undefined) {
+      const trimmed = patch.shopName.trim();
+      if (trimmed.length > 0) {
+        const [primary] = await tx
+          .select({ isPrimary: branches.isPrimary })
+          .from(branches)
+          .where(and(eq(branches.id, branchId), eq(branches.tenantId, tenantId)))
+          .limit(1);
+        if (primary?.isPrimary) {
+          await tx
+            .update(tenants)
+            .set({ name: trimmed.slice(0, 120) })
+            .where(eq(tenants.id, tenantId));
+        }
+      }
+    }
   });
   // Co-located bust: the only place that mutates settings is also the only
   // place that knows what to drop from cache.

@@ -86,6 +86,21 @@ export interface ShopSettings {
   receiptFontFamily: ReceiptFontFamily;
   /** Owner-defined text blocks the renderer splices in by ID — added in 0030. */
   receiptCustomBlocks: Record<string, ReceiptCustomBlock>;
+  /** Receipt identity (0065). All optional — empty string hides the row. */
+  receiptTaxRegistration: string;
+  receiptTaxCardNumber: string;
+  receiptSlogan: string;
+  receiptReturnPolicy: string;
+  receiptAddress: string;
+  receiptReferencePrefix: string;
+  /** Visibility toggles (0066). Default true — a filled field prints unless
+   *  the Owner flips the toggle off. Lets them hide a row without clearing. */
+  receiptShowAddress: boolean;
+  receiptShowSlogan: boolean;
+  receiptShowTaxInfo: boolean;
+  receiptShowReturnPolicy: boolean;
+  /** Per-row alignment overrides (0067). */
+  receiptBlockAlignments: Record<string, "left" | "center" | "right">;
 }
 
 export const DEFAULT_SETTINGS: ShopSettings = {
@@ -115,6 +130,17 @@ export const DEFAULT_SETTINGS: ShopSettings = {
   receiptBlockOrder: DEFAULT_RECEIPT_BLOCK_ORDER,
   receiptFontFamily: "cairo",
   receiptCustomBlocks: {},
+  receiptTaxRegistration: "",
+  receiptTaxCardNumber: "",
+  receiptSlogan: "",
+  receiptReturnPolicy: "",
+  receiptAddress: "",
+  receiptReferencePrefix: "",
+  receiptShowAddress: true,
+  receiptShowSlogan: true,
+  receiptShowTaxInfo: true,
+  receiptShowReturnPolicy: true,
+  receiptBlockAlignments: {},
 };
 
 export interface ReceiptVars {

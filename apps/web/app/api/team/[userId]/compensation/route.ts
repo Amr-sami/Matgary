@@ -24,6 +24,10 @@ const postSchema = z
     baseSalaryMonthly: z.number().nonnegative().nullable().optional(),
     hourlyRate: z.number().nonnegative().nullable().optional(),
     standardMonthlyHours: z.number().nonnegative().nullable().optional(),
+    // V1 payroll — flat % commission on attributed revenue + opt-in bonus flag.
+    commissionRate: z.number().min(0).max(100).optional(),
+    commissionBase: z.enum(["gross_sales", "profit_contribution"]).optional(),
+    bonusEligible: z.boolean().optional(),
     effectiveFrom: z.string().datetime().optional(),
   })
   .superRefine((v, ctx) => {
@@ -71,6 +75,9 @@ export async function POST(
     baseSalaryMonthly: parsed.data.baseSalaryMonthly ?? null,
     hourlyRate: parsed.data.hourlyRate ?? null,
     standardMonthlyHours: parsed.data.standardMonthlyHours ?? null,
+    commissionRate: parsed.data.commissionRate,
+    commissionBase: parsed.data.commissionBase,
+    bonusEligible: parsed.data.bonusEligible,
     effectiveFrom: parsed.data.effectiveFrom
       ? new Date(parsed.data.effectiveFrom)
       : new Date(),
@@ -87,6 +94,9 @@ export async function POST(
       payType: parsed.data.payType,
       baseSalaryMonthly: parsed.data.baseSalaryMonthly ?? null,
       hourlyRate: parsed.data.hourlyRate ?? null,
+      commissionRate: parsed.data.commissionRate ?? 0,
+      commissionBase: parsed.data.commissionBase ?? "gross_sales",
+      bonusEligible: parsed.data.bonusEligible ?? false,
     },
   });
   return NextResponse.json({ row }, { status: 201 });

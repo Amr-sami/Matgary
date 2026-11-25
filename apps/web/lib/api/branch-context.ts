@@ -1,26 +1,29 @@
-import { cookies, headers } from "next/headers";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
-import { db, withTenant } from "@/lib/db";
-import { branches, tenantMembers } from "@/lib/db/schema";
+import { and, asc, desc, eq } from "drizzle-orm";
+import { withTenant } from "@/lib/db";
+import { branches } from "@/lib/db/schema";
 import { cacheRemember, globalKey } from "@/lib/cache";
 import { withSpan } from "@/lib/observability/tracing";
 
-// Active-branch session model.
+// Branch has been removed from Storo as a product concept — there is no
+// user-facing branch UI, no switching, no per-branch filters. The legacy
+// `branches` table + `branch_id` columns on ~25 tables remain as DB residue
+// so historical data stays intact, but at the application layer every call
+// collapses to the tenant's SINGLE active branch (seeded on signup as the
+// "primary" branch).
 //
-// Once a tenant has more than one branch, every page render and every
-// branch-scoped write needs to know "which branch is the user currently
-// operating at". We persist that decision in a plain HttpOnly cookie
-// (`mg.branch`). The cookie is *not* signed — it carries a UUID, not a
-// secret, and the server validates it against the user's allow-list on every
-// read. A tampered cookie just falls back to the user's primary branch.
+// This file is now the single source of truth for that collapse:
 //
-// Access rules:
-//   - Owners implicitly have access to every branch in their tenant. They
-//     don't need an entry in tenant_members.branch_ids.
-//   - Staff are restricted to the branches listed in tenant_members.branch_ids
-//     on their tenant_members row. Empty list = no branch access (default
-//     deny). The migration backfilled existing staff with the primary
-//     branch so legacy logins keep working.
+//   - `resolveActiveBranch*` always returns the primary branch, ignoring any
+//     `X-Branch-Id` header or `mg.branch` cookie the client may still send.
+//     Existing route handlers that still call `requireTenantWithBranch`
+//     continue to work unchanged — they just always get the primary branch.
+//   - `getAccessibleBranches` returns `[primaryBranchId]`. The old per-staff
+//     branch allow-list is dead code.
+//   - `resolveBranchFilter` honours only "all" (owner-only) vs single-branch;
+//     any specific branch id passed is treated as "my branch".
+//
+// The cookie name is kept as a constant for one reason: a session logging in
+// with an old cookie value needs us to NOT crash. We never read it.
 
 export const ACTIVE_BRANCH_COOKIE = "mg.branch";
 
@@ -79,13 +82,10 @@ export async function bustBranchAllowListCache(
 }
 
 /**
- * Resolve the list of branch ids this user can access.
- *  - Owner: every branch in their tenant (implicit access).
- *  - Staff: exactly one — the `branch_id` on their tenant_members row.
- *    Multi-store: each staff member is locked to one branch.
- *
- * Cached 60s per (tenant, user) so a busy POS terminal doesn't re-walk the
- * branches table on every keystroke.
+ * Legacy — previously returned the per-staff branch allow-list. With branches
+ * removed from the product, every user has access to exactly one branch: the
+ * tenant's primary. Kept callable for the two or three routes that read this
+ * list; the single-element array stands in cleanly.
  */
 export async function getAccessibleBranches(
   ctx: ResolveInput,
@@ -94,32 +94,39 @@ export async function getAccessibleBranches(
     allowedCacheKey(ctx.tenantId, ctx.userId),
     ALLOWED_TTL_SEC,
     async () => {
-      if (ctx.role === "owner") {
-        // RLS-protected: branches lookup goes through withTenant.
-        return withTenant(ctx.tenantId, async (tx) => {
-          const rows = await tx
-            .select({ id: branches.id })
-            .from(branches)
-            .where(eq(branches.tenantId, ctx.tenantId));
-          return rows.map((r) => r.id);
-        });
-      }
-      // Staff: read the single branch from tenant_members. tenant_members is
-      // not RLS-protected (it's the join table the app uses to even know
-      // which tenant the user belongs to), so we hit it on the plain client.
-      const [member] = await db
-        .select({ branchId: tenantMembers.branchId })
-        .from(tenantMembers)
-        .where(
-          and(
-            eq(tenantMembers.tenantId, ctx.tenantId),
-            eq(tenantMembers.userId, ctx.userId),
-          ),
-        )
-        .limit(1);
-      return member?.branchId ? [member.branchId] : [];
+      const id = await getPrimaryBranchId(ctx.tenantId);
+      return id ? [id] : [];
     },
   );
+}
+
+/**
+ * Resolve the tenant's one active branch — the primary seeded on signup.
+ * Cached per tenant for the full process lifetime (primary doesn't change
+ * after creation; the invariant is enforced in `lib/repo/branches.ts`).
+ */
+const PRIMARY_CACHE = new Map<string, Promise<string | null>>();
+
+export async function getPrimaryBranchId(tenantId: string): Promise<string | null> {
+  const cached = PRIMARY_CACHE.get(tenantId);
+  if (cached) return cached;
+  const promise = withTenant(tenantId, async (tx) => {
+    const [row] = await tx
+      .select({ id: branches.id })
+      .from(branches)
+      .where(and(eq(branches.tenantId, tenantId), eq(branches.isActive, true)))
+      .orderBy(desc(branches.isPrimary), asc(branches.createdAt))
+      .limit(1);
+    return row?.id ?? null;
+  });
+  PRIMARY_CACHE.set(tenantId, promise);
+  try {
+    return await promise;
+  } catch (err) {
+    // Transient DB error — don't poison the cache.
+    PRIMARY_CACHE.delete(tenantId);
+    throw err;
+  }
 }
 
 /**
@@ -162,170 +169,61 @@ export async function resolveActiveBranchResult(
   );
 }
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
+/**
+ * Always resolves to the tenant's primary branch. Branch switching is gone
+ * from the product — the client may still send `X-Branch-Id` or `mg.branch`
+ * (old apps in the wild, legacy tests), and we silently ignore both.
+ *
+ * Failure paths left in place:
+ *   - 403 NO_BRANCH_ACCESS: a tenant with zero active branches (pathological;
+ *     the signup flow seeds one, so this is "the branches table was cleared
+ *     out of band" territory).
+ *
+ * The 400 INVALID_BRANCH code is no longer returned. Nothing can "ask for" a
+ * branch anymore, so there is no bad-ask to refuse.
+ */
 async function resolveActiveBranchImpl(
   ctx: ResolveInput,
 ): Promise<ActiveBranchResult> {
-  const allowedBranchIds = await getAccessibleBranches(ctx);
-  if (allowedBranchIds.length === 0) {
-    return { ok: false, status: 403, error: "NO_BRANCH_ACCESS" };
-  }
-
-  // Branch selection has two transports, in priority order:
-  //
-  //   1. `X-Branch-Id` request header — per-request, and the only option for a
-  //      client that has no cookie jar. A native app sends it on every call, so
-  //      two screens can look at two branches without fighting over one global
-  //      session value.
-  //   2. `mg.branch` HttpOnly cookie — what the web app has always used, and
-  //      still the fallback when no header is present.
-  //
-  // Both are validated against the SAME allow-list below, so the header grants
-  // no authority the cookie did not already have. What differs is the answer
-  // to a miss:
-  //
-  //   - The cookie is a remembered preference. A stale or tampered value falls
-  //     through to the user's primary branch, as it always has — the web app
-  //     never asked for a specific branch on this request.
-  //   - The header is an explicit, per-request choice. Serving another branch
-  //     under it would hand the client rows it did not ask for, labelled as
-  //     the branch it did (doc 14 §5.3: a zero UUID answered 200 with primary
-  //     data). So a header that is not a UUID, not on the allow-list, or
-  //     names an inactive branch is refused with INVALID_BRANCH instead. The
-  //     web (cookie) path is unchanged: it never sends the header.
-  const headerStore = await headers();
-  const headerValue = headerStore.get("x-branch-id")?.trim() || null;
-  const cookieStore = await cookies();
-  const requested =
-    headerValue ?? cookieStore.get(ACTIVE_BRANCH_COOKIE)?.value ?? null;
-  const strict = headerValue !== null;
-
-  if (
-    strict &&
-    (!UUID_RE.test(headerValue) || !allowedBranchIds.includes(headerValue))
-  ) {
-    return {
-      ok: false,
-      status: 400,
-      error: "INVALID_BRANCH",
-      branchId: headerValue,
-    };
-  }
-
+  const id = await getPrimaryBranchId(ctx.tenantId);
+  if (!id) return { ok: false, status: 403, error: "NO_BRANCH_ACCESS" };
   return withTenant(ctx.tenantId, async (tx) => {
-    // First try the explicitly requested branch (header, else cookie).
-    if (requested && allowedBranchIds.includes(requested)) {
-      const [b] = await tx
-        .select({
-          id: branches.id,
-          name: branches.name,
-          isPrimary: branches.isPrimary,
-        })
-        .from(branches)
-        .where(
-          and(
-            eq(branches.id, requested),
-            eq(branches.tenantId, ctx.tenantId),
-            eq(branches.isActive, true),
-          ),
-        )
-        .limit(1);
-      if (b) {
-        return {
-          ok: true,
-          branch: {
-            branchId: b.id,
-            branchName: b.name,
-            isPrimary: b.isPrimary,
-            allowedBranchIds,
-          },
-        };
-      }
-      // On the allow-list but no longer active. The header asked for it by
-      // name, so it gets the refusal rather than a quiet swap to primary.
-      if (strict) {
-        return {
-          ok: false,
-          status: 400,
-          error: "INVALID_BRANCH",
-          branchId: requested,
-        };
-      }
-    }
-
-    // Fallback: user's primary (or first active).
-    const [first] = await tx
+    const [row] = await tx
       .select({
         id: branches.id,
         name: branches.name,
         isPrimary: branches.isPrimary,
       })
       .from(branches)
-      .where(
-        and(
-          eq(branches.tenantId, ctx.tenantId),
-          inArray(branches.id, allowedBranchIds),
-          eq(branches.isActive, true),
-        ),
-      )
-      .orderBy(desc(branches.isPrimary), asc(branches.createdAt))
+      .where(and(eq(branches.id, id), eq(branches.tenantId, ctx.tenantId)))
       .limit(1);
-    if (!first) return { ok: false, status: 403, error: "NO_BRANCH_ACCESS" };
+    if (!row) return { ok: false, status: 403, error: "NO_BRANCH_ACCESS" };
     return {
       ok: true,
       branch: {
-        branchId: first.id,
-        branchName: first.name,
-        isPrimary: first.isPrimary,
-        allowedBranchIds,
+        branchId: row.id,
+        branchName: row.name,
+        isPrimary: row.isPrimary,
+        allowedBranchIds: [row.id],
       },
     };
   });
 }
 
 /**
- * Resolve the read-side branch filter for a list endpoint, given the raw
- * `?branchId=` query value. Centralised so every list route handles the
- * three cases identically:
- *   - "all" → owner-only; returns null (no filter).
- *   - <uuid> → must be in the user's allow-list.
- *   - omitted → default to the active branch (X-Branch-Id header, else the
- *     cookie); an unservable header is 400 INVALID_BRANCH and a caller with
- *     no reachable branch is 403 NO_BRANCH_ACCESS, never "all".
- *
- * Returns either the resolved branch id (or null for "all"), or the status +
- * error code for the caller to return immediately.
+ * Legacy — list endpoints used to accept `?branchId=all|<uuid>` for the
+ * owner's cross-branch view. With branches gone, every call collapses to
+ * the tenant's primary branch regardless of what the client sends. The
+ * previous codes (ALL_BRANCHES_OWNER_ONLY / FORBIDDEN_BRANCH) are no longer
+ * returned because they have no meaning in a single-branch world.
  */
 export async function resolveBranchFilter(
   ctx: ResolveInput,
-  raw: string | null,
+  _raw: string | null,
 ): Promise<
   | { ok: true; branchId: string | null }
   | { ok: false; status: number; error: string }
 > {
-  if (raw === "all") {
-    if (ctx.role !== "owner") {
-      return {
-        ok: false,
-        status: 403,
-        error: "ALL_BRANCHES_OWNER_ONLY",
-      };
-    }
-    return { ok: true, branchId: null };
-  }
-  if (raw) {
-    const allowed = await getAccessibleBranches(ctx);
-    if (!allowed.includes(raw)) {
-      return { ok: false, status: 403, error: "FORBIDDEN_BRANCH" };
-    }
-    return { ok: true, branchId: raw };
-  }
-  // Omitted: the active branch. A miss is answered, not widened — `null`
-  // here would mean "every branch", which is exactly the read the caller
-  // has no claim to (an unservable X-Branch-Id, or a staff row with no
-  // branch at all).
   const active = await resolveActiveBranchResult(ctx);
   if (!active.ok) {
     return { ok: false, status: active.status, error: active.error };

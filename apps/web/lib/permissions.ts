@@ -15,6 +15,13 @@ export type Permission =
   | "view_purchases"
   // Action capabilities
   | "manage_inventory" // add / edit / delete products + adjust stock
+  // Inventory count (جرد): separate from manage_inventory so an owner can
+  // grant a trusted stock-taker the counting flow without exposing the
+  // product editor. view_ lets them open the count/report screens; manage_
+  // lets them create, enter lines, cancel, and confirm (writes to the
+  // ledger). Reports are gated by view_.
+  | "view_inventory_counts"
+  | "manage_inventory_counts"
   | "record_sales" // create new sales (POS flow)
   | "modify_sales" // edit / void existing sales
   | "manage_returns"
@@ -26,6 +33,11 @@ export type Permission =
   | "manage_team" // owner-only in practice — invite / remove employees
   // Attendance & payroll
   | "attendance_self_manual" // staff may record own check-in/out manually
+  // Payroll V1 — gate for the payroll register, adjustments, finalize/void,
+  // and compensation edits. Separate from `manage_team` so a store manager
+  // can be given team edit rights without exposing finalized sheets or the
+  // ability to post monthly bonuses/deductions.
+  | "manage_payroll"
   // Tasks (every staffer can see their own; manage allows assigning to others)
   | "manage_tasks"
   // Leave requests
@@ -39,7 +51,24 @@ export type Permission =
   // (requirePermissionWithBranchEnforced), never in DEFAULT_STAFF_PERMISSIONS.
   | "view_collections" // inbox, daily totals, credits
   | "confirm_collections" // confirm / reject / match / ignore / paste (four-eyes)
-  | "manage_collection_accounts"; // receiving accounts, collections settings, ingest devices
+  | "manage_collection_accounts" // receiving accounts, collections settings, ingest devices
+  // Notification override — NOT an authorization bypass. A user with this
+  // permission ignores their personal per-event preference rows and receives
+  // every event they are already ELIGIBLE for (by role + event's recipient
+  // rules). Tenant isolation, EVENT_RECIPIENT_ROLES, EVENT_RECIPIENT_PERMISSION
+  // and the walls still gate everything else.
+  | "receive_all_alerts"
+  // ── Financial Management (Slice 1, migration 0064) ────────────────────────
+  // `view_financials` is the gate for the Financials section (Insights →
+  // Financials) + the engine's read APIs. `view_profit` can be denied
+  // separately if a shop manager should see expense totals but not margin.
+  // `manage_*` gate writes to the hierarchical category tree, recurring
+  // expense templates, and the new money_movements table respectively.
+  | "view_financials"
+  | "view_profit"
+  | "manage_expense_categories"
+  | "manage_recurring_expenses"
+  | "manage_money_movements";
 
 export const ALL_PERMISSIONS: Permission[] = [
   "view_dashboard",
@@ -53,6 +82,8 @@ export const ALL_PERMISSIONS: Permission[] = [
   "view_suppliers",
   "view_purchases",
   "manage_inventory",
+  "view_inventory_counts",
+  "manage_inventory_counts",
   "record_sales",
   "modify_sales",
   "manage_returns",
@@ -63,6 +94,7 @@ export const ALL_PERMISSIONS: Permission[] = [
   "manage_whatsapp",
   "manage_team",
   "attendance_self_manual",
+  "manage_payroll",
   "manage_tasks",
   "request_leave",
   "manage_leave",
@@ -71,6 +103,12 @@ export const ALL_PERMISSIONS: Permission[] = [
   "view_collections",
   "confirm_collections",
   "manage_collection_accounts",
+  "receive_all_alerts",
+  "view_financials",
+  "view_profit",
+  "manage_expense_categories",
+  "manage_recurring_expenses",
+  "manage_money_movements",
 ];
 
 export const PERMISSION_LABELS: Record<Permission, string> = {
@@ -85,6 +123,8 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   view_suppliers: "الموردين",
   view_purchases: "المشتريات",
   manage_inventory: "إدارة المنتجات (إضافة / تعديل / حذف)",
+  view_inventory_counts: "عرض جرد المخزون",
+  manage_inventory_counts: "إجراء جرد المخزون (عدّ / اعتماد)",
   record_sales: "تسجيل المبيعات",
   modify_sales: "تعديل / إلغاء فاتورة",
   manage_returns: "تسجيل المرتجعات",
@@ -95,6 +135,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   manage_whatsapp: "إعدادات المتجر و WhatsApp",
   manage_team: "إدارة الموظفين",
   attendance_self_manual: "تسجيل الحضور يدوياً",
+  manage_payroll: "إدارة الرواتب (حساب / اعتماد / تسويات)",
   manage_tasks: "إنشاء وتوزيع المهام",
   request_leave: "تقديم طلبات إجازة",
   manage_leave: "الموافقة على طلبات الإجازة",
@@ -103,6 +144,12 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   view_collections: "عرض التحويلات",
   confirm_collections: "تأكيد ورفض التحويلات",
   manage_collection_accounts: "إدارة حسابات الاستلام",
+  receive_all_alerts: "استقبال كل الإشعارات",
+  view_financials: "عرض الماليات",
+  view_profit: "عرض الأرباح",
+  manage_expense_categories: "إدارة أقسام المصاريف",
+  manage_recurring_expenses: "إدارة المصاريف الدورية",
+  manage_money_movements: "إدارة الحركات المالية",
 };
 
 export interface PermissionGroup {
@@ -143,6 +190,10 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     permissions: ["manage_suppliers", "manage_purchases"],
   },
   {
+    title: "جرد المخزون",
+    permissions: ["view_inventory_counts", "manage_inventory_counts"],
+  },
+  {
     title: "المهام والإجازات",
     permissions: ["manage_tasks", "request_leave", "manage_leave"],
   },
@@ -155,12 +206,30 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     permissions: ["attendance_self_manual"],
   },
   {
+    title: "الرواتب",
+    permissions: ["manage_payroll"],
+  },
+  {
     title: "الملخص اليومي",
     permissions: ["manage_digest_settings"],
   },
   {
+    title: "الإشعارات",
+    permissions: ["receive_all_alerts"],
+  },
+  {
     title: "التحويلات",
     permissions: ["view_collections", "confirm_collections", "manage_collection_accounts"],
+  },
+  {
+    title: "الماليات",
+    permissions: [
+      "view_financials",
+      "view_profit",
+      "manage_expense_categories",
+      "manage_recurring_expenses",
+      "manage_money_movements",
+    ],
   },
 ];
 

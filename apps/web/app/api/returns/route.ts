@@ -4,6 +4,7 @@ import { requirePermissionAudited } from "@/lib/api/auth-helpers";
 import { resolveBranchFilter } from "@/lib/api/branch-context";
 import { resolveSinceWindow } from "@/lib/api/list-window";
 import { listReturns, recordReturn } from "@/lib/repo/operations";
+import { fanoutEvent } from "@/lib/notifications/dispatch";
 
 export async function GET(req: NextRequest) {
   // `view_returns` — both clients hide the screen without it; the API said
@@ -41,6 +42,13 @@ export async function POST(req: NextRequest) {
   }
   try {
     const result = await recordReturn(r.ctx.tenantId, parsed.data);
+    void fanoutEvent(r.ctx.tenantId, null, "return.recorded", {
+      returnId: result.returnId,
+      invoiceId: null, // cheap path — detail screen shows the invoice
+      amountEgp: null,
+      actorUserId: r.ctx.userId,
+      link: `/returns`,
+    });
     return NextResponse.json(result, { status: 201 });
   } catch (err) {
     return NextResponse.json(

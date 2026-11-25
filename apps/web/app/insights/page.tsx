@@ -3,8 +3,7 @@
 import { useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import { AppShell } from "@/components/layout/AppShell";
-import { useInsights, type InsightsBranchScope } from "@/hooks/useInsights";
-import { useBranches } from "@/hooks/useBranches";
+import { useInsights } from "@/hooks/useInsights";
 import { TrendChart } from "@/components/insights/TrendChart";
 import { CategoryPieChart } from "@/components/insights/CategoryPieChart";
 import { TopProducts } from "@/components/insights/TopProducts";
@@ -13,7 +12,6 @@ import { DeepDive } from "@/components/insights/deep/DeepDive";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { PageSkeleton } from "@/components/ui/PageSkeleton";
 import { Tabs } from "@/components/ui/Tabs";
-import { UserText } from "@/components/ui/UserText";
 import { CATEGORY_LABELS, type Category } from "@/lib/types";
 import { useDictionary, useLocale } from "@/components/i18n/DictionaryProvider";
 import { formatCurrency } from "@/lib/i18n/format";
@@ -92,7 +90,6 @@ function resolveInsightsWindow(
 export default function InsightsPage() {
   const { data: session } = useSession();
   const isOwner = session?.user?.role === "owner";
-  const { branches: accessibleBranches, current: activeBranch } = useBranches();
   const dict = useDictionary();
   const locale = useLocale();
   const t = dict.app.insights;
@@ -110,19 +107,12 @@ export default function InsightsPage() {
   const [dateRange, setDateRange] = useState<DateRangeKey>("all");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
-  // Branch scope: "active" follows the topbar picker; "all" merges every
-  // branch (owner only). Default for owner is "all" so they see the merged
-  // view they're used to; staff always see their active branch.
-  const [branchScope, setBranchScope] = useState<"active" | "all">("active");
-  const showBranchToggle = isOwner && accessibleBranches.length > 1;
-  const branchScopeParam: InsightsBranchScope =
-    branchScope === "all" ? "all" : undefined;
 
   const insightsWindow = useMemo(
     () => resolveInsightsWindow(dateRange, customFrom, customTo) ?? undefined,
     [dateRange, customFrom, customTo],
   );
-  const { data, loading } = useInsights(insightsWindow, branchScopeParam);
+  const { data, loading } = useInsights(insightsWindow);
   const headlineLabel =
     dateRange === "all"
       ? t.headline.monthCurrent
@@ -153,36 +143,6 @@ export default function InsightsPage() {
     <AppShell title={t.title}>
       <div className="space-y-5">
         <Tabs items={INSIGHTS_TABS} active={tab} onChange={setTab} />
-
-        {showBranchToggle && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-text-secondary">{t.scope.label}:</span>
-            <div className="inline-flex rounded-lg border border-border bg-white overflow-hidden text-xs">
-              <button
-                type="button"
-                onClick={() => setBranchScope("active")}
-                className={`px-3 py-1.5 transition-colors whitespace-nowrap shrink-0 min-h-11 lg:min-h-0 ${
-                  branchScope === "active"
-                    ? "bg-accent text-white"
-                    : "text-text-secondary hover:bg-bg-main"
-                }`}
-              >
-                <UserText>{activeBranch?.name ?? t.scope.currentFallback}</UserText>
-              </button>
-              <button
-                type="button"
-                onClick={() => setBranchScope("all")}
-                className={`px-3 py-1.5 transition-colors border-s border-border whitespace-nowrap shrink-0 min-h-11 lg:min-h-0 ${
-                  branchScope === "all"
-                    ? "bg-accent text-white"
-                    : "text-text-secondary hover:bg-bg-main"
-                }`}
-              >
-                {t.scope.all}
-              </button>
-            </div>
-          </div>
-        )}
 
         <div className="space-y-2">
           <div className="flex gap-2 overflow-x-auto lg:flex-wrap lg:overflow-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -251,7 +211,12 @@ export default function InsightsPage() {
         ) : tab === "deep" ? (
           <DeepDive
             window={insightsWindow}
-            branchScope={branchScopeParam}
+            // No branch scope: the top-level branch toggle was removed
+            // (Storo has no branches). The deep-dive reports still accept
+            // the prop for API compatibility; `undefined` means "the caller's
+            // current branch", which the server resolves to the user's
+            // single branch.
+            branchScope={undefined}
             isOwner={isOwner}
             locale={locale}
           />

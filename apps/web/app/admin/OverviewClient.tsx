@@ -40,6 +40,57 @@ interface OverviewPayload {
   }[];
   planDistribution: { plan: string; count: number }[];
   signupsLast30Days: { day: string; count: number }[];
+  attention: {
+    critical: { suspended: number; paymentFailures30d: number };
+    atRisk: { highRiskStores: number };
+    attention: { trialsExpiring7d: number; mediumRiskStores: number };
+  };
+  presence: {
+    onlineNow: number;
+    active5m: number;
+    active15m: number;
+    activeToday: number;
+    dau: number;
+    wau: number;
+    mau: number;
+    byPlatform: { ios: number; android: number; web: number; other: number };
+  };
+  devices: {
+    activeDevicesNow: number;
+    activeDevicesToday: number;
+    installsToday: number;
+    installsThisWeek: number;
+    installsThisMonth: number;
+    byPlatform: { ios: number; android: number; web: number; other: number };
+    installsLast90d: { day: string; count: number }[];
+    appVersionDistribution: {
+      platform: string;
+      appVersion: string;
+      count: number;
+    }[];
+  };
+  storeActivity: {
+    activeToday: number;
+    active7d: number;
+    active30d: number;
+    salesActiveToday: number;
+    salesActive7d: number;
+    salesActive30d: number;
+    inactive7d: number;
+    inactive14d: number;
+    inactive30d: number;
+    activityTrend30d: { day: string; stores: number }[];
+  };
+  aggregates: {
+    totalProducts: number;
+    totalCategories: number;
+    totalCustomers: number;
+    totalSuppliers: number;
+    totalEmployees: number;
+    totalActivePaid: number;
+    totalSuspended: number;
+    totalExpiredTrials: number;
+  };
 }
 
 interface SalesOverview {
@@ -115,6 +166,22 @@ export function OverviewClient() {
         <h1 className="text-2xl font-bold">{t.title}</h1>
         <p className="text-sm text-text-secondary mt-1">{t.subtitle}</p>
       </header>
+
+      {/* Requires Attention — Phase 1. Deliberately placed above the KPI
+          row so the admin sees the actionable signals first. */}
+      <AttentionPanel data={data.attention} dict={dict} />
+
+      {/* Phase 2 — Real-time presence + active users. */}
+      <PresencePanel data={data.presence} dict={dict} />
+
+      {/* Phase 2 — Store activity rollup (active/sales-active/inactive). */}
+      <StoreActivityPanel data={data.storeActivity} dict={dict} />
+
+      {/* Phase 2 — Install + device analytics. */}
+      <DeviceAnalyticsPanel data={data.devices} dict={dict} />
+
+      {/* Phase 3 — Platform totals (products / categories / customers / etc). */}
+      <PlatformTotalsPanel data={data.aggregates} dict={dict} />
 
       {/* KPI cards */}
       <section className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -347,6 +414,509 @@ export function OverviewClient() {
       <span className="hidden" aria-hidden>
         {dateLocale}
       </span>
+    </div>
+  );
+}
+
+/** Live presence — "who is using Storo right now".
+ *  All counts are exact across the platform (SQL aggregates, no sampling).
+ *  Reads one payload; splits into KPI tiles + platform mini-cards. */
+function PresencePanel({
+  data,
+  dict,
+}: {
+  data: OverviewPayload["presence"];
+  dict: ReturnType<typeof useDictionary>;
+}) {
+  const t = (dict.app.admin.overview as unknown as {
+    presence: {
+      title: string;
+      onlineNow: string;
+      active5m: string;
+      active15m: string;
+      activeToday: string;
+      dau: string;
+      wau: string;
+      mau: string;
+      platformSplit: string;
+      platform: {
+        ios: string;
+        android: string;
+        web: string;
+        other: string;
+      };
+      liveDot: string;
+    };
+  }).presence;
+  return (
+    <section className="bg-white rounded-2xl border border-border overflow-hidden">
+      <header className="px-5 py-3 border-b border-border flex items-center gap-2">
+        <span className="relative inline-flex w-2 h-2">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
+        </span>
+        <h2 className="text-sm font-semibold">{t.title}</h2>
+      </header>
+      <div className="grid grid-cols-2 md:grid-cols-7 gap-0">
+        <PresenceTile label={t.onlineNow} value={data.onlineNow} highlight />
+        <PresenceTile label={t.active5m} value={data.active5m} />
+        <PresenceTile label={t.active15m} value={data.active15m} />
+        <PresenceTile label={t.activeToday} value={data.activeToday} />
+        <PresenceTile label={t.dau} value={data.dau} />
+        <PresenceTile label={t.wau} value={data.wau} />
+        <PresenceTile label={t.mau} value={data.mau} />
+      </div>
+      <div className="px-5 py-3 border-t border-border">
+        <p className="text-[11px] text-text-secondary uppercase tracking-wider mb-2">
+          {t.platformSplit}
+        </p>
+        <div className="grid grid-cols-4 gap-3">
+          <PlatformCell label={t.platform.ios} value={data.byPlatform.ios} />
+          <PlatformCell
+            label={t.platform.android}
+            value={data.byPlatform.android}
+          />
+          <PlatformCell label={t.platform.web} value={data.byPlatform.web} />
+          <PlatformCell
+            label={t.platform.other}
+            value={data.byPlatform.other}
+          />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PresenceTile({
+  label,
+  value,
+  highlight,
+}: {
+  label: string;
+  value: number;
+  highlight?: boolean;
+}) {
+  return (
+    <div className="p-4 border-e border-b md:border-b-0 border-border last:border-e-0">
+      <p className="text-[11px] text-text-secondary uppercase tracking-wider">
+        {label}
+      </p>
+      <p
+        className={`text-2xl font-bold mt-1 tabular-nums ${highlight ? "text-success" : ""}`}
+        dir="ltr"
+      >
+        {value.toLocaleString("en-US")}
+      </p>
+    </div>
+  );
+}
+
+function PlatformCell({ label, value }: { label: string; value: number }) {
+  return (
+    <div>
+      <p className="text-[11px] text-text-secondary">{label}</p>
+      <p className="text-lg font-semibold tabular-nums" dir="ltr">
+        {value.toLocaleString("en-US")}
+      </p>
+    </div>
+  );
+}
+
+/** Store activity rollup — active/sales-active/inactive buckets at a
+ *  glance, plus a 30-day distinct-active-store sparkline. */
+function StoreActivityPanel({
+  data,
+  dict,
+}: {
+  data: OverviewPayload["storeActivity"];
+  dict: ReturnType<typeof useDictionary>;
+}) {
+  const t = (dict.app.admin.overview as unknown as {
+    storeActivity: {
+      title: string;
+      activeToday: string;
+      active7d: string;
+      active30d: string;
+      salesActiveToday: string;
+      salesActive7d: string;
+      salesActive30d: string;
+      inactive7d: string;
+      inactive14d: string;
+      inactive30d: string;
+      trend: string;
+    };
+  }).storeActivity;
+  return (
+    <section className="bg-white rounded-2xl border border-border p-5">
+      <h2 className="text-sm font-semibold mb-3">{t.title}</h2>
+      <div className="grid grid-cols-3 gap-3">
+        <StoreActivityColumn
+          title={t.activeToday.split(" ")[0] ?? ""}
+          items={[
+            { label: t.activeToday, value: data.activeToday },
+            { label: t.active7d, value: data.active7d },
+            { label: t.active30d, value: data.active30d },
+          ]}
+          tone="success"
+        />
+        <StoreActivityColumn
+          title=""
+          items={[
+            { label: t.salesActiveToday, value: data.salesActiveToday },
+            { label: t.salesActive7d, value: data.salesActive7d },
+            { label: t.salesActive30d, value: data.salesActive30d },
+          ]}
+          tone="accent"
+        />
+        <StoreActivityColumn
+          title=""
+          items={[
+            { label: t.inactive7d, value: data.inactive7d, warn: true },
+            { label: t.inactive14d, value: data.inactive14d, warn: true },
+            { label: t.inactive30d, value: data.inactive30d, warn: true },
+          ]}
+          tone="warn"
+        />
+      </div>
+      <div className="mt-4">
+        <p className="text-[11px] text-text-secondary uppercase tracking-wider mb-1.5">
+          {t.trend}
+        </p>
+        <Sparkline
+          rows={data.activityTrend30d.map((r) => ({ day: r.day, count: r.stores }))}
+        />
+      </div>
+    </section>
+  );
+}
+
+function StoreActivityColumn({
+  title,
+  items,
+  tone,
+}: {
+  title: string;
+  items: { label: string; value: number; warn?: boolean }[];
+  tone: "success" | "accent" | "warn";
+}) {
+  const DOT = {
+    success: "bg-success",
+    accent: "bg-accent",
+    warn: "bg-orange-500",
+  } as const;
+  return (
+    <div className="bg-bg-main/30 rounded-xl p-3">
+      {title && (
+        <div className="flex items-center gap-1.5 mb-2">
+          <span className={`w-1.5 h-1.5 rounded-full ${DOT[tone]}`} />
+          <span className="text-[11px] uppercase tracking-wider text-text-secondary">
+            {title}
+          </span>
+        </div>
+      )}
+      <ul className="space-y-1.5">
+        {items.map((it) => (
+          <li
+            key={it.label}
+            className="flex items-baseline justify-between text-sm"
+          >
+            <span className="text-text-secondary text-xs">{it.label}</span>
+            <span
+              className={`font-bold tabular-nums ${it.warn ? "text-orange-700" : ""}`}
+              dir="ltr"
+            >
+              {it.value.toLocaleString("en-US")}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** Install + device analytics — install counts, per-platform active
+ *  devices, 90-day install trend, and app-version distribution. */
+function DeviceAnalyticsPanel({
+  data,
+  dict,
+}: {
+  data: OverviewPayload["devices"];
+  dict: ReturnType<typeof useDictionary>;
+}) {
+  const t = (dict.app.admin.overview as unknown as {
+    devices: {
+      title: string;
+      activeDevicesNow: string;
+      activeDevicesToday: string;
+      installsToday: string;
+      installsThisWeek: string;
+      installsThisMonth: string;
+      byPlatform: string;
+      platform: {
+        ios: string;
+        android: string;
+        web: string;
+        other: string;
+      };
+      trend: string;
+      versions: string;
+      versionLabel: string;
+      versionsEmpty: string;
+    };
+  }).devices;
+  return (
+    <section className="bg-white rounded-2xl border border-border overflow-hidden">
+      <header className="px-5 py-3 border-b border-border">
+        <h2 className="text-sm font-semibold">{t.title}</h2>
+      </header>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-0">
+        <PresenceTile label={t.activeDevicesNow} value={data.activeDevicesNow} />
+        <PresenceTile label={t.activeDevicesToday} value={data.activeDevicesToday} />
+        <PresenceTile label={t.installsToday} value={data.installsToday} />
+        <PresenceTile label={t.installsThisWeek} value={data.installsThisWeek} />
+        <PresenceTile label={t.installsThisMonth} value={data.installsThisMonth} />
+      </div>
+      <div className="px-5 py-3 border-t border-border grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <p className="text-[11px] text-text-secondary uppercase tracking-wider mb-2">
+            {t.byPlatform}
+          </p>
+          <div className="grid grid-cols-4 gap-3">
+            <PlatformCell label={t.platform.ios} value={data.byPlatform.ios} />
+            <PlatformCell label={t.platform.android} value={data.byPlatform.android} />
+            <PlatformCell label={t.platform.web} value={data.byPlatform.web} />
+            <PlatformCell label={t.platform.other} value={data.byPlatform.other} />
+          </div>
+        </div>
+        <div>
+          <p className="text-[11px] text-text-secondary uppercase tracking-wider mb-2">
+            {t.trend}
+          </p>
+          <Sparkline
+            rows={data.installsLast90d.map((r) => ({ day: r.day, count: r.count }))}
+          />
+        </div>
+      </div>
+      <div className="px-5 py-3 border-t border-border">
+        <p className="text-[11px] text-text-secondary uppercase tracking-wider mb-2">
+          {t.versions}
+        </p>
+        {data.appVersionDistribution.length === 0 ? (
+          <p className="text-xs text-text-secondary">{t.versionsEmpty}</p>
+        ) : (
+          <ul className="space-y-1.5">
+            {data.appVersionDistribution.slice(0, 8).map((v) => (
+              <li
+                key={`${v.platform}-${v.appVersion}`}
+                className="flex items-baseline justify-between text-sm"
+              >
+                <span className="text-xs">
+                  <span className="text-text-secondary">{v.platform}</span>{" "}
+                  <span dir="ltr">{v.appVersion}</span>
+                </span>
+                <span className="font-semibold tabular-nums" dir="ltr">
+                  {v.count.toLocaleString("en-US")}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/** Phase 3 — platform-wide totals. Compact responsive grid; collapses to
+ *  2 columns on mobile, 4 on tablet, 8 on desktop. */
+function PlatformTotalsPanel({
+  data,
+  dict,
+}: {
+  data: OverviewPayload["aggregates"];
+  dict: ReturnType<typeof useDictionary>;
+}) {
+  const t = (dict.app.admin.overview as unknown as {
+    totals: {
+      title: string;
+      products: string;
+      categories: string;
+      customers: string;
+      suppliers: string;
+      employees: string;
+      activePaid: string;
+      suspended: string;
+      expiredTrials: string;
+    };
+  }).totals;
+  const items = [
+    { label: t.products, value: data.totalProducts },
+    { label: t.categories, value: data.totalCategories },
+    { label: t.customers, value: data.totalCustomers },
+    { label: t.suppliers, value: data.totalSuppliers },
+    { label: t.employees, value: data.totalEmployees },
+    { label: t.activePaid, value: data.totalActivePaid },
+    { label: t.suspended, value: data.totalSuspended },
+    { label: t.expiredTrials, value: data.totalExpiredTrials },
+  ];
+  return (
+    <section className="bg-white rounded-2xl border border-border overflow-hidden">
+      <header className="px-5 py-3 border-b border-border">
+        <h2 className="text-sm font-semibold">{t.title}</h2>
+      </header>
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8">
+        {items.map((it) => (
+          <div
+            key={it.label}
+            className="p-4 border-e border-b sm:border-b-0 border-border last:border-e-0"
+          >
+            <p className="text-[11px] text-text-secondary uppercase tracking-wider">
+              {it.label}
+            </p>
+            <p className="text-2xl font-bold mt-1 tabular-nums" dir="ltr">
+              {it.value.toLocaleString("en-US")}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/** Requires-Attention panel. Hides itself when every count is zero so a
+ *  quiet day doesn't waste screen space. Items deep-link to a filtered
+ *  tenant list — the same filters the admin would set by hand. */
+function AttentionPanel({
+  data,
+  dict,
+}: {
+  data: OverviewPayload["attention"];
+  dict: ReturnType<typeof useDictionary>;
+}) {
+  const t = (dict.app.admin.overview as unknown as {
+    attention: {
+      title: string;
+      allClear: string;
+      critical: string;
+      atRisk: string;
+      attention: string;
+      items: Record<string, string>;
+    };
+  }).attention;
+  const critical = [
+    {
+      key: "suspended",
+      count: data.critical.suspended,
+      href: "/admin/tenants?status=suspended",
+    },
+    {
+      key: "paymentFailures",
+      count: data.critical.paymentFailures30d,
+      href: "/admin/tenants?status=past_due",
+    },
+  ].filter((x) => x.count > 0);
+  const atRisk = [
+    {
+      key: "highRisk",
+      count: data.atRisk.highRiskStores,
+      href: "/admin/tenants?risk=high",
+    },
+  ].filter((x) => x.count > 0);
+  const attention = [
+    {
+      key: "trialsExpiring",
+      count: data.attention.trialsExpiring7d,
+      href: "/admin/tenants?status=trialing&trialExpiringInDays=7",
+    },
+    {
+      key: "mediumRisk",
+      count: data.attention.mediumRiskStores,
+      href: "/admin/tenants?risk=medium",
+    },
+  ].filter((x) => x.count > 0);
+
+  const total = critical.length + atRisk.length + attention.length;
+  if (total === 0) {
+    return (
+      <section className="bg-success-light/50 border border-success-light rounded-2xl p-4 flex items-center gap-2">
+        <span>✓</span>
+        <p className="text-sm text-success">{t.allClear}</p>
+      </section>
+    );
+  }
+  return (
+    <section className="bg-white rounded-2xl border border-border overflow-hidden">
+      <header className="px-5 py-3 border-b border-border">
+        <h2 className="text-sm font-semibold">{t.title}</h2>
+      </header>
+      <div className="grid grid-cols-1 md:grid-cols-3">
+        <AttentionGroup
+          tone="danger"
+          title={t.critical}
+          items={critical}
+          itemsI18n={t.items}
+        />
+        <AttentionGroup
+          tone="orange"
+          title={t.atRisk}
+          items={atRisk}
+          itemsI18n={t.items}
+        />
+        <AttentionGroup
+          tone="yellow"
+          title={t.attention}
+          items={attention}
+          itemsI18n={t.items}
+        />
+      </div>
+    </section>
+  );
+}
+
+function AttentionGroup({
+  tone,
+  title,
+  items,
+  itemsI18n,
+}: {
+  tone: "danger" | "orange" | "yellow";
+  title: string;
+  items: { key: string; count: number; href: string }[];
+  itemsI18n: Record<string, string>;
+}) {
+  const DOT = {
+    danger: "bg-danger",
+    orange: "bg-orange-500",
+    yellow: "bg-yellow-400",
+  } as const;
+  return (
+    <div className="p-5 border-b md:border-b-0 md:border-e border-border last:border-e-0 last:border-b-0">
+      <div className="flex items-center gap-2 mb-2">
+        <span className={`w-2 h-2 rounded-full ${DOT[tone]}`} />
+        <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
+          {title}
+        </h3>
+      </div>
+      {items.length === 0 ? (
+        <p className="text-xs text-text-secondary">—</p>
+      ) : (
+        <ul className="space-y-1.5">
+          {items.map((it) => (
+            <li key={it.key}>
+              <Link
+                href={it.href}
+                className="flex items-baseline gap-2 text-sm hover:text-accent"
+              >
+                <span className="font-bold tabular-nums" dir="ltr">
+                  {it.count}
+                </span>
+                <span className="text-xs">
+                  {(itemsI18n[it.key] ?? it.key).replace("{n}", String(it.count))}
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

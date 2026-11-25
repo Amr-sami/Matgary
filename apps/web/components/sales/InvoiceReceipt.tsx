@@ -38,11 +38,33 @@ type InvoiceReceiptData = ReceiptInvoiceData & { payment?: ReceiptPayment };
 export function InvoiceReceipt({ invoice }: { invoice: InvoiceReceiptData }) {
   const { settings } = useShopSettings();
   const lang = settings.receiptLanguage;
-  const code = (invoice.invoiceId || invoice.saleDate.getTime().toString())
+  const shortCode = (invoice.invoiceId || invoice.saleDate.getTime().toString())
     .slice(-10)
     .toUpperCase();
+  const prefix = (settings.receiptReferencePrefix || "").trim().toUpperCase();
+  const code = prefix ? `${prefix}-${shortCode}` : shortCode;
   const shopName = (settings.shopName || "STORE").toUpperCase();
   const shopPhone = settings.shopPhone || "";
+  // Identity rows honor BOTH the text ("empty = hidden") AND the per-row
+  // visibility toggle ("show flag off → hidden even when text is set").
+  // Tax reg and tax card share a single toggle — the Owner prints tax info
+  // or doesn't; splitting the toggle gets no UX win.
+  const shopAddress =
+    settings.receiptShowAddress ? (settings.receiptAddress || "").trim() : "";
+  const slogan =
+    settings.receiptShowSlogan ? (settings.receiptSlogan || "").trim() : "";
+  const taxReg =
+    settings.receiptShowTaxInfo ? (settings.receiptTaxRegistration || "").trim() : "";
+  const taxCard =
+    settings.receiptShowTaxInfo ? (settings.receiptTaxCardNumber || "").trim() : "";
+  const returnPolicy =
+    settings.receiptShowReturnPolicy ? (settings.receiptReturnPolicy || "").trim() : "";
+  // Per-row alignment overrides (0067). Missing key → center (today's shape).
+  const aligns = settings.receiptBlockAlignments ?? {};
+  const alignStyle = (key: string): React.CSSProperties => {
+    const v = aligns[key];
+    return { textAlign: v === "left" || v === "right" ? v : "center" };
+  };
   const qrPayload = invoice.invoiceId
     ? `INVOICE ${invoice.invoiceId}`
     : shopPhone
@@ -75,10 +97,30 @@ export function InvoiceReceipt({ invoice }: { invoice: InvoiceReceiptData }) {
       ) : null,
     shopInfo: (
       <>
-        <div className="receipt-slogan">{shopName}</div>
+        <div className="receipt-slogan" style={alignStyle("name")}>{shopName}</div>
+        {shopAddress && (
+          <div className="receipt-contact whitespace-pre-wrap" dir="auto" style={alignStyle("address")}>
+            {shopAddress}
+          </div>
+        )}
         {shopPhone && (
-          <div className="receipt-contact">
+          <div className="receipt-contact" style={alignStyle("phone")}>
             {rl("tel", lang)}: {shopPhone}
+          </div>
+        )}
+        {slogan && (
+          <div className="receipt-contact" dir="auto" style={alignStyle("slogan")}>
+            {slogan}
+          </div>
+        )}
+        {taxReg && (
+          <div className="receipt-contact" dir="auto" style={alignStyle("taxReg")}>
+            {rl("taxRegistration", lang)}: {taxReg}
+          </div>
+        )}
+        {taxCard && (
+          <div className="receipt-contact" dir="auto" style={alignStyle("taxCard")}>
+            {rl("taxCard", lang)}: {taxCard}
           </div>
         )}
       </>
@@ -210,8 +252,13 @@ export function InvoiceReceipt({ invoice }: { invoice: InvoiceReceiptData }) {
     footer: (
       <>
         <div className="receipt-thankyou">{rl("thankYou", lang)}</div>
+        {returnPolicy && (
+          <div className="receipt-footer whitespace-pre-wrap" dir="auto" style={alignStyle("returnPolicy")}>
+            {returnPolicy}
+          </div>
+        )}
         {settings.receiptFooterText && (
-          <div className="receipt-footer">{settings.receiptFooterText}</div>
+          <div className="receipt-footer" style={alignStyle("footerText")}>{settings.receiptFooterText}</div>
         )}
         <div className="receipt-divider">- - - - - - - - - - - - - - - - - - - - - - - - -</div>
         <div className="receipt-qr">

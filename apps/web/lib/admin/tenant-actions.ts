@@ -7,9 +7,19 @@
 // that tenant gets bounced on their next request (no waiting for the
 // 60-second JWT cache TTL).
 
+import crypto from "node:crypto";
+import bcrypt from "bcryptjs";
 import { eq, inArray, sql } from "drizzle-orm";
 import { isNull, and as andOp } from "drizzle-orm";
-import { sessions, subscriptions, tenantMembers, tenants } from "@/lib/db/schema";
+import {
+  adminAuditLog,
+  authDevices,
+  sessions,
+  subscriptions,
+  tenantMembers,
+  tenants,
+  users,
+} from "@/lib/db/schema";
 import { bustUserContextCache } from "@/lib/auth";
 import { getAdminDb } from "./db";
 import { logAuditEvent } from "./audit";
@@ -238,6 +248,249 @@ export async function extendTrial(
   await Promise.all(userIds.map((id) => bustUserContextCache(id)));
 
   return { newTrialEndsAt: newEndsAt };
+}
+
+// ─── Enable trial (fresh N-day grant) ──────────────────────────────────────
+
+export interface EnableTrialResult {
+  newTrialEndsAt: Date;
+  /** True when the subscription row didn't exist and we created it. Lets
+   *  the admin UI tailor the success message. */
+  created: boolean;
+}
+
+/**
+ * Grant a fresh N-day trial to a store.
+ *
+ * Semantics intentionally distinct from {@link extendTrial}:
+ *   extend  — keep the current trial end if it's in the future, add days
+ *   enable  — IGNORE the current end, start N days FROM NOW
+ *
+ * Used when a store's trial has elapsed / was cancelled / was never active,
+ * and an admin wants to gift them a new evaluation window. The subscription
+ * row must already exist (every signup creates one); if it's somehow
+ * missing we create a fresh trialing row so the admin can't get stuck.
+ *
+ * Status is set to 'trialing' regardless of its previous value — the whole
+ * point of this action is to put the store back into a trial state.
+ */
+export async function enableTrial(
+  adminId: string,
+  tenantId: string,
+  trialDays: number,
+  meta: ActionMeta,
+): Promise<EnableTrialResult> {
+  if (!Number.isInteger(trialDays) || trialDays < TRIAL_DAYS_MIN || trialDays > TRIAL_DAYS_MAX) {
+    throw new TenantActionError(
+      "INVALID_DAYS",
+      `trialDays must be between ${TRIAL_DAYS_MIN} and ${TRIAL_DAYS_MAX}`,
+      400,
+    );
+  }
+  const db = getAdminDb();
+  const now = new Date();
+  const newEndsAt = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000);
+
+  const [existing] = await db
+    .select({
+      tenantId: subscriptions.tenantId,
+      status: subscriptions.status,
+      trialEndsAt: subscriptions.trialEndsAt,
+      plan: subscriptions.plan,
+    })
+    .from(subscriptions)
+    .where(eq(subscriptions.tenantId, tenantId))
+    .limit(1);
+
+  let created = false;
+  if (!existing) {
+    await db.insert(subscriptions).values({
+      tenantId,
+      plan: "trial",
+      status: "trialing",
+      trialEndsAt: newEndsAt,
+    });
+    created = true;
+  } else {
+    await db
+      .update(subscriptions)
+      .set({
+        status: "trialing",
+        trialEndsAt: newEndsAt,
+        // Clear cancellation history so the tenant isn't marked as cancelled
+        // while they're actively on a fresh trial.
+        cancelledAt: null,
+        updatedAt: sql`now()`,
+      })
+      .where(eq(subscriptions.tenantId, tenantId));
+  }
+
+  await logAuditEvent({
+    adminId,
+    action: "tenant.enable_trial",
+    targetKind: "tenant",
+    targetId: tenantId,
+    ip: meta.ip,
+    userAgent: meta.userAgent,
+    before: existing
+      ? {
+          status: existing.status,
+          trialEndsAt: existing.trialEndsAt.toISOString(),
+          plan: existing.plan,
+        }
+      : { status: null, trialEndsAt: null, plan: null },
+    after: {
+      status: "trialing",
+      trialEndsAt: newEndsAt.toISOString(),
+      plan: existing?.plan ?? "trial",
+      trialDays,
+      created,
+    },
+  });
+
+  // Bust caches so the tenant's UI picks up the new trial end immediately.
+  // No session eviction — the tenant was never offline.
+  const userIds = await tenantMemberUserIds(tenantId);
+  await Promise.all(userIds.map((id) => bustUserContextCache(id)));
+
+  return { newTrialEndsAt: newEndsAt, created };
+}
+
+// ─── Reset owner password (admin-triggered) ───────────────────────────────
+
+export interface ResetOwnerPasswordResult {
+  /** The newly-minted temporary password, shown to the admin ONCE. Never
+   *  persisted or logged. */
+  temporaryPassword: string;
+  ownerEmail: string;
+  ownerUserId: string;
+}
+
+/**
+ * Admin-initiated owner password reset.
+ *
+ * Why no self-service email flow for this path: we don't yet operate SMTP
+ * reliably outside of a handful of flows, and this is a last-resort rescue
+ * ("I locked myself out, help me get in"). An ops person generates a secure
+ * one-shot temp password, reads it to the owner over WhatsApp/phone, and the
+ * owner is forced to set a new password on next login. The temp password
+ * exists only for the one HTTP response body — it is NEVER stored and NEVER
+ * logged.
+ *
+ * Atomicity:
+ *   1. Hash temp password.
+ *   2. Update users.password_hash + must_change_password = true +
+ *      bump token_version (→ every JWT issued before this moment is dead on
+ *      next request).
+ *   3. Delete every NextAuth sessions row for this user.
+ *   4. Revoke every mobile auth_devices row for this user (native app
+ *      sessions use refresh tokens stored there).
+ *   5. Bust the in-memory JWT cache.
+ *   6. Audit the action — before/after carry NO password material; just the
+ *      user id + email + token_version change. Fails loudly if audit fails.
+ *
+ * All six steps happen inside one drizzle transaction so a crash between
+ * "password changed" and "sessions dropped" cannot leave the owner with
+ * both a valid old session AND a new password.
+ */
+export async function resetOwnerPassword(
+  adminId: string,
+  tenantId: string,
+  meta: ActionMeta,
+): Promise<ResetOwnerPasswordResult> {
+  const db = getAdminDb();
+
+  // Resolve the earliest-joined owner (matches the convention used in
+  // `lib/admin/tenants.ts::ownerRowsFor`, so the admin always acts on the
+  // same owner they see on the detail page).
+  const ownerRows = await db
+    .select({
+      userId: users.id,
+      email: users.email,
+      tokenVersion: users.tokenVersion,
+      joinedAt: tenantMembers.joinedAt,
+    })
+    .from(tenantMembers)
+    .innerJoin(users, eq(users.id, tenantMembers.userId))
+    .where(
+      andOp(eq(tenantMembers.tenantId, tenantId), eq(tenantMembers.role, "owner")),
+    );
+  ownerRows.sort((a, b) => a.joinedAt.getTime() - b.joinedAt.getTime());
+  const owner = ownerRows[0];
+  if (!owner) {
+    throw new TenantActionError("OWNER_NOT_FOUND", "Owner not found", 404);
+  }
+
+  const temporaryPassword = generateTemporaryPassword();
+  const hash = await bcrypt.hash(temporaryPassword, 12);
+  const newTokenVersion = owner.tokenVersion + 1;
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(users)
+      .set({
+        passwordHash: hash,
+        mustChangePassword: true,
+        tokenVersion: newTokenVersion,
+      })
+      .where(eq(users.id, owner.userId));
+
+    await tx.delete(sessions).where(eq(sessions.userId, owner.userId));
+    await tx.delete(authDevices).where(eq(authDevices.userId, owner.userId));
+
+    // Audit INSIDE the transaction. Deliberately redacted: we store the id,
+    // the email, and the token_version delta — never the password or any
+    // hash material. The reader must infer "a password was set" from the
+    // action string + token_version bump.
+    await tx.insert(adminAuditLog).values({
+      adminId,
+      action: "owner.password_reset",
+      targetKind: "user",
+      targetId: owner.userId,
+      ip: meta.ip ?? null,
+      userAgent: meta.userAgent ?? null,
+      beforeJsonb: {
+        tenantId,
+        ownerEmail: owner.email,
+        tokenVersion: owner.tokenVersion,
+      },
+      afterJsonb: {
+        tenantId,
+        ownerEmail: owner.email,
+        tokenVersion: newTokenVersion,
+        mustChangePassword: true,
+      },
+    });
+  });
+
+  // Post-transaction: bust the in-memory JWT cache so an in-flight request
+  // that raced past the DELETE ... sessions can't be served with the old
+  // decoded claims. Safe to retry the tx — the mutation is already durable.
+  await bustUserContextCache(owner.userId);
+
+  return {
+    temporaryPassword,
+    ownerEmail: owner.email,
+    ownerUserId: owner.userId,
+  };
+}
+
+/**
+ * 16-character URL-safe temporary password with sufficient entropy (~96
+ * bits). base64url charset excludes confusing lookalikes well enough that
+ * reading one over a phone is tolerable; the owner is forced to change it
+ * on next login anyway so collision-resistance matters more than human
+ * memorisation.
+ */
+function generateTemporaryPassword(): string {
+  // 12 random bytes → 16 base64url chars (no padding).
+  const b64 = crypto
+    .randomBytes(12)
+    .toString("base64")
+    .replace(/\+/g, "A")
+    .replace(/\//g, "B")
+    .replace(/=+$/g, "");
+  return b64.slice(0, 16);
 }
 
 // ─── Helpers used by cron sweeps ──────────────────────────────────────────

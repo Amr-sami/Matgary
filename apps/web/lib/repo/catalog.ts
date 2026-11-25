@@ -662,30 +662,67 @@ export async function adjustProductQuantity(
   productId: string,
   delta: number,
 ): Promise<number> {
-  return withTenant(tenantId, async (tx) => {
-    const [before] = await tx
-      .select({ name: products.name, quantity: products.quantity })
-      .from(products)
-      .where(and(eq(products.tenantId, tenantId), eq(products.id, productId)));
-    if (!before) throw new Error("المنتج غير موجود");
+  return withTenant(tenantId, async (tx) =>
+    _applyAdjustment(tx, tenantId, productId, delta).then((r) => r.newQuantity),
+  );
+}
 
-    const next = Math.max(0, before.quantity + delta);
-    await tx
-      .update(products)
-      .set({ quantity: next, updatedAt: new Date() })
-      .where(and(eq(products.tenantId, tenantId), eq(products.id, productId)));
+/**
+ * Internal, transaction-scoped adjustment. Callers that already hold a
+ * `withTenant` transaction (e.g. the inventory-count confirm handler, which
+ * reconciles many products in one atomic step) call this directly so a loop
+ * of adjustments commits or rolls back together — no nested transactions,
+ * one row lock per product, one `product_history` row per real change.
+ *
+ * Returns the new quantity AND the product_history row id — so the caller
+ * can link it in an audit table (inventory_count_reconciliations) without a
+ * follow-up read.
+ *
+ * `opts.note` is passed through to the history row; useful for marking a
+ * movement as "inventory_count:<id>" so the owner can trace a quantity
+ * change back to the count that caused it.
+ */
+export async function _applyAdjustment(
+  tx: Parameters<Parameters<typeof withTenant>[1]>[0],
+  tenantId: string,
+  productId: string,
+  delta: number,
+  opts?: { note?: string; createdByUserId?: string },
+): Promise<{ newQuantity: number; productHistoryId: string | null }> {
+  // `SELECT … FOR UPDATE` serializes against every other writer of this row:
+  // sales/returns/receives/other adjusts. Guarantees the next read sees our
+  // UPDATE and that a concurrent confirm on the same count waits for us.
+  const [before] = await tx
+    .select({ name: products.name, quantity: products.quantity })
+    .from(products)
+    .where(and(eq(products.tenantId, tenantId), eq(products.id, productId)))
+    .for("update");
+  if (!before) throw new Error("المنتج غير موجود");
 
-    await tx.insert(productHistory).values({
+  if (delta === 0) {
+    return { newQuantity: before.quantity, productHistoryId: null };
+  }
+
+  const next = Math.max(0, before.quantity + delta);
+  await tx
+    .update(products)
+    .set({ quantity: next, updatedAt: new Date() })
+    .where(and(eq(products.tenantId, tenantId), eq(products.id, productId)));
+
+  const [history] = await tx
+    .insert(productHistory)
+    .values({
       tenantId,
       productId,
       productName: before.name,
       type: delta >= 0 ? "restocked" : "decreased",
       delta,
       quantityAfter: next,
-    });
+      note: opts?.note ?? null,
+    })
+    .returning({ id: productHistory.id });
 
-    return next;
-  });
+  return { newQuantity: next, productHistoryId: history?.id ?? null };
 }
 
 /**
