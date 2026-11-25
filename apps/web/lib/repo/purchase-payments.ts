@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { withTenant } from "@/lib/db";
 import {
   purchaseOrders,
@@ -71,12 +71,150 @@ export async function listPayments(
   });
 }
 
+export interface ListSupplierPaymentsOptions {
+  from?: Date;
+  to?: Date;
+  limit?: number;
+}
+
+export interface SupplierPaymentHistory {
+  supplierId: string;
+  window: { from: Date | null; to: Date | null };
+  totals: { paidInWindow: number; countInWindow: number };
+  rows: PurchaseOrderPayment[];
+}
+
+/**
+ * Supplier-level payment ledger across ALL of this supplier's purchase orders,
+ * ordered newest-first. Pairs with `get_supplier_details` (which returns the
+ * last 8 and the outstanding balance) when the caller needs the full history
+ * or a date-ranged slice.
+ *
+ * `limit` is clamped server-side (default 50, max 200) so an unbounded Agent
+ * call can't exhaust rows.
+ */
+export async function listSupplierPayments(
+  tenantId: string,
+  supplierId: string,
+  opts: ListSupplierPaymentsOptions = {},
+): Promise<SupplierPaymentHistory> {
+  const limit = Math.min(Math.max(1, opts.limit ?? 50), 200);
+  return withTenant(tenantId, async (tx) => {
+    const filters = [
+      eq(purchaseOrderPayments.tenantId, tenantId),
+      eq(purchaseOrderPayments.supplierId, supplierId),
+    ];
+    if (opts.from) filters.push(gte(purchaseOrderPayments.paidAt, opts.from));
+    if (opts.to) filters.push(lte(purchaseOrderPayments.paidAt, opts.to));
+
+    const [agg] = await tx
+      .select({
+        totalPaid: sql<string>`coalesce(sum(${purchaseOrderPayments.amount}), 0)::text`,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(purchaseOrderPayments)
+      .where(and(...filters));
+
+    const rows = await tx
+      .select()
+      .from(purchaseOrderPayments)
+      .where(and(...filters))
+      .orderBy(
+        desc(purchaseOrderPayments.paidAt),
+        asc(purchaseOrderPayments.createdAt),
+      )
+      .limit(limit);
+
+    return {
+      supplierId,
+      window: {
+        from: opts.from ?? null,
+        to: opts.to ?? null,
+      },
+      totals: {
+        paidInWindow: Number(agg?.totalPaid ?? 0),
+        countInWindow: Number(agg?.count ?? 0),
+      },
+      rows: rows.map(rowToPayment),
+    };
+  });
+}
+
+/**
+ * Lightweight supplier-scoped PO reader for W1.5 (`list_unpaid_purchase_orders`
+ * in the Agent). Returns POs whose status = 'received' and
+ * `total - paid_amount > 0` — i.e. the ones that actually carry outstanding
+ * supplier payable. Draft POs are excluded because they haven't hit the
+ * ledger yet.
+ */
+export interface UnpaidPurchaseOrderRow {
+  id: string;
+  supplierId: string;
+  orderDate: Date;
+  receivedDate: Date | null;
+  status: string;
+  total: number;
+  paidAmount: number;
+  outstanding: number;
+}
+
+export async function listUnpaidPurchaseOrdersBySupplier(
+  tenantId: string,
+  supplierId: string,
+  opts: { from?: Date; to?: Date; limit?: number } = {},
+): Promise<UnpaidPurchaseOrderRow[]> {
+  const limit = Math.min(Math.max(1, opts.limit ?? 25), 100);
+  return withTenant(tenantId, async (tx) => {
+    const filters = [
+      eq(purchaseOrders.tenantId, tenantId),
+      eq(purchaseOrders.supplierId, supplierId),
+      eq(purchaseOrders.status, "received"),
+      sql`${purchaseOrders.total} > coalesce(${purchaseOrders.paidAmount}, 0)`,
+    ];
+    if (opts.from) filters.push(gte(purchaseOrders.orderDate, opts.from));
+    if (opts.to) filters.push(lte(purchaseOrders.orderDate, opts.to));
+
+    const rows = await tx
+      .select({
+        id: purchaseOrders.id,
+        supplierId: purchaseOrders.supplierId,
+        orderDate: purchaseOrders.orderDate,
+        receivedDate: purchaseOrders.receivedDate,
+        status: purchaseOrders.status,
+        total: purchaseOrders.total,
+        paidAmount: purchaseOrders.paidAmount,
+      })
+      .from(purchaseOrders)
+      .where(and(...filters))
+      .orderBy(desc(purchaseOrders.orderDate))
+      .limit(limit);
+
+    return rows.map((r) => ({
+      id: r.id,
+      supplierId: r.supplierId,
+      orderDate: r.orderDate,
+      receivedDate: r.receivedDate,
+      status: r.status,
+      total: Number(r.total),
+      paidAmount: Number(r.paidAmount ?? 0),
+      outstanding: Number(r.total) - Number(r.paidAmount ?? 0),
+    }));
+  });
+}
+
 /**
  * Record a payment against a PO. Atomically increments paid_amount, decrements
  * supplier.balance, and writes a payment row. Rejects payments that exceed
  * the outstanding remainder or target a PO that isn't in 'received' state.
  */
-export async function recordPayment(
+/**
+ * Tx-scoped record payment. Same behaviour as recordPayment without opening
+ * its own transaction — lets composite orchestrators (AI purchase + payment,
+ * UI's receive-and-settle) share a single tx. Public recordPayment below
+ * remains the one-shot helper used from REST routes.
+ */
+export async function _recordPaymentTx(
+  tx: Parameters<Parameters<typeof withTenant>[1]>[0],
   tenantId: string,
   purchaseOrderId: string,
   input: RecordPaymentInput,
@@ -86,7 +224,7 @@ export async function recordPayment(
   }
   const amount = Math.round(input.amount * 100) / 100;
 
-  return withTenant(tenantId, async (tx) => {
+  {
     const [po] = await tx
       .select({
         id: purchaseOrders.id,
@@ -160,7 +298,17 @@ export async function recordPayment(
     await adjustSupplierBalance(tx, tenantId, po.supplierId, -amount);
 
     return { id: created.id };
-  });
+  }
+}
+
+export async function recordPayment(
+  tenantId: string,
+  purchaseOrderId: string,
+  input: RecordPaymentInput,
+): Promise<{ id: string }> {
+  return withTenant(tenantId, (tx) =>
+    _recordPaymentTx(tx, tenantId, purchaseOrderId, input),
+  );
 }
 
 /**
