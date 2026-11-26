@@ -166,7 +166,6 @@ describe("tenant_notification_overrides — 3-level resolver", () => {
     await cleanBoth();
 
     await fanoutEvent(A.tenantId, null, EVENT, {
-      productId: "test-product-id",
       productName: "Test",
       remainingQty: 1,
       threshold: 5,
@@ -187,7 +186,6 @@ describe("tenant_notification_overrides — 3-level resolver", () => {
     );
 
     await fanoutEvent(A.tenantId, null, EVENT, {
-      productId: "test-product-id",
       productName: "Test2",
       remainingQty: 1,
       threshold: 5,
@@ -219,7 +217,6 @@ describe("tenant_notification_overrides — 3-level resolver", () => {
     );
 
     await fanoutEvent(A.tenantId, null, EVENT, {
-      productId: "test-product-id-3",
       productName: "Test3",
       remainingQty: 1,
       threshold: 5,

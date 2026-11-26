@@ -208,7 +208,20 @@ export type NotificationEventType =
   | "product.added"
   | "inventory.adjusted"
   | "return.recorded"
-  | "attendance.check_in";
+  | "attendance.check_in"
+  // Notification Center extension — mirrors apps/web/lib/notifications/event-types.ts
+  | "purchase.created"
+  | "purchase.returned"
+  | "supplier.payment.recorded"
+  | "customer.created"
+  | "expense.voided"
+  | "leave.approved"
+  | "leave.rejected"
+  | "payroll.calculated"
+  | "payroll.finalized"
+  | "payroll.voided"
+  | "report.daily"
+  | "attendance.late";
 
 export type DigestMode = "instant" | "digest";
 
@@ -250,6 +263,108 @@ export async function setPreference(
   return c.request<{ ok: true; isDefault: boolean }>("/api/notifications/preferences", {
     method: "PUT",
     body: input,
+    noBranch: true,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Notification Center — report scheduling (migration 0069).
+// GET + PATCH /api/settings/notifications/reports.
+// ---------------------------------------------------------------------------
+
+export interface ReportSettings {
+  tenantId: string;
+  dailyEnabled: boolean;
+  dailyHour: number;
+  dailyMinute: number;
+  weeklyEnabled: boolean;
+  weeklyDow: number; // 0=Sun … 6=Sat
+  weeklyHour: number;
+  weeklyMinute: number;
+  monthlyEnabled: boolean;
+  monthlyDay: number; // 1..28
+  monthlyHour: number;
+  monthlyMinute: number;
+  recipients: string[];
+  isDefault?: boolean;
+  updatedAt?: string;
+}
+
+export async function getReportSettings(c: ApiClient): Promise<ReportSettings> {
+  return c.request<ReportSettings>("/api/settings/notifications/reports", {
+    noBranch: true,
+  });
+}
+
+export async function updateReportSettings(
+  c: ApiClient,
+  patch: Partial<Omit<ReportSettings, "tenantId" | "isDefault" | "updatedAt">>,
+): Promise<{ ok: true; settings: ReportSettings }> {
+  return c.request<{ ok: true; settings: ReportSettings }>(
+    "/api/settings/notifications/reports",
+    { method: "PATCH", body: patch, noBranch: true },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Attendance schedules (migration 0069 N2).
+// GET + POST /api/attendance/schedules, DELETE /api/attendance/schedules/:userId.
+// ---------------------------------------------------------------------------
+
+export interface EmployeeSchedule {
+  id: string;
+  userId: string;
+  userName: string | null;
+  /** 'HH:MM:SS' (Postgres `time` column). */
+  shiftStart: string;
+  shiftEnd: string;
+  /** 7-bit bitmask: bit 0 = Sun … bit 6 = Sat. Egypt default 125 (Fri off). */
+  workDays: number;
+  /** -1 = inherit tenant default (attendance_settings.grace_minutes_late). */
+  graceMinutes: number;
+  enabled: boolean;
+  timezoneOverride: string | null;
+  updatedAt: string;
+}
+
+export interface SchedulesResponse {
+  tenantId: string;
+  schedules: EmployeeSchedule[];
+}
+
+export async function listSchedules(c: ApiClient): Promise<SchedulesResponse> {
+  return c.request<SchedulesResponse>("/api/attendance/schedules", {
+    noBranch: true,
+  });
+}
+
+export interface UpsertScheduleInput {
+  userId: string;
+  shiftStart: string; // HH:MM or HH:MM:SS
+  shiftEnd: string;
+  workDays: number;
+  graceMinutes: number;
+  enabled?: boolean;
+  timezoneOverride?: string | null;
+}
+
+export async function upsertSchedule(
+  c: ApiClient,
+  input: UpsertScheduleInput,
+): Promise<{ ok: true }> {
+  return c.request<{ ok: true }>("/api/attendance/schedules", {
+    method: "POST",
+    body: input,
+    noBranch: true,
+  });
+}
+
+export async function deleteSchedule(
+  c: ApiClient,
+  userId: string,
+): Promise<{ ok: true }> {
+  return c.request<{ ok: true }>(`/api/attendance/schedules/${userId}`, {
+    method: "DELETE",
     noBranch: true,
   });
 }

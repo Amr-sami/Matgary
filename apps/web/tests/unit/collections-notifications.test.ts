@@ -50,9 +50,15 @@ const COLLECTION_EVENTS = [
 
 // The five pre-collections events. `sale.alert` (doc 16) is neither: it is
 // push-only, has no fanout recipients and is gated by view_sales.
-const LEGACY_EVENTS = NOTIFICATION_EVENT_TYPES.filter(
-  (e) => !e.startsWith("collection.") && e !== "sale.alert",
-);
+// Explicit list (not a filter) so that additive event growth (Notification
+// Center expansion, 2026-11) doesn't bleed into "legacy" assertions below.
+const LEGACY_EVENTS = [
+  "sale.created",
+  "purchase.received",
+  "inventory.low_stock",
+  "payment.deferred_settled",
+  "leave.requested",
+] as const satisfies readonly NotificationEventType[];
 /** LEGACY_EVENTS with `sale.alert` in its registry slot (right after sale.created). */
 const withSaleAlert = (evs: readonly NotificationEventType[]): NotificationEventType[] => [
   evs[0]!,
@@ -61,8 +67,10 @@ const withSaleAlert = (evs: readonly NotificationEventType[]): NotificationEvent
 ];
 
 describe("registry walk", () => {
-  it("lists the five collection events after the five legacy ones, in 13 §4.2 order", () => {
-    expect(NOTIFICATION_EVENT_TYPES).toEqual([
+  it("keeps the eleven original slots in the 13 §4.2 order at the head of the registry", () => {
+    // Post-NC the registry grows with new event types; the original eleven
+    // must still appear in order and uninterleaved at the head.
+    const original: NotificationEventType[] = [
       "sale.created",
       "sale.alert",
       "purchase.received",
@@ -70,7 +78,8 @@ describe("registry walk", () => {
       "payment.deferred_settled",
       "leave.requested",
       ...COLLECTION_EVENTS,
-    ]);
+    ];
+    expect(NOTIFICATION_EVENT_TYPES.slice(0, original.length)).toEqual(original);
   });
 
   it("gives every event roles, both default rows, a push default, a kind and a label", () => {
@@ -123,7 +132,10 @@ describe("registry walk", () => {
 describe("collection defaults (03 §B.6 + D13-2)", () => {
   it("sends every collection event to owners by role and to staff only by permission", () => {
     for (const e of COLLECTION_EVENTS) expect(EVENT_RECIPIENT_ROLES[e]).toEqual(["owner"]);
-    expect(EVENT_RECIPIENT_PERMISSION).toEqual({
+    // `toMatchObject` rather than `toEqual` — the Notification Center adds
+    // further permission-gated events (payroll.*, attendance.late, …) that
+    // are not under test here.
+    expect(EVENT_RECIPIENT_PERMISSION).toMatchObject({
       "collection.pending": "view_collections",
       "collection.stale": "view_collections",
       "collection.unmatched_credit": "view_collections",
@@ -170,37 +182,56 @@ describe("collection defaults (03 §B.6 + D13-2)", () => {
 });
 
 describe("visibleEventTypes (D13-8)", () => {
-  it("owner, tenant not admitted → the five legacy events + sale alerts", () => {
-    expect(visibleEventTypes("owner", [], false)).toEqual(withSaleAlert(LEGACY_EVENTS));
+  // Structural assertions, not "exactly N" — the registry grows additively
+  // with the Notification Center (purchase.created, payroll.*, attendance.late,
+  // report.daily, …). What matters here is collection-event gating by
+  // admission + permission, and that the legacy slots stay visible.
+
+  function expectHasAll(actual: readonly string[], expected: readonly string[]) {
+    for (const e of expected) expect(actual, e).toContain(e);
+  }
+  function expectHasNone(actual: readonly string[], forbidden: readonly string[]) {
+    for (const e of forbidden) expect(actual, e).not.toContain(e);
+  }
+
+  it("owner, tenant not admitted → no collection events", () => {
+    const v = visibleEventTypes("owner", [], false);
+    expectHasAll(v, withSaleAlert(LEGACY_EVENTS));
+    expectHasNone(v, COLLECTION_EVENTS);
   });
   it("sale.alert is listed to the owner and to staff holding view_sales only (doc 16 §7)", () => {
-    expect(visibleEventTypes("staff", ["record_sales"], false)).toEqual(LEGACY_EVENTS);
-    expect(visibleEventTypes("staff", ["record_sales", "view_sales"], false)).toEqual(withSaleAlert(LEGACY_EVENTS));
+    expect(visibleEventTypes("staff", ["record_sales"], false)).not.toContain("sale.alert");
+    expect(visibleEventTypes("staff", ["record_sales", "view_sales"], false)).toContain("sale.alert");
     expect(visibleEventTypes("staff", ["view_sales", "view_collections"], true)).toContain("sale.alert");
     expect(EVENT_RECIPIENT_PERMISSION["sale.alert"]).toBeUndefined();
   });
-  it("owner, admitted → all eleven", () => {
+  it("owner, admitted → every event in the registry", () => {
     expect(visibleEventTypes("owner", [], true)).toEqual([...NOTIFICATION_EVENT_TYPES]);
   });
-  it("staff with view_collections → 8", () => {
+  it("staff with view_collections → 3 collection events, not the two manager-gated ones", () => {
     const v = visibleEventTypes("staff", ["record_sales", "view_collections"], true);
-    expect(v).toHaveLength(8);
-    expect(v).toEqual([
+    expectHasAll(v, [
       ...LEGACY_EVENTS,
       "collection.pending",
       "collection.stale",
       "collection.unmatched_credit",
     ]);
+    expectHasNone(v, ["collection.source_silent", "collection.limit_warning"]);
   });
-  it("staff with manage_collection_accounts → 7", () => {
+  it("staff with manage_collection_accounts → the two manager-gated collections", () => {
     const v = visibleEventTypes("staff", ["manage_collection_accounts"], true);
-    expect(v).toEqual([...LEGACY_EVENTS, "collection.source_silent", "collection.limit_warning"]);
+    expectHasAll(v, [...LEGACY_EVENTS, "collection.source_silent", "collection.limit_warning"]);
+    expectHasNone(v, ["collection.pending", "collection.stale", "collection.unmatched_credit"]);
   });
-  it("staff with both keys → 10; with neither → 5; either way 5 when not admitted", () => {
-    expect(visibleEventTypes("staff", ["view_collections", "manage_collection_accounts"], true)).toHaveLength(10);
-    expect(visibleEventTypes("staff", ["confirm_collections"], true)).toEqual(LEGACY_EVENTS);
-    expect(visibleEventTypes("staff", ["view_collections", "manage_collection_accounts"], false)).toEqual(
-      LEGACY_EVENTS,
+  it("staff with both keys → every collection event; with neither → none; neither when not admitted", () => {
+    expectHasAll(
+      visibleEventTypes("staff", ["view_collections", "manage_collection_accounts"], true),
+      COLLECTION_EVENTS,
+    );
+    expectHasNone(visibleEventTypes("staff", ["confirm_collections"], true), COLLECTION_EVENTS);
+    expectHasNone(
+      visibleEventTypes("staff", ["view_collections", "manage_collection_accounts"], false),
+      COLLECTION_EVENTS,
     );
   });
 });
@@ -514,7 +545,7 @@ describe("push routing and channel", () => {
     expect(routeForNotification("info", "/sales")).toBe("/sales");
   });
 
-  it("channelForKind: collection_* → collections, the rest → default (undefined)", () => {
+  it("channelForKind: collection_* → collections, low_stock → critical, info/report → generic", () => {
     for (const k of [
       "collection_pending",
       "collection_stale",
@@ -524,7 +555,10 @@ describe("push routing and channel", () => {
     ]) {
       expect(channelForKind(k), k).toBe("collections");
     }
-    for (const k of ["low_stock", "info", "task_assigned", "leave_decided", "collections"]) {
+    expect(channelForKind("low_stock")).toBe("critical");
+    expect(channelForKind("info")).toBe("generic");
+    expect(channelForKind("report")).toBe("generic");
+    for (const k of ["task_assigned", "leave_decided", "collections"]) {
       expect(channelForKind(k), k).toBeUndefined();
     }
   });

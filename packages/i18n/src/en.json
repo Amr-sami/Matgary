@@ -6570,6 +6570,151 @@
         "minutes": "{n} min ago",
         "hours": "{n} h ago",
         "days": "{n} d ago"
+      },
+      "events": {
+        "purchase": {
+          "created": {
+            "title": "Purchase Created",
+            "hint": "A supplier purchase order was created."
+          },
+          "returned": {
+            "title": "Purchase Return",
+            "hint": "A received purchase was returned."
+          }
+        },
+        "supplier": {
+          "payment": {
+            "recorded": {
+              "title": "Supplier Payment",
+              "hint": "A payment was recorded for a supplier."
+            }
+          }
+        },
+        "customer": {
+          "created": {
+            "title": "New Customer",
+            "hint": "A new customer purchased for the first time."
+          }
+        },
+        "expense": {
+          "voided": {
+            "title": "Expense Voided",
+            "hint": "A recorded expense was voided."
+          }
+        },
+        "leave": {
+          "approved": {
+            "title": "Leave Approved",
+            "hint": "An employee's leave request was approved."
+          },
+          "rejected": {
+            "title": "Leave Rejected",
+            "hint": "An employee's leave request was rejected."
+          }
+        },
+        "payroll": {
+          "calculated": {
+            "title": "Payroll Draft",
+            "hint": "A draft payroll was computed (off by default — noisy)."
+          },
+          "finalized": {
+            "title": "Payroll Finalized",
+            "hint": "A monthly payroll was approved and locked."
+          },
+          "voided": {
+            "title": "Payroll Voided",
+            "hint": "A finalized payroll was reverted."
+          }
+        },
+        "report": {
+          "daily": {
+            "title": "Daily Report",
+            "hint": "The previous day's sales + revenue summary."
+          }
+        },
+        "attendance": {
+          "late": {
+            "title": "Employee Late",
+            "hint": "An employee has not clocked in past their grace period."
+          }
+        }
+      },
+      "center": {
+        "title": "Notifications & Automation",
+        "subtitle": "Control what Storo should tell you about and when",
+        "sections": {
+          "events": "Notification Events",
+          "eventsHint": "Pick which events notify you and on which channels",
+          "attendance": "Attendance",
+          "attendanceHint": "Late arrival policy and per-employee schedules",
+          "reports": "Reports",
+          "reportsHint": "Daily, weekly, and monthly report delivery"
+        }
+      },
+      "reports": {
+        "title": "Reports",
+        "back": "Notifications",
+        "intro": "When Storo should send you each scheduled report. Times use your store's timezone.",
+        "daily": {
+          "label": "Daily Report",
+          "hint": "A summary of yesterday — sales, revenue, invoices."
+        },
+        "weekly": {
+          "label": "Weekly Report",
+          "hint": "Summary of last week."
+        },
+        "monthly": {
+          "label": "Monthly Report",
+          "hint": "Summary of last month."
+        },
+        "fields": {
+          "enabled": "Enabled",
+          "time": "Time",
+          "day": "Day of week",
+          "dayOfMonth": "Day of month"
+        },
+        "days": {
+          "sun": "Sun",
+          "mon": "Mon",
+          "tue": "Tue",
+          "wed": "Wed",
+          "thu": "Thu",
+          "fri": "Fri",
+          "sat": "Sat"
+        },
+        "savedOk": "Saved",
+        "saveFailed": "Couldn't save, try again"
+      },
+      "attendance": {
+        "title": "Attendance",
+        "back": "Notifications",
+        "policy": {
+          "title": "Late Arrival Notifications",
+          "hint": "Employees are marked late after their scheduled shift start plus the allowed grace period. Notifications go to the owner and anyone with team access.",
+          "disabledBadge": "Disabled",
+          "enabled": "Enabled"
+        },
+        "schedules": {
+          "title": "Employee Schedules",
+          "empty": "No schedules yet — tap an employee to configure their shift.",
+          "add": "Add schedule",
+          "enabled": "Enabled",
+          "inherits": "Uses store default"
+        },
+        "editor": {
+          "title": "Edit schedule",
+          "subtitle": "Configure the employee's shift and grace period",
+          "shiftStart": "Shift start",
+          "shiftEnd": "Shift end",
+          "workDays": "Working days",
+          "graceMinutes": "Grace period",
+          "graceInherit": "Use store default",
+          "graceValue": "{n} min",
+          "enabled": "Enabled",
+          "save": "Save",
+          "remove": "Remove schedule",
+          "saveFailed": "Couldn't save, try again"
+        }
       }
     },
     "branchSwitcher": {

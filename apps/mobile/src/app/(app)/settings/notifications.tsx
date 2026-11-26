@@ -8,7 +8,10 @@ import {
   View,
 } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
 import * as Notifications from "expo-notifications";
+import { CalendarCheckIcon as CalendarCheck } from "phosphor-react-native/src/icons/CalendarCheck";
+import { ClockClockwiseIcon as ClockClockwise } from "phosphor-react-native/src/icons/ClockClockwise";
 
 import { notifications } from "@matgary/api-client";
 
@@ -18,6 +21,7 @@ import { Screen } from "@/components/layout/Screen";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
+import { ChevronForward } from "@/components/ui/Chevron";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Segmented } from "@/components/ui/Segmented";
 import { SettingsHeader } from "@/components/ui/SettingsHeader";
@@ -152,6 +156,55 @@ const EVENTS = (): Record<EventType, { title: string; hint: string }> => ({
     title: t("app.notificationSettings.events.attendance.check_in.title"),
     hint: t("app.notificationSettings.events.attendance.check_in.hint"),
   },
+  // Notification Center extension — labels resolve against mobile.notifications.events.*
+  "purchase.created": {
+    title: t("mobile.notifications.events.purchase.created.title"),
+    hint: t("mobile.notifications.events.purchase.created.hint"),
+  },
+  "purchase.returned": {
+    title: t("mobile.notifications.events.purchase.returned.title"),
+    hint: t("mobile.notifications.events.purchase.returned.hint"),
+  },
+  "supplier.payment.recorded": {
+    title: t("mobile.notifications.events.supplier.payment.recorded.title"),
+    hint: t("mobile.notifications.events.supplier.payment.recorded.hint"),
+  },
+  "customer.created": {
+    title: t("mobile.notifications.events.customer.created.title"),
+    hint: t("mobile.notifications.events.customer.created.hint"),
+  },
+  "expense.voided": {
+    title: t("mobile.notifications.events.expense.voided.title"),
+    hint: t("mobile.notifications.events.expense.voided.hint"),
+  },
+  "leave.approved": {
+    title: t("mobile.notifications.events.leave.approved.title"),
+    hint: t("mobile.notifications.events.leave.approved.hint"),
+  },
+  "leave.rejected": {
+    title: t("mobile.notifications.events.leave.rejected.title"),
+    hint: t("mobile.notifications.events.leave.rejected.hint"),
+  },
+  "payroll.calculated": {
+    title: t("mobile.notifications.events.payroll.calculated.title"),
+    hint: t("mobile.notifications.events.payroll.calculated.hint"),
+  },
+  "payroll.finalized": {
+    title: t("mobile.notifications.events.payroll.finalized.title"),
+    hint: t("mobile.notifications.events.payroll.finalized.hint"),
+  },
+  "payroll.voided": {
+    title: t("mobile.notifications.events.payroll.voided.title"),
+    hint: t("mobile.notifications.events.payroll.voided.hint"),
+  },
+  "report.daily": {
+    title: t("mobile.notifications.events.report.daily.title"),
+    hint: t("mobile.notifications.events.report.daily.hint"),
+  },
+  "attendance.late": {
+    title: t("mobile.notifications.events.attendance.late.title"),
+    hint: t("mobile.notifications.events.attendance.late.hint"),
+  },
 });
 
 const DELIVERY = () => ([
@@ -160,6 +213,7 @@ const DELIVERY = () => ([
 ]);
 
 export default function NotificationSettingsScreen() {
+  const router = useRouter();
   const [notice, setNotice] = useState<{ tone: "ok" | "err"; text: string } | null>(
     null,
   );
@@ -239,6 +293,46 @@ export default function NotificationSettingsScreen() {
           </Text>
         </Pressable>
       ) : null}
+
+      <Card>
+        <Pressable
+          onPress={() => router.push("/settings/notifications/attendance")}
+          style={({ pressed }) => [styles.navRow, pressed && styles.navRowPressed]}
+          accessibilityRole="button"
+          testID="nc-nav-attendance"
+        >
+          <CalendarCheck size={20} color={colors.textSecondary} />
+          <View style={styles.navBody}>
+            <Text numberOfLines={1} style={styles.navTitle}>
+              {t("mobile.notifications.center.sections.attendance")}
+            </Text>
+            <Text style={styles.navHint}>
+              {t("mobile.notifications.center.sections.attendanceHint")}
+            </Text>
+          </View>
+          <ChevronForward size={18} color={colors.textSecondary} />
+        </Pressable>
+
+        <View style={styles.navDivider} />
+
+        <Pressable
+          onPress={() => router.push("/settings/notifications/reports")}
+          style={({ pressed }) => [styles.navRow, pressed && styles.navRowPressed]}
+          accessibilityRole="button"
+          testID="nc-nav-reports"
+        >
+          <ClockClockwise size={20} color={colors.textSecondary} />
+          <View style={styles.navBody}>
+            <Text numberOfLines={1} style={styles.navTitle}>
+              {t("mobile.notifications.center.sections.reports")}
+            </Text>
+            <Text style={styles.navHint}>
+              {t("mobile.notifications.center.sections.reportsHint")}
+            </Text>
+          </View>
+          <ChevronForward size={18} color={colors.textSecondary} />
+        </Pressable>
+      </Card>
 
       {q.isPending && !q.data ? (
         <SkeletonListRow count={6} avatarSize={0} trailingWidth={48} height={56} />
@@ -648,4 +742,38 @@ const styles = StyleSheet.create({
   },
   deviceError: { color: colors.danger },
   deviceActions: { gap: spacing.sm, marginTop: spacing.md },
+
+  navRow: {
+    minHeight: MIN_TOUCH,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  navRowPressed: {
+    opacity: 0.6,
+  },
+  navBody: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  navTitle: {
+    ...RTL_TEXT,
+    fontFamily: fonts.semibold,
+    fontSize: 15,
+    color: colors.text,
+  },
+  navHint: {
+    ...RTL_TEXT,
+    fontFamily: fonts.regular,
+    fontSize: 12,
+    color: colors.textSecondary,
+    lineHeight: 18,
+  },
+  navDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.border,
+    marginVertical: spacing.xs,
+  },
 });
