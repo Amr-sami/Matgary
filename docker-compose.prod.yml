@@ -205,6 +205,18 @@ services:
       # pokes in any sliding hour, under guardCronRequest's default 6/h for the
       # "collections-tick" bucket. Never faster; never slower than hourly (retention).
       COLLECTIONS_TICK_CRON: "*/15 * * * *"
+      # Notification Center (migration 0069): report.daily/weekly/monthly
+      # scheduled sends. reports-tick reads tenant_report_settings and fires
+      # whichever reports are enabled at the configured local time. Every 15
+      # min so we catch any owner-configured HH:MM within the trailing 14
+      # min (route uses `withinTickWindow`). Idempotent — wasAlreadyDispatched
+      # prevents duplicates within the period.
+      REPORTS_TICK_CRON: "*/15 * * * *"
+      # Low-stock sweep — fires inventory.low_stock for every product at or
+      # below its threshold, once per calendar day (dedupe keyed on
+      # /inventory/<productId>?lowStock=YYYY-MM-DD). Hourly so a mid-day
+      # drop-to-threshold doesn't wait until midnight to notify.
+      LOW_STOCK_SWEEP_CRON: "0 * * * *"
     entrypoint:
       - sh
       - -c
@@ -240,8 +252,10 @@ services:
           echo "$$DEMO_CLEANUP_CRON /usr/local/bin/poke-cron.sh /api/cron/demo-cleanup demo-cleanup >> /var/log/cron.log 2>&1"
           echo "$$NOTIFICATIONS_DIGEST_CRON /usr/local/bin/poke-cron.sh /api/cron/notifications-digest notifications-digest >> /var/log/cron.log 2>&1"
           echo "$$COLLECTIONS_TICK_CRON /usr/local/bin/poke-cron.sh /api/cron/collections-tick collections-tick >> /var/log/cron.log 2>&1"
+          echo "$$REPORTS_TICK_CRON /usr/local/bin/poke-cron.sh /api/cron/reports-tick reports-tick >> /var/log/cron.log 2>&1"
+          echo "$$LOW_STOCK_SWEEP_CRON /usr/local/bin/poke-cron.sh /api/cron/low-stock-sweep low-stock-sweep >> /var/log/cron.log 2>&1"
         } > /etc/crontabs/root
-        echo "[cron] target: $$CRON_TARGET_URL — 8 jobs scheduled"
+        echo "[cron] target: $$CRON_TARGET_URL — 10 jobs scheduled"
         exec tini -- crond -f -d 8
 
   backup:

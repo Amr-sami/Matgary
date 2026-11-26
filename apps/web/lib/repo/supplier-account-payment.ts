@@ -94,6 +94,31 @@ export class SupplierAccountPaymentError extends Error {
  *     to accept a 10,000 payment that would make the account credit" —
  *     Storo has no supplier-credit concept yet, so the ceiling is enforced).
  */
+/**
+ * Fire supplier.payment.recorded after the service commits. Non-blocking:
+ * `fanoutEvent` swallows its own errors and we never let a notification
+ * failure bubble back to the business caller.
+ */
+async function fireNotification(
+  tenantId: string,
+  result: RecordSupplierAccountPaymentResult,
+): Promise<void> {
+  try {
+    const { fanoutEvent } = await import("@/lib/notifications/dispatch");
+    void fanoutEvent(tenantId, null, "supplier.payment.recorded", {
+      supplierId: result.supplierId,
+      supplierName: result.supplierName,
+      amountEgp: result.amount,
+      method: result.method,
+      kind: "account",
+      purchaseOrderId: null,
+      remainingBalanceEgp: result.balanceAfter,
+    });
+  } catch (err) {
+    console.warn("[recordSupplierAccountPayment] fanout failed", err);
+  }
+}
+
 export async function recordSupplierAccountPayment(
   tenantId: string,
   supplierId: string,
@@ -162,5 +187,11 @@ export async function recordSupplierAccountPayment(
       method,
       paidAt,
     };
+  }).then((result) => {
+    // Fire the notification AFTER the transaction has committed — not
+    // inside the `withTenant` callback. Never produces a false-positive
+    // alert on rollback.
+    void fireNotification(tenantId, result);
+    return result;
   });
 }

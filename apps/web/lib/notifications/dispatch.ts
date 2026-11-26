@@ -15,6 +15,7 @@ import {
   notificationDigestQueue,
   notificationPreferences,
   tenantMembers,
+  tenantNotificationOverrides,
   tenants,
   users,
 } from "@/lib/db/schema";
@@ -199,6 +200,105 @@ export interface AttendanceCheckInPayload extends BaseEventPayload {
   occurredAt: string;
 }
 
+// ── Notification Center extension payloads ────────────────────────────────
+
+export interface PurchaseCreatedPayload extends BaseEventPayload {
+  purchaseOrderId: string;
+  supplierName: string;
+  itemCount: number;
+  totalEgp: number;
+  actorName?: string | null;
+}
+
+export interface PurchaseReturnedPayload extends BaseEventPayload {
+  purchaseOrderId: string;
+  supplierName: string;
+  reason?: string | null;
+  actorName?: string | null;
+}
+
+export interface SupplierPaymentRecordedPayload extends BaseEventPayload {
+  supplierId: string;
+  supplierName: string;
+  amountEgp: number;
+  method: string;
+  /** Payment mode — `po` (allocated to a specific PO) or `account` (account-level). */
+  kind: "po" | "account";
+  /** Only set for `kind='po'`. */
+  purchaseOrderId?: string | null;
+  /** Server-computed new supplier balance after the payment committed. */
+  remainingBalanceEgp?: number | null;
+  actorName?: string | null;
+}
+
+export interface CustomerCreatedPayload extends BaseEventPayload {
+  customerPhone: string;
+  customerName?: string | null;
+  firstSaleId?: string | null;
+  firstSaleAmountEgp?: number | null;
+}
+
+export interface ExpenseVoidedPayload extends BaseEventPayload {
+  expenseId: string;
+  title: string;
+  amountEgp: number;
+  actorName?: string | null;
+}
+
+export interface LeaveApprovedPayload extends BaseEventPayload {
+  leaveRequestId: string;
+  requesterUserId: string;
+  requesterName: string;
+  dayCount: number;
+  approverName?: string | null;
+}
+
+export interface LeaveRejectedPayload extends BaseEventPayload {
+  leaveRequestId: string;
+  requesterUserId: string;
+  requesterName: string;
+  reason?: string | null;
+  decidedByName?: string | null;
+}
+
+export interface PayrollCalculatedPayload extends BaseEventPayload {
+  payrollPeriodId: string;
+  employeeUserId: string;
+  employeeName: string;
+  month: string; // YYYY-MM
+  netEgp: number;
+}
+
+export interface PayrollFinalizedPayload extends BaseEventPayload {
+  payrollPeriodId: string;
+  employeeUserId: string;
+  employeeName: string;
+  month: string;
+  netEgp: number;
+  finalizedByName?: string | null;
+}
+
+export interface PayrollVoidedPayload extends BaseEventPayload {
+  payrollPeriodId: string;
+  employeeUserId: string;
+  employeeName: string;
+  month: string;
+  voidedByName?: string | null;
+  reason?: string | null;
+}
+
+/** `attendance.late` payload — all values authoritative at the moment the
+ *  sweep fired. `lateMinutes` is `(now_local − (shift_start + grace))`. */
+export interface AttendanceLatePayload extends BaseEventPayload {
+  employeeUserId: string;
+  employeeName: string;
+  date: string; // YYYY-MM-DD local
+  scheduledStart: string; // HH:mm
+  graceMinutes: number;
+  lateMinutes: number;
+  actualCheckIn?: string | null; // ISO or null (no check-in yet)
+}
+
 export type EventPayloadMap = {
   "sale.created": SaleCreatedPayload;
   // Never fanned out (EVENT_RECIPIENT_ROLES is empty); alertSale delivers it.
@@ -219,6 +319,18 @@ export type EventPayloadMap = {
   "inventory.adjusted": InventoryAdjustedPayload;
   "return.recorded": ReturnRecordedPayload;
   "attendance.check_in": AttendanceCheckInPayload;
+  "purchase.created": PurchaseCreatedPayload;
+  "purchase.returned": PurchaseReturnedPayload;
+  "supplier.payment.recorded": SupplierPaymentRecordedPayload;
+  "customer.created": CustomerCreatedPayload;
+  "expense.voided": ExpenseVoidedPayload;
+  "leave.approved": LeaveApprovedPayload;
+  "leave.rejected": LeaveRejectedPayload;
+  "payroll.calculated": PayrollCalculatedPayload;
+  "payroll.finalized": PayrollFinalizedPayload;
+  "payroll.voided": PayrollVoidedPayload;
+  "report.daily": ReportPayload;
+  "attendance.late": AttendanceLatePayload;
 };
 
 // Notification `kind` column values. We reuse the existing loose enum
@@ -244,6 +356,23 @@ export const EVENT_TO_KIND: Record<NotificationEventType, NotificationKind> = {
   "inventory.adjusted": "info",
   "return.recorded": "info",
   "attendance.check_in": "info",
+  // Notification Center extension — all route through the generic `"info"`
+  // kind so they inherit the Universfield push sound via
+  // lib/push/notify.ts:soundForKind("info") → generic_notification.wav. The
+  // sale.created mapping above is also "info" but dispatch never pushes it
+  // (sale.alert is the phone chime path).
+  "purchase.created": "info",
+  "purchase.returned": "info",
+  "supplier.payment.recorded": "info",
+  "customer.created": "info",
+  "expense.voided": "info",
+  "leave.approved": "leave_decided",
+  "leave.rejected": "leave_decided",
+  "payroll.calculated": "info",
+  "payroll.finalized": "info",
+  "payroll.voided": "info",
+  "report.daily": "report",
+  "attendance.late": "info",
 };
 
 // ─── Public API ──────────────────────────────────────────────────────────────
@@ -349,6 +478,25 @@ async function doFanout<E extends NotificationEventType>(
   });
   const storedByUser = new Map(stored.map((s) => [s.userId, s]));
 
+  // 2b) Tenant-level override — one row per (tenant, event_type). When
+  //     enabled=false, the owner has disabled this event at the tenant level,
+  //     which zeros out in-app + email + push for every member whose own
+  //     preference row doesn't explicitly re-enable the channel. See
+  //     resolveMemberPref below for the precedence rules.
+  const [tenantOverride] = await withTenant(tenantId, async (tx) => {
+    return tx
+      .select({ enabled: tenantNotificationOverrides.enabled })
+      .from(tenantNotificationOverrides)
+      .where(
+        and(
+          eq(tenantNotificationOverrides.tenantId, tenantId),
+          eq(tenantNotificationOverrides.eventType, eventType),
+        ),
+      )
+      .limit(1);
+  });
+  const tenantDisabled = tenantOverride?.enabled === false;
+
   // 3) Fetch tenant display name once — used in every email subject.
   const [tenantRow] = await withTenant(tenantId, async (tx) =>
     tx.select({ name: tenants.name }).from(tenants).where(eq(tenants.id, tenantId)).limit(1),
@@ -374,6 +522,7 @@ async function doFanout<E extends NotificationEventType>(
         r.role as TenantMemberRole,
         eventType,
         storedByUser.get(r.userId) ?? null,
+        tenantDisabled,
       );
       // receive_all_alerts (permissions.ts) upgrades the in-app + push
       // delivery for any event this member is already role/permission-eligible
@@ -407,6 +556,9 @@ async function doFanout<E extends NotificationEventType>(
           push:
             eventType !== "sale.created" &&
             pref.digestMode !== "digest" &&
+            // Tenant-wide disable zeros out push too, unless the member has
+            // a stored preference row that explicitly re-enables it.
+            (!tenantDisabled || storedByUser.get(r.userId)?.push === true) &&
             (hasAllAlerts
               || (storedByUser.get(r.userId)?.push ??
                 (DEFAULT_PUSH[role] ?? DEFAULT_PUSH.staff)[eventType])),
@@ -457,10 +609,20 @@ function resolveMemberPref(
     email: boolean;
     digestMode: string;
   } | null,
+  tenantDisabled: boolean = false,
 ): EventPreference {
+  // 3-level resolution: user pref → tenant override → system default.
+  // Precedence when a user has a stored row: the user row wins (they
+  // consciously configured it). Absent a user row, a tenant `enabled=false`
+  // zeros out every channel. Otherwise the role default applies.
   const base = DEFAULT_EVENT_PREFERENCE[role]?.[eventType]
     ?? DEFAULT_EVENT_PREFERENCE.staff[eventType];
-  if (!stored) return base;
+  if (!stored) {
+    if (tenantDisabled) {
+      return { inApp: false, email: false, digestMode: "instant" };
+    }
+    return base;
+  }
   return {
     inApp: stored.inApp,
     email: stored.email,
@@ -836,6 +998,147 @@ export function renderInApp<E extends NotificationEventType>(
       return ar
         ? { title: `${p.employeeName} سجَّل الحضور`, body: hhmm }
         : { title: `${p.employeeName} checked in`, body: hhmm };
+    }
+    case "purchase.created": {
+      const p = payload as PurchaseCreatedPayload;
+      return ar
+        ? {
+            title: `فاتورة شراء جديدة — ${fmtEgp(p.totalEgp)} ج.م`,
+            body: `${p.supplierName} · ${p.itemCount} صنف${p.actorName ? ` · ${p.actorName}` : ""}`,
+          }
+        : {
+            title: `Purchase created — EGP ${fmtEgp(p.totalEgp)}`,
+            body: `${p.supplierName} · ${p.itemCount} items${p.actorName ? ` · ${p.actorName}` : ""}`,
+          };
+    }
+    case "purchase.returned": {
+      const p = payload as PurchaseReturnedPayload;
+      return ar
+        ? {
+            title: `مرتجع شراء — ${p.supplierName}`,
+            body: p.reason ?? (p.actorName ?? ""),
+          }
+        : {
+            title: `Purchase return — ${p.supplierName}`,
+            body: p.reason ?? (p.actorName ?? ""),
+          };
+    }
+    case "supplier.payment.recorded": {
+      const p = payload as SupplierPaymentRecordedPayload;
+      const remAr = p.remainingBalanceEgp != null
+        ? ` · متبقّي ${fmtEgp(p.remainingBalanceEgp)} ج.م`
+        : "";
+      const remEn = p.remainingBalanceEgp != null
+        ? ` · balance EGP ${fmtEgp(p.remainingBalanceEgp)}`
+        : "";
+      return ar
+        ? {
+            title: `دفعة لـ ${p.supplierName} — ${fmtEgp(p.amountEgp)} ج.م`,
+            body: `${p.method}${remAr}`,
+          }
+        : {
+            title: `Paid ${p.supplierName} — EGP ${fmtEgp(p.amountEgp)}`,
+            body: `${p.method}${remEn}`,
+          };
+    }
+    case "customer.created": {
+      const p = payload as CustomerCreatedPayload;
+      const name = p.customerName && p.customerName.trim() ? p.customerName.trim() : p.customerPhone;
+      const amt = p.firstSaleAmountEgp != null
+        ? (ar ? ` · أول بيع ${fmtEgp(p.firstSaleAmountEgp)} ج.م` : ` · first sale EGP ${fmtEgp(p.firstSaleAmountEgp)}`)
+        : "";
+      return ar
+        ? { title: `عميل جديد — ${name}`, body: `${p.customerPhone}${amt}` }
+        : { title: `New customer — ${name}`, body: `${p.customerPhone}${amt}` };
+    }
+    case "expense.voided": {
+      const p = payload as ExpenseVoidedPayload;
+      return ar
+        ? {
+            title: `مصروف ملغى — ${fmtEgp(p.amountEgp)} ج.م`,
+            body: p.actorName ? `${p.title} · ${p.actorName}` : p.title,
+          }
+        : {
+            title: `Expense voided — EGP ${fmtEgp(p.amountEgp)}`,
+            body: p.actorName ? `${p.title} · ${p.actorName}` : p.title,
+          };
+    }
+    case "leave.approved": {
+      const p = payload as LeaveApprovedPayload;
+      return ar
+        ? {
+            title: `إجازة ${p.requesterName} معتمدة`,
+            body: `${p.dayCount} يوم${p.approverName ? ` · اعتمد ${p.approverName}` : ""}`,
+          }
+        : {
+            title: `Leave approved — ${p.requesterName}`,
+            body: `${p.dayCount} day${p.dayCount === 1 ? "" : "s"}${p.approverName ? ` · by ${p.approverName}` : ""}`,
+          };
+    }
+    case "leave.rejected": {
+      const p = payload as LeaveRejectedPayload;
+      return ar
+        ? {
+            title: `إجازة ${p.requesterName} مرفوضة`,
+            body: p.reason ?? (p.decidedByName ? `قرار ${p.decidedByName}` : ""),
+          }
+        : {
+            title: `Leave rejected — ${p.requesterName}`,
+            body: p.reason ?? (p.decidedByName ? `by ${p.decidedByName}` : ""),
+          };
+    }
+    case "payroll.calculated": {
+      const p = payload as PayrollCalculatedPayload;
+      return ar
+        ? { title: `كشف مرتب ${p.employeeName} — ${p.month}`, body: `صافي ${fmtEgp(p.netEgp)} ج.م` }
+        : { title: `Payroll draft — ${p.employeeName}`, body: `${p.month} · net EGP ${fmtEgp(p.netEgp)}` };
+    }
+    case "payroll.finalized": {
+      const p = payload as PayrollFinalizedPayload;
+      return ar
+        ? {
+            title: `اعتماد مرتب ${p.employeeName} — ${p.month}`,
+            body: `صافي ${fmtEgp(p.netEgp)} ج.م${p.finalizedByName ? ` · ${p.finalizedByName}` : ""}`,
+          }
+        : {
+            title: `Payroll finalized — ${p.employeeName}`,
+            body: `${p.month} · net EGP ${fmtEgp(p.netEgp)}${p.finalizedByName ? ` · ${p.finalizedByName}` : ""}`,
+          };
+    }
+    case "payroll.voided": {
+      const p = payload as PayrollVoidedPayload;
+      return ar
+        ? {
+            title: `إلغاء اعتماد مرتب ${p.employeeName}`,
+            body: `${p.month}${p.voidedByName ? ` · ${p.voidedByName}` : ""}${p.reason ? ` — ${p.reason}` : ""}`,
+          }
+        : {
+            title: `Payroll voided — ${p.employeeName}`,
+            body: `${p.month}${p.voidedByName ? ` · ${p.voidedByName}` : ""}${p.reason ? ` — ${p.reason}` : ""}`,
+          };
+    }
+    case "report.daily": {
+      const p = payload as ReportPayload;
+      const bodyParts: string[] = [p.period];
+      if (p.totalRevenueEgp != null)
+        bodyParts.push(ar ? `${fmtEgp(p.totalRevenueEgp)} ج.م` : `EGP ${fmtEgp(p.totalRevenueEgp)}`);
+      if (p.salesCount != null)
+        bodyParts.push(ar ? `${p.salesCount} فاتورة` : `${p.salesCount} sales`);
+      return ar
+        ? { title: "التقرير اليومي جاهز", body: bodyParts.join(" · ") }
+        : { title: "Daily report ready", body: bodyParts.join(" · ") };
+    }
+    case "attendance.late": {
+      const p = payload as AttendanceLatePayload;
+      return ar
+        ? {
+            title: `${p.employeeName} متأخر`,
+            body: `${p.lateMinutes} دقيقة تأخير · الموعد ${p.scheduledStart}`,
+          }
+        : {
+            title: `${p.employeeName} is late`,
+            body: `${p.lateMinutes} min late · scheduled ${p.scheduledStart}`,
+          };
     }
     default:
       return { title: eventType, body: null };

@@ -3,6 +3,7 @@ import {
   text,
   uuid,
   timestamp,
+  time,
   boolean,
   primaryKey,
   integer,
@@ -3481,3 +3482,100 @@ export const moneyMovements = pgTable(
 );
 
 export type MoneyMovementRow = typeof moneyMovements.$inferSelect;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Notification Center & Automation — three new tables. See
+// lib/db/migrations/0069_notification_center.sql for the detailed intent.
+// Nothing in this block changes existing notification_preferences semantics;
+// the 3-level resolver reads tenant_notification_overrides after user prefs.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const tenantNotificationOverrides = pgTable(
+  "tenant_notification_overrides",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    eventType: text("event_type").notNull(),
+    enabled: boolean("enabled").notNull(),
+    updatedByUserId: uuid("updated_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [
+    uniqueIndex("tenant_notification_overrides_tenant_event_unique").on(
+      t.tenantId,
+      t.eventType,
+    ),
+    index("tenant_notification_overrides_tenant_idx").on(t.tenantId),
+  ],
+);
+
+export type TenantNotificationOverrideRow =
+  typeof tenantNotificationOverrides.$inferSelect;
+
+export const tenantReportSettings = pgTable(
+  "tenant_report_settings",
+  {
+    tenantId: uuid("tenant_id")
+      .primaryKey()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    dailyEnabled: boolean("daily_enabled").notNull().default(true),
+    dailyHour: integer("daily_hour").notNull().default(21),
+    dailyMinute: integer("daily_minute").notNull().default(0),
+    weeklyEnabled: boolean("weekly_enabled").notNull().default(true),
+    weeklyDow: integer("weekly_dow").notNull().default(0), // 0=Sun
+    weeklyHour: integer("weekly_hour").notNull().default(9),
+    weeklyMinute: integer("weekly_minute").notNull().default(0),
+    monthlyEnabled: boolean("monthly_enabled").notNull().default(true),
+    monthlyDay: integer("monthly_day").notNull().default(1), // 1..28
+    monthlyHour: integer("monthly_hour").notNull().default(9),
+    monthlyMinute: integer("monthly_minute").notNull().default(0),
+    recipients: uuid("recipients")
+      .array()
+      .notNull()
+      .default(sql`'{}'::uuid[]`),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+);
+
+export type TenantReportSettingsRow = typeof tenantReportSettings.$inferSelect;
+
+export const employeeSchedules = pgTable(
+  "employee_schedules",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    shiftStart: time("shift_start").notNull(),
+    shiftEnd: time("shift_end").notNull(),
+    /** Bitmask: bit 0 = Sun … bit 6 = Sat. 125 = 0b1111101 (Fri off, Egyptian default). */
+    workDays: smallint("work_days").notNull().default(125),
+    /** -1 = inherit tenant default (attendance_settings.grace_minutes_late). */
+    graceMinutes: integer("grace_minutes").notNull().default(-1),
+    enabled: boolean("enabled").notNull().default(true),
+    timezoneOverride: text("timezone_override"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => [
+    uniqueIndex("employee_schedules_tenant_user_unique").on(t.tenantId, t.userId),
+    index("employee_schedules_tenant_idx").on(t.tenantId),
+  ],
+);
+
+export type EmployeeScheduleRow = typeof employeeSchedules.$inferSelect;

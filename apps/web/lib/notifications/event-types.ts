@@ -40,6 +40,21 @@ export const NOTIFICATION_EVENT_TYPES = [
   "inventory.adjusted",
   "return.recorded",
   "attendance.check_in",
+  // Notification Center extension — fired post-TX by the authoritative
+  // service for each business event. Every new event here needs a
+  // DEFAULT_EVENT_PREFERENCE entry for both roles AND an EVENT_LABELS entry.
+  "purchase.created",
+  "purchase.returned",
+  "supplier.payment.recorded",
+  "customer.created",
+  "expense.voided",
+  "leave.approved",
+  "leave.rejected",
+  "payroll.calculated",
+  "payroll.finalized",
+  "payroll.voided",
+  "report.daily",
+  "attendance.late",
 ] as const;
 
 export type NotificationEventType = (typeof NOTIFICATION_EVENT_TYPES)[number];
@@ -78,6 +93,22 @@ export const EVENT_RECIPIENT_ROLES: Record<NotificationEventType, TenantMemberRo
   "inventory.adjusted": ["owner"],
   "return.recorded": ["owner"],
   "attendance.check_in": ["owner"],
+  "purchase.created": ["owner"],
+  "purchase.returned": ["owner"],
+  "supplier.payment.recorded": ["owner"],
+  "customer.created": ["owner"],
+  "expense.voided": ["owner"],
+  "leave.approved": ["owner"],
+  "leave.rejected": ["owner"],
+  // Payroll events require `view_payroll` to receive — enforced via
+  // EVENT_RECIPIENT_PERMISSION below. The owner always sees them.
+  "payroll.calculated": ["owner"],
+  "payroll.finalized": ["owner"],
+  "payroll.voided": ["owner"],
+  "report.daily": ["owner"],
+  // Attendance late requires `view_team` / `manage_team` for staff; owner
+  // always sees.
+  "attendance.late": ["owner"],
 };
 
 /** Staff (role 'staff') holding this permission also receive the event — scoped to the event's
@@ -89,6 +120,15 @@ export const EVENT_RECIPIENT_PERMISSION: Partial<Record<NotificationEventType, P
   "collection.unmatched_credit": "view_collections",
   "collection.source_silent": "manage_collection_accounts",
   "collection.limit_warning": "manage_collection_accounts",
+  // Payroll events carry salary totals — staff recipients must hold
+  // manage_payroll (no view_payroll exists in the catalog, so the stricter
+  // permission is the gate). Owner always sees.
+  "payroll.calculated": "manage_payroll",
+  "payroll.finalized": "manage_payroll",
+  "payroll.voided": "manage_payroll",
+  // Attendance late carries employee identity — gated by manage_team
+  // (same reason: no view_team permission exists today). Owner always sees.
+  "attendance.late": "manage_team",
 };
 
 /** Default preference matrix per (role, event). The dispatcher applies
@@ -132,6 +172,23 @@ export const DEFAULT_EVENT_PREFERENCE: Record<
     "inventory.adjusted": { inApp: true, email: false, digestMode: "instant" },
     "return.recorded": { inApp: true, email: false, digestMode: "instant" },
     "attendance.check_in": { inApp: true, email: false, digestMode: "instant" },
+    // Notification Center extension — ON by default for the owner (business
+    // operations the owner expects to be told about). Email OFF to keep the
+    // inbox calm; the owner can opt-in per event.
+    "purchase.created": { inApp: true, email: false, digestMode: "instant" },
+    "purchase.returned": { inApp: true, email: false, digestMode: "instant" },
+    "supplier.payment.recorded": { inApp: true, email: false, digestMode: "instant" },
+    "customer.created": { inApp: true, email: false, digestMode: "instant" },
+    "expense.voided": { inApp: true, email: false, digestMode: "instant" },
+    "leave.approved": { inApp: true, email: false, digestMode: "instant" },
+    "leave.rejected": { inApp: true, email: false, digestMode: "instant" },
+    // Payroll: `.calculated` is noisy (can fire per employee preview). OFF by
+    // default; `.finalized` and `.voided` are meaningful state transitions.
+    "payroll.calculated": { inApp: false, email: false, digestMode: "instant" },
+    "payroll.finalized": { inApp: true, email: false, digestMode: "instant" },
+    "payroll.voided": { inApp: true, email: false, digestMode: "instant" },
+    "report.daily": { inApp: true, email: false, digestMode: "instant" },
+    "attendance.late": { inApp: true, email: false, digestMode: "instant" },
   },
   staff: {
     // Staff get in-app pings so they can see activity in their branch UI,
@@ -161,6 +218,21 @@ export const DEFAULT_EVENT_PREFERENCE: Record<
     "inventory.adjusted": { inApp: false, email: false, digestMode: "instant" },
     "return.recorded": { inApp: false, email: false, digestMode: "instant" },
     "attendance.check_in": { inApp: false, email: false, digestMode: "instant" },
+    // Staff defaults for the new events: OFF. Staff only receive these when
+    // the owner explicitly opts them in via Notification Center. Permission
+    // gates (EVENT_RECIPIENT_PERMISSION) still apply above this default.
+    "purchase.created": { inApp: false, email: false, digestMode: "instant" },
+    "purchase.returned": { inApp: false, email: false, digestMode: "instant" },
+    "supplier.payment.recorded": { inApp: false, email: false, digestMode: "instant" },
+    "customer.created": { inApp: false, email: false, digestMode: "instant" },
+    "expense.voided": { inApp: false, email: false, digestMode: "instant" },
+    "leave.approved": { inApp: false, email: false, digestMode: "instant" },
+    "leave.rejected": { inApp: false, email: false, digestMode: "instant" },
+    "payroll.calculated": { inApp: false, email: false, digestMode: "instant" },
+    "payroll.finalized": { inApp: false, email: false, digestMode: "instant" },
+    "payroll.voided": { inApp: false, email: false, digestMode: "instant" },
+    "report.daily": { inApp: false, email: false, digestMode: "instant" },
+    "attendance.late": { inApp: false, email: false, digestMode: "instant" },
   },
 };
 
@@ -186,6 +258,18 @@ export const EVENT_LABELS: Record<NotificationEventType, { ar: string; en: strin
   "inventory.adjusted": { ar: "تعديلات مخزون", en: "Inventory adjustments" },
   "return.recorded": { ar: "مرتجعات", en: "Returns" },
   "attendance.check_in": { ar: "تسجيلات حضور", en: "Check-ins" },
+  "purchase.created": { ar: "فواتير شراء جديدة", en: "Purchase orders created" },
+  "purchase.returned": { ar: "مرتجعات مشتريات", en: "Purchase returns" },
+  "supplier.payment.recorded": { ar: "دفعات موردين", en: "Supplier payments" },
+  "customer.created": { ar: "عملاء جدد", en: "New customers" },
+  "expense.voided": { ar: "مصاريف مُلغاة", en: "Expenses voided" },
+  "leave.approved": { ar: "إجازات معتمدة", en: "Leave approved" },
+  "leave.rejected": { ar: "إجازات مرفوضة", en: "Leave rejected" },
+  "payroll.calculated": { ar: "كشوف مرتبات محسوبة (مسودة)", en: "Payroll drafts" },
+  "payroll.finalized": { ar: "اعتماد كشوف المرتبات", en: "Payroll finalized" },
+  "payroll.voided": { ar: "إلغاء اعتماد كشوف", en: "Payroll voided" },
+  "report.daily": { ar: "التقرير اليومي", en: "Daily report" },
+  "attendance.late": { ar: "تأخير موظف", en: "Employee late arrival" },
 };
 
 /** Web link a producer's payload falls back to when it carries none (13 §4.2).

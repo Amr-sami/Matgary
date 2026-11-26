@@ -299,6 +299,22 @@ export const DEFAULT_PUSH: Record<
     "inventory.adjusted": true,
     "return.recorded": true,
     "attendance.check_in": true,
+    // Notification Center extension — push defaults mirror the role
+    // DEFAULT_EVENT_PREFERENCE pattern (owner receives instant push; staff
+    // opts in). Push for `.calculated` is OFF because that event is noisy
+    // (per-employee draft recalc); `.finalized` / `.voided` are meaningful.
+    "purchase.created": true,
+    "purchase.returned": true,
+    "supplier.payment.recorded": true,
+    "customer.created": true,
+    "expense.voided": true,
+    "leave.approved": true,
+    "leave.rejected": true,
+    "payroll.calculated": false,
+    "payroll.finalized": true,
+    "payroll.voided": true,
+    "report.daily": true,
+    "attendance.late": true,
   },
   staff: {
     "sale.created": false,
@@ -320,6 +336,21 @@ export const DEFAULT_PUSH: Record<
     "inventory.adjusted": false,
     "return.recorded": false,
     "attendance.check_in": false,
+    // Staff opt-in for the new Notification Center events — default OFF
+    // (owner is the natural recipient for these). Permission filters
+    // (EVENT_RECIPIENT_PERMISSION) still apply above this default.
+    "purchase.created": false,
+    "purchase.returned": false,
+    "supplier.payment.recorded": false,
+    "customer.created": false,
+    "expense.voided": false,
+    "leave.approved": false,
+    "leave.rejected": false,
+    "payroll.calculated": false,
+    "payroll.finalized": false,
+    "payroll.voided": false,
+    "report.daily": false,
+    "attendance.late": false,
   },
 };
 

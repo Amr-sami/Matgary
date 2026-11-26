@@ -3,6 +3,7 @@ import { withTenant } from "@/lib/db";
 import {
   purchaseOrders,
   purchaseOrderPayments,
+  suppliers,
 } from "@/lib/db/schema";
 import { adjustSupplierBalance } from "./suppliers";
 import { PurchaseOrderConflictError } from "./purchase-orders";
@@ -306,9 +307,51 @@ export async function recordPayment(
   purchaseOrderId: string,
   input: RecordPaymentInput,
 ): Promise<{ id: string }> {
-  return withTenant(tenantId, (tx) =>
+  const result = await withTenant(tenantId, (tx) =>
     _recordPaymentTx(tx, tenantId, purchaseOrderId, input),
   );
+
+  // Post-TX fanout — fire AFTER the payment actually commits. Non-blocking:
+  // fanoutEvent swallows its own errors, and we read the authoritative state
+  // (supplier name + remaining balance) in a fresh tenant-scoped query so a
+  // half-rolled tx never produces a "payment recorded" notification.
+  try {
+    const context = await withTenant(tenantId, async (tx) => {
+      const [row] = await tx
+        .select({
+          supplierId: purchaseOrders.supplierId,
+          supplierName: suppliers.name,
+          supplierBalance: suppliers.balance,
+        })
+        .from(purchaseOrders)
+        .innerJoin(suppliers, eq(suppliers.id, purchaseOrders.supplierId))
+        .where(
+          and(
+            eq(purchaseOrders.tenantId, tenantId),
+            eq(purchaseOrders.id, purchaseOrderId),
+          ),
+        )
+        .limit(1);
+      return row ?? null;
+    });
+    if (context) {
+      const { fanoutEvent } = await import("@/lib/notifications/dispatch");
+      void fanoutEvent(tenantId, null, "supplier.payment.recorded", {
+        supplierId: context.supplierId,
+        supplierName: context.supplierName,
+        amountEgp: input.amount,
+        method: input.method ?? "cash",
+        kind: "po",
+        purchaseOrderId,
+        remainingBalanceEgp: Number(context.supplierBalance ?? 0),
+      });
+    }
+  } catch (err) {
+    // Fanout failure must never affect the caller — payment already committed.
+    console.warn("[recordPayment] fanout failed", err);
+  }
+
+  return result;
 }
 
 /**
