@@ -163,7 +163,9 @@ export async function PATCH(req: Request) {
       action: "notification.preference.changed",
       category: "settings",
       entityType: "tenant_notification_override",
-      entityId: eventType,
+      // activity_logs.entity_id is uuid; the event name moves into metadata.
+      entityId: r.ctx.tenantId,
+      entityLabel: eventType,
       metadata: {
         scope: "tenant",
         eventType,
@@ -238,7 +240,8 @@ export async function PATCH(req: Request) {
     action: "notification.preference.changed",
     category: "settings",
     entityType: "notification_preference",
-    entityId: eventType,
+    entityId: r.ctx.userId,
+    entityLabel: eventType,
     metadata: {
       scope: "user",
       eventType,

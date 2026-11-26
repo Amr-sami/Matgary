@@ -413,9 +413,19 @@ export async function voidFinanceExpense(
   id: string,
   opts: { voidedByUserId: string; reason?: string | null },
 ): Promise<{ ok: true } | { ok: false; reason: "NOT_FOUND" | "ALREADY_VOIDED" }> {
-  return withTenant(tenantId, async (tx) => {
+  // Capture the row snapshot for the notification payload inside the tx;
+  // read it back out of the closure after commit.
+  let voidedSnapshot: { title: string; amount: number } | null = null;
+
+  const result = await withTenant(tenantId, async (tx): Promise<
+    { ok: true } | { ok: false; reason: "NOT_FOUND" | "ALREADY_VOIDED" }
+  > => {
     const [existing] = await tx
-      .select({ status: expensesTable.status })
+      .select({
+        status: expensesTable.status,
+        title: expensesTable.title,
+        amount: expensesTable.amount,
+      })
       .from(expensesTable)
       .where(and(eq(expensesTable.tenantId, tenantId), eq(expensesTable.id, id)))
       .limit(1);
@@ -432,8 +442,26 @@ export async function voidFinanceExpense(
       })
       .where(and(eq(expensesTable.tenantId, tenantId), eq(expensesTable.id, id)));
 
+    voidedSnapshot = { title: existing.title, amount: Number(existing.amount) };
     return { ok: true };
   });
+
+  // Post-TX fanout. Swallowed — a notification failure can't un-void the row.
+  if (result.ok && voidedSnapshot) {
+    try {
+      const snap = voidedSnapshot as { title: string; amount: number };
+      const { fanoutEvent } = await import("@/lib/notifications/dispatch");
+      void fanoutEvent(tenantId, null, "expense.voided", {
+        expenseId: id,
+        title: snap.title,
+        amountEgp: snap.amount,
+      });
+    } catch (err) {
+      console.warn("[voidFinanceExpense] fanout failed", err);
+    }
+  }
+
+  return result;
 }
 
 // Satisfy the legacy `expenses.category` CHECK / text constraint. The slug

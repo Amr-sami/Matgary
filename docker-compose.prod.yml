@@ -217,6 +217,12 @@ services:
       # /inventory/<productId>?lowStock=YYYY-MM-DD). Hourly so a mid-day
       # drop-to-threshold doesn't wait until midnight to notify.
       LOW_STOCK_SWEEP_CRON: "0 * * * *"
+      # Attendance late-arrival sweep (migration 0069, N2). Checks each
+      # enabled employee_schedules row against now-in-tenant-tz:
+      # work_day? not on leave? grace expired? fires attendance.late,
+      # one notification per employee per day (dedupe via link embedding
+      # YYYY-MM-DD). Every 5 min so a late detection arrives promptly.
+      ATTENDANCE_LATE_SWEEP_CRON: "*/5 * * * *"
     entrypoint:
       - sh
       - -c
@@ -254,8 +260,9 @@ services:
           echo "$$COLLECTIONS_TICK_CRON /usr/local/bin/poke-cron.sh /api/cron/collections-tick collections-tick >> /var/log/cron.log 2>&1"
           echo "$$REPORTS_TICK_CRON /usr/local/bin/poke-cron.sh /api/cron/reports-tick reports-tick >> /var/log/cron.log 2>&1"
           echo "$$LOW_STOCK_SWEEP_CRON /usr/local/bin/poke-cron.sh /api/cron/low-stock-sweep low-stock-sweep >> /var/log/cron.log 2>&1"
+          echo "$$ATTENDANCE_LATE_SWEEP_CRON /usr/local/bin/poke-cron.sh /api/cron/attendance-late-sweep attendance-late-sweep >> /var/log/cron.log 2>&1"
         } > /etc/crontabs/root
-        echo "[cron] target: $$CRON_TARGET_URL — 10 jobs scheduled"
+        echo "[cron] target: $$CRON_TARGET_URL — 11 jobs scheduled"
         exec tini -- crond -f -d 8
 
   backup:

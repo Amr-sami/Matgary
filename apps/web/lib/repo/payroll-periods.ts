@@ -447,7 +447,7 @@ export async function finalizePayrollPeriod(
       .limit(1);
     const member = memberRows[0];
 
-    return rowToView({
+    const view = rowToView({
       row: savedRow,
       liveSnapshot: snap,
       liveComp: comp,
@@ -457,6 +457,27 @@ export async function finalizePayrollPeriod(
       periodStart: ps,
       periodEnd: pe,
     });
+
+    // Post-TX fanout — payroll.finalized for the owner (default ON per
+    // Notification Center spec §10). Swallowed: notification failure
+    // cannot un-finalize the period.
+    void (async () => {
+      try {
+        const { fanoutEvent } = await import("@/lib/notifications/dispatch");
+        const month = `${ps.getUTCFullYear()}-${String(ps.getUTCMonth() + 1).padStart(2, "0")}`;
+        void fanoutEvent(tenantId, null, "payroll.finalized", {
+          payrollPeriodId: savedRow.id,
+          employeeUserId: employeeId,
+          employeeName: member?.displayName ?? member?.userName ?? "",
+          month,
+          netEgp: Number(snap.netAmount),
+        });
+      } catch (err) {
+        console.warn("[finalizePayrollPeriod] fanout failed", err);
+      }
+    })();
+
+    return view;
   });
 }
 
@@ -498,6 +519,42 @@ export async function voidPayrollPeriod(
       })
       .where(eq(payrollPeriods.id, periodId))
       .returning();
+
+    // Post-TX fanout — payroll.voided for the owner. Swallowed: never
+    // affects the business transaction.
+    void (async () => {
+      try {
+        const { fanoutEvent } = await import("@/lib/notifications/dispatch");
+        const ps = new Date(row.periodStart);
+        const month = `${ps.getUTCFullYear()}-${String(ps.getUTCMonth() + 1).padStart(2, "0")}`;
+        // Resolve employee display name once outside the transaction that
+        // just closed.
+        const [member] = await tx
+          .select({
+            displayName: tenantMembers.displayName,
+            userName: users.name,
+          })
+          .from(tenantMembers)
+          .innerJoin(users, eq(users.id, tenantMembers.userId))
+          .where(
+            and(
+              eq(tenantMembers.tenantId, tenantId),
+              eq(tenantMembers.userId, row.employeeId),
+            ),
+          )
+          .limit(1);
+        void fanoutEvent(tenantId, null, "payroll.voided", {
+          payrollPeriodId: row.id,
+          employeeUserId: row.employeeId,
+          employeeName: member?.displayName ?? member?.userName ?? "",
+          month,
+          reason: reason ?? null,
+        });
+      } catch (err) {
+        console.warn("[voidPayrollPeriod] fanout failed", err);
+      }
+    })();
+
     return row;
   });
 }

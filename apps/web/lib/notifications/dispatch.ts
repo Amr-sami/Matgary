@@ -528,11 +528,16 @@ async function doFanout<E extends NotificationEventType>(
       // delivery for any event this member is already role/permission-eligible
       // for. It does NOT flip email on — email is a separate channel the
       // owner opts into explicitly. Owner always has every permission.
+      // Exception: if a tenant override disables the event AND the member
+      // has no stored preference row, respect the tenant disable — the owner
+      // explicitly turned the event off tenant-wide. A user row still wins.
+      const hasStoredRow = !!storedByUser.get(r.userId);
       const hasAllAlerts =
         r.role === "owner" || (Array.isArray(r.permissions) && r.permissions.includes("receive_all_alerts"));
-      const pref: EventPreference = hasAllAlerts
-        ? { inApp: true, email: basePref.email, digestMode: "instant" }
-        : basePref;
+      const pref: EventPreference =
+        hasAllAlerts && !(tenantDisabled && !hasStoredRow)
+          ? { inApp: true, email: basePref.email, digestMode: "instant" }
+          : basePref;
       const locale = (r.locale === "en" ? "en" : "ar") as "ar" | "en";
 
       if (pref.inApp) {

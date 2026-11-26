@@ -3,9 +3,11 @@
 // Covers Phase N1:
 //   • 3-level resolver (user → tenant override → system default)
 //   • new producers (supplier.payment.recorded in both payment paths)
-//   • report-settings persistence
 //   • tenant isolation across all three new tables
 //   • audit-log side effect
+//
+// Every tenant-scoped read/write goes through withTenant so RLS is honoured;
+// direct `db.*` on tenant-scoped tables returns zero rows even when they exist.
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { and, eq, sql } from "drizzle-orm";
@@ -13,6 +15,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db, withTenant } from "@/lib/db";
 import {
   activityLogs,
+  employeeSchedules,
   notificationPreferences,
   notifications,
   purchaseOrders,
@@ -23,6 +26,7 @@ import {
 import { fanoutEvent } from "@/lib/notifications/dispatch";
 import { recordPayment } from "@/lib/repo/purchase-payments";
 import { recordSupplierAccountPayment } from "@/lib/repo/supplier-account-payment";
+import { insertActivityRow } from "@/lib/repo/activity";
 import {
   seedPayrollTenant,
   type PayrollTenantSeed,
@@ -69,6 +73,18 @@ async function insertReceivedPO(
   });
 }
 
+/** Count notification rows for a tenant+user inside withTenant so RLS doesn't
+ *  hide the rows the dispatcher just inserted. */
+async function countNotifications(tenantId: string, userId: string): Promise<number> {
+  const [row] = await withTenant(tenantId, (tx) =>
+    tx
+      .select({ c: sql<number>`count(*)::int` })
+      .from(notifications)
+      .where(and(eq(notifications.tenantId, tenantId), eq(notifications.userId, userId))),
+  );
+  return Number(row?.c ?? 0);
+}
+
 let A: PayrollTenantSeed;
 let B: PayrollTenantSeed;
 
@@ -84,31 +100,32 @@ afterAll(async () => {
 
 describe("tenant_report_settings — isolation + defaults", () => {
   it("inserting a row in A doesn't surface in B", async () => {
-    await db.insert(tenantReportSettings).values({
-      tenantId: A.tenantId,
-      dailyEnabled: false,
-      dailyHour: 7,
-    });
-    const [a] = await db
-      .select()
-      .from(tenantReportSettings)
-      .where(eq(tenantReportSettings.tenantId, A.tenantId));
-    const [b] = await db
-      .select()
-      .from(tenantReportSettings)
-      .where(eq(tenantReportSettings.tenantId, B.tenantId));
+    await withTenant(A.tenantId, (tx) =>
+      tx.insert(tenantReportSettings).values({
+        tenantId: A.tenantId,
+        dailyEnabled: false,
+        dailyHour: 7,
+      }),
+    );
+    const [a] = await withTenant(A.tenantId, (tx) =>
+      tx.select().from(tenantReportSettings).where(eq(tenantReportSettings.tenantId, A.tenantId)),
+    );
+    const [b] = await withTenant(B.tenantId, (tx) =>
+      tx.select().from(tenantReportSettings).where(eq(tenantReportSettings.tenantId, B.tenantId)),
+    );
     expect(a?.dailyEnabled).toBe(false);
     expect(a?.dailyHour).toBe(7);
     expect(b).toBeUndefined();
   });
 
-  it("row is deleted when tenant is deleted (cascade)", async () => {
-    // Can't actually delete the test tenant mid-suite; just sanity check FK.
-    const [row] = await db
-      .select({ tenantId: tenantReportSettings.tenantId })
-      .from(tenantReportSettings)
-      .where(eq(tenantReportSettings.tenantId, A.tenantId))
-      .limit(1);
+  it("row persists for A after insert", async () => {
+    const [row] = await withTenant(A.tenantId, (tx) =>
+      tx
+        .select({ tenantId: tenantReportSettings.tenantId })
+        .from(tenantReportSettings)
+        .where(eq(tenantReportSettings.tenantId, A.tenantId))
+        .limit(1),
+    );
     expect(row?.tenantId).toBe(A.tenantId);
   });
 });
@@ -116,19 +133,37 @@ describe("tenant_report_settings — isolation + defaults", () => {
 describe("tenant_notification_overrides — 3-level resolver", () => {
   const EVENT = "inventory.low_stock" as const;
 
-  it("with no user pref + no tenant override → system default applies (owner gets in-app)", async () => {
-    // Clean slate
-    await db
-      .delete(tenantNotificationOverrides)
-      .where(
-        and(
-          eq(tenantNotificationOverrides.tenantId, A.tenantId),
-          eq(tenantNotificationOverrides.eventType, EVENT),
+  async function cleanBoth(): Promise<void> {
+    await withTenant(A.tenantId, (tx) =>
+      tx
+        .delete(tenantNotificationOverrides)
+        .where(
+          and(
+            eq(tenantNotificationOverrides.tenantId, A.tenantId),
+            eq(tenantNotificationOverrides.eventType, EVENT),
+          ),
         ),
-      );
-    await db
-      .delete(notifications)
-      .where(and(eq(notifications.tenantId, A.tenantId), eq(notifications.userId, A.ownerId)));
+    );
+    await withTenant(A.tenantId, (tx) =>
+      tx
+        .delete(notificationPreferences)
+        .where(
+          and(
+            eq(notificationPreferences.tenantId, A.tenantId),
+            eq(notificationPreferences.userId, A.ownerId),
+            eq(notificationPreferences.eventType, EVENT),
+          ),
+        ),
+    );
+    await withTenant(A.tenantId, (tx) =>
+      tx
+        .delete(notifications)
+        .where(and(eq(notifications.tenantId, A.tenantId), eq(notifications.userId, A.ownerId))),
+    );
+  }
+
+  it("with no user pref + no tenant override → system default applies (owner gets in-app)", async () => {
+    await cleanBoth();
 
     await fanoutEvent(A.tenantId, null, EVENT, {
       productId: "test-product-id",
@@ -137,25 +172,19 @@ describe("tenant_notification_overrides — 3-level resolver", () => {
       threshold: 5,
     });
 
-    const rows = await db
-      .select({ c: sql<number>`count(*)::int` })
-      .from(notifications)
-      .where(and(eq(notifications.tenantId, A.tenantId), eq(notifications.userId, A.ownerId)));
-    expect(Number(rows[0]?.c ?? 0)).toBeGreaterThan(0);
+    expect(await countNotifications(A.tenantId, A.ownerId)).toBeGreaterThan(0);
   });
 
   it("with tenant override enabled=false → no in-app row created", async () => {
-    // Insert override
-    await db.insert(tenantNotificationOverrides).values({
-      tenantId: A.tenantId,
-      eventType: EVENT,
-      enabled: false,
-      updatedByUserId: A.ownerId,
-    });
-    // Clean notifications for the owner
-    await db
-      .delete(notifications)
-      .where(and(eq(notifications.tenantId, A.tenantId), eq(notifications.userId, A.ownerId)));
+    await cleanBoth();
+    await withTenant(A.tenantId, (tx) =>
+      tx.insert(tenantNotificationOverrides).values({
+        tenantId: A.tenantId,
+        eventType: EVENT,
+        enabled: false,
+        updatedByUserId: A.ownerId,
+      }),
+    );
 
     await fanoutEvent(A.tenantId, null, EVENT, {
       productId: "test-product-id",
@@ -164,45 +193,30 @@ describe("tenant_notification_overrides — 3-level resolver", () => {
       threshold: 5,
     });
 
-    const rows = await db
-      .select({ c: sql<number>`count(*)::int` })
-      .from(notifications)
-      .where(and(eq(notifications.tenantId, A.tenantId), eq(notifications.userId, A.ownerId)));
-    expect(Number(rows[0]?.c ?? 0)).toBe(0);
-
-    // Cleanup
-    await db
-      .delete(tenantNotificationOverrides)
-      .where(
-        and(
-          eq(tenantNotificationOverrides.tenantId, A.tenantId),
-          eq(tenantNotificationOverrides.eventType, EVENT),
-        ),
-      );
+    expect(await countNotifications(A.tenantId, A.ownerId)).toBe(0);
   });
 
   it("tenant override enabled=false BUT user pref inApp=true → user wins (gets the row)", async () => {
-    // Set tenant override off
-    await db.insert(tenantNotificationOverrides).values({
-      tenantId: A.tenantId,
-      eventType: EVENT,
-      enabled: false,
-      updatedByUserId: A.ownerId,
-    });
-    // Set user preference explicitly ON
-    await db.insert(notificationPreferences).values({
-      tenantId: A.tenantId,
-      userId: A.ownerId,
-      eventType: EVENT,
-      inApp: true,
-      push: true,
-      email: false,
-      digestMode: "instant",
-    });
-    // Clean
-    await db
-      .delete(notifications)
-      .where(and(eq(notifications.tenantId, A.tenantId), eq(notifications.userId, A.ownerId)));
+    await cleanBoth();
+    await withTenant(A.tenantId, (tx) =>
+      tx.insert(tenantNotificationOverrides).values({
+        tenantId: A.tenantId,
+        eventType: EVENT,
+        enabled: false,
+        updatedByUserId: A.ownerId,
+      }),
+    );
+    await withTenant(A.tenantId, (tx) =>
+      tx.insert(notificationPreferences).values({
+        tenantId: A.tenantId,
+        userId: A.ownerId,
+        eventType: EVENT,
+        inApp: true,
+        push: true,
+        email: false,
+        digestMode: "instant",
+      }),
+    );
 
     await fanoutEvent(A.tenantId, null, EVENT, {
       productId: "test-product-id-3",
@@ -211,30 +225,7 @@ describe("tenant_notification_overrides — 3-level resolver", () => {
       threshold: 5,
     });
 
-    const rows = await db
-      .select({ c: sql<number>`count(*)::int` })
-      .from(notifications)
-      .where(and(eq(notifications.tenantId, A.tenantId), eq(notifications.userId, A.ownerId)));
-    expect(Number(rows[0]?.c ?? 0)).toBeGreaterThan(0);
-
-    // Cleanup
-    await db
-      .delete(notificationPreferences)
-      .where(
-        and(
-          eq(notificationPreferences.tenantId, A.tenantId),
-          eq(notificationPreferences.userId, A.ownerId),
-          eq(notificationPreferences.eventType, EVENT),
-        ),
-      );
-    await db
-      .delete(tenantNotificationOverrides)
-      .where(
-        and(
-          eq(tenantNotificationOverrides.tenantId, A.tenantId),
-          eq(tenantNotificationOverrides.eventType, EVENT),
-        ),
-      );
+    expect(await countNotifications(A.tenantId, A.ownerId)).toBeGreaterThan(0);
   });
 });
 
@@ -249,22 +240,25 @@ describe("supplier.payment.recorded producer — both payment paths", () => {
         .where(and(eq(suppliers.tenantId, A.tenantId), eq(suppliers.id, supplierId))),
     );
 
-    await db
-      .delete(notifications)
-      .where(and(eq(notifications.tenantId, A.tenantId), eq(notifications.userId, A.ownerId)));
+    await withTenant(A.tenantId, (tx) =>
+      tx
+        .delete(notifications)
+        .where(and(eq(notifications.tenantId, A.tenantId), eq(notifications.userId, A.ownerId))),
+    );
 
     await recordPayment(A.tenantId, poId, { amount: 500, method: "cash" });
+    // Producer is void-fired post-TX — give the microtask + fanout ~200ms.
+    await new Promise((resolve) => setTimeout(resolve, 250));
 
-    // The producer is void-fanned-out, so give the microtask queue a tick.
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    const [row] = await db
-      .select({ title: notifications.title })
-      .from(notifications)
-      .where(and(eq(notifications.tenantId, A.tenantId), eq(notifications.userId, A.ownerId)))
-      .orderBy(sql`${notifications.createdAt} desc`)
-      .limit(1);
-    expect(row?.title).toMatch(/حسين/);
+    const [row] = await withTenant(A.tenantId, (tx) =>
+      tx
+        .select({ title: notifications.title })
+        .from(notifications)
+        .where(and(eq(notifications.tenantId, A.tenantId), eq(notifications.userId, A.ownerId)))
+        .orderBy(sql`${notifications.createdAt} desc`)
+        .limit(1),
+    );
+    expect(row?.title ?? "").toMatch(/حسين/);
   });
 
   it("account-level recordSupplierAccountPayment fires supplier.payment.recorded after commit", async () => {
@@ -277,25 +271,28 @@ describe("supplier.payment.recorded producer — both payment paths", () => {
         .where(and(eq(suppliers.tenantId, A.tenantId), eq(suppliers.id, supplierId))),
     );
 
-    await db
-      .delete(notifications)
-      .where(and(eq(notifications.tenantId, A.tenantId), eq(notifications.userId, A.ownerId)));
+    await withTenant(A.tenantId, (tx) =>
+      tx
+        .delete(notifications)
+        .where(and(eq(notifications.tenantId, A.tenantId), eq(notifications.userId, A.ownerId))),
+    );
 
     await recordSupplierAccountPayment(A.tenantId, supplierId, {
       amount: 2500,
       method: "cash",
       createdByUserId: A.ownerId,
     });
+    await new Promise((resolve) => setTimeout(resolve, 250));
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    const [row] = await db
-      .select({ title: notifications.title })
-      .from(notifications)
-      .where(and(eq(notifications.tenantId, A.tenantId), eq(notifications.userId, A.ownerId)))
-      .orderBy(sql`${notifications.createdAt} desc`)
-      .limit(1);
-    expect(row?.title).toMatch(/محمود/);
+    const [row] = await withTenant(A.tenantId, (tx) =>
+      tx
+        .select({ title: notifications.title })
+        .from(notifications)
+        .where(and(eq(notifications.tenantId, A.tenantId), eq(notifications.userId, A.ownerId)))
+        .orderBy(sql`${notifications.createdAt} desc`)
+        .limit(1),
+    );
+    expect(row?.title ?? "").toMatch(/محمود/);
   });
 
   it("cross-tenant: A's payment doesn't produce a notification in B", async () => {
@@ -308,82 +305,80 @@ describe("supplier.payment.recorded producer — both payment paths", () => {
         .where(and(eq(suppliers.tenantId, A.tenantId), eq(suppliers.id, supplierId))),
     );
 
-    const beforeB = await db
-      .select({ c: sql<number>`count(*)::int` })
-      .from(notifications)
-      .where(eq(notifications.tenantId, B.tenantId));
+    const beforeB = await countNotifications(B.tenantId, B.ownerId);
 
     await recordSupplierAccountPayment(A.tenantId, supplierId, {
       amount: 100,
       method: "cash",
       createdByUserId: A.ownerId,
     });
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 250));
 
-    const afterB = await db
-      .select({ c: sql<number>`count(*)::int` })
-      .from(notifications)
-      .where(eq(notifications.tenantId, B.tenantId));
-
-    expect(Number(afterB[0]?.c ?? 0)).toBe(Number(beforeB[0]?.c ?? 0));
+    const afterB = await countNotifications(B.tenantId, B.ownerId);
+    expect(afterB).toBe(beforeB);
   });
 });
 
 describe("Notification Center schema — accepts expected values", () => {
   it("employee_schedules: upsert round-trip", async () => {
-    // Just insert + read to prove the schema is reachable + bitmask default.
-    // Real schedule CRUD + late-sweep ride in N2.
-    const { employeeSchedules } = await import("@/lib/db/schema");
-    await db.insert(employeeSchedules).values({
-      tenantId: A.tenantId,
-      userId: A.ownerId,
-      shiftStart: "09:00:00",
-      shiftEnd: "17:00:00",
-      // work_days default = 125 (Fri off, Sat–Thu on)
-    });
-    const [row] = await db
-      .select()
-      .from(employeeSchedules)
-      .where(eq(employeeSchedules.tenantId, A.tenantId))
-      .limit(1);
+    await withTenant(A.tenantId, (tx) =>
+      tx.insert(employeeSchedules).values({
+        tenantId: A.tenantId,
+        userId: A.ownerId,
+        shiftStart: "09:00:00",
+        shiftEnd: "17:00:00",
+      }),
+    );
+    const [row] = await withTenant(A.tenantId, (tx) =>
+      tx
+        .select()
+        .from(employeeSchedules)
+        .where(eq(employeeSchedules.tenantId, A.tenantId))
+        .limit(1),
+    );
     expect(row?.workDays).toBe(125);
     expect(row?.graceMinutes).toBe(-1);
     expect(row?.enabled).toBe(true);
-    // Cleanup so the next suite run can insert again.
-    await db
-      .delete(employeeSchedules)
-      .where(
-        and(
-          eq(employeeSchedules.tenantId, A.tenantId),
-          eq(employeeSchedules.userId, A.ownerId),
+    await withTenant(A.tenantId, (tx) =>
+      tx
+        .delete(employeeSchedules)
+        .where(
+          and(
+            eq(employeeSchedules.tenantId, A.tenantId),
+            eq(employeeSchedules.userId, A.ownerId),
+          ),
         ),
-      );
+    );
   });
 });
 
 describe("activity_logs — preference changes auditable", () => {
-  it("writing an activity row via logActivity for a preference change works", async () => {
-    const { logActivity } = await import("@/lib/repo/activity");
-    await logActivity({
+  it("insertActivityRow persists a preference change", async () => {
+    // insertActivityRow is the synchronous path (logActivity enqueues).
+    await insertActivityRow({
       tenantId: A.tenantId,
       actorUserId: A.ownerId,
       action: "notification.preference.changed",
       category: "settings",
-      entityType: "test_entity",
-      entityId: "test-event",
-      metadata: { scope: "tenant", eventType: "test", before: null, after: { enabled: false } },
+      entityType: "tenant_notification_override",
+      // entity_id is uuid — use tenant id as the stable handle; event type
+      // moves into metadata.
+      entityId: A.tenantId,
+      metadata: { scope: "tenant", eventType: "inventory.low_stock", before: null, after: { enabled: false } },
     });
-    const [row] = await db
-      .select({ action: activityLogs.action })
-      .from(activityLogs)
-      .where(
-        and(
-          eq(activityLogs.tenantId, A.tenantId),
-          eq(activityLogs.action, "notification.preference.changed"),
-        ),
-      )
-      .orderBy(sql`${activityLogs.createdAt} desc`)
-      .limit(1);
+    const [row] = await withTenant(A.tenantId, (tx) =>
+      tx
+        .select({ action: activityLogs.action })
+        .from(activityLogs)
+        .where(
+          and(
+            eq(activityLogs.tenantId, A.tenantId),
+            eq(activityLogs.action, "notification.preference.changed"),
+          ),
+        )
+        .orderBy(sql`${activityLogs.createdAt} desc`)
+        .limit(1),
+    );
     expect(row?.action).toBe("notification.preference.changed");
   });
 });

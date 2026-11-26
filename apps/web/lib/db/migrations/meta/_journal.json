@@ -484,6 +484,13 @@
       "when": 1795700000000,
       "tag": "0068_payroll_v1",
       "breakpoints": false
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1795800000000,
+      "tag": "0069_notification_center",
+      "breakpoints": false
     }
   ]
 }
