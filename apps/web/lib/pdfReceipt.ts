@@ -1,0 +1,345 @@
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+// @ts-ignore — fontkit ships without types
+import fontkit from "@pdf-lib/fontkit";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { receiptPaymentRows, type ReceiptPayment } from "@matgary/domain/receipt/payment";
+
+export interface PdfInvoiceLine {
+  productName: string;
+  brand?: string;
+  quantity: number;
+  pricePerUnit: number;
+  subtotal: number;
+  lineDiscountAmount: number;
+}
+
+export interface PdfInvoiceData {
+  invoiceId: string;
+  saleDate: string; // ISO
+  customerName?: string;
+  customerPhone?: string;
+  lines: PdfInvoiceLine[];
+  cartSubtotal: number;
+  orderDiscountAmount: number;
+  totalPrice: number;
+  note?: string;
+  shopName: string;
+  shopPhone: string;
+  /** Doc 15 spec 13 §4.15: method + masked account, printed in English
+   *  (the mono font has no Arabic glyphs; masks are ASCII). The send-pdf
+   *  routes pass the body through as z.unknown(), so the helper's filtering
+   *  is the validation. Never a confirmation status. */
+  payment?: ReceiptPayment | null;
+  /** Receipt identity (0065). Each field is optional; a blank value means
+   *  the row is omitted entirely rather than printed as a placeholder. */
+  shopAddress?: string;
+  slogan?: string;
+  taxRegistration?: string;
+  taxCardNumber?: string;
+  returnPolicy?: string;
+  /** Short uppercase prefix stamped before the invoice short code in the
+   *  footer reference (e.g. "INV" → "#INV-A1B2C3D4"). */
+  referencePrefix?: string;
+  /** Visibility toggles (0066). Undefined / omitted → treated as true, so
+   *  pre-migration clients still print the text they send. Tax reg and tax
+   *  card share a single toggle (showTaxInfo). */
+  showAddress?: boolean;
+  showSlogan?: boolean;
+  showTaxInfo?: boolean;
+  showReturnPolicy?: boolean;
+  /** Per-row alignment overrides (0067). Missing key → center. */
+  blockAlignments?: Record<string, "left" | "center" | "right">;
+}
+
+const PT_PER_MM = 2.83465;
+const WIDTH_MM = 80;
+const PAD_MM = 4;
+
+const PAGE_W = WIDTH_MM * PT_PER_MM;
+const PAD = PAD_MM * PT_PER_MM;
+const CONTENT_W = PAGE_W - PAD * 2;
+
+function fmtMoney(n: number): string {
+  return `${n.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} EGP`;
+}
+
+function fmtDate(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours() % 12 || 12)}:${pad(d.getMinutes())} ${d.getHours() >= 12 ? "PM" : "AM"}`;
+}
+
+let cachedFontBytes: Uint8Array | null = null;
+async function loadCairoFont(): Promise<Uint8Array> {
+  if (cachedFontBytes) return cachedFontBytes;
+  const p = path.join(process.cwd(), "public", "fonts", "Cairo.ttf");
+  const buf = await readFile(p);
+  cachedFontBytes = new Uint8Array(buf);
+  return cachedFontBytes;
+}
+
+let cachedLogoBytes: Uint8Array | null = null;
+async function loadLogo(): Promise<Uint8Array | null> {
+  if (cachedLogoBytes) return cachedLogoBytes;
+  try {
+    const p = path.join(process.cwd(), "public", "logo.png");
+    const buf = await readFile(p);
+    cachedLogoBytes = new Uint8Array(buf);
+    return cachedLogoBytes;
+  } catch {
+    return null;
+  }
+}
+
+export async function generateReceiptPdf(data: PdfInvoiceData): Promise<Uint8Array> {
+  const pdf = await PDFDocument.create();
+  pdf.registerFontkit(fontkit);
+
+  const cairoBytes = await loadCairoFont();
+  const arabicFont = await pdf.embedFont(cairoBytes, { subset: true });
+  const monoFont = await pdf.embedFont(StandardFonts.Courier);
+  const monoBoldFont = await pdf.embedFont(StandardFonts.CourierBold);
+
+  // Two-pass approach: first measure required height
+  let estHeight = PAD; // top
+  estHeight += 60; // logo space
+  estHeight += 14 * 4; // header lines
+  estHeight += 8;
+  estHeight += 2; // divider
+  estHeight += 22; // RECEIPT title
+  estHeight += 14; // date
+  estHeight += 8;
+  estHeight += 2;
+  for (const line of data.lines) {
+    estHeight += 14;
+    if (line.brand) estHeight += 12;
+    if (line.quantity > 1) estHeight += 12;
+    if (line.lineDiscountAmount > 0) estHeight += 12;
+  }
+  estHeight += 8;
+  estHeight += 2;
+  estHeight += 14 * 3;
+  estHeight += 2;
+  estHeight += 22; // total
+  const paymentRows = receiptPaymentRows(data.payment, "en");
+  estHeight += 13 * paymentRows.length; // payment method rows (size 9 + 4)
+  estHeight += 2;
+  estHeight += 14 * 2;
+  if (data.customerName || data.customerPhone) estHeight += 14 * 2;
+  // Identity rows: each present adds one wrapped line of ~12pt. Toggles honored
+  // so a hidden row is not reserved for in the height estimate.
+  if (data.showAddress !== false && data.shopAddress)
+    estHeight += 14 + 12 * Math.ceil(data.shopAddress.length / 50);
+  if (data.showSlogan !== false && data.slogan) estHeight += 14;
+  if (data.showTaxInfo !== false && data.taxRegistration) estHeight += 12;
+  if (data.showTaxInfo !== false && data.taxCardNumber) estHeight += 12;
+  if (data.showReturnPolicy !== false && data.returnPolicy)
+    estHeight += 14 + 12 * Math.ceil(data.returnPolicy.length / 50);
+  estHeight += PAD;
+
+  const pageHeight = Math.max(estHeight, 200);
+  const page = pdf.addPage([PAGE_W, pageHeight]);
+
+  let y = pageHeight - PAD;
+
+  // Logo
+  const logoBytes = await loadLogo();
+  if (logoBytes) {
+    try {
+      const logo = await pdf.embedPng(logoBytes);
+      const targetW = 28 * PT_PER_MM;
+      const aspect = logo.width / logo.height;
+      const targetH = targetW / aspect;
+      page.drawImage(logo, {
+        x: (PAGE_W - targetW) / 2,
+        y: y - targetH,
+        width: targetW,
+        height: targetH,
+      });
+      y -= targetH + 4;
+    } catch {
+      // Skip logo if embedding fails
+    }
+  }
+
+  // Per-row alignment overrides (0067). Missing key → center (default). The
+  // PDF page is mono-directional (LTR); "right" sits the row at PAGE_W - PAD,
+  // "left" at PAD — physical alignment, same semantics as the HTML renderer.
+  const aligns = data.blockAlignments ?? {};
+  const alignFor = (key: string): "left" | "center" | "right" => {
+    const v = aligns[key];
+    return v === "left" || v === "right" ? v : "center";
+  };
+
+  const drawAlignedMono = (
+    text: string,
+    size: number,
+    key: string,
+    font = monoFont,
+  ) => {
+    const w = font.widthOfTextAtSize(text, size);
+    const a = alignFor(key);
+    const x = a === "center" ? (PAGE_W - w) / 2 : a === "left" ? PAD : PAGE_W - PAD - w;
+    page.drawText(text, { x, y: y - size, size, font });
+    y -= size + 2;
+  };
+
+  const drawAlignedArabic = (text: string, size: number, key: string) => {
+    const w = arabicFont.widthOfTextAtSize(text, size);
+    const a = alignFor(key);
+    const x = a === "center" ? (PAGE_W - w) / 2 : a === "left" ? PAD : PAGE_W - PAD - w;
+    page.drawText(text, { x, y: y - size, size, font: arabicFont });
+    y -= size + 2;
+  };
+
+  const drawCenteredMono = (text: string, size: number, font = monoFont) => {
+    const w = font.widthOfTextAtSize(text, size);
+    page.drawText(text, {
+      x: (PAGE_W - w) / 2,
+      y: y - size,
+      size,
+      font,
+    });
+    y -= size + 2;
+  };
+
+  const drawCenteredArabic = (text: string, size: number) => {
+    const w = arabicFont.widthOfTextAtSize(text, size);
+    page.drawText(text, {
+      x: (PAGE_W - w) / 2,
+      y: y - size,
+      size,
+      font: arabicFont,
+    });
+    y -= size + 2;
+  };
+
+  const drawDivider = () => {
+    y -= 4;
+    page.drawLine({
+      start: { x: PAD, y },
+      end: { x: PAGE_W - PAD, y },
+      thickness: 0.7,
+      color: rgb(0, 0, 0),
+    });
+    y -= 4;
+  };
+
+  const drawRowMono = (left: string, right: string, size = 9, bold = false) => {
+    const f = bold ? monoBoldFont : monoFont;
+    page.drawText(left, { x: PAD, y: y - size, size, font: f });
+    const rw = f.widthOfTextAtSize(right, size);
+    page.drawText(right, {
+      x: PAGE_W - PAD - rw,
+      y: y - size,
+      size,
+      font: f,
+    });
+    y -= size + 4;
+  };
+
+  drawAlignedMono(`*** ${data.shopName.toUpperCase()} ***`, 11, "name", monoBoldFont);
+  if (data.shopPhone) drawAlignedMono(`TEL: ${data.shopPhone}`, 8, "phone");
+  // Address, slogan, tax info — each printed ONLY when the tenant filled it
+  // in AND its visibility toggle is on. `!== false` keeps the default (true)
+  // behavior for pre-migration clients that don't pass the flag.
+  const showAddr = data.showAddress !== false;
+  const showSlog = data.showSlogan !== false;
+  const showTax = data.showTaxInfo !== false;
+  if (showAddr && data.shopAddress) {
+    for (const row of data.shopAddress.split(/\r?\n/)) {
+      if (row.trim()) drawAlignedArabic(row.trim(), 9, "address");
+    }
+  }
+  if (showSlog && data.slogan) drawAlignedArabic(data.slogan, 9, "slogan");
+  if (showTax && data.taxRegistration)
+    drawAlignedMono(`TAX REG: ${data.taxRegistration}`, 8, "taxReg");
+  if (showTax && data.taxCardNumber)
+    drawAlignedMono(`TAX CARD: ${data.taxCardNumber}`, 8, "taxCard");
+
+  drawDivider();
+
+  drawCenteredMono("*** RECEIPT ***", 14, monoBoldFont);
+  drawCenteredMono(fmtDate(data.saleDate), 8);
+
+  if (data.customerName || data.customerPhone) {
+    if (data.customerName) drawCenteredArabic(`العميل: ${data.customerName}`, 9);
+    if (data.customerPhone) drawCenteredMono(`TEL: ${data.customerPhone}`, 8);
+  }
+
+  drawDivider();
+
+  // Items
+  for (const line of data.lines) {
+    drawRowMono(
+      line.productName.slice(0, 24),
+      fmtMoney(line.subtotal),
+      9,
+      true
+    );
+    if (line.brand) {
+      page.drawText(`  BRAND: ${line.brand}`, {
+        x: PAD,
+        y: y - 8,
+        size: 8,
+        font: monoFont,
+      });
+      y -= 12;
+    }
+    if (line.quantity > 1) {
+      page.drawText(
+        `  x${line.quantity} @ ${fmtMoney(line.pricePerUnit)}`,
+        { x: PAD, y: y - 8, size: 8, font: monoFont }
+      );
+      y -= 12;
+    }
+    if (line.lineDiscountAmount > 0) {
+      page.drawText(
+        `  DISC. (- ${fmtMoney(line.lineDiscountAmount)})`,
+        { x: PAD, y: y - 8, size: 8, font: monoFont }
+      );
+      y -= 12;
+    }
+  }
+
+  drawDivider();
+
+  drawRowMono("SUBTOTAL", fmtMoney(data.cartSubtotal));
+  if (data.orderDiscountAmount > 0) {
+    drawRowMono("DISCOUNT", `- ${fmtMoney(data.orderDiscountAmount)}`);
+  }
+
+  drawDivider();
+
+  drawRowMono("TOTAL AMOUNT", fmtMoney(data.totalPrice), 11, true);
+  for (const r of paymentRows) drawRowMono(r.label, r.value);
+
+  drawDivider();
+
+  drawCenteredMono("THANK YOU FOR SHOPPING!", 9, monoBoldFont);
+  drawCenteredArabic("شكراً لتسوقكم معنا ❤", 9);
+
+  const showPol = data.showReturnPolicy !== false;
+  if (showPol && data.returnPolicy) {
+    drawDivider();
+    for (const row of data.returnPolicy.split(/\r?\n/)) {
+      if (row.trim()) drawAlignedArabic(row.trim(), 8, "returnPolicy");
+    }
+  }
+
+  drawDivider();
+
+  const prefix = (data.referencePrefix || "").trim().toUpperCase();
+  const shortCode = data.invoiceId.slice(-10).toUpperCase();
+  drawCenteredMono(
+    prefix ? `#${prefix}-${shortCode}` : `#${shortCode}`,
+    8,
+    monoBoldFont,
+  );
+
+  return pdf.save();
+}

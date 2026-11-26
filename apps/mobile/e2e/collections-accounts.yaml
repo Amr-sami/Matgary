@@ -1,0 +1,467 @@
+# Collections — receiving accounts through Settings (doc 15 spec 15 §4.5.4;
+# spec 09 §7 "hub → add InstaPay → add wallet → edit → archive"; 13 §7 b).
+#
+# Setup by API only turns the branch on and ensures the two fixture accounts
+# (so the hub lists rows and the "add" sheet — not the empty-state buttons —
+# carries the add ids). Every account below is created, edited and archived
+# through 09's screens:
+#   1. Settings → Collections tile → the hub;
+#   2. add InstaPay (QNB): a look-alike link (ipn.eg.evil.com) is refused on
+#      the form and nothing reaches the server; then the whole InstaPay share
+#      text is pasted, the handle is derived from its link, + last 4 → saved;
+#   3. add a wallet (e& money) with a run-unique number → saved;
+#   4. rename the QNB account → saved under the new label;
+#   5. archive both (the RN Alert's button, by its dictionary text) → gone from
+#      the hub and from the API;
+#   6. Settings → Notifications lists the five collection.* events (13 §7 b).
+#
+# Labels carry this run's stamp, so rows are found through the API by label
+# (`accountByLabel` → the row id), never by position. A run that fails
+# half-way leaves "E2E QNB|EM <stamp>" active; the next setup archives it.
+# Alert buttons have no testID: they are tapped by their text, case-folded
+# with (?i) (some Android themes upper-case dialog buttons). Ends on Settings
+# → Notifications.
+appId: com.thestoro.app
+---
+# 1. Setup, launch, login guard.
+- runScript:
+    file: helpers/collections-api.js
+    env:
+      MODE: setup
+- launchApp
+- runFlow: helpers/dev-launcher.yaml
+- extendedWaitUntil:
+    visible:
+      text: "المزيد|More|تسجيل الدخول|Sign in"
+    timeout: 45000
+- runFlow:
+    when:
+      visible:
+        id: "login-identifier"
+    file: login.yaml
+
+# 2. More → Settings → the Collections tile → the hub.
+- runFlow: helpers/dismiss-logbox.yaml
+- tapOn:
+    text: "المزيد|More"
+    retryTapIfNoChange: true
+- scrollUntilVisible:
+    element:
+      text: "الإعدادات|Settings"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    text: "الإعدادات|Settings"
+- scrollUntilVisible:
+    element:
+      id: "settings-tile-collections"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: "settings-tile-collections"
+- extendedWaitUntil:
+    visible:
+      id: "collections-settings-enabled"
+    timeout: 30000
+
+# 3. Add InstaPay: QNB, a run-unique label, and a look-alike link first.
+- scrollUntilVisible:
+    element:
+      id: "collection-accounts-add"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: "collection-accounts-add"
+- extendedWaitUntil:
+    visible:
+      id: "collection-accounts-add-instapay"
+    timeout: 10000
+- tapOn:
+    id: "collection-accounts-add-instapay"
+- extendedWaitUntil:
+    visible:
+      id: "collection-account-form-provider"
+    timeout: 20000
+- tapOn:
+    id: "collection-account-form-provider"
+- extendedWaitUntil:
+    visible:
+      id: "collection-account-form-provider-qnb"
+    timeout: 10000
+- tapOn:
+    id: "collection-account-form-provider-qnb"
+- tapOn:
+    id: "collection-account-form-label"
+- inputText: "E2E QNB ${output.stamp}"
+# iOS: keys down before the next field is looked for — Maestro counts a
+# field under the keyboard as visible. And the next field is reached with
+# swipe-to, not scrollUntilVisible + centerElement: the centring swipe
+# overshot and parked the link field at y 76–177, BEHIND the fixed header
+# (back link + title, to ≈ y 170) — still "visible" to Maestro, so the tap
+# hit the header and the URL went into the label or nowhere (T1 iOS I1
+# reruns 1 and 3). The same for last 4 and the wallet number below.
+- runFlow:
+    file: helpers/keyboard-down-ios.yaml
+    env:
+      ID: "collection-account-form-label"
+- runFlow:
+    file: helpers/swipe-to.yaml
+    env:
+      ID: "collection-account-form-ipa_link"
+- tapOn:
+    id: "collection-account-form-ipa_link"
+- inputText: "https://ipn.eg.evil.com/S/a/instapay/b"
+- runFlow:
+    file: helpers/keyboard-down-ios.yaml
+    env:
+      ID: "collection-account-form-ipa_link"
+- runFlow:
+    file: helpers/swipe-to.yaml
+    env:
+      ID: "collection-account-save"
+- tapOn:
+    id: "collection-account-save"
+
+# 4. Still on the form (the link's error is under the field), nothing created.
+#    Save is the last row, so it sits at the bottom edge when tapped; the
+#    refusal adds the notice at the TOP of the scroll content, which pushes
+#    Save below the fold — asserting Save visible here tested the scroll
+#    offset, not the screen. The field error found below proves the form.
+- scrollUntilVisible:
+    element:
+      id: "collection-account-form-ipa_link-error"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- runScript:
+    file: helpers/collections-api.js
+    env:
+      MODE: expect
+      CHECK: noAccount
+      LABEL: "E2E QNB ${output.stamp}"
+
+# 5. Fix it: paste the whole InstaPay share text; the form derives the handle
+#    from its link (06 ipaLinkFromShareText). Add the last 4, save.
+# Tap the box's empty bottom-end corner, not its centre: the link is one LTR
+# line at the top of this multi-line field, so a centre tap parks the caret
+# INSIDE the URL and eraseText (backspace) then left its tail behind
+# ("…Qn8Zx2S/a/instapay/b", T1 rerun 2). Below the text, the caret goes to
+# the end of the line.
+- tapOn:
+    id: "collection-account-form-ipa_link"
+    point: "95%,85%"
+- eraseText: 120
+- eraseText: 120
+- inputText: "Click the link to send money to e2eqnb@instapay https://ipn.eg/S/e2eqnb/instapay/Qn8Zx2"
+- runFlow:
+    file: helpers/keyboard-down-ios.yaml
+    env:
+      ID: "collection-account-form-ipa_link"
+- scrollUntilVisible:
+    element:
+      id: "collection-account-form-ipa_handle"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    id: "collection-account-form-ipa_handle"
+    text: ".*e2eqnb@instapay.*"
+- runFlow:
+    file: helpers/swipe-to.yaml
+    env:
+      ID: "collection-account-form-account_last4"
+- tapOn:
+    id: "collection-account-form-account_last4"
+- inputText: "5"
+- inputText: "5"
+- inputText: "9"
+- inputText: "7"
+- runFlow:
+    file: helpers/keyboard-down-ios.yaml
+    env:
+      ID: "collection-account-form-account_last4"
+- runFlow:
+    file: helpers/swipe-to.yaml
+    env:
+      ID: "collection-account-save"
+- tapOn:
+    id: "collection-account-save"
+
+# 6. Back on the hub, the new row is there. (The hub comes back at the scroll
+#    offset it was left at — scrolled down to the add button — so its top
+#    switch is not on screen; the form leaving is the signal, the row is
+#    checked on the server and then on screen.)
+- extendedWaitUntil:
+    notVisible:
+      id: "collection-account-save"
+    timeout: 30000
+- runScript:
+    file: helpers/collections-api.js
+    env:
+      MODE: expect
+      CHECK: accountByLabel
+      LABEL: "E2E QNB ${output.stamp}"
+      OUT: qnbId
+- scrollUntilVisible:
+    element:
+      id: "collection-account-${output.qnbId}"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+
+# 7. Add a wallet: e& money, a run-unique number (011 + payer twice).
+- scrollUntilVisible:
+    element:
+      id: "collection-accounts-add"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: "collection-accounts-add"
+- extendedWaitUntil:
+    visible:
+      id: "collection-accounts-add-wallet"
+    timeout: 10000
+- tapOn:
+    id: "collection-accounts-add-wallet"
+- extendedWaitUntil:
+    visible:
+      id: "collection-account-form-provider"
+    timeout: 20000
+- tapOn:
+    id: "collection-account-form-provider"
+- extendedWaitUntil:
+    visible:
+      id: "collection-account-form-provider-etisalat_money"
+    timeout: 10000
+- tapOn:
+    id: "collection-account-form-provider-etisalat_money"
+- tapOn:
+    id: "collection-account-form-label"
+- inputText: "E2E EM ${output.stamp}"
+- runFlow:
+    file: helpers/keyboard-down-ios.yaml
+    env:
+      ID: "collection-account-form-label"
+- runFlow:
+    file: helpers/swipe-to.yaml
+    env:
+      ID: "collection-account-form-wallet_msisdn"
+- tapOn:
+    id: "collection-account-form-wallet_msisdn"
+- inputText: "011${output.payer}${output.payer}"
+- runFlow:
+    file: helpers/keyboard-down-ios.yaml
+    env:
+      ID: "collection-account-form-wallet_msisdn"
+- runFlow:
+    file: helpers/swipe-to.yaml
+    env:
+      ID: "collection-account-save"
+- tapOn:
+    id: "collection-account-save"
+- extendedWaitUntil:
+    notVisible:
+      id: "collection-account-save"
+    timeout: 30000
+- runScript:
+    file: helpers/collections-api.js
+    env:
+      MODE: expect
+      CHECK: accountByLabel
+      LABEL: "E2E EM ${output.stamp}"
+      OUT: emId
+- scrollUntilVisible:
+    element:
+      id: "collection-account-${output.emId}"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+
+# 8. Rename the QNB account. The hub lists InstaPay rows before wallets, and
+#    it is still scrolled to the new wallet row, so QNB is ABOVE.
+- scrollUntilVisible:
+    element:
+      id: "collection-account-${output.qnbId}"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: "collection-account-${output.qnbId}"
+- extendedWaitUntil:
+    visible:
+      id: "collection-account-form-label"
+    timeout: 20000
+# The label is a right-aligned (Arabic) field holding a Latin run, so the
+# run's END is at the box's right edge; a centre tap parked the caret after
+# "E2E " and the rename came out "E2E QNB <stamp> v2QNB <stamp>" (T1 rerun 6);
+# at 96% it still landed before the last digit ("…v21", rerun 7), so 99%.
+- tapOn:
+    id: "collection-account-form-label"
+    point: "99%,50%"
+- eraseText: 80
+- inputText: "E2E QNB ${output.stamp} v2"
+- runFlow:
+    file: helpers/keyboard-down-ios.yaml
+    env:
+      ID: "collection-account-form-label"
+- runFlow:
+    file: helpers/swipe-to.yaml
+    env:
+      ID: "collection-account-save"
+- tapOn:
+    id: "collection-account-save"
+- extendedWaitUntil:
+    notVisible:
+      id: "collection-account-save"
+    timeout: 30000
+- runScript:
+    file: helpers/collections-api.js
+    env:
+      MODE: expect
+      CHECK: accountByLabel
+      LABEL: "E2E QNB ${output.stamp} v2"
+      OUT: qnbId
+
+# 9. Archive both: the form's archive button, then the Alert's button
+#    (09 §4.9 `form.archive`, the same words as the button that opens it).
+#    iOS keeps the form's own button (y 678–730, under Save) in the
+#    hierarchy behind the alert, and a bare text tap hit IT, not the alert's
+#    (T1 iOS rerun 4); the alert's button sits above Save, so `above` picks
+#    it. Android's dialog hierarchy has no such twin: the plain tap stays.
+- scrollUntilVisible:
+    element:
+      id: "collection-account-${output.qnbId}"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: "collection-account-${output.qnbId}"
+- runFlow:
+    file: helpers/swipe-to.yaml
+    env:
+      ID: "collection-account-archive"
+- tapOn:
+    id: "collection-account-archive"
+- extendedWaitUntil:
+    visible:
+      text: "(?i)أرشفة الحساب|archive account"
+    timeout: 10000
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          text: "(?i)أرشفة الحساب|archive account"
+          above:
+            id: "collection-account-save"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn:
+          text: "(?i)أرشفة الحساب|archive account"
+- extendedWaitUntil:
+    notVisible:
+      id: "collection-account-archive"
+    timeout: 30000
+- extendedWaitUntil:
+    notVisible:
+      id: "collection-account-${output.qnbId}"
+    timeout: 20000
+- runScript:
+    file: helpers/collections-api.js
+    env:
+      MODE: expect
+      CHECK: archived
+      ID: "${output.qnbId}"
+- scrollUntilVisible:
+    element:
+      id: "collection-account-${output.emId}"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: "collection-account-${output.emId}"
+- runFlow:
+    file: helpers/swipe-to.yaml
+    env:
+      ID: "collection-account-archive"
+- tapOn:
+    id: "collection-account-archive"
+- extendedWaitUntil:
+    visible:
+      text: "(?i)أرشفة الحساب|archive account"
+    timeout: 10000
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          text: "(?i)أرشفة الحساب|archive account"
+          above:
+            id: "collection-account-save"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn:
+          text: "(?i)أرشفة الحساب|archive account"
+- extendedWaitUntil:
+    notVisible:
+      id: "collection-account-archive"
+    timeout: 30000
+- extendedWaitUntil:
+    notVisible:
+      id: "collection-account-${output.emId}"
+    timeout: 20000
+- runScript:
+    file: helpers/collections-api.js
+    env:
+      MODE: expect
+      CHECK: archived
+      ID: "${output.emId}"
+
+# 10. Settings → Notifications lists the five collection.* events for the
+#     owner (13 §7 b): on the server, then each title on screen. The rows have
+#     no testID (the screen renders EVENTS()[type].title), so the titles are
+#     matched as "ar|en" dictionary text (packages/i18n, re-read 2026-09-30).
+- runScript:
+    file: helpers/collections-api.js
+    env:
+      MODE: expect
+      CHECK: prefsCollections
+- openLink: matgary://settings/notifications
+- scrollUntilVisible:
+    element:
+      text: "تحويل في انتظار التأكيد|Transfer awaiting confirmation"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: "تحويل تأخّر تأكيده|Transfer waiting too long"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: "مبلغ وصل دون بيع مطابق|Money with no matching sale"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: "توقّف التأكيد التلقائي|Automatic confirmation stopped"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: "محفظة اقتربت من الحد|Wallet near its limit"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000

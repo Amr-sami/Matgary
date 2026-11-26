@@ -1,0 +1,79 @@
+{
+  "cli": {
+    "version": ">= 24.0.0",
+    "appVersionSource": "remote",
+    "promptToConfigurePushNotifications": false
+  },
+  "build": {
+    "base": {
+      "env": {
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
+      }
+    },
+    "development": {
+      "extends": "base",
+      "environment": "development",
+      "developmentClient": true,
+      "distribution": "internal",
+      "channel": "development",
+      "ios": {
+        "simulator": true
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "development-device": {
+      "extends": "development",
+      "environment": "development",
+      "ios": {
+        "simulator": false
+      }
+    },
+    "preview": {
+      "extends": "base",
+      "environment": "preview",
+      "distribution": "internal",
+      "channel": "preview",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://thestoro.com",
+        "EXPO_UNSTABLE_TREE_SHAKING": "1",
+        "EXPO_UNSTABLE_METRO_OPTIMIZE_GRAPH": "1"
+      }
+    },
+    "production": {
+      "extends": "base",
+      "environment": "production",
+      "distribution": "store",
+      "channel": "production",
+      "autoIncrement": true,
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://thestoro.com",
+        "EXPO_UNSTABLE_TREE_SHAKING": "1",
+        "EXPO_UNSTABLE_METRO_OPTIMIZE_GRAPH": "1"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "REPLACE_ME_APPLE_ID_EMAIL",
+        "ascAppId": "REPLACE_ME_ASC_APP_ID",
+        "appleTeamId": "REPLACE_ME_APPLE_TEAM_ID",
+        "language": "ar-SA",
+        "metadataPath": "./store/store.config.js"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./secrets/play-service-account.json",
+        "track": "internal",
+        "releaseStatus": "draft"
+      }
+    }
+  }
+}

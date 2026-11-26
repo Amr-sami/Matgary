@@ -1,0 +1,10 @@
+{
+  "name": "backup-exclusion",
+  "version": "1.0.0",
+  "description": "Local Expo module: exclude a file from iOS backups (isExcludedFromBackup). No-op on Android, where android:allowBackup=false covers the app.",
+  "main": "index.ts",
+  "private": true,
+  "license": "UNLICENSED",
+  "author": "TheStoro",
+  "homepage": "https://thestoro.com"
+}

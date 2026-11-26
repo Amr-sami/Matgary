@@ -1,0 +1,403 @@
+import {
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useCallback } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowCounterClockwiseIcon as ArrowCounterClockwise } from "phosphor-react-native/src/icons/ArrowCounterClockwise";
+import { CoinsIcon as Coins } from "phosphor-react-native/src/icons/Coins";
+import { PackageIcon as Package } from "phosphor-react-native/src/icons/Package";
+import { ShoppingCartIcon as ShoppingCart } from "phosphor-react-native/src/icons/ShoppingCart";
+import { dashboard as dashboardApi } from "@matgary/api-client";
+
+import { api } from "@/api/client";
+import { usePullRefresh } from "@/components/layout/usePullRefresh";
+import { HeaderAccessories } from "@/components/shell/HeaderAccessories";
+import { money, shortDate } from "@/lib/format";
+import { useSnapshotAge } from "@/offline/hydrate";
+import { AwaitingCollectionsCard } from "@/components/dashboard/AwaitingCollectionsCard";
+import { StockAlerts } from "@/components/dashboard/StockAlerts";
+import { Badge } from "@/components/ui/Badge";
+import { ChevronForward } from "@/components/ui/Chevron";
+import { StatCard } from "@/components/ui/StatCard";
+import { useSession } from "@/stores/session";
+import { RTL, RTL_TEXT } from "@/theme/rtl";
+import { colors, elevation, fonts, MIN_TOUCH, radius, spacing } from "@/theme/tokens";
+import { t } from "@/i18n";
+import { errorText } from "@/lib/errors";
+import { saleBadgeKind } from "@/collections/rules";
+import { shouldRefetchOnFocus } from "@/lib/focus-refetch";
+import { useOffline } from "@/stores/offline";
+import { CollectionBadge } from "@/components/collections/CollectionBadge";
+import {
+  Skeleton,
+  SkeletonListRow,
+  SkeletonStatCard,
+} from "@/components/ui/skeleton";
+
+type RecentSale = dashboardApi.RecentSale;
+
+/**
+ * Port of apps/web/app/[lang]/(app)/page.tsx — the dashboard as it actually
+ * ships: greeting, a 2×2 KPI grid with the same four metrics, icons and
+ * colours, the recent-sales strip, then the stock-alert tile, over the
+ * permission-filtered tab bar.
+ *
+ * The four cards mirror StatsGrid.tsx one-for-one, including which icon and
+ * which semantic colour each carries.
+ */
+export default function DashboardScreen() {
+  const insets = useSafeAreaInsets();
+  const me = useSession((s) => s.me);
+  const activeBranchId = me?.branch.id ?? null;
+  // Same rule as web Greeting.tsx: the owner is greeted by the shop, staff by
+  // their own name. `tenant.name` is what the web reads as `settings.shopName`.
+  const greetingName =
+    (me?.isOwner ? me.tenant.name?.trim() || me.user.name : me?.user.name) ?? "";
+
+  const { data, error, isPending, refetch, isRefetching } = useQuery({
+    queryKey: ["dashboard", activeBranchId],
+    queryFn: () => dashboardApi.getDashboard(api),
+  });
+  // Show skeleton only when there is NO data yet. Background refetch keeps
+  // the existing dashboard visible — `isRefetching` drives the native pull-
+  // to-refresh spinner instead.
+  const showSkeleton = isPending && !data;
+  // Home is a tab and stays mounted, so returning to it neither mounts a new
+  // observer nor changes AppState: without this the "awaiting confirmation"
+  // card kept a count from before sales recorded elsewhere (audit T1 N-card,
+  // lib/focus-refetch.ts). Refetch a stale dashboard when Home regains focus.
+  const qc = useQueryClient();
+  const online = useOffline((s) => s.online);
+  useFocusEffect(
+    useCallback(() => {
+      const key = ["dashboard", activeBranchId];
+      if (online && shouldRefetchOnFocus(qc.getQueryState(key), Date.now())) {
+        void qc.refetchQueries({ queryKey: key, exact: true });
+      }
+    }, [qc, activeBranchId, online]),
+  );
+  // Offline the refetch fails at once (retry: false) but the hydrated
+  // snapshot stays in `data`: it is shown, with its age, never hidden
+  // behind the error (doc 06 §6.2 — staleness is said, not concealed).
+  const snapshotAge = useSnapshotAge();
+  const pull = usePullRefresh(() => refetch(), isRefetching);
+
+  // The web formats through Intl; doc 06 §4.3 requires a deterministic
+  // formatter on device, because Hermes ships a trimmed ICU and the same
+  // number can render differently across platforms.
+
+  return (
+    <View style={[styles.root, { paddingTop: insets.top }]}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.content, { paddingTop: spacing.lg }]}
+        refreshControl={
+          <RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />
+        }
+      >
+        <HeaderAccessories />
+        <View style={styles.header}>
+          <Text style={styles.greeting}>{t("app.dashboard.greeting", { name: greetingName })}</Text>
+          <Text style={styles.sub}>{t(me?.isOwner ? "app.dashboard.greetingOwner" : "app.dashboard.greetingStaff")}</Text>
+        </View>
+
+        {showSkeleton ? (
+          <DashboardSkeleton />
+        ) : error && !data ? (
+          <Text style={styles.error}>
+            {errorText(error, t("app.activity.errors.loadFailed"))}
+          </Text>
+        ) : data ? (
+          <>
+            {error ? (
+              <Text style={styles.stale}>
+                {snapshotAge === null
+                  ? t("mobile.offline.staleDataUnknownAge")
+                  : t("mobile.offline.staleData", { ago: formatAge(snapshotAge) })}
+              </Text>
+            ) : null}
+            <View style={styles.grid}>
+              <View style={styles.gridRow}>
+                <StatCard
+                  title={t("app.dashboard.stats.todaySales")}
+                  value={money(data.stats.todayRevenue)}
+                  icon={Coins}
+                  color="success"
+                />
+                <StatCard
+                  title={t("app.dashboard.stats.itemCount")}
+                  value={String(data.stats.productCount)}
+                  icon={Package}
+                  color="accent"
+                />
+              </View>
+              <View style={styles.gridRow}>
+                <StatCard
+                  title={t("app.dashboard.stats.monthSales")}
+                  value={money(data.stats.monthRevenue)}
+                  icon={ShoppingCart}
+                  color="accent"
+                />
+                <StatCard
+                  title={t("app.dashboard.stats.monthReturns")}
+                  value={String(data.stats.monthReturns)}
+                  icon={ArrowCounterClockwise}
+                  color="danger"
+                />
+              </View>
+            </View>
+
+            <AwaitingCollectionsCard data={data.collections} />
+
+            <RecentSales items={data.recentSales ?? []} />
+
+            <StockAlerts items={data.lowStock.items} />
+          </>
+        ) : null}
+      </ScrollView>
+
+    </View>
+  );
+}
+
+/**
+ * Port of apps/web/components/dashboard/RecentSalesListServer.tsx. The web
+ * renders a 5-column table of the last 10 *lines*; a 390pt phone gets a card
+ * list of the last 8 *invoices* (the server folds cart lines), each row a
+ * 44pt tap target into the sale detail. "View all" goes to the full,
+ * paginated history — this strip is deliberately not scrollable on its own.
+ *
+ * `items` may be missing on a snapshot hydrated before the field shipped,
+ * hence the `?? []` at the call site — an older cache must not blank the
+ * whole dashboard.
+ */
+function RecentSales({ items }: { items: RecentSale[] }) {
+  const router = useRouter();
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardTitle}>{t("app.dashboard.recentSales.title")}</Text>
+        {items.length > 0 ? (
+          <Pressable
+            onPress={() => router.push("/sales/history")}
+            hitSlop={8}
+            accessibilityRole="link"
+            style={styles.viewAllHit}
+          >
+            <Text style={styles.viewAll}>{t("app.common.viewAll")}</Text>
+          </Pressable>
+        ) : null}
+      </View>
+
+      {items.length === 0 ? (
+        <Text style={styles.empty}>{t("app.dashboard.recentSales.empty")}</Text>
+      ) : (
+        <View>
+          {items.map((sale, i) => (
+            <Pressable
+              key={sale.id}
+              onPress={() => router.push(`/sales/${sale.id}`)}
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                styles.row,
+                i > 0 && styles.rowDivider,
+                pressed && styles.rowPressed,
+              ]}
+            >
+              <View style={styles.rowText}>
+                <Text style={styles.customer} numberOfLines={2}>
+                  {saleTitle(sale)}
+                </Text>
+                <Text style={styles.rowMeta} numberOfLines={1}>
+                  {saleMeta(sale)}
+                </Text>
+              </View>
+              <View style={styles.rowEnd}>
+                <Text style={styles.total}>{money(sale.total)}</Text>
+                {sale.discount && sale.discount > 0 ? (
+                  <Badge
+                    label={t("mobile.salesHistory.discountBadge", { amount: money(sale.discount) })}
+                    variant="accent"
+                  />
+                ) : null}
+                <SaleBadge sale={sale} />
+              </View>
+              <ChevronForward />
+            </Pressable>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+/**
+ * One status chip per row, mirroring the web's sold/returned column but
+ * carrying the payment method too, since that is what a cashier glances for:
+ * returned beats everything; then a rejected transfer, then one awaiting the
+ * owner's confirmation (doc 15 spec 08 §4.9, `saleBadgeKind`); an unsettled
+ * آجل invoice is a warning; otherwise the method in neutral.
+ */
+function SaleBadge({ sale }: { sale: RecentSale }) {
+  const kind = saleBadgeKind(sale);
+  if (kind === "returned") {
+    return <Badge label={t("app.dashboard.recentSales.status.returned")} variant="outofstock" />;
+  }
+  if (kind === "rejected" || kind === "pending") return <CollectionBadge status={kind} />;
+  if (kind === "unpaid") {
+    return <Badge label={t("mobile.dashboard.unpaid")} variant="lowstock" />;
+  }
+  if (kind !== "method" || !sale.paymentMethod) return null;
+  return (
+    <Badge
+      label={t(`app.activityLabels.paymentMethods.${sale.paymentMethod}`)}
+      variant="neutral"
+    />
+  );
+}
+
+/**
+ * Today's sales read as a time ("النهاردة 14:05"), older ones as a date. Both
+ * are built by hand — no Intl on Hermes — and the day comparison is in the
+ * device's local zone, the same zone the clock on the wall shows.
+ */
+/**
+ * Row title: a product summary when the server gives us lines ("2 × Anna
+ * Fayrouz · 1 × Khamra · +2 more"), falling back to the customer/invoice
+ * identity on older servers that haven't started sending `lines` yet.
+ */
+function saleTitle(sale: RecentSale): string {
+  if (sale.lines && sale.lines.length > 0) {
+    const MAX = 2;
+    const head = sale.lines.slice(0, MAX).map((l) => `⁦${l.quantitySold}⁩ × ${l.productName}`);
+    const total = sale.lineCount ?? sale.lines.length;
+    if (total > MAX) head.push(t("mobile.salesHistory.moreLines", { n: total - MAX }));
+    return head.join(" · ");
+  }
+  return sale.customerName ?? sale.customerPhone ?? t("mobile.dashboard.walkInCustomer");
+}
+
+/** Meta line: when + who. The product summary is already on the title line. */
+function saleMeta(sale: RecentSale): string {
+  const when = saleWhen(sale.createdAt);
+  const who = sale.customerName ?? sale.customerPhone ?? t("mobile.dashboard.walkInCustomer");
+  return `${when} · ${who}`;
+}
+
+function saleWhen(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  const now = new Date();
+  const sameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+  if (!sameDay) return shortDate(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return t("mobile.dashboard.todayAt", { time: `${pad(d.getHours())}:${pad(d.getMinutes())}` });
+}
+
+/** Seconds → "just now" / "{n}m ago" / "{n}h ago" / "{n}d ago", through the dictionary (no Intl on device). */
+function formatAge(seconds: number): string {
+  if (seconds < 60) return t("mobile.offline.ageNow");
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return t("mobile.offline.ageMinutes", { n: minutes });
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return t("mobile.offline.ageHours", { n: hours });
+  return t("mobile.offline.ageDays", { n: Math.floor(hours / 24) });
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg, ...RTL },
+  scroll: { flex: 1 },
+  content: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xxl,
+    gap: spacing.lg,
+  },
+  header: { gap: 4 },
+  greeting: { fontFamily: fonts.bold, fontSize: 26, color: colors.text, ...RTL_TEXT },
+  sub: { fontFamily: fonts.regular, fontSize: 15, color: colors.textSecondary, ...RTL_TEXT },
+  grid: { gap: spacing.lg },
+  gridRow: { flexDirection: "row", gap: spacing.lg },
+  error: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.danger },
+  stale: { fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary, ...RTL_TEXT },
+
+  // Recent sales — same surface as StockAlerts / Card so the two tiles read
+  // as siblings.
+  card: {
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    padding: spacing.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...elevation.card,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    // The "view all" hit box below is MIN_TOUCH tall, so the header already
+    // carries its own breathing room — no extra margin under it.
+    minHeight: MIN_TOUCH,
+  },
+  cardTitle: { fontFamily: fonts.semibold, fontSize: 16, color: colors.text, ...RTL_TEXT },
+  // hitSlop alone cannot reach 44pt here: RN clips slop to the parent's
+  // bounds, and the header row is only one line of text tall.
+  viewAllHit: { minHeight: MIN_TOUCH, justifyContent: "center" },
+  viewAll: { ...RTL_TEXT, fontFamily: fonts.medium, fontSize: 14, color: colors.accent },
+  empty: {
+    fontFamily: fonts.regular,
+    fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: "center",
+    paddingVertical: spacing.xl,
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    minHeight: MIN_TOUCH + spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  rowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  rowPressed: { opacity: 0.6 },
+  rowText: { flex: 1, gap: 2 },
+  customer: { fontFamily: fonts.medium, fontSize: 15, color: colors.text, ...RTL_TEXT },
+  rowMeta: { fontFamily: fonts.regular, fontSize: 12, color: colors.textSecondary, ...RTL_TEXT },
+  rowEnd: { alignItems: "flex-end", gap: 4 },
+  total: { ...RTL_TEXT, fontFamily: fonts.bold, fontSize: 15, color: colors.text },
+  skeletonGrid: { gap: spacing.md },
+  skeletonRow: { flexDirection: "row", gap: spacing.md },
+  skeletonFlex1: { flex: 1 },
+});
+
+/**
+ * Dashboard skeleton — mirrors the real layout (2×2 KPI grid, awaiting-
+ * collections card, recent-sales card, stock-alerts card) so swapping to
+ * the real content reads as a progressive reveal, not a page swap.
+ */
+function DashboardSkeleton() {
+  return (
+    <View style={styles.skeletonGrid}>
+      <View style={styles.skeletonRow}>
+        <SkeletonStatCard style={styles.skeletonFlex1} />
+        <SkeletonStatCard style={styles.skeletonFlex1} />
+      </View>
+      <View style={styles.skeletonRow}>
+        <SkeletonStatCard style={styles.skeletonFlex1} />
+        <SkeletonStatCard style={styles.skeletonFlex1} />
+      </View>
+      <Skeleton height={80} borderRadius={radius.lg} />
+      <SkeletonListRow count={4} avatarSize={0} trailingWidth={64} height={58} />
+      <Skeleton height={110} borderRadius={radius.lg} />
+    </View>
+  );
+}

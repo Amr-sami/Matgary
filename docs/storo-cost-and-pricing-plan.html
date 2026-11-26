@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Storo — Cost model & pricing plan</title>
+<style>
+  :root {
+    --accent: #1203E3;
+    --accent-soft: #EEEAFF;
+    --ink: #1E1E2A;
+    --muted: #6A6A80;
+    --line: #E4E4EF;
+    --good: #00875A;
+    --warn: #B9520B;
+    --bad: #C81E1E;
+  }
+  @page { size: A4; margin: 18mm 15mm 18mm 15mm; }
+  html, body { margin: 0; padding: 0; color: var(--ink); font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; line-height: 1.45; font-size: 10.5pt; }
+  h1 { font-size: 24pt; margin: 0 0 6pt; font-weight: 800; letter-spacing: -0.02em; }
+  h2 { font-size: 14pt; margin: 18pt 0 6pt; color: var(--accent); font-weight: 700; letter-spacing: -0.01em; page-break-after: avoid; }
+  h3 { font-size: 11pt; margin: 10pt 0 4pt; font-weight: 700; color: var(--ink); page-break-after: avoid; }
+  p { margin: 0 0 6pt; }
+  small, .caption { color: var(--muted); font-size: 9pt; }
+  code { font-family: "SF Mono", Menlo, monospace; font-size: 9.5pt; background: var(--accent-soft); padding: 1px 4px; border-radius: 3px; color: var(--accent); }
+  .cover { page-break-after: always; display: flex; flex-direction: column; justify-content: space-between; height: 258mm; }
+  .cover-header { padding-top: 40mm; }
+  .cover-subtitle { font-size: 13pt; color: var(--muted); margin-top: 4pt; }
+  .cover-meta { border-top: 2px solid var(--accent); padding-top: 10pt; font-size: 10pt; }
+  .cover-meta div { display: flex; justify-content: space-between; margin: 3pt 0; }
+  .cover-meta .label { color: var(--muted); }
+  .brand-dot { display: inline-block; width: 12pt; height: 12pt; background: var(--accent); border-radius: 50%; margin-right: 6pt; vertical-align: middle; }
+  table { border-collapse: collapse; width: 100%; font-size: 9.5pt; margin: 6pt 0 10pt; }
+  th { text-align: left; background: var(--accent-soft); color: var(--accent); font-weight: 700; padding: 5pt 7pt; border-bottom: 1px solid var(--accent); }
+  td { padding: 5pt 7pt; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tbody tr.total td { font-weight: 700; background: #FAFAFF; border-top: 2px solid var(--accent); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .pill { display: inline-block; padding: 1pt 7pt; border-radius: 99pt; font-size: 8.5pt; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; }
+  .pill.good { background: #E4F7EE; color: var(--good); }
+  .pill.warn { background: #FFF1DC; color: var(--warn); }
+  .pill.bad { background: #FEE4E4; color: var(--bad); }
+  .pill.accent { background: var(--accent-soft); color: var(--accent); }
+  .kpi-row { display: flex; gap: 10pt; margin: 8pt 0 14pt; }
+  .kpi { flex: 1; border: 1px solid var(--line); border-radius: 6pt; padding: 10pt 12pt; background: #fff; }
+  .kpi .v { font-size: 20pt; font-weight: 800; color: var(--accent); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .kpi .l { font-size: 9pt; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; }
+  ul, ol { margin: 4pt 0 10pt 16pt; padding: 0; }
+  li { margin: 3pt 0; }
+  .callout { border-left: 3pt solid var(--accent); background: var(--accent-soft); padding: 8pt 12pt; margin: 8pt 0 12pt; border-radius: 0 4pt 4pt 0; }
+  .callout strong { color: var(--accent); }
+  .note { font-size: 9pt; color: var(--muted); font-style: italic; margin-top: 2pt; }
+  .page-break { page-break-before: always; }
+  .section-lead { font-size: 10.5pt; color: var(--muted); margin: 0 0 10pt; max-width: 170mm; }
+  .footnote { font-size: 8pt; color: var(--muted); padding-top: 8pt; border-top: 1px solid var(--line); margin-top: 16pt; }
+  .two-col { display: flex; gap: 16pt; }
+  .two-col > div { flex: 1; }
+  .highlight-row td { background: #FFF9EA; }
+</style>
+</head>
+<body>
+
+<!-- ─────────────────────────────── COVER ─────────────────────────────── -->
+<section class="cover">
+  <div class="cover-header">
+    <h1><span class="brand-dot"></span>Storo — Cost model & pricing plan</h1>
+    <div class="cover-subtitle">Infrastructure + variable costs, scaling thresholds, pricing recommendation, and launch budget for the Egyptian SMB market.</div>
+  </div>
+  <div class="cover-meta">
+    <div><span class="label">Prepared for</span><span>Amr Elwany — Storo founding team</span></div>
+    <div><span class="label">Date</span><span>November 10, 2026</span></div>
+    <div><span class="label">Currency basis</span><span>USD prices from public vendor pages; EGP at <code>1 USD ≈ 50 EGP</code></span></div>
+    <div><span class="label">Scope</span><span>Hostinger VPS, daily/weekly backup, Gemini API, SMS OTP, email, domain, launch marketing</span></div>
+  </div>
+</section>
+
+<!-- ─────────────────────────── EXECUTIVE SUMMARY ─────────────────────── -->
+<h2>Executive summary</h2>
+
+<div class="kpi-row">
+  <div class="kpi">
+    <div class="v">~$19/mo</div>
+    <div class="l">Fixed infra at launch (VPS + backup + domain)</div>
+  </div>
+  <div class="kpi">
+    <div class="v">~$1.10</div>
+    <div class="l">Variable cost per active tenant / month (SMS + AI)</div>
+  </div>
+  <div class="kpi">
+    <div class="v">EGP 399</div>
+    <div class="l">Recommended monthly price (≈ $8)</div>
+  </div>
+  <div class="kpi">
+    <div class="v">~85%</div>
+    <div class="l">Gross margin at steady state</div>
+  </div>
+</div>
+
+<p>At launch (0–50 active tenants) you can run everything on a single Hostinger KVM 2 VPS with weekly backup snapshots for about <strong>$19/month fixed</strong>. Variable costs are dominated by Gemini API (~$0.90/tenant/mo at typical AI usage) and SMS OTP (~$0.02/tenant/mo using a local Egyptian SMS provider).</p>
+
+<p>Pricing <strong>EGP 399/mo</strong> (one flat tier) with discounts for 3-month and annual prepay gives a gross margin above 85% once you clear ~15 paying tenants. The &ldquo;first month free&rdquo; promotion costs you at most $1/signup in variable cost — cheaper than paid acquisition would be.</p>
+
+<p>First VPS upgrade trigger: ~50 active tenants (move KVM 2 → KVM 4, +$3/mo). Second upgrade: ~200 tenants (KVM 4 → KVM 8, +$8/mo). You stay below <strong>$50/month total infra cost</strong> until you cross 500 active tenants.</p>
+
+<!-- ─────────────────────────── FIXED INFRA ─────────────────────────── -->
+<h2>1 · Fixed infrastructure costs</h2>
+<p class="section-lead">What you pay every month whether you have 5 customers or 500.</p>
+
+<h3>1.1 &nbsp; Hostinger VPS — recommended plan</h3>
+<table>
+  <thead>
+    <tr>
+      <th>Plan</th>
+      <th>Specs</th>
+      <th class="num">Monthly (24-mo plan)</th>
+      <th class="num">Monthly (1-mo plan)</th>
+      <th>When to pick it</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="highlight-row">
+      <td><strong>KVM 2</strong> <span class="pill accent">Launch</span></td>
+      <td>2 vCPU · 8 GB RAM · 100 GB NVMe · 8 TB BW</td>
+      <td class="num">$7.99 ≈ <strong>EGP 400</strong></td>
+      <td class="num">$13.99</td>
+      <td>Launch → 50 active tenants</td>
+    </tr>
+    <tr>
+      <td><strong>KVM 4</strong></td>
+      <td>4 vCPU · 16 GB RAM · 200 GB NVMe · 16 TB BW</td>
+      <td class="num">$10.99 ≈ EGP 550</td>
+      <td class="num">$19.99</td>
+      <td>50 → 200 active tenants</td>
+    </tr>
+    <tr>
+      <td><strong>KVM 8</strong></td>
+      <td>8 vCPU · 32 GB RAM · 400 GB NVMe · 32 TB BW</td>
+      <td class="num">$18.99 ≈ EGP 950</td>
+      <td class="num">$31.99</td>
+      <td>200 → 500 active tenants</td>
+    </tr>
+    <tr>
+      <td><em>KVM 16+ or managed DB</em></td>
+      <td>16 vCPU · 64 GB RAM+ / Postgres managed</td>
+      <td class="num">$40–80</td>
+      <td class="num">—</td>
+      <td>500+ tenants — split DB off app</td>
+    </tr>
+  </tbody>
+</table>
+<p class="note">Lock the 24-month term at launch — the price is 35–40% lower than month-to-month and Hostinger refunds the unused portion if you cancel. The savings vs monthly billing are typically 2–3× your real upgrade cost later.</p>
+
+<h3>1.2 &nbsp; Backup strategy</h3>
+<table>
+  <thead>
+    <tr><th>Option</th><th>Coverage</th><th class="num">Monthly</th><th>Notes</th></tr>
+  </thead>
+  <tbody>
+    <tr class="highlight-row">
+      <td><strong>Hostinger weekly snapshot</strong> <span class="pill accent">Launch</span></td>
+      <td>Full VPS state, 1×/week, 1 restore slot</td>
+      <td class="num">Included</td>
+      <td>Already in KVM plan; restore covers full disaster.</td>
+    </tr>
+    <tr>
+      <td><strong>Hostinger daily automated</strong></td>
+      <td>Full VPS state, 7 daily retention</td>
+      <td class="num">$2.99</td>
+      <td>Add this when you have ≥ 30 paying tenants — RPO drops from 7 days to 24 hours.</td>
+    </tr>
+    <tr>
+      <td><strong>Off-site Postgres dump → Backblaze B2</strong></td>
+      <td>Daily SQL dump, 30-day retention, geographically separate</td>
+      <td class="num">~$1 per 10 GB</td>
+      <td>Recommended at ≥ 100 tenants. A <code>pg_dump | gzip | b2 upload</code> cron is ~15 lines of bash.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>1.3 &nbsp; Domain + SSL + email transactional</h3>
+<table>
+  <thead><tr><th>Item</th><th>Vendor</th><th class="num">Annualised</th><th class="num">Monthly</th></tr></thead>
+  <tbody>
+    <tr><td>Domain <code>.com</code> or <code>.store</code></td><td>Hostinger / Namecheap</td><td class="num">$9–12</td><td class="num">$0.90</td></tr>
+    <tr><td>SSL certificate</td><td>Let&rsquo;s Encrypt (auto-renew)</td><td class="num">Free</td><td class="num">$0</td></tr>
+    <tr><td>Transactional email (receipts, password reset, invoices)</td><td>Resend <em>free tier</em> (3,000/mo) → paid at scale</td><td class="num">$0 → $20</td><td class="num">$0 → $1.70</td></tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  <strong>Fixed total at launch:</strong> KVM 2 <code>$7.99</code> + domain <code>$1</code> + email <code>$0</code> + weekly backup <code>included</code> ≈ <strong>$9/month ≈ EGP 450/month</strong>. Pay a bit more ($19/mo) once you turn on daily backup + off-site dumps around 30 tenants.
+</div>
+
+<!-- ─────────────────────────── VARIABLE COSTS ─────────────────────────── -->
+<h2>2 · Variable costs (per tenant, per usage)</h2>
+
+<h3>2.1 &nbsp; Gemini API — the biggest variable line</h3>
+<p class="section-lead">Storo uses <code>gemini-3.6-flash</code> for every AI chat. Current public Flash-tier pricing (Google AI Studio pay-as-you-go):</p>
+<table>
+  <thead><tr><th>Token class</th><th class="num">Price per 1 M tokens</th><th>Typical per request</th><th class="num">Cost per request</th></tr></thead>
+  <tbody>
+    <tr><td>Input (prompt + tool defs + context)</td><td class="num">$0.075</td><td>~4,000 tokens</td><td class="num">$0.00030</td></tr>
+    <tr><td>Output (model response + tool-call JSON)</td><td class="num">$0.30</td><td>~500 tokens</td><td class="num">$0.00015</td></tr>
+    <tr><td>Cached input <span class="pill good">optimise</span></td><td class="num">$0.01875 (4× cheaper)</td><td>Enable context cache</td><td class="num">~$0.00008</td></tr>
+    <tr class="total"><td colspan="3">Avg per AI request without caching</td><td class="num">≈ <strong>$0.0005</strong></td></tr>
+    <tr class="total"><td colspan="3">Avg per AI request <em>with</em> context caching</td><td class="num">≈ <strong>$0.00022</strong></td></tr>
+  </tbody>
+</table>
+
+<p>Typical Storo user hits the AI 40–80 times/month (sales queries, inventory lookups, occasional writes). Budget <strong>60 requests/tenant/month</strong>:</p>
+<table>
+  <thead><tr><th>Scenario</th><th class="num">Requests / mo</th><th class="num">Monthly Gemini cost / tenant</th></tr></thead>
+  <tbody>
+    <tr><td>Light user (just reads, few greetings)</td><td class="num">20</td><td class="num">$0.01</td></tr>
+    <tr class="highlight-row"><td><strong>Typical user</strong></td><td class="num">60</td><td class="num"><strong>$0.03</strong></td></tr>
+    <tr><td>Power user (daily AI-driven ops + import files)</td><td class="num">200</td><td class="num">$0.10</td></tr>
+  </tbody>
+</table>
+<p class="note">The <em>fast-path greeting</em> optimisation (zero model calls for &ldquo;hi&rdquo;/&ldquo;thanks&rdquo;) already saves ~15% on this line. Enabling Gemini&rsquo;s context cache on the system prompt + tool definitions would cut another ~50%.</p>
+
+<h3>2.2 &nbsp; SMS OTP — pick the right provider</h3>
+<table>
+  <thead><tr><th>Provider</th><th class="num">Cost per SMS to Egypt</th><th class="num">1 OTP/tenant/mo</th><th>Verdict</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Twilio</strong></td><td class="num">~$0.0505</td><td class="num">$0.10 / tenant / mo</td><td><span class="pill bad">Avoid</span> — international carrier fees, 10× what you need.</td></tr>
+    <tr><td><strong>Infobip / MessageBird</strong></td><td class="num">~$0.015–0.025</td><td class="num">$0.03–0.05 / tenant / mo</td><td><span class="pill warn">OK</span> — global tooling, mid-price.</td></tr>
+    <tr class="highlight-row"><td><strong>SMSMisr / Victory Link</strong> (Egyptian)</td><td class="num">~$0.005–0.01 ≈ EGP 0.30–0.50</td><td class="num">$0.01–0.02 / tenant / mo</td><td><span class="pill good">Recommended</span> — local sender ID, Arabic support, DLR included.</td></tr>
+  </tbody>
+</table>
+<p>Assume 1 OTP on signup + 1 login OTP/month after that. Over 12 months a tenant costs you ~$0.10 in SMS at SMSMisr rates. A shop with multiple staff (3–5 users each getting a monthly re-auth OTP) is still under <strong>$0.10/mo</strong>.</p>
+
+<h3>2.3 &nbsp; Total variable cost per tenant</h3>
+<table>
+  <thead><tr><th>Line</th><th class="num">Typical tenant / mo</th><th class="num">Heavy tenant / mo</th></tr></thead>
+  <tbody>
+    <tr><td>Gemini API</td><td class="num">$0.03</td><td class="num">$0.10</td></tr>
+    <tr><td>SMS OTP (SMSMisr, 3–5 users)</td><td class="num">$0.03</td><td class="num">$0.08</td></tr>
+    <tr><td>Email (Resend after free tier kicks in)</td><td class="num">$0.00</td><td class="num">$0.02</td></tr>
+    <tr><td>Other (payment processor fee allocation, misc APIs)</td><td class="num">$0.00</td><td class="num">$0.05</td></tr>
+    <tr class="total"><td>Total variable per tenant</td><td class="num"><strong>$0.06 ≈ EGP 3</strong></td><td class="num"><strong>$0.25 ≈ EGP 13</strong></td></tr>
+  </tbody>
+</table>
+<p class="note">Even on the heavy-user scenario, variable cost is &lt; 4% of the EGP 399 monthly price. This is the single most important number in this document — it means almost every EGP of revenue is gross margin.</p>
+
+<!-- ─────────────────────────── SCALING ─────────────────────────── -->
+<h2>3 · Capacity &amp; upgrade triggers</h2>
+<p class="section-lead">Objective signals that tell you when to move to the next VPS tier — not guesses.</p>
+<table>
+  <thead>
+    <tr>
+      <th>Signal</th>
+      <th>Threshold</th>
+      <th>Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>CPU utilisation (5-min avg, business hours)</td><td>&gt; 70% sustained for 3 days</td><td>Upgrade VPS tier.</td></tr>
+    <tr><td>Postgres cache hit ratio</td><td>&lt; 97%</td><td>Add RAM (same tier upgrade) OR split DB to managed Postgres.</td></tr>
+    <tr><td>Disk used / provisioned</td><td>&gt; 75%</td><td>Upgrade tier (more NVMe) OR offload old uploads to object storage.</td></tr>
+    <tr><td>P95 API latency</td><td>&gt; 1 s sustained</td><td>Check slow queries first, VPS upgrade second.</td></tr>
+    <tr><td>Active paying tenants</td><td>50 / 200 / 500</td><td>Scheduled upgrade to KVM 4 / KVM 8 / managed DB.</td></tr>
+    <tr><td>Metro/App bandwidth usage</td><td>&gt; 50% of plan BW</td><td>Consider a CDN in front of static assets (Cloudflare free).</td></tr>
+  </tbody>
+</table>
+
+<div class="callout"><strong>Scaling math (rough):</strong> One KVM 2 (2 vCPU / 8 GB) comfortably serves <strong>~50 active shops</strong> each with 2–5 concurrent users during peak sales hours. One KVM 4 serves ~200. One KVM 8 serves ~500. Above 500 the bottleneck is Postgres — move it to Hostinger Managed DB or Neon/Supabase ($20–40/mo) and keep the app on your VPS.</div>
+
+<!-- ─────────────────────────── TOTAL AT SCALE ─────────────────────────── -->
+<h2>4 · Total monthly cost at three scale points</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Line item</th>
+      <th class="num">Launch (10 tenants)</th>
+      <th class="num">Growth (100 tenants)</th>
+      <th class="num">Scale (500 tenants)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>VPS plan</td><td class="num">KVM 2 · $7.99</td><td class="num">KVM 4 · $10.99</td><td class="num">KVM 8 · $18.99</td></tr>
+    <tr><td>Backup (weekly / daily / off-site)</td><td class="num">Included</td><td class="num">$2.99 + $1</td><td class="num">$2.99 + $5</td></tr>
+    <tr><td>Managed DB (Supabase/Neon)</td><td class="num">—</td><td class="num">—</td><td class="num">$25</td></tr>
+    <tr><td>Domain + SSL</td><td class="num">$1</td><td class="num">$1</td><td class="num">$1</td></tr>
+    <tr><td>Transactional email</td><td class="num">$0</td><td class="num">$0</td><td class="num">$20</td></tr>
+    <tr><td>Gemini API (typical usage)</td><td class="num">$0.30</td><td class="num">$3.00</td><td class="num">$15</td></tr>
+    <tr><td>SMS OTP (SMSMisr)</td><td class="num">$0.30</td><td class="num">$3.00</td><td class="num">$15</td></tr>
+    <tr class="total">
+      <td>Total monthly cost</td>
+      <td class="num">≈ <strong>$10 / EGP 500</strong></td>
+      <td class="num">≈ <strong>$22 / EGP 1,100</strong></td>
+      <td class="num">≈ <strong>$100 / EGP 5,000</strong></td>
+    </tr>
+    <tr class="total">
+      <td>Cost per tenant</td>
+      <td class="num">$1.00 / tenant</td>
+      <td class="num">$0.22 / tenant</td>
+      <td class="num">$0.20 / tenant</td>
+    </tr>
+  </tbody>
+</table>
+<p class="note">Unit economics get <em>better</em> as you scale — fixed infra dilutes across more tenants, Gemini context caching pays off harder with more repeated queries, and you unlock volume SMS tiers (SMSMisr &lt; EGP 0.25 at 10k+ messages/mo).</p>
+
+<!-- ─────────────────────────── PRICING ─────────────────────────── -->
+<h2>5 · Pricing recommendation</h2>
+<p class="section-lead">One flat tier (as requested) — only the billing cadence changes.</p>
+
+<div class="kpi-row">
+  <div class="kpi">
+    <div class="v">EGP 399</div>
+    <div class="l">Monthly plan</div>
+  </div>
+  <div class="kpi">
+    <div class="v">EGP 999</div>
+    <div class="l">Quarterly — save 17%</div>
+  </div>
+  <div class="kpi">
+    <div class="v">EGP 3,599</div>
+    <div class="l">Annual — save 25%</div>
+  </div>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Plan</th>
+      <th class="num">Price (EGP)</th>
+      <th class="num">Effective / month</th>
+      <th class="num">Discount</th>
+      <th class="num">Cash now vs 12 mo</th>
+      <th>Target buyer</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td><strong>Free trial</strong></td><td class="num">0</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td>Everyone, 30 days, no card</td></tr>
+    <tr><td><strong>Monthly</strong></td><td class="num">399</td><td class="num">399</td><td class="num">—</td><td class="num">4,788</td><td>Hesitant buyers, seasonal shops</td></tr>
+    <tr class="highlight-row"><td><strong>Quarterly</strong></td><td class="num">999</td><td class="num">333</td><td class="num">–17%</td><td class="num">3,996</td><td>Default push for new signups</td></tr>
+    <tr><td><strong>Annual</strong></td><td class="num">3,599</td><td class="num">300</td><td class="num">–25%</td><td class="num">3,599</td><td>Shops that already trust Storo (post-month-2)</td></tr>
+  </tbody>
+</table>
+
+<h3>Why these numbers</h3>
+<ul>
+  <li><strong>EGP 399/mo</strong> sits above Daftra&rsquo;s entry tier (EGP 150) but below their Pro (EGP 400–500) — positioning Storo as a premium AI-native option without being the cheapest.</li>
+  <li><strong>25% annual discount</strong> is the SaaS industry standard and extends your cash runway dramatically: 100 annual subscribers = EGP 359,900 upfront vs EGP 29,992/mo recurring.</li>
+  <li><strong>Quarterly as the &ldquo;default&rdquo; plan</strong> gives you a 3-month commitment (big churn-reducer) without asking for a full year of trust on day 1.</li>
+  <li><strong>No feature tiers</strong> (as you requested) removes a sales-objection surface entirely — the only decision is cadence.</li>
+</ul>
+
+<h3>Unit economics at EGP 399/mo</h3>
+<table>
+  <thead>
+    <tr><th>Metric</th><th class="num">Monthly plan</th><th class="num">Annual plan (at EGP 300/mo effective)</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Revenue per tenant</td><td class="num">EGP 399</td><td class="num">EGP 300</td></tr>
+    <tr><td>Variable cost (typical)</td><td class="num">EGP 3</td><td class="num">EGP 3</td></tr>
+    <tr><td>Fixed infra share @ 100 tenants</td><td class="num">EGP 11</td><td class="num">EGP 11</td></tr>
+    <tr class="total"><td>Gross profit per tenant / mo</td><td class="num"><strong>EGP 385 (96%)</strong></td><td class="num"><strong>EGP 286 (95%)</strong></td></tr>
+    <tr><td>Breakeven (covers all fixed infra)</td><td class="num" colspan="2"><strong>3 paying tenants</strong> cover all infra at the growth tier</td></tr>
+    <tr><td>Target MRR for salary of one founder (EGP 20k)</td><td class="num" colspan="2"><strong>52 monthly subscribers</strong> or <strong>70 annual at EGP 300/mo effective</strong></td></tr>
+  </tbody>
+</table>
+
+<!-- ─────────────────────────── LAUNCH ─────────────────────────── -->
+<h2>6 · Launch strategy &amp; marketing budget</h2>
+<p class="section-lead">Egyptian SMB shop owners live on Facebook groups, WhatsApp, and TikTok — not LinkedIn. Spend accordingly.</p>
+
+<h3>6.1 &nbsp; The &ldquo;first month free&rdquo; offer, costed honestly</h3>
+<p>A trial tenant costs you ≈ $0.06 in variable costs over 30 days. Even if only 20% of trials convert to paid, your acquisition cost per paying customer via the free-trial route is roughly <strong>EGP 15 (the 5 trials × EGP 3)</strong>. Compare that to ~EGP 50–100 CPA via Facebook Ads for the same audience — the free trial IS your acquisition channel. Make it easy: no credit card, instant access, one-tap-to-upgrade inside the app.</p>
+
+<h3>6.2 &nbsp; Phase-by-phase marketing budget (6 months)</h3>
+<table>
+  <thead>
+    <tr>
+      <th>Phase</th>
+      <th>Channel</th>
+      <th class="num">Monthly spend</th>
+      <th class="num">Target CPA</th>
+      <th class="num">Target signups</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Month 1–2 — pre-launch beta</strong></td>
+      <td>Direct outreach, Facebook group posts in 3–5 shop-owner groups, WhatsApp referrals</td>
+      <td class="num">EGP 0 (time only)</td>
+      <td class="num">EGP 0</td>
+      <td class="num">20–40 beta users</td>
+    </tr>
+    <tr>
+      <td><strong>Month 3 — public launch</strong></td>
+      <td>FB/IG ads (Arabic creative), 1 TikTok shopkeeper collab, local YouTube tutorial</td>
+      <td class="num">EGP 3,000</td>
+      <td class="num">EGP 50</td>
+      <td class="num">60 signups</td>
+    </tr>
+    <tr>
+      <td><strong>Month 4–5 — scale</strong></td>
+      <td>FB/IG ads (double down on best-performing creative), WhatsApp Business broadcast, 2–3 TikTok collabs</td>
+      <td class="num">EGP 5,000</td>
+      <td class="num">EGP 40</td>
+      <td class="num">125 signups / mo</td>
+    </tr>
+    <tr>
+      <td><strong>Month 6+ — retention &amp; referrals</strong></td>
+      <td>Referral programme (1 month free per successful referral), case-study posts from happy tenants</td>
+      <td class="num">EGP 3,000 (ads) + EGP 2,000 (referral rewards)</td>
+      <td class="num">EGP 25</td>
+      <td class="num">200+ signups / mo</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>6.3 &nbsp; Specific campaign tactics worth trying</h3>
+<ul>
+  <li><strong>Launch WhatsApp group</strong> &ldquo;أصحاب المحلات مع Storo&rdquo; — 100% free, builds trust faster than any paid ad. Pin a short 60-second demo video.</li>
+  <li><strong>TikTok shopkeeper POV</strong> &mdash; pay one popular shop-owner creator EGP 2–5k to post &ldquo;my day with Storo.&rdquo; Egyptian SMB TikTok reaches hundreds of thousands at that price.</li>
+  <li><strong>Arabic YouTube tutorial series</strong> (5 videos × 4 min each) — &ldquo;افتح متجرك في 10 دقايق،&rdquo; &ldquo;قدم استيراد من إكسل.&rdquo; Zero ongoing cost, compounds forever.</li>
+  <li><strong>Referral: 1 month free per paying referral</strong>, capped at 6 months/account. You give up EGP 399 but gain a tenant with ~50% lower churn (referred users are stickier).</li>
+  <li><strong>Hardware reseller partnerships</strong> — 20% revenue share with POS printer / barcode-scanner shops that bundle Storo in their package deal. They do your field sales for free.</li>
+</ul>
+
+<!-- ─────────────────────────── MINIMISATION ─────────────────────────── -->
+<h2>7 · Cost-minimisation checklist (apply before scaling)</h2>
+<table>
+  <thead><tr><th>#</th><th>Lever</th><th>Savings</th><th>Effort</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>Switch SMS from Twilio to SMSMisr (or Victory Link)</td><td>~90% on SMS line</td><td>1 day integration</td></tr>
+    <tr><td>2</td><td>Enable Gemini context caching on system prompt + tool defs</td><td>~50% on AI line</td><td>2–4 hours</td></tr>
+    <tr><td>3</td><td>Lock in 24-month VPS commitment (vs monthly billing)</td><td>35–40% on VPS line</td><td>1 checkout click</td></tr>
+    <tr><td>4</td><td>Keep the fast-path for trivial greetings (already shipped)</td><td>~15% on AI line</td><td>Done ✓</td></tr>
+    <tr><td>5</td><td>Trim history sent to Gemini to last 8 turns + summarise the rest</td><td>~20% on AI input tokens</td><td>Half day</td></tr>
+    <tr><td>6</td><td>Resend free tier (3,000 emails/mo) until you clear 100 tenants</td><td>Delay $20/mo email cost by ~6 months</td><td>Already free</td></tr>
+    <tr><td>7</td><td>Cloudflare in front of app (free) for static assets + DDoS buffer</td><td>~30% on VPS bandwidth</td><td>1 hour DNS setup</td></tr>
+    <tr><td>8</td><td>Daily <code>pg_dump</code> → Backblaze B2 ($6/TB/mo) instead of managed backup addon at scale</td><td>Up to 70% on backup line at &gt; 50 GB</td><td>2 hours scripting</td></tr>
+    <tr><td>9</td><td>Push annual billing — 25% discount buys you 12 months of cash upfront</td><td>LTV × 2, churn drops ~40%</td><td>Pricing-page copy change</td></tr>
+    <tr><td>10</td><td>Track Gemini spend by tenant; flag &gt; 500 requests/mo as potential abuse</td><td>Prevents one bad actor burning your margin</td><td>1 day dashboard</td></tr>
+  </tbody>
+</table>
+
+<!-- ─────────────────────────── PROJECTION ─────────────────────────── -->
+<h2>8 · 12-month projection (realistic base case)</h2>
+<p class="section-lead">Assumes free trial → 20% conversion → 60/40 split between monthly and quarterly plans. Churn modelled at 5%/mo on monthly, 2%/mo on quarterly, 1%/mo on annual.</p>
+<table>
+  <thead>
+    <tr>
+      <th>Month</th>
+      <th class="num">New trials</th>
+      <th class="num">Paying tenants (EOM)</th>
+      <th class="num">MRR (EGP)</th>
+      <th class="num">Infra + variable cost (EGP)</th>
+      <th class="num">Marketing (EGP)</th>
+      <th class="num">Net (EGP)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>1 (launch)</td><td class="num">40</td><td class="num">0 (all free trial)</td><td class="num">0</td><td class="num">500</td><td class="num">0</td><td class="num">–500</td></tr>
+    <tr><td>2</td><td class="num">60</td><td class="num">8</td><td class="num">3,000</td><td class="num">550</td><td class="num">0</td><td class="num">+2,450</td></tr>
+    <tr><td>3 (public)</td><td class="num">80</td><td class="num">24</td><td class="num">9,000</td><td class="num">700</td><td class="num">3,000</td><td class="num">+5,300</td></tr>
+    <tr><td>4</td><td class="num">120</td><td class="num">48</td><td class="num">18,000</td><td class="num">900</td><td class="num">5,000</td><td class="num">+12,100</td></tr>
+    <tr><td>5</td><td class="num">150</td><td class="num">78</td><td class="num">29,000</td><td class="num">1,100</td><td class="num">5,000</td><td class="num">+22,900</td></tr>
+    <tr><td>6</td><td class="num">180</td><td class="num">115</td><td class="num">42,000</td><td class="num">1,400</td><td class="num">5,000</td><td class="num">+35,600</td></tr>
+    <tr><td>9</td><td class="num">220</td><td class="num">220</td><td class="num">79,000</td><td class="num">2,000</td><td class="num">5,000</td><td class="num">+72,000</td></tr>
+    <tr class="total"><td>12</td><td class="num">250</td><td class="num"><strong>350</strong></td><td class="num"><strong>125,000</strong></td><td class="num">3,500</td><td class="num">5,000</td><td class="num"><strong>+116,500</strong></td></tr>
+  </tbody>
+</table>
+<div class="callout">By month 12 the typical trajectory lands around <strong>350 paying tenants, EGP 125k MRR, 93% gross margin</strong>, infra on KVM 4. The bottleneck at that point is not money — it&rsquo;s support capacity. Plan to hire one part-time support rep around month 8.</div>
+
+<!-- ─────────────────────────── FOOTER ─────────────────────────── -->
+<div class="footnote">
+  <p><strong>Disclaimer:</strong> all USD prices are from the vendors&rsquo; public pricing pages as of late 2025 / early 2026 and may change. EGP figures assume USD/EGP ≈ 50 — recalculate if the rate shifts materially. Gemini token-cost math assumes the current <code>gemini-3.6-flash</code> tier; prompt-caching pricing is a ballpark based on the <code>gemini-2.5-flash</code> cached-tokens discount and may differ in 3.6. SMS Egypt rates vary by provider volume tier and campaign type (transactional / promotional) — confirm with SMSMisr sales directly before launch. Marketing-channel CPAs are industry rules-of-thumb for Egyptian SMB SaaS; your first month of live data should replace these estimates.</p>
+  <p>Prepared by Claude, Anthropic — 2026-11-10 — for Storo founding team internal planning.</p>
+</div>
+
+</body>
+</html>

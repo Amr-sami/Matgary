@@ -101,7 +101,7 @@ services:
       postgres:
         condition: service_healthy
     env_file:
-      - .env
+      - ./apps/web/.env
     environment:
       NODE_ENV: production
       # All four must be rewritten, not just DATABASE_URL. migrate.ts only uses
@@ -129,7 +129,7 @@ services:
       redis:
         condition: service_healthy
     env_file:
-      - .env
+      - ./apps/web/.env
     environment:
       NODE_ENV: production
       HOSTNAME: 0.0.0.0
@@ -143,6 +143,15 @@ services:
       APP_DATABASE_URL: postgres://matgary_app:${APP_DB_PASSWORD}@postgres:5432/matgary
       ADMIN_DATABASE_URL: postgres://matgary_admin:${ADMIN_DB_PASSWORD}@postgres:5432/matgary
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      # Pinned next to the mount below so the two cannot drift; the image's
+      # ENV already says the same (Dockerfile runner stage).
+      UPLOADS_DIR: /repo/uploads
+    volumes:
+      # Product / team photos and receipt logos (lib/uploads.ts). A named
+      # volume so they survive `up -d --build`; the Dockerfile pre-creates
+      # /repo/uploads owned by nextjs, and a named volume copies that
+      # ownership on first mount, so the app can write here as uid 1001.
+      - matgary_uploads:/repo/uploads
     ports:
       - "127.0.0.1:3000:3000"
     healthcheck:
@@ -155,9 +164,10 @@ services:
       start_period: 20s
 
   # Pokes the app's internal cron routes. Holds no DB credentials — only the
-  # shared bearer token. All six routes are scheduled here; the dev compose
-  # file wires only three, which is why admin lockouts are never applied,
-  # digests never send, and demo clones accumulate.
+  # shared bearer token. All eight routes are scheduled here (one per directory
+  # in apps/web/app/api/cron); the dev compose file wires only four, which is
+  # why admin lockouts are never applied, digests never send, and demo clones
+  # accumulate.
   cron:
     image: alpine:3.20
     container_name: matgary-cron
@@ -175,13 +185,44 @@ services:
       ACTIVITY_CLEANUP_CRON: "30 3 * * *"
       TENANT_DELETION_CRON: "0 3 * * *"
       ADMIN_SESSION_CLEANUP_CRON: "*/15 * * * *"
-      DIGEST_TICK_CRON: "*/30 * * * *"
+      # Also the push-receipts poller: digest-tick/route.ts ends with
+      # drainPushReceipts() (apps/web/lib/push/receipts.ts). A receipt is asked
+      # for RECEIPT_DELAY_MS = 15 min after the ticket, so a 15-min tick bounds
+      # dead-token detection at ~30 min. Digests stay idempotent (digest_runs
+      # unique index). "*/15" lands at most 5 pokes in any sliding hour
+      # (:00,:15,:30,:45,:00 at the boundary — lib/ratelimit's window slides,
+      # it does not reset), still under the route's 6/h per-IP bucket.
+      DIGEST_TICK_CRON: "*/15 * * * *"
       DEMO_CLEANUP_CRON: "15 4 * * *"
       # Drains notification_digest_queue. Its query takes every row where
       # sent_at IS NULL with no age filter, so the cron interval IS the digest
       # period — running it hourly would turn an opt-in daily summary into an
       # hourly one. Once a day, 17:00 UTC = 20:00 Cairo (19:00 outside DST).
       NOTIFICATIONS_DIGEST_CRON: "0 17 * * *"
+      # Digital collections (mobile-dev-docs/15-digital-collections, specs 13 + 16):
+      # M1 staleSweep + limitSweep; M2 adds silentSourceSweep, rawPurge (raw-message
+      # retention: a legal duty, spec 14) and lateRematch. "*/15" lands at most 5
+      # pokes in any sliding hour, under guardCronRequest's default 6/h for the
+      # "collections-tick" bucket. Never faster; never slower than hourly (retention).
+      COLLECTIONS_TICK_CRON: "*/15 * * * *"
+      # Notification Center (migration 0069): report.daily/weekly/monthly
+      # scheduled sends. reports-tick reads tenant_report_settings and fires
+      # whichever reports are enabled at the configured local time. Every 15
+      # min so we catch any owner-configured HH:MM within the trailing 14
+      # min (route uses `withinTickWindow`). Idempotent — wasAlreadyDispatched
+      # prevents duplicates within the period.
+      REPORTS_TICK_CRON: "*/15 * * * *"
+      # Low-stock sweep — fires inventory.low_stock for every product at or
+      # below its threshold, once per calendar day (dedupe keyed on
+      # /inventory/<productId>?lowStock=YYYY-MM-DD). Hourly so a mid-day
+      # drop-to-threshold doesn't wait until midnight to notify.
+      LOW_STOCK_SWEEP_CRON: "0 * * * *"
+      # Attendance late-arrival sweep (migration 0069, N2). Checks each
+      # enabled employee_schedules row against now-in-tenant-tz:
+      # work_day? not on leave? grace expired? fires attendance.late,
+      # one notification per employee per day (dedupe via link embedding
+      # YYYY-MM-DD). Every 5 min so a late detection arrives promptly.
+      ATTENDANCE_LATE_SWEEP_CRON: "*/5 * * * *"
     entrypoint:
       - sh
       - -c
@@ -203,6 +244,11 @@ services:
           | sed "s|^|[cron $$label] |"
         WRAPPER
         chmod 700 /usr/local/bin/poke-cron.sh
+        # Every line below is authenticated by CRON_SECRET: poke-cron.sh sends
+        # it as "Authorization: Bearer <CRON_SECRET>" and each /api/cron/* route
+        # compares it constant-time (apps/web/lib/cron/auth.ts guardCronRequest;
+        # recurring-expenses keeps its own copy). One line per directory in
+        # apps/web/app/api/cron — a route missing here never runs in prod.
         {
           echo "$$RECURRING_EXPENSES_CRON /usr/local/bin/poke-cron.sh /api/cron/recurring-expenses recurring-expenses >> /var/log/cron.log 2>&1"
           echo "$$ACTIVITY_CLEANUP_CRON /usr/local/bin/poke-cron.sh /api/cron/activity-log-cleanup activity-cleanup >> /var/log/cron.log 2>&1"
@@ -211,8 +257,12 @@ services:
           echo "$$DIGEST_TICK_CRON /usr/local/bin/poke-cron.sh /api/cron/digest-tick digest-tick >> /var/log/cron.log 2>&1"
           echo "$$DEMO_CLEANUP_CRON /usr/local/bin/poke-cron.sh /api/cron/demo-cleanup demo-cleanup >> /var/log/cron.log 2>&1"
           echo "$$NOTIFICATIONS_DIGEST_CRON /usr/local/bin/poke-cron.sh /api/cron/notifications-digest notifications-digest >> /var/log/cron.log 2>&1"
+          echo "$$COLLECTIONS_TICK_CRON /usr/local/bin/poke-cron.sh /api/cron/collections-tick collections-tick >> /var/log/cron.log 2>&1"
+          echo "$$REPORTS_TICK_CRON /usr/local/bin/poke-cron.sh /api/cron/reports-tick reports-tick >> /var/log/cron.log 2>&1"
+          echo "$$LOW_STOCK_SWEEP_CRON /usr/local/bin/poke-cron.sh /api/cron/low-stock-sweep low-stock-sweep >> /var/log/cron.log 2>&1"
+          echo "$$ATTENDANCE_LATE_SWEEP_CRON /usr/local/bin/poke-cron.sh /api/cron/attendance-late-sweep attendance-late-sweep >> /var/log/cron.log 2>&1"
         } > /etc/crontabs/root
-        echo "[cron] target: $$CRON_TARGET_URL — 7 jobs scheduled"
+        echo "[cron] target: $$CRON_TARGET_URL — 11 jobs scheduled"
         exec tini -- crond -f -d 8
 
   backup:
@@ -238,6 +288,11 @@ services:
       - ./infra/restore.sh:/usr/local/bin/restore.sh:ro
       - ./backups:/backups
       - ./logs/backup:/var/log
+      # Read-only view of the uploads volume. backup.sh does not tar it on
+      # the nightly schedule (see the note there); the mount is here so a
+      # manual snapshot / restore drill can reach the files without exec-ing
+      # into the app container.
+      - matgary_uploads:/uploads:ro
     entrypoint:
       - sh
       - -c
@@ -253,3 +308,4 @@ services:
 volumes:
   matgary_pg_data:
   matgary_redis_data:
+  matgary_uploads:

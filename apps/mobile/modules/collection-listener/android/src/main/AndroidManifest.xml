@@ -1,0 +1,33 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- Doc 15 spec 11 §4.3. No <uses-permission> at all: BIND_NOTIFICATION_LISTENER_SERVICE is the permission
+       the SYSTEM must hold to bind us, set on the service; INTERNET is already in the app. No SMS permission,
+       no foreground service, no QUERY_ALL_PACKAGES, ever (D11-d, D11-f; 14 §4.10). -->
+  <queries>
+    <!-- = packagesForProviders(every CollectionProvider) from packages/domain/src/collections/providers.ts,
+         pinned by __tests__/manifest-parity.test.ts (03 §B.10: a new package is a native change). -->
+    <package android:name="com.egyptianbanks.instapay" />          <!-- INSTAPAY_APP_PACKAGE (06 §4.4) -->
+    <package android:name="com.ofss.obdx.and.nbe.com.eg" />        <!-- nbe -->
+    <package android:name="com.cibeg.ddc1.digitalbanking.live" />  <!-- cib -->
+    <package android:name="eg.com.qnb.eazymobile" />              <!-- qnb -->
+    <package android:name="com.BanqueMisr.MobileBanking" />       <!-- banque_misr -->
+    <package android:name="com.emeint.android.myservices" />      <!-- vodafone_cash (Ana Vodafone) -->
+    <package android:name="com.etisalat.flous" />                 <!-- etisalat_money -->
+    <package android:name="com.orange.mobinilandme" />            <!-- orange_cash (Max it) -->
+    <package android:name="com.TE.WEWallet" />                    <!-- we_pay -->
+    <package android:name="com.emeint.android.mwallet" />         <!-- nbe_phone_cash -->
+    <package android:name="com.emeint.android.mwallet.bm" />      <!-- bm_wallet -->
+  </queries>
+  <application>
+    <service
+      android:name="expo.modules.collectionlistener.CollectionListenerService"
+      android:exported="false"
+      android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+      <intent-filter>
+        <action android:name="android.service.notification.NotificationListenerService" />
+      </intent-filter>
+      <meta-data
+        android:name="android.service.notification.disabled_filter_types"
+        android:value="ongoing" />
+    </service>
+  </application>
+</manifest>

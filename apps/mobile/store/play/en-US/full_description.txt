@@ -1,0 +1,37 @@
+TheStoro is the point-of-sale system that runs your shop from your phone — supermarket, clothing store, pharmacy, café or wholesale stockroom — and stays in sync with the web dashboard at thestoro.com in real time.
+
+REGISTER
+• Scan barcodes with the phone camera; items drop straight into the cart.
+• Line and receipt discounts, multiple payment methods.
+• Print receipts on a Bluetooth thermal printer, or share them as an image/PDF over WhatsApp.
+• Works offline: sales are recorded locally and upload themselves the moment the connection returns.
+
+INVENTORY
+• Live stock per product and per branch, with low-stock alerts.
+• Add a product with barcode, photo and price in seconds.
+• Quick counts, branch transfers, and returns that adjust stock automatically.
+
+PURCHASES & SUPPLIERS
+• Record purchase invoices against a supplier and track what you owe.
+
+CUSTOMERS
+• A profile per customer with phone number, purchase history and balance.
+• Message customers on WhatsApp straight from their profile.
+
+EXPENSES & REPORTS
+• Log the day's expenses; see net sales, profit and best-sellers at a glance.
+• A daily summary arrives as a push notification.
+
+TEAM
+• Staff accounts with per-person permissions.
+• Check-in/check-out from within the shop's radius, leave requests, daily tasks.
+
+SECURITY
+• Lock the app with Face ID / Touch ID.
+• Your data is encrypted and synced with your web account — a lost phone is not lost data.
+
+TheStoro is Arabic-first by design: true right-to-left layout, Egyptian pound formatting, and every screen in your language. Also available in English.
+
+A TheStoro account is required. Open the app and register your shop in a minute, or sign in with your existing web account.
+
+Support: support@thestoro.com — thestoro.com/en/help

@@ -1,0 +1,106 @@
+# Team — More → Team → first member → the Permissions card is visible → back
+# → the attendance roster loads for today.
+#
+# testIDs: team-member-row (list), team-permissions (the card wrapper on the
+# member page), team-attendance (the roster entry row on Team), roster-row
+# (one staff line on /team/attendance). The seeded owner is always a member,
+# so the list is never empty; the roster shows the empty-state copy instead of
+# rows when the store has no staff — both outcomes are accepted there.
+# Signs in first when the app is on the login screen. Ends on the dashboard.
+appId: com.thestoro.app
+---
+- launchApp
+- runFlow: helpers/dev-launcher.yaml
+- extendedWaitUntil:
+    visible:
+      text: "المزيد|More|تسجيل الدخول|Sign in"
+    timeout: 45000
+- runFlow:
+    when:
+      visible:
+        id: "login-identifier"
+    file: login.yaml
+- runFlow: helpers/dismiss-logbox.yaml
+
+- tapOn:
+    text: "المزيد|More"
+- scrollUntilVisible:
+    element:
+      text: "الموظفون|Team"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    text: "الموظفون|Team"
+- extendedWaitUntil:
+    visible:
+      id: "team-member-row"
+    timeout: 30000
+
+# First member → permissions card.
+- tapOn:
+    id: "team-member-row"
+    index: 0
+- extendedWaitUntil:
+    visible:
+      text: "الصلاحيات|Permissions"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "team-permissions"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    id: "team-permissions"
+# The card is taller than the screen, so centring it scrolls its header hint
+# ("{n} صلاحية" / "{n} صلاحيات" by count, or the owner line) off the top —
+# scroll back up to it. The stem "صلاحي" / "permission" covers every plural
+# form the count picks (the Pixel's seeded owner shows "5 صلاحيات").
+- scrollUntilVisible:
+    element:
+      text: "(?s).*صلاحي.*|(?s).*permission.*|(?s).*المالك عنده كل الصلاحيات.*|(?s).*owner has every permission.*"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    text: "(?s).*صلاحي.*|(?s).*permission.*|(?s).*المالك عنده كل الصلاحيات.*|(?s).*owner has every permission.*"
+
+# Back to Team via the breadcrumb (router.navigate("/team")). The breadcrumb
+# reads t("app.team.tabs.team") ("الفريق والصلاحيات" / "Team & permissions"),
+# so tap it by id rather than by a text regex.
+- scrollUntilVisible:
+    element:
+      id: "team-breadcrumb"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: "team-breadcrumb"
+- extendedWaitUntil:
+    visible:
+      id: "team-attendance"
+    timeout: 30000
+
+# Attendance roster for today.
+- tapOn:
+    id: "team-attendance"
+# Roster heading is t("app.team.roster.todayHeading"): "حضور اليوم" / "Today's attendance".
+- extendedWaitUntil:
+    visible:
+      text: "حضور اليوم|Today's attendance"
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      text: "اليوم|Today"
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      text: "(?s).*حاضر.*|(?s).*Present.*|(?s).*غائب.*|(?s).*Absent.*|(?s).*انصرف.*|(?s).*Out.*|(?s).*يحتاج مراجعة.*|(?s).*Needs review.*|(?s)مفيش موظفين لسه.*|(?s)No staff yet.*"
+    timeout: 30000
+
+# Back to the dashboard.
+- tapOn:
+    text: "الرئيسية|Home"
+- assertVisible:
+    text: "أهلاً، .+|Welcome back, .+"

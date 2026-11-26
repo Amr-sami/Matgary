@@ -1,0 +1,177 @@
+# Language — Settings → English, then back to Arabic.
+#
+# The root Stack is re-keyed on locale (src/app/_layout.tsx), so a switch
+# remounts the navigator onto the dashboard; the flow re-opens Settings after
+# each switch. Starts by normalising to Arabic if a previous run left English
+# persisted. Signs in first when the app is on the login screen. Ends on the
+# dashboard, in Arabic.
+#
+# Settings tiles are accessibility-merged buttons whose label is
+# "title, badge, hint" as one string, so a tile is matched as "(?s)title.*".
+appId: com.thestoro.app
+---
+- launchApp
+- runFlow: helpers/dev-launcher.yaml
+- extendedWaitUntil:
+    visible:
+      text: "المزيد|More|تسجيل الدخول|Sign in"
+    timeout: 45000
+- runFlow:
+    when:
+      visible:
+        id: "login-identifier"
+    file: login.yaml
+
+# Open Settings (More → Settings row, near the bottom of the More list).
+- tapOn:
+    text: "المزيد|More"
+- scrollUntilVisible:
+    element:
+      text: "الإعدادات|Settings"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    text: "الإعدادات|Settings"
+- extendedWaitUntil:
+    visible:
+      text: "اللغة|Language"
+    timeout: 30000
+
+# Normalise: if the page came up in English, go to Arabic and reopen Settings.
+- runFlow:
+    when:
+      visible:
+        text: "Language"
+    commands:
+      - tapOn:
+          text: "العربية"
+      - extendedWaitUntil:
+          visible:
+            text: "المزيد"
+          timeout: 30000
+      - tapOn:
+          text: "المزيد"
+      - scrollUntilVisible:
+          element:
+            text: "الإعدادات"
+          direction: DOWN
+          centerElement: true
+          timeout: 20000
+      - tapOn:
+          text: "الإعدادات"
+      - extendedWaitUntil:
+          visible:
+            text: "اللغة"
+          timeout: 30000
+
+- assertVisible:
+    text: "اللغة"
+- assertVisible:
+    text: "(?s)إدارة الفروع.*"
+
+# → English
+- tapOn:
+    text: "English"
+- extendedWaitUntil:
+    visible:
+      text: "More"
+    timeout: 30000
+- assertNotVisible:
+    text: "المزيد"
+- runFlow:
+    when:
+      notVisible:
+        text: "Language"
+    commands:
+      - tapOn:
+          text: "More"
+      - scrollUntilVisible:
+          element:
+            text: "Settings"
+          direction: DOWN
+          centerElement: true
+          timeout: 20000
+      - tapOn:
+          text: "Settings"
+- extendedWaitUntil:
+    visible:
+      text: "Language"
+    timeout: 30000
+- assertVisible:
+    text: "(?s)Branches.*"
+- scrollUntilVisible:
+    element:
+      text: "(?s)Categories.*"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+# The Printers tile sits below Categories; on the Pixel's shorter viewport it
+# is still off-screen once Categories is centred — scroll to it before asserting.
+- scrollUntilVisible:
+    element:
+      text: "(?s)Printers.*"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    text: "(?s)Printers.*"
+- scrollUntilVisible:
+    element:
+      text: "العربية"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+
+# → back to Arabic
+- tapOn:
+    text: "العربية"
+- extendedWaitUntil:
+    visible:
+      text: "المزيد"
+    timeout: 30000
+- assertNotVisible:
+    text: "More"
+- runFlow:
+    when:
+      notVisible:
+        text: "اللغة"
+    commands:
+      - tapOn:
+          text: "المزيد"
+      - scrollUntilVisible:
+          element:
+            text: "الإعدادات"
+          direction: DOWN
+          centerElement: true
+          timeout: 20000
+      - tapOn:
+          text: "الإعدادات"
+- extendedWaitUntil:
+    visible:
+      text: "اللغة"
+    timeout: 30000
+- assertVisible:
+    text: "(?s)إدارة الفروع.*"
+- scrollUntilVisible:
+    element:
+      text: "(?s)الأقسام.*"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+# The Printers tile sits below Categories; on the Pixel's shorter viewport it
+# is still off-screen once Categories is centred — scroll to it before asserting.
+- scrollUntilVisible:
+    element:
+      text: "(?s)الطابعات.*"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    text: "(?s)الطابعات.*"
+
+# Finish on the dashboard, in Arabic.
+- tapOn:
+    text: "الرئيسية"
+- assertVisible:
+    text: "أهلاً، .+"

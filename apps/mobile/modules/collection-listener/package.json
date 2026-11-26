@@ -1,0 +1,10 @@
+{
+  "name": "collection-listener",
+  "version": "1.0.0",
+  "description": "Local Expo module (Android only): a NotificationListenerService that forwards bank/wallet APP notifications (never SMS) to the L2 ingest API, with an encrypted queue, WorkManager uploads and a 15-minute heartbeat (doc 15 spec 11, M4).",
+  "main": "index.ts",
+  "private": true,
+  "license": "UNLICENSED",
+  "author": "TheStoro",
+  "homepage": "https://thestoro.com"
+}

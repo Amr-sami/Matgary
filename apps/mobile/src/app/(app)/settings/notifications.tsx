@@ -1,0 +1,779 @@
+import { useState } from "react";
+import {
+  Linking,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
+import * as Notifications from "expo-notifications";
+import { CalendarCheckIcon as CalendarCheck } from "phosphor-react-native/src/icons/CalendarCheck";
+import { ClockClockwiseIcon as ClockClockwise } from "phosphor-react-native/src/icons/ClockClockwise";
+
+import { notifications } from "@matgary/api-client";
+
+import { api } from "@/api/client";
+import { ensureSalesChannel, forgetRegistration } from "@/effects/PushRegistrar";
+import { Screen } from "@/components/layout/Screen";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
+import { Card } from "@/components/ui/Card";
+import { ChevronForward } from "@/components/ui/Chevron";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Segmented } from "@/components/ui/Segmented";
+import { SettingsHeader } from "@/components/ui/SettingsHeader";
+import { ToggleRow } from "@/components/ui/ToggleRow";
+import {
+  previewNotificationRequest,
+  saleAlertPreferenceBody,
+  splitSaleAlertRow,
+} from "@/lib/sale-alerts";
+import { usePush, type PushStatus } from "@/stores/push";
+import { RTL_TEXT } from "@/theme/rtl";
+import { MIN_TOUCH, colors, fonts, radius, spacing } from "@/theme/tokens";
+import { SkeletonListRow } from "@/components/ui/skeleton";
+import { t } from "@/i18n";
+
+/**
+ * Port of app__settings-notifications.png.
+ *
+ * DELIBERATE DEVIATION, and the only one on this screen: the web renders a
+ * four-column grid (الحدث · داخل التطبيق · البريد · التسليم). At 360dp that
+ * grid gives the event title ~90px, which breaks "تنبيه مخزون منخفض" one word
+ * per line — the exact defect the polish pass exists to kill. The same four
+ * fields become labelled rows inside one card per event; every string,
+ * every default and every PUT body is unchanged.
+ *
+ * ADDITION over the web (doc 06 §8.3): a "Push" switch per event — the phone
+ * column the web page has no use for. The server only pushes when in-app is
+ * on AND delivery is instant (dispatch.ts skips digest-mode events), so the
+ * switch shows the EFFECTIVE state: it dims with in-app off, the way delivery
+ * dims with email off, and dims again — with a hint saying why — while the
+ * event is on the daily digest.
+ *
+ * SALE ALERTS (doc 16 §7): `sale.alert` is not a per-event card. It renders
+ * first as its own card — one switch bound to `push` alone (the server forces
+ * inApp/email off and delivery instant for it, so the in-app/digest blocking
+ * above never applies), a "Play the sound" local preview, and the denied-
+ * permission hint. The `sale.created` card loses its push switch: that event
+ * can never push any more (dispatch.ts), the cha-ching is `sale.alert`.
+ */
+type EventType = notifications.NotificationEventType;
+type Pref = notifications.EventPreference;
+type Prefs = notifications.NotificationPreferences;
+
+const PREFS_KEY = ["notification-preferences"] as const;
+
+/** The GET payload with one event's row replaced by `patch`. */
+function withPatch(cur: Prefs, patch: Pref): Prefs {
+  return {
+    ...cur,
+    preferences: cur.preferences.map((p) =>
+      p.eventType === patch.eventType ? { ...p, ...patch } : p,
+    ),
+  };
+}
+
+/** apps/web/dictionaries/ar.json → app.notificationSettings.events */
+const EVENTS = (): Record<EventType, { title: string; hint: string }> => ({
+  "sale.created": {
+    title: t("app.notificationSettings.events.sale.created.title"),
+    hint: t("app.notificationSettings.events.sale.created.hint"),
+  },
+  "sale.alert": {
+    title: t("app.notificationSettings.events.sale.alert.title"),
+    hint: t("app.notificationSettings.events.sale.alert.hint"),
+  },
+  "purchase.received": {
+    title: t("app.notificationSettings.events.purchase.received.title"),
+    hint: t("app.notificationSettings.events.purchase.received.hint"),
+  },
+  "inventory.low_stock": {
+    title: t("app.notificationSettings.events.inventory.low_stock.title"),
+    hint: t("app.notificationSettings.events.inventory.low_stock.hint"),
+  },
+  "payment.deferred_settled": {
+    title: t("app.notificationSettings.events.payment.deferred_settled.title"),
+    hint: t("app.notificationSettings.events.payment.deferred_settled.hint"),
+  },
+  "leave.requested": {
+    title: t("app.notificationSettings.events.leave.requested.title"),
+    hint: t("app.notificationSettings.events.leave.requested.hint"),
+  },
+  // Digital collections (doc 15 spec 13 §4.9): the server lists these only to
+  // members who can receive them; the map must still cover every event.
+  "collection.pending": {
+    title: t("app.notificationSettings.events.collection.pending.title"),
+    hint: t("app.notificationSettings.events.collection.pending.hint"),
+  },
+  "collection.stale": {
+    title: t("app.notificationSettings.events.collection.stale.title"),
+    hint: t("app.notificationSettings.events.collection.stale.hint"),
+  },
+  "collection.unmatched_credit": {
+    title: t("app.notificationSettings.events.collection.unmatched_credit.title"),
+    hint: t("app.notificationSettings.events.collection.unmatched_credit.hint"),
+  },
+  "collection.source_silent": {
+    title: t("app.notificationSettings.events.collection.source_silent.title"),
+    hint: t("app.notificationSettings.events.collection.source_silent.hint"),
+  },
+  "collection.limit_warning": {
+    title: t("app.notificationSettings.events.collection.limit_warning.title"),
+    hint: t("app.notificationSettings.events.collection.limit_warning.hint"),
+  },
+  // Phase B events (reports + instant business events). Labels + hints must
+  // never fall back to the raw event id — the UI shows `attendance.check_in`
+  // to the user otherwise.
+  "report.weekly": {
+    title: t("app.notificationSettings.events.report.weekly.title"),
+    hint: t("app.notificationSettings.events.report.weekly.hint"),
+  },
+  "report.monthly": {
+    title: t("app.notificationSettings.events.report.monthly.title"),
+    hint: t("app.notificationSettings.events.report.monthly.hint"),
+  },
+  "expense.recorded": {
+    title: t("app.notificationSettings.events.expense.recorded.title"),
+    hint: t("app.notificationSettings.events.expense.recorded.hint"),
+  },
+  "product.added": {
+    title: t("app.notificationSettings.events.product.added.title"),
+    hint: t("app.notificationSettings.events.product.added.hint"),
+  },
+  "inventory.adjusted": {
+    title: t("app.notificationSettings.events.inventory.adjusted.title"),
+    hint: t("app.notificationSettings.events.inventory.adjusted.hint"),
+  },
+  "return.recorded": {
+    title: t("app.notificationSettings.events.return.recorded.title"),
+    hint: t("app.notificationSettings.events.return.recorded.hint"),
+  },
+  "attendance.check_in": {
+    title: t("app.notificationSettings.events.attendance.check_in.title"),
+    hint: t("app.notificationSettings.events.attendance.check_in.hint"),
+  },
+  // Notification Center extension — labels resolve against mobile.notifications.events.*
+  "purchase.created": {
+    title: t("mobile.notifications.events.purchase.created.title"),
+    hint: t("mobile.notifications.events.purchase.created.hint"),
+  },
+  "purchase.returned": {
+    title: t("mobile.notifications.events.purchase.returned.title"),
+    hint: t("mobile.notifications.events.purchase.returned.hint"),
+  },
+  "supplier.payment.recorded": {
+    title: t("mobile.notifications.events.supplier.payment.recorded.title"),
+    hint: t("mobile.notifications.events.supplier.payment.recorded.hint"),
+  },
+  "customer.created": {
+    title: t("mobile.notifications.events.customer.created.title"),
+    hint: t("mobile.notifications.events.customer.created.hint"),
+  },
+  "expense.voided": {
+    title: t("mobile.notifications.events.expense.voided.title"),
+    hint: t("mobile.notifications.events.expense.voided.hint"),
+  },
+  "leave.approved": {
+    title: t("mobile.notifications.events.leave.approved.title"),
+    hint: t("mobile.notifications.events.leave.approved.hint"),
+  },
+  "leave.rejected": {
+    title: t("mobile.notifications.events.leave.rejected.title"),
+    hint: t("mobile.notifications.events.leave.rejected.hint"),
+  },
+  "payroll.calculated": {
+    title: t("mobile.notifications.events.payroll.calculated.title"),
+    hint: t("mobile.notifications.events.payroll.calculated.hint"),
+  },
+  "payroll.finalized": {
+    title: t("mobile.notifications.events.payroll.finalized.title"),
+    hint: t("mobile.notifications.events.payroll.finalized.hint"),
+  },
+  "payroll.voided": {
+    title: t("mobile.notifications.events.payroll.voided.title"),
+    hint: t("mobile.notifications.events.payroll.voided.hint"),
+  },
+  "report.daily": {
+    title: t("mobile.notifications.events.report.daily.title"),
+    hint: t("mobile.notifications.events.report.daily.hint"),
+  },
+  "attendance.late": {
+    title: t("mobile.notifications.events.attendance.late.title"),
+    hint: t("mobile.notifications.events.attendance.late.hint"),
+  },
+});
+
+const DELIVERY = () => ([
+  { key: "instant" as const, label: t("app.notificationSettings.delivery.instant") },
+  { key: "digest" as const, label: t("app.notificationSettings.delivery.digest") },
+]);
+
+export default function NotificationSettingsScreen() {
+  const router = useRouter();
+  const [notice, setNotice] = useState<{ tone: "ok" | "err"; text: string } | null>(
+    null,
+  );
+
+  const qc = useQueryClient();
+  const q = useQuery({
+    queryKey: PREFS_KEY,
+    queryFn: () => notifications.getPreferences(api),
+  });
+
+  const save = useMutation({
+    mutationFn: (patch: Pref) =>
+      notifications.setPreference(api, {
+        eventType: patch.eventType,
+        inApp: patch.inApp,
+        push: patch.push,
+        email: patch.email,
+        digestMode: patch.digestMode,
+      }),
+    // Optimistic: the switch the user just flipped shows its new value during
+    // the PUT instead of snapping back to the stale row until the GET lands.
+    onMutate: (patch) => {
+      qc.setQueryData<Prefs>(PREFS_KEY, (cur) => (cur ? withPatch(cur, patch) : cur));
+    },
+    onSuccess: (res, patch) => {
+      setNotice({ tone: "ok", text: t("app.notificationSettings.savedToast") });
+      // `isDefault` comes from the server — it DELETES the row when a patch
+      // happens to match the code default for this role.
+      qc.setQueryData<Prefs>(PREFS_KEY, (cur) =>
+        cur ? withPatch(cur, { ...patch, isDefault: res.isDefault }) : cur,
+      );
+      // RETURNED, not `void`ed: `isPending` stays true until the re-read
+      // lands, so the card stays locked and a second toggle cannot spread a
+      // stale row into its PUT body and revert this one on the server.
+      return q.refetch();
+    },
+    onError: () => {
+      setNotice({ tone: "err", text: t("app.notificationSettings.errorToast") });
+      // Drops the optimistic row; the server is the truth. Awaited for the
+      // same lock-until-fresh reason as onSuccess.
+      return q.refetch();
+    },
+  });
+
+  const { saleAlert, rest: rows } = splitSaleAlertRow(q.data?.preferences ?? []);
+
+  return (
+    <Screen onRefresh={() => void q.refetch()} refreshing={q.isRefetching}>
+      {/* The role rides in the header's accessory slot as a Badge — it is a
+          two-word status, not a second subtitle. */}
+      <SettingsHeader
+        parentLabel={t("app.settingsPage.title")}
+        title={t("app.shell.notifications.title")}
+        subtitle={t("app.notificationSettings.intro")}
+        accessories={
+          q.data ? (
+            <Badge
+              label={
+                q.data.role === "owner"
+                  ? t("app.notificationSettings.role.owner")
+                  : t("app.notificationSettings.role.staff")
+              }
+            />
+          ) : undefined
+        }
+      />
+
+      {notice ? (
+        <Pressable onPress={() => setNotice(null)}>
+          <Text
+            style={[
+              styles.notice,
+              notice.tone === "ok" ? styles.noticeOk : styles.noticeErr,
+            ]}
+          >
+            {notice.text}
+          </Text>
+        </Pressable>
+      ) : null}
+
+      <Card>
+        <Pressable
+          onPress={() => router.push("/settings/notifications/attendance")}
+          style={({ pressed }) => [styles.navRow, pressed && styles.navRowPressed]}
+          accessibilityRole="button"
+          testID="nc-nav-attendance"
+        >
+          <CalendarCheck size={20} color={colors.textSecondary} />
+          <View style={styles.navBody}>
+            <Text numberOfLines={1} style={styles.navTitle}>
+              {t("mobile.notifications.center.sections.attendance")}
+            </Text>
+            <Text style={styles.navHint}>
+              {t("mobile.notifications.center.sections.attendanceHint")}
+            </Text>
+          </View>
+          <ChevronForward size={18} color={colors.textSecondary} />
+        </Pressable>
+
+        <View style={styles.navDivider} />
+
+        <Pressable
+          onPress={() => router.push("/settings/notifications/reports")}
+          style={({ pressed }) => [styles.navRow, pressed && styles.navRowPressed]}
+          accessibilityRole="button"
+          testID="nc-nav-reports"
+        >
+          <ClockClockwise size={20} color={colors.textSecondary} />
+          <View style={styles.navBody}>
+            <Text numberOfLines={1} style={styles.navTitle}>
+              {t("mobile.notifications.center.sections.reports")}
+            </Text>
+            <Text style={styles.navHint}>
+              {t("mobile.notifications.center.sections.reportsHint")}
+            </Text>
+          </View>
+          <ChevronForward size={18} color={colors.textSecondary} />
+        </Pressable>
+      </Card>
+
+      {q.isPending && !q.data ? (
+        <SkeletonListRow count={6} avatarSize={0} trailingWidth={48} height={56} />
+      ) : q.isError && !q.data ? (
+        // A failed FIRST load used to render nothing at all between the header
+        // and the This-device card — no message, no retry. A refetch that fails
+        // after one good load keeps the rows (`q.data` is still there).
+        <View style={styles.errorBox}>
+          <Text style={styles.err}>{t("mobile.push.prefsLoadFailed")}</Text>
+          <Button
+            label={t("app.common.retry")}
+            variant="ghost"
+            loading={q.isRefetching}
+            onPress={() => void q.refetch()}
+          />
+        </View>
+      ) : rows.length === 0 && !saleAlert ? (
+        <EmptyState title={t("mobile.push.prefsEmpty")} />
+      ) : (
+        <>
+        {saleAlert ? (
+          <SaleAlertsCard
+            pref={saleAlert}
+            saving={save.isPending && save.variables?.eventType === saleAlert.eventType}
+            onToggle={(v) => save.mutate({ ...saleAlert, ...saleAlertPreferenceBody(v) })}
+            onNotice={setNotice}
+          />
+        ) : null}
+        {rows.map((p) => {
+          const meta = EVENTS()[p.eventType];
+          const saving = save.isPending && save.variables?.eventType === p.eventType;
+          // Mirror of dispatch.ts: a push goes out only when in-app is on AND
+          // the event is not on the daily digest. The switch shows that
+          // effective state — a stored `push: true` the server will never
+          // act on must not render as ON.
+          const pushBlocked = !p.inApp || p.digestMode === "digest";
+          // In-app off wins the hint (it blocks first); otherwise say digest.
+          const pushHint =
+            p.inApp && pushBlocked
+              ? t("mobile.push.perEventDigestHint")
+              : t("mobile.push.perEventHint");
+          return (
+            <Card key={p.eventType}>
+              <View style={styles.eventHead}>
+                <Text numberOfLines={1} style={styles.eventTitle}>
+                  {meta?.title ?? p.eventType}
+                </Text>
+                {p.isDefault ? <Badge label={t("app.notificationSettings.defaultBadge")} /> : null}
+              </View>
+              <Text style={styles.eventHint}>{meta?.hint}</Text>
+
+              <View style={styles.divider} />
+
+              <ToggleRow
+                label={t("app.notificationSettings.headers.inApp")}
+                value={p.inApp}
+                disabled={saving}
+                onValueChange={(v) => save.mutate({ ...p, inApp: v })}
+              />
+
+              {/* sale.created never pushes (doc 16 §5) — the cha-ching is
+                  the Sale sound alerts card above — so no push switch. */}
+              {p.eventType === "sale.created" ? null : (
+                <ToggleRow
+                  label={t("mobile.push.perEvent")}
+                  hint={pushHint}
+                  value={!pushBlocked && p.push}
+                  disabled={saving || pushBlocked}
+                  onValueChange={(v) => save.mutate({ ...p, push: v })}
+                />
+              )}
+
+              <ToggleRow
+                label={t("app.notificationSettings.headers.email")}
+                value={p.email}
+                disabled={saving}
+                onValueChange={(v) => save.mutate({ ...p, email: v })}
+              />
+
+              <Text style={styles.deliveryLabel}>{t("app.notificationSettings.headers.delivery")}</Text>
+              {/* The web disables the delivery select while email is off —
+                  reproduced with pointerEvents rather than a new prop on
+                  Segmented, which has no disabled state to re-style. */}
+              <View
+                pointerEvents={p.email && !saving ? "auto" : "none"}
+                style={!p.email ? styles.disabled : undefined}
+              >
+                <Segmented
+                  equal
+                  items={DELIVERY()}
+                  value={p.digestMode}
+                  onChange={(v) => save.mutate({ ...p, digestMode: v })}
+                />
+              </View>
+            </Card>
+          );
+        })}
+        </>
+      )}
+
+      <ThisDeviceCard onNotice={setNotice} />
+    </Screen>
+  );
+}
+
+/**
+ * Sale sound alerts (doc 16 §7) — the per-user switch that covers this
+ * user's phones AND open dashboard tabs (OPEN-9). Bound to `push` only.
+ * "Play the sound" posts a LOCAL notification on the `sales` channel, so it
+ * works with no FCM/APNs at all (the emulator check in §13).
+ */
+function SaleAlertsCard({
+  pref,
+  saving,
+  onToggle,
+  onNotice,
+}: {
+  pref: Pref;
+  saving: boolean;
+  onToggle: (v: boolean) => void;
+  onNotice: (n: { tone: "ok" | "err"; text: string } | null) => void;
+}) {
+  const pushStatus = usePush((s) => s.status);
+  const meta = EVENTS()["sale.alert"];
+  const preview = useMutation({
+    mutationFn: async () => {
+      // Android 13+: a local notification needs POST_NOTIFICATIONS too. Ask
+      // here (an explicit tap) when the OS still allows asking.
+      let perm = await Notifications.getPermissionsAsync();
+      if (!perm.granted && perm.canAskAgain) perm = await Notifications.requestPermissionsAsync();
+      if (!perm.granted) throw new Error("denied");
+      await ensureSalesChannel();
+      const req = previewNotificationRequest(Platform.OS, {
+        title: t("app.saleAlerts.previewTitle"),
+        body: t("app.saleAlerts.previewBody"),
+      });
+      await Notifications.scheduleNotificationAsync(req);
+    },
+    onError: () => onNotice({ tone: "err", text: t("app.saleAlerts.previewFailed") }),
+  });
+
+  return (
+    <Card testID="sale-alerts-card">
+      <View style={styles.eventHead}>
+        <Text numberOfLines={1} style={styles.eventTitle}>
+          {meta.title}
+        </Text>
+        {pref.isDefault ? <Badge label={t("app.notificationSettings.defaultBadge")} /> : null}
+      </View>
+      <Text style={styles.eventHint}>{meta.hint}</Text>
+
+      <View style={styles.divider} />
+
+      <ToggleRow
+        testID="sale-alerts-switch"
+        label={t("app.saleAlerts.switch")}
+        hint={t("app.saleAlerts.webHint")}
+        value={pref.push}
+        disabled={saving}
+        onValueChange={onToggle}
+      />
+      {pushStatus === "denied" ? (
+        <Text style={[styles.eventHint, styles.deviceError]}>{t("mobile.push.deniedHint")}</Text>
+      ) : null}
+
+      <View style={styles.deviceActions}>
+        <Button
+          testID="sale-alerts-preview"
+          label={t("app.saleAlerts.preview")}
+          variant="outline"
+          loading={preview.isPending}
+          onPress={() => preview.mutate()}
+        />
+      </View>
+    </Card>
+  );
+}
+
+/** Badge variant + copy for each push status (src/stores/push.ts). */
+const PUSH_STATUS = (): Record<
+  PushStatus,
+  { label: string; hint: string | null; variant: "success" | "lowstock" | "outofstock" | "neutral" }
+> => ({
+  idle: { label: t("mobile.push.status.idle"), hint: null, variant: "neutral" },
+  granted: { label: t("mobile.push.status.granted"), hint: null, variant: "success" },
+  denied: { label: t("mobile.push.status.denied"), hint: t("mobile.push.deniedHint"), variant: "outofstock" },
+  unsupported: {
+    label: t("mobile.push.status.unsupported"),
+    hint: t("mobile.push.unsupportedHint"),
+    variant: "neutral",
+  },
+  noProjectId: {
+    label: t("mobile.push.status.noProjectId"),
+    hint: t("mobile.push.noProjectIdDetail"),
+    variant: "lowstock",
+  },
+  error: { label: t("mobile.push.status.error"), hint: null, variant: "outofstock" },
+});
+
+/**
+ * "This device" — the one card the web cannot have. Reads what
+ * <PushRegistrar/> recorded in the push store and offers the two fixes a user
+ * can actually apply: the OS settings page when permission was denied, and a
+ * server-side test push once a token is registered.
+ */
+function ThisDeviceCard({
+  onNotice,
+}: {
+  onNotice: (n: { tone: "ok" | "err"; text: string } | null) => void;
+}) {
+  const push = usePush();
+  const meta = PUSH_STATUS()[push.status];
+
+  // HTTP 200 is not delivery: the route answers 200 with `sent: 0` when every
+  // Expo ticket failed, and `disabled > 0` means it pruned a token — ours, if
+  // our ticket errored — so MMKV must forget it or postToken() short-circuits
+  // on "already registered" forever and this device silently never re-POSTs.
+  const test = useMutation({
+    // `kind: "sale"` (doc 16 §8.11): a sample sale alert on channel `sales`
+    // with cha_ching — the real-device check for R1.
+    mutationFn: (kind: "sale" | undefined) =>
+      notifications.sendTestPush(api, kind ? { kind } : undefined),
+    onSuccess: (r) => {
+      const mine = r.tickets.find((tk) => tk.to === push.token) ?? r.tickets[0];
+      const pruned = r.disabled > 0 && (!mine || mine.status === "error");
+      if (pruned) {
+        forgetRegistration();
+        push.retry(); // re-mint + re-POST now, not on the next foreground
+      }
+      if (r.sent > 0) {
+        onNotice({ tone: "ok", text: t("mobile.push.testSent") });
+        return;
+      }
+      const error = mine?.error ?? r.tickets.find((tk) => tk.error)?.error ?? r.status;
+      onNotice({
+        tone: "err",
+        text: pruned
+          ? `${t("mobile.push.testFailedDetail", { error })} ${t("mobile.push.testReregistering")}`
+          : t("mobile.push.testFailedDetail", { error }),
+      });
+    },
+    onError: () => onNotice({ tone: "err", text: t("mobile.push.testFailed") }),
+  });
+
+  const canTest = push.status === "granted" && push.registered;
+  const canRetry =
+    push.status === "error" || (push.status === "granted" && !push.registered);
+
+  return (
+    <Card>
+      <View style={styles.eventHead}>
+        <Text numberOfLines={1} style={styles.eventTitle}>
+          {t("mobile.push.thisDevice")}
+        </Text>
+        <Badge label={meta.label} variant={meta.variant} />
+      </View>
+      <Text style={styles.eventHint}>{t("mobile.push.intro")}</Text>
+
+      <View style={styles.divider} />
+
+      <View style={styles.toggleRow}>
+        <Text numberOfLines={1} style={styles.toggleLabel}>
+          {t("mobile.push.status.label")}
+        </Text>
+        <Text numberOfLines={1} style={styles.deviceValue}>
+          {meta.label}
+        </Text>
+      </View>
+      {push.status === "granted" ? (
+        <View style={styles.toggleRow}>
+          <Text numberOfLines={1} style={styles.toggleLabel}>
+            {t("mobile.push.registration")}
+          </Text>
+          <Text numberOfLines={1} style={styles.deviceValue}>
+            {push.registered ? t("mobile.push.registered") : t("mobile.push.notRegistered")}
+          </Text>
+        </View>
+      ) : null}
+      {meta.hint ? <Text style={styles.eventHint}>{meta.hint}</Text> : null}
+      {push.error && (push.status === "error" || !push.registered) ? (
+        <Text style={[styles.eventHint, styles.deviceError]} numberOfLines={3}>
+          {push.error}
+        </Text>
+      ) : null}
+
+      <View style={styles.deviceActions}>
+        {push.status === "denied" ? (
+          <Button
+            label={t("mobile.push.openSettings")}
+            variant="outline"
+            onPress={() => {
+              Linking.openSettings().catch(() => {
+                onNotice({ tone: "err", text: t("mobile.push.openSettingsFailed") });
+              });
+            }}
+          />
+        ) : null}
+        {canRetry ? (
+          <Button
+            label={t("mobile.push.retry")}
+            variant="outline"
+            onPress={() => push.retry()}
+          />
+        ) : null}
+        {canTest ? (
+          <Button
+            label={t("mobile.push.sendTest")}
+            loading={test.isPending && test.variables !== "sale"}
+            disabled={test.isPending}
+            onPress={() => test.mutate(undefined)}
+          />
+        ) : null}
+        {canTest ? (
+          <Button
+            testID="sale-alerts-test-push"
+            label={t("mobile.push.sendTestSale")}
+            variant="outline"
+            loading={test.isPending && test.variables === "sale"}
+            disabled={test.isPending}
+            onPress={() => test.mutate("sale")}
+          />
+        ) : null}
+      </View>
+    </Card>
+  );
+}
+
+const styles = StyleSheet.create({
+  notice: {
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    overflow: "hidden",
+    ...RTL_TEXT,
+  },
+  noticeOk: { backgroundColor: colors.successLight, color: colors.successStrong },
+  noticeErr: { backgroundColor: colors.dangerLight, color: colors.danger },
+
+  eventHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    flexWrap: "wrap",
+  },
+  eventTitle: {
+    fontFamily: fonts.semibold,
+    fontSize: 15,
+    color: colors.text,
+    flexShrink: 1,
+    ...RTL_TEXT,
+  },
+  eventHint: {
+    fontFamily: fonts.regular,
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 4,
+    ...RTL_TEXT,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: spacing.lg,
+  },
+  toggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+    minHeight: MIN_TOUCH,
+  },
+  // Explicit lineHeights: Cairo's natural line box is tall and carries the
+  // glyphs low, so a centred box was not a centred label next to the Switch.
+  toggleLabel: {
+    fontFamily: fonts.medium,
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.text,
+    flexShrink: 1,
+    ...RTL_TEXT,
+  },
+  deliveryLabel: {
+    fontFamily: fonts.medium,
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+    ...RTL_TEXT,
+  },
+  disabled: { opacity: 0.5 },
+
+  errorBox: { alignItems: "center", gap: spacing.sm, paddingVertical: spacing.lg },
+  err: {
+    fontFamily: fonts.medium,
+    fontSize: 14,
+    color: colors.danger,
+    textAlign: "center",
+  },
+
+  deviceValue: {
+    ...RTL_TEXT,
+    fontFamily: fonts.medium,
+    fontSize: 14,
+    color: colors.text,
+    flexShrink: 1,
+  },
+  deviceError: { color: colors.danger },
+  deviceActions: { gap: spacing.sm, marginTop: spacing.md },
+
+  navRow: {
+    minHeight: MIN_TOUCH,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  navRowPressed: {
+    opacity: 0.6,
+  },
+  navBody: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  navTitle: {
+    ...RTL_TEXT,
+    fontFamily: fonts.semibold,
+    fontSize: 15,
+    color: colors.text,
+  },
+  navHint: {
+    ...RTL_TEXT,
+    fontFamily: fonts.regular,
+    fontSize: 12,
+    color: colors.textSecondary,
+    lineHeight: 18,
+  },
+  navDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.border,
+    marginVertical: spacing.xs,
+  },
+});

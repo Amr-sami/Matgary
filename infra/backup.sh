@@ -15,6 +15,15 @@
 # dump path as $1 after the local write succeeds. Wire rclone, aws s3 cp,
 # rsync, or anything else there. Stays out of this script so the script
 # stays simple and the secrets stay in the host.
+#
+# Uploads (product / team photos, receipt logos) are NOT in the dump. They
+# live in the matgary_uploads named volume, which docker-compose.prod.yml
+# mounts into this sidecar read-only at /uploads. The volume already survives
+# rebuilds on its own; this script deliberately does not tar it nightly —
+# binary blobs would crowd the 14-daily / 8-weekly window on a shared VPS.
+# To snapshot it next to a dump, run from the sidecar:
+#   tar -C /uploads -czf "$BACKUP_DIR/uploads-$(date -u +%Y-%m-%dT%H-%M-%SZ).tar.gz" .
+# or do the same inside $BACKUP_REMOTE_HOOK so it ships off-site with the dump.
 
 set -eu
 

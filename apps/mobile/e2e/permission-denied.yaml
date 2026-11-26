@@ -1,0 +1,124 @@
+# CP-08 — A staff account without manage_catalog cannot add a category.
+#
+# Signs out the owner, signs in as the seeded cashier (view_dashboard,
+# view_inventory, view_sales, view_customers, record_sales — nothing else),
+# lands on the staff dashboard, and checks the three faces of the denial:
+#   1. More has no Settings row at all (it needs view_settings);
+#   2. deep-linked straight to Settings → Categories, the screen carries the
+#      read-only banner ("View only — editing … needs the manage catalog
+#      permission");
+#   3. the "New category" (+) control is not rendered.
+# Then signs the owner back in (login.yaml signs out whoever is in, then
+# signs in as the owner), so the app is left on the owner's dashboard.
+#
+# Elements are addressed by testID (categories-*, login-*). Credentials
+# follow login.yaml: the dev build prefills the owner's, so both fields are
+# erased before typing.
+appId: com.thestoro.app
+env:
+  STAFF_ID: "cashier@amr-store"
+  STAFF_PW: "Cashier123!"
+---
+- launchApp
+- runFlow: helpers/dev-launcher.yaml
+- extendedWaitUntil:
+    visible:
+      text: "المزيد|More|تسجيل الدخول|Sign in"
+    timeout: 45000
+
+# Signed in → More → Sign out.
+- runFlow:
+    when:
+      visible:
+        text: "المزيد|More"
+    commands:
+      - runFlow: helpers/dismiss-logbox.yaml
+      - tapOn:
+          text: "المزيد|More"
+          # A tab press right after a cold launch is occasionally dropped
+          # while the shell hydrates; retry when the screen did not change.
+          retryTapIfNoChange: true
+      - scrollUntilVisible:
+          element:
+            text: "تسجيل الخروج|Sign out"
+          direction: DOWN
+          centerElement: true
+          timeout: 20000
+      - tapOn:
+          text: "تسجيل الخروج|Sign out"
+- extendedWaitUntil:
+    visible:
+      id: "login-identifier"
+    timeout: 30000
+
+# Locale left in English by a previous run → the toggle reads "العربية".
+- runFlow:
+    when:
+      visible:
+        text: "العربية"
+    commands:
+      - tapOn:
+          text: "العربية"
+      - extendedWaitUntil:
+          visible:
+            text: "تصفح المتجر التجريبي"
+          timeout: 15000
+
+# Sign in as the cashier.
+- tapOn:
+    id: "login-identifier"
+- eraseText: 80
+- inputText: ${STAFF_ID}
+- tapOn:
+    id: "login-password"
+- eraseText: 80
+- inputText: ${STAFF_PW}
+- pressKey: Enter
+- extendedWaitUntil:
+    visible:
+      text: "أهلاً، .+"
+    timeout: 45000
+# The staff greeting line, not the owner's.
+- assertVisible:
+    text: "يسعدنا وجودك معنا اليوم"
+- assertNotVisible:
+    text: "نتمنى لك يوم عمل موفق"
+
+# 1. More: no Settings row (needs view_settings). The staff list is short;
+#    scroll to its last row (Sign out) so the whole list has been on screen.
+- runFlow: helpers/dismiss-logbox.yaml
+- tapOn:
+    text: "المزيد"
+- scrollUntilVisible:
+    element:
+      text: "تسجيل الخروج"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertNotVisible:
+    text: "الإعدادات"
+
+# 2 + 3. Straight to Settings → Categories by deep link: the read-only banner
+#        is up and the add control is not rendered.
+- openLink: matgary://settings/categories
+- extendedWaitUntil:
+    visible:
+      id: "categories-readonly"
+    timeout: 30000
+- assertVisible:
+    text: "الأقسام"
+- assertVisible:
+    id: "categories-readonly"
+    text: "(?s)عرض فقط.*إدارة الأقسام والبراندات.*"
+- assertNotVisible:
+    id: "categories-add"
+- assertNotVisible:
+    text: "قسم جديد"
+
+# Back to the owner: login.yaml signs the cashier out and the owner in, and
+# ends on the owner's Arabic dashboard.
+- runFlow: login.yaml
+- assertVisible:
+    text: "أهلاً، متجر عمرو"
+- assertVisible:
+    text: "نتمنى لك يوم عمل موفق"

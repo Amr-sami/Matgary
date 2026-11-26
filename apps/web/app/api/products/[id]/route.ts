@@ -1,0 +1,88 @@
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { requirePermissionAudited } from "@/lib/api/auth-helpers";
+import { deleteProduct, updateProduct } from "@/lib/repo/catalog";
+import { logActivity } from "@/lib/repo/activity";
+
+const patchSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  brand: z.string().max(80).nullable().optional(),
+  quantity: z.number().int().min(0).optional(),
+  price: z.number().min(0).optional(),
+  costPrice: z.number().min(0).nullable().optional(),
+  lowStockThreshold: z.number().int().min(0).optional(),
+  sku: z.string().max(80).nullable().optional(),
+  tags: z.array(z.string().max(40)).optional(),
+  supplier: z.string().max(120).nullable().optional(),
+  supplierId: z.string().uuid().nullable().optional(),
+  location: z.string().max(120).nullable().optional(),
+  categoryId: z.string().uuid().optional(),
+  /** Relative URL minted by POST /api/uploads/product-image; null clears. */
+  imageUrl: z.string().max(500).regex(/^\/api\/uploads\/product-image\/[A-Za-z0-9\-]+\/products\/[A-Za-z0-9\-]+\.(jpg|png|webp)$/).nullable().optional(),
+});
+
+// C20 — a non-uuid id made Postgres refuse the `id = $2` cast → 500, and an
+// unknown uuid was a silent `200 {ok:true}` (plus a phantom product.update /
+// product.delete activity row). The uuid gate answers the first without a
+// query; updateProduct / deleteProduct already select the row they touch and
+// report whether it existed, so the second is a 404 with no extra lookup.
+const idSchema = z.string().uuid();
+const notFound = () => NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  // Same gate as POST /api/products (manage_inventory), audit-mode until
+  // PERMISSION_ENFORCE_WRITES=1. The route has no branch context, so use the
+  // branch-less audited helper.
+  const r = await requirePermissionAudited("manage_inventory");
+  if (!r.ok) return r.response;
+  const { id } = await params;
+  if (!idSchema.safeParse(id).success) return notFound();
+  const body = await req.json().catch(() => null);
+  const parsed = patchSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+  }
+  if (
+    parsed.data.imageUrl &&
+    !parsed.data.imageUrl.startsWith(`/api/uploads/product-image/${r.ctx.tenantId}/products/`)
+  ) {
+    // Shape is checked by zod; the tenant segment must be the caller's own.
+    return NextResponse.json({ error: "رابط الصورة غير صالح" }, { status: 400 });
+  }
+  if (!(await updateProduct(r.ctx.tenantId, id, parsed.data))) return notFound();
+  logActivity({
+    tenantId: r.ctx.tenantId,
+    actorUserId: r.ctx.userId,
+    action: "product.update",
+    category: "product",
+    entityType: "product",
+    entityId: id,
+    entityLabel: parsed.data.name ?? null,
+    metadata: { changed: Object.keys(parsed.data) },
+  });
+  return NextResponse.json({ ok: true });
+}
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  // Same gate as PATCH above and POST /api/products (doc 14 §3.1 C5).
+  const r = await requirePermissionAudited("manage_inventory");
+  if (!r.ok) return r.response;
+  const { id } = await params;
+  if (!idSchema.safeParse(id).success) return notFound();
+  if (!(await deleteProduct(r.ctx.tenantId, id))) return notFound();
+  logActivity({
+    tenantId: r.ctx.tenantId,
+    actorUserId: r.ctx.userId,
+    action: "product.delete",
+    category: "product",
+    entityType: "product",
+    entityId: id,
+  });
+  return NextResponse.json({ ok: true });
+}

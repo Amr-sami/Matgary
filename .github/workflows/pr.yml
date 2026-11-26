@@ -38,7 +38,7 @@ jobs:
         run: npm ci
 
       - name: Typecheck
-        run: npx tsc --noEmit
+        run: npx tsc --noEmit --project apps/web/tsconfig.json
 
       # Lint surfaces the pre-existing 194-error backlog while we work
       # through it. Marked non-blocking until that backlog is empty (tracked
@@ -46,7 +46,7 @@ jobs:
       # remain the gating signals.
       - name: Lint (informational, not gating)
         continue-on-error: true
-        run: npm run lint
+        run: npm run lint --workspace @matgary/web
 
       - name: Unit tests (cache + ratelimit + pure repo math)
-        run: npx vitest run tests/cache.test.ts tests/ratelimit.test.ts tests/repo/
+        run: npm test --workspace @matgary/web -- tests/cache.test.ts tests/ratelimit.test.ts tests/repo/

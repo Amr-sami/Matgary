@@ -1,0 +1,62 @@
+# Notifications — the header bell → the centre → "Mark all read" → the bell's
+# unread badge is gone.
+#
+# The bell is a header accessory whose accessibility label carries the count:
+# "الإشعارات، N غير مقروء" / "Notifications, N unread" while anything is
+# unread and the bare "الإشعارات" / "Notifications" once nothing is. The
+# mark-all control (testID notifications-mark-all) only renders while unread
+# > 0, so the flow accepts an inbox that is already fully read.
+# Signs in first when the app is on the login screen. Ends on the dashboard.
+appId: com.thestoro.app
+---
+- launchApp
+- runFlow: helpers/dev-launcher.yaml
+- extendedWaitUntil:
+    visible:
+      text: "المزيد|More|تسجيل الدخول|Sign in"
+    timeout: 45000
+- runFlow:
+    when:
+      visible:
+        id: "login-identifier"
+    file: login.yaml
+- runFlow: helpers/dismiss-logbox.yaml
+
+# Bell (dashboard header) → notification centre.
+- extendedWaitUntil:
+    visible:
+      text: "الإشعارات، \\d+ غير مقروء|Notifications, \\d+ unread|الإشعارات|Notifications"
+    timeout: 30000
+- tapOn:
+    text: "الإشعارات، \\d+ غير مقروء|Notifications, \\d+ unread|الإشعارات|Notifications"
+- extendedWaitUntil:
+    visible:
+      text: "كل ما يحدث في متجرك، أولاً بأول|Everything happening in your store, as it happens|\\d+ غير مقروءة|\\d+ unread"
+    timeout: 30000
+
+# Mark all read when there is anything to mark.
+- runFlow:
+    when:
+      visible:
+        id: "notifications-mark-all"
+    commands:
+      - tapOn:
+          id: "notifications-mark-all"
+      - extendedWaitUntil:
+          notVisible:
+            id: "notifications-mark-all"
+          timeout: 20000
+- assertNotVisible:
+    text: "\\d+ غير مقروءة|\\d+ unread"
+
+# Back → the bell no longer announces an unread count.
+- tapOn:
+    text: "رجوع|Back"
+- extendedWaitUntil:
+    visible:
+      text: "أهلاً، .+|Welcome back, .+"
+    timeout: 30000
+- assertNotVisible:
+    text: "الإشعارات، \\d+ غير مقروء|Notifications, \\d+ unread"
+- assertVisible:
+    text: "الإشعارات|Notifications"

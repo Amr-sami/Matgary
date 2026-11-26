@@ -1,0 +1,292 @@
+# Collections — a wallet sale rung OFFLINE keeps its ring time (doc 15 spec 15
+# §4.5.2; spec 08 acceptance 7).
+#
+# Setup by API (fixture accounts, random payer). Warm the POS caches online,
+# including the receiving-accounts query (snapshot root `collection-accounts`,
+# 03 §B.10), by tapping the wallet chip once. Then flip the DEV-ONLY "Simulate
+# offline" switch (offline-sale.yaml), ring a wallet sale on E2E VF with the
+# payer hint, and check:
+#   1. the result card says queued (not synced) AND awaiting confirmation;
+#   2. /sync names the method and the account (08 §4.6 `syncLineAccount`);
+#   3. after 65 s offline the queue drains, and the server's `rungAt` is the
+#      ring time (±30 s), not the drain time (≥ 60 s later).
+#
+# The "Edit restores the cart" check needs a FAILED queued item; Maestro
+# cannot stop :3003, so it stays with 08's unit round trip and 08 step 23's
+# manual check. Leaves the switch OFF and ends on Sync.
+#
+# Step 7 relies on `optional: true` on extendedWaitUntil (UNVERIFIED on
+# Maestro 2.10.0). If a run shows the wait did not happen (the command fails
+# the flow, or returns at once), drop step 7 and set MIN_GAP_S to "0" in
+# step 9; record which in the spec 15 §5 step 7 proof.
+appId: com.thestoro.app
+---
+# 1. Setup, launch, login guard.
+- runScript:
+    file: helpers/collections-api.js
+    env:
+      MODE: setup
+- launchApp
+- runFlow: helpers/dev-launcher.yaml
+- extendedWaitUntil:
+    visible:
+      text: "المزيد|More|تسجيل الدخول|Sign in"
+    timeout: 45000
+- runFlow:
+    when:
+      visible:
+        id: "login-identifier"
+    file: login.yaml
+
+# 2. Warm the caches online: POS, a product, the wallet chip once (the
+#    accounts query lands in the cache), then back to cash.
+- runFlow: helpers/dismiss-logbox.yaml
+- tapOn:
+    text: "المبيعات|Sales"
+- extendedWaitUntil:
+    visible:
+      id: "pos-recent-chip"
+    timeout: 30000
+- tapOn:
+    id: "pos-recent-chip"
+    index: 0
+- runFlow:
+    when:
+      notVisible:
+        id: "pos-cart-totals"
+    commands:
+      - tapOn:
+          id: "pos-recent-chip"
+          index: 1
+- runFlow:
+    when:
+      notVisible:
+        id: "pos-cart-totals"
+    commands:
+      - tapOn:
+          id: "pos-recent-chip"
+          index: 2
+- runFlow:
+    when:
+      notVisible:
+        id: "pos-cart-totals"
+    commands:
+      - tapOn:
+          id: "pos-recent-chip"
+          index: 3
+- scrollUntilVisible:
+    element:
+      id: "pos-pay-wallet"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: "pos-pay-wallet"
+- scrollUntilVisible:
+    element:
+      id: "pos-collection-account-${output.vfId}"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: "pos-pay-cash"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: "pos-pay-cash"
+
+# 3. Simulate offline (offline-sale.yaml:35-61).
+- runFlow: helpers/dismiss-logbox.yaml
+- openLink: matgary://sync
+- extendedWaitUntil:
+    visible:
+      id: "sync-now"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "sync-simulate-offline"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: "sync-simulate-offline"
+- scrollUntilVisible:
+    element:
+      id: "sync-now"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    text: "لا يوجد اتصال بالإنترنت.*|No internet connection.*"
+
+# 4. Ring a wallet sale offline: the account list comes from the cache (the
+#    row is there with no network), payer hint, mark the ring time, record.
+#    The cart kept the product from step 2; the fall-through only adds one
+#    when it is empty.
+- tapOn:
+    text: "المبيعات|Sales"
+- extendedWaitUntil:
+    visible:
+      id: "pos-recent-chip|pos-cart-totals"
+    timeout: 30000
+- runFlow:
+    when:
+      notVisible:
+        id: "pos-cart-totals"
+    commands:
+      - tapOn:
+          id: "pos-recent-chip"
+          index: 0
+- runFlow:
+    when:
+      notVisible:
+        id: "pos-cart-totals"
+    commands:
+      - tapOn:
+          id: "pos-recent-chip"
+          index: 1
+- scrollUntilVisible:
+    element:
+      id: "pos-pay-wallet"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: "pos-pay-wallet"
+- scrollUntilVisible:
+    element:
+      id: "pos-collection-account-${output.vfId}"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: "pos-collection-payer"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: "pos-collection-payer"
+- inputText: "${output.payer.charAt(0)}"
+- inputText: "${output.payer.charAt(1)}"
+- inputText: "${output.payer.charAt(2)}"
+- inputText: "${output.payer.charAt(3)}"
+- scrollUntilVisible:
+    element:
+      id: "pos-record"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- runScript:
+    file: helpers/collections-api.js
+    env:
+      MODE: mark
+- tapOn:
+    id: "pos-record"
+
+# 5. Queued, awaiting confirmation, not synced (swipe pair: pos-sale.yaml:99-110).
+- extendedWaitUntil:
+    visible:
+      text: "بيع جديد|New sale"
+    timeout: 45000
+- swipe:
+    start: "50%, 30%"
+    end: "50%, 85%"
+    duration: 400
+- swipe:
+    start: "50%, 30%"
+    end: "50%, 85%"
+    duration: 400
+- extendedWaitUntil:
+    visible:
+      id: "pos-sale-result"
+    timeout: 10000
+- assertVisible:
+    id: "pos-sync-pending"
+- assertVisible:
+    id: "collection-badge-pending"
+- assertNotVisible:
+    id: "pos-sync-synced"
+
+# 6. /sync: at least one queued, and the queued line names the account.
+- runFlow: helpers/dismiss-logbox.yaml
+- openLink: matgary://sync
+- extendedWaitUntil:
+    visible:
+      id: "sync-stat-queued-value"
+    timeout: 30000
+- assertVisible:
+    id: "sync-stat-queued-value"
+    text: "[1-9][0-9]*"
+- scrollUntilVisible:
+    element:
+      text: "(?s).*E2E VF.*"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+
+# 7. Stay offline 65 s, so the drain time is not the ring time. The id never
+#    exists; `optional` turns the timeout into a warning.
+- extendedWaitUntil:
+    visible:
+      id: "__never__"
+    timeout: 65000
+    optional: true
+
+# 8. Back online and drain (offline-sale.yaml:170-193).
+- scrollUntilVisible:
+    element:
+      id: "sync-simulate-offline"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: "sync-simulate-offline"
+# On iOS the single tap sometimes lands while the scroll is still settling and
+# the switch stays on (T2 iOS run: the banner stayed, 1 queued). Re-tap while
+# the offline banner is still there; the switch itself works (checked by hand).
+- repeat:
+    while:
+      visible:
+        text: "لا يوجد اتصال بالإنترنت.*|No internet connection.*"
+    times: 3
+    commands:
+      - waitForAnimationToEnd
+      - scrollUntilVisible:
+          element:
+            id: "sync-simulate-offline"
+          direction: DOWN
+          centerElement: true
+          timeout: 10000
+      - tapOn:
+          id: "sync-simulate-offline"
+      - waitForAnimationToEnd
+- scrollUntilVisible:
+    element:
+      id: "sync-now"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: "sync-now"
+- extendedWaitUntil:
+    visible:
+      id: "sync-stat-queued-value"
+      text: "0"
+    timeout: 60000
+- assertVisible:
+    id: "sync-stat-queued-value"
+    text: "0"
+
+# 9. The server row carries the RING time: within 30 s of the mark, and at
+#    least 60 s before now (the drain happened > 65 s later).
+- runScript:
+    file: helpers/collections-api.js
+    env:
+      MODE: expect
+      CHECK: rungAt
+      PAYER: "${output.payer}"
+      RING_AT: "${output.ringAt}"
+      MIN_GAP_S: "60"

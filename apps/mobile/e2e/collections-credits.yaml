@@ -1,0 +1,220 @@
+# Collections (M2) — the credits tab: paste → held → one-tap match (doc 15
+# spec 15 §4.5.6; spec 08 §4.11, steps 24–25; 15 acceptance 13).
+#
+# Needs :3003 with COLLECTIONS_INGEST_ENABLED=on (setup NEED=ingest refuses
+# otherwise) and spec 08's M2 screens (README §3 order 21: credits tab,
+# CreditRow, paste sheet, `collections/credit/[id]`).
+#
+# Setup by API: a wallet sale of EGP 2700 on E2E VF (VF-1's amount), so the
+# credit and the sale agree. The helper's `vf1Text` is VF-1's filled text with
+# this run's 12-digit reference and Cairo "now", so a second run is never a
+# `duplicate` of the first run's credit and falls inside the match window.
+#
+# The paste (step 4) — which path, written down per 15 §5 step 18:
+#   Maestro 2.10.0 HAS `setClipboard` (maestro-orchestra.jar
+#   SetClipboardCommand / YamlSetClipboard{text}), but `pasteText` replays
+#   that text through `Maestro.inputText` (Orchestra.pasteText → inputText,
+#   read from the 2.10.0 bytecode): it is not a system-clipboard paste. So:
+#   - iOS: the UI paste — account `credits-paste-account-<vfId>` (above the
+#     text since T1 I5), setClipboard + pasteText into `credits-paste-text`,
+#     a header tap to put the keys away, `credits-paste-submit`.
+#     VERIFIED on the iPhone 17 Pro simulator (T1 iOS, 2026-10-19): the
+#     Arabic multi-line VF-1 text lands in the field line by line
+#     (screenshot in audit/t1/ios/rerun/) and the server parses it. The
+#     keyboard must go down before a control below the text is tapped (I3).
+#   - Android: Maestro's inputText cannot type non-ASCII on Android, so the
+#     helper posts the same text through POST /api/collections/credits/paste
+#     with accountId BEFORE launch (15 §4.5.6 step 4's fallback); the UI paste
+#     stays with iOS and the real-Chrome walkthrough (12's PasteDialog).
+#
+# Then, both platforms: the held credit (`manual_source`, a paste never
+# auto-confirms) shows as `credit-row-<id>`; its screen offers the sale's
+# collection as `credit-match-<collectionId>`; one tap confirms it (the owner
+# is exempt from four-eyes). Ends on the owner's dashboard.
+appId: com.thestoro.app
+---
+# 1. Setup (ingest) and the wallet sale of VF-1's amount.
+- runScript:
+    file: helpers/collections-api.js
+    env:
+      MODE: setup
+      NEED: ingest
+- runScript:
+    file: helpers/collections-api.js
+    env:
+      MODE: sale
+      METHOD: wallet
+      ACCOUNT: vf
+      PRICE: "2700"
+      KEY: c
+# 1b. Android: the paste by API (see the header), before launch so the
+#     credits tab's first load already lists it.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - runScript:
+          file: helpers/collections-api.js
+          env:
+            MODE: paste
+            ACCOUNT: vf
+
+# 2. Launch, login guard.
+- launchApp
+- runFlow: helpers/dev-launcher.yaml
+- extendedWaitUntil:
+    visible:
+      text: "المزيد|More|تسجيل الدخول|Sign in"
+    timeout: 45000
+- runFlow:
+    when:
+      visible:
+        id: "login-identifier"
+    file: login.yaml
+
+# 3. The credits tab by deep link (08 §4.11 route params).
+- runFlow: helpers/dismiss-logbox.yaml
+- openLink: "matgary://collections?tab=credits"
+- extendedWaitUntil:
+    visible:
+      id: "credits-paste"
+    timeout: 30000
+
+# 4. iOS: paste VF-1 on the wallet account through the sheet.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: "credits-paste"
+      - extendedWaitUntil:
+          visible:
+            id: "credits-paste-text"
+          timeout: 10000
+      # The account picker sits ABOVE the text (T1 I5): pick the account
+      # first, while no keyboard is up, as a person would top to bottom.
+      - scrollUntilVisible:
+          element:
+            id: "credits-paste-account-${output.vfId}"
+          direction: DOWN
+          centerElement: true
+          timeout: 20000
+      - tapOn:
+          id: "credits-paste-account-${output.vfId}"
+      - tapOn:
+          id: "credits-paste-text"
+      - setClipboard: "${output.vf1Text}"
+      - pasteText
+      # Keys down before the submit button is looked for: Maestro on the
+      # iOS simulator does not count the keyboard when it decides an element
+      # is visible (T1 iOS I1-I4). A tap on the sheet HEADER now puts the
+      # keyboard away (T1 I5) - the step proves it. The pasted Arabic text
+      # arrives intact (server parsed amount, payer, reference 788247566405).
+      - tapOn:
+          id: "credits-paste-sheet-header"
+      - waitForAnimationToEnd:
+          timeout: 2000
+      - assertVisible:
+          id: "credits-paste-account-${output.vfId}"
+      - scrollUntilVisible:
+          element:
+            id: "credits-paste-submit"
+          direction: DOWN
+          centerElement: true
+          timeout: 20000
+      - tapOn:
+          id: "credits-paste-submit"
+      - extendedWaitUntil:
+          notVisible:
+            id: "credits-paste-submit"
+          timeout: 20000
+
+# 5. Held with manual_source, on the server and in the list.
+- runScript:
+    file: helpers/collections-api.js
+    env:
+      MODE: expect
+      CHECK: creditByRef
+      REF: "${output.ref12}"
+      ACCOUNT: vf
+# The list is newest first, so the pasted credit is normally the TOP row.
+# Wait for it there; scroll only when it is not on screen. No centring: a
+# centring swipe on the first row pushed it under the status bar, and the
+# tap then missed (T3 Android, step 38: still on the list).
+- extendedWaitUntil:
+    visible:
+      id: "credit-row-${output.cCredit}"
+    timeout: 15000
+    optional: true
+- runFlow:
+    when:
+      notVisible:
+        id: "credit-row-${output.cCredit}"
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: "credit-row-${output.cCredit}"
+          direction: DOWN
+          timeout: 30000
+
+# 6. One-tap match: the credit screen lists the sale's collection.
+#    The row tap can land while the centring scroll is still moving and miss
+#    (T2 Android: still on the list afterwards), so settle first and re-tap
+#    until the credit screen (credit-detail) is up.
+- waitForAnimationToEnd
+- tapOn:
+    id: "credit-row-${output.cCredit}"
+- repeat:
+    while:
+      notVisible:
+        id: "credit-detail"
+    times: 3
+    commands:
+      - waitForAnimationToEnd
+      - scrollUntilVisible:
+          element:
+            id: "credit-row-${output.cCredit}"
+          direction: UP
+          timeout: 10000
+      - waitForAnimationToEnd
+      - tapOn:
+          id: "credit-row-${output.cCredit}"
+- extendedWaitUntil:
+    visible:
+      id: "credit-detail"
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: "credit-match-${output.cColl}"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- tapOn:
+    id: "credit-match-${output.cColl}"
+- extendedWaitUntil:
+    notVisible:
+      id: "credit-match-${output.cColl}"
+    timeout: 30000
+
+# 7. Confirmed on the server; the credit names that collection.
+- runScript:
+    file: helpers/collections-api.js
+    env:
+      MODE: expect
+      CHECK: status
+      ID: "${output.cColl}"
+      STATUS: confirmed
+- runScript:
+    file: helpers/collections-api.js
+    env:
+      MODE: expect
+      CHECK: creditMatched
+      ID: "${output.cCredit}"
+      COLL: "${output.cColl}"
+
+# 8. Back to the dashboard.
+- runFlow: helpers/dismiss-logbox.yaml
+- tapOn:
+    text: "الرئيسية|Home"
+- assertVisible:
+    text: "أهلاً، .+|Welcome back, .+"

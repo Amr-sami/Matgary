@@ -73,23 +73,23 @@ jobs:
           psql -h localhost -U matgary -d matgary_test -v ON_ERROR_STOP=1 -f infra/init-postgres.sql
 
       - name: Typecheck
-        run: npx tsc --noEmit
+        run: npx tsc --noEmit --project apps/web/tsconfig.json
 
       # Lint surfaces the pre-existing 194-error backlog while we work
       # through it. Marked non-blocking until that backlog is empty
       # (tracked in task.md §4 "Cleanup pre-existing lint errors").
       - name: Lint (informational, not gating)
         continue-on-error: true
-        run: npm run lint
+        run: npm run lint --workspace @matgary/web
 
       - name: Run migrations
-        run: npm run db:migrate
+        run: npm run db:migrate --workspace @matgary/web
 
       - name: Full vitest (cache + ratelimit + isolation)
-        run: npx vitest run
+        run: npm test --workspace @matgary/web
 
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
 
       - name: E2E smoke test (production build, port 3100)
-        run: npm run test:e2e
+        run: npm run test:e2e --workspace @matgary/web
